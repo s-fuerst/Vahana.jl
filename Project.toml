@@ -1,6 +1,6 @@
 name = "Vahana"
 uuid = "e9033725-1633-496a-b29a-3bc5a5543602"
-authors = ["sfuerst <fuerst@zib.de> and contributors"]
+authors = ["Steffen Fürst <fuerst@zib.de> and contributors"]
 version = "0.1.0"
 
 [compat]
