@@ -1,8 +1,12 @@
 module Vahana
 
-using Tables
+# using Tables
 
+include("Types.jl")
+
+include("Agent.jl")
 
 include("Simulation.jl")
-# Write your package code here.
+
+
 end
