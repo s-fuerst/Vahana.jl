@@ -6,6 +6,8 @@ include("Types.jl")
 
 include("Agent.jl")
 
+include("Edge.jl")
+
 include("Simulation.jl")
 
 
