@@ -2,30 +2,42 @@ export Simulation
 export add_agenttype!, add_edgetype!
 export add_agents!, add_edge!
 export finish_init!
-# Ist Abstractvector wirklich die sinnvolle Basisklasse
-# Ich verlange ja vor allem, dass das Table-Interface unterstützt wird.
 
 const MAX_STEPS = 2 
+const MAX_TYPES = typemax(T_TypeNumber)
 
-#TODO: umbauen
-Base.@kwdef struct IDFactory
-    id_counter = Dict{DataType, T_AgentNr}()
+Base.@kwdef struct TypeIDs
     type2number = Dict{DataType, T_TypeNumber}()
+    id_counter = Vector{T_AgentNr}(undef, typemax(T_TypeNumber))
     number2type = Vector{DataType}(undef, typemax(T_TypeNumber))
 end
 
+function add_type!(ids::TypeIDs, T::DataType)
+    type_number = reduce(max, values(ids.type2number); init = 0) + 1
+    @assert type_number < typemax(T_TypeNumber) "Can not add new type, maximal number of types already registered"
+    push!(ids.type2number, T => type_number)
+    ids.id_counter[type_number] = 0
+    ids.number2type[type_number] = T
+    type_number
+end
 
 
-Base.@kwdef mutable struct Simulation15
+Base.@kwdef mutable struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
     # Any will be something like Vahala_Agent_Collection
-    agents = fill(Dict{DataType, Any}(), MAX_STEPS)
-    edges = fill(Dict{DataType, Any}(), MAX_STEPS)
-    id_counter = Dict{DataType, T_AgentNr}()
-    type2number = Dict{DataType, T_TypeNumber}()
-    number2type = Vector{DataType}(undef, typemax(T_TypeNumber))
-    current = 1
+    # agents is a matrix with typemax(T_Typenumber) as first index
+    # and MAX_STEPS as second index
+    # The Values are the Dict{T_AgentID, Agent}
+    # where Dict will be something like Vahala_Agent_Collection
+    agents = Array{Dict{T_AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
+    # The Values are the Dict{T_AgentID, Vector{Edges}}
+    edges = Array{Dict{T_AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
+    agent_type_ids::TypeIDs = TypeIDs()
+    edge_type_ids::TypeIDs = TypeIDs()
+    read = fill(1, MAX_TYPES)
+    write = fill(1, MAX_TYPES)
+    
     next = 1
 end
 
@@ -33,9 +45,10 @@ end
 # an inner constructor
 function Simulation(name::String,
              params::Union{Tuple, NamedTuple})
-    sim = Simulation15(name = name,
-                       params = params)
-    push!(sim.edges[sim.next], StatelessEdge => Vector{StatelessEdge})
+    sim = Simulation(name = name,
+                     params = params)
+    # TODO StatelessEdges
+    # push!(sim.edges[sim.next], StatelessEdge => Vector{StatelessEdge})
     
     #    add_edgetype!(sim, StatelessEdge(::UInt64, ::UInt64))
     sim
@@ -46,36 +59,40 @@ end
 # TODO: add data structure for type
 function add_agenttype!(sim, ::Type{T}) where {T} #where { T <: Agent }
     # TODO: check isbitstype incl. ignore optional
-    # TODO: check that field _id exists and has the correct type
     # TODO: was ist mit privaten Daten
-    type_number = reduce(max, values(sim.type2number); init = 0) + 1
-    # TODO: assert type_number ist klein genug
- #   push!(sim.agents_t, T => Dict{T_AgentID, T}())
-    push!(sim.agents[sim.next], T => Dict{T_AgentID, T}())
-    push!(sim.id_counter, T => 0)
-    push!(sim.type2number, T => type_number)
-    sim.number2type[type_number] = T
+    type_number = add_type!(sim.agent_type_ids, T)
+
+    foreach(i -> sim.agents[type_number, i] = Dict{T_AgentID, T}(),
+            1:MAX_STEPS)
+    #    push!(sim.agents[sim.next], T => Dict{T_AgentID, T}())
     type_number
 end
 
+
 function add_edgetype!(sim, ::Type{T}) where { T } 
-#    push!(sim.edges_t, T => Vector{T})
-    push!(sim.edges[sim.next],
-          T => Dict{T_AgentID,  Vector{Edge{T}}}())
+    type_number = add_type!(sim.edge_type_ids, T)
+
+    foreach(i -> sim.edges[type_number, i] = Dict{T_AgentID, Vector{Edge{T}}},
+            1:MAX_STEPS)
+    type_number
+#     push!(sim.edges[sim.next],
+#           T => Dict{T_AgentID,  Vector{Edge{T}}}())
 end
 
-function add_agents!(sim::Simulation15, agent::T) where { T <: Agent }
-    id = agentId(sim.type2number[T], sim.id_counter[T])
-    sim.id_counter[T] = sim.id_counter[T] + 1
-    sim.agents[sim.next][T][id] = agent
+function add_agents!(sim::Simulation, agent::T) where { T <: Agent }
+    ids = sim.agent_type_ids
+    nr = ids.type2number[T]
+    id = agentId(nr, ids.id_counter[nr])
+    ids.id_counter[nr] = ids.id_counter[nr] + 1
+    sim.agents[nr, sim.write[nr]][id] = agent
     id
 end
 
-function add_agents!(sim::Simulation15, agents)
+function add_agents!(sim::Simulation, agents)
     [ add_agents!(sim, a) for a in agents ]
 end
 
-function add_agents!(sim::Simulation15, agents...)
+function add_agents!(sim::Simulation, agents...)
     [ add_agents!(sim, a) for a in agents ]
 end
 
