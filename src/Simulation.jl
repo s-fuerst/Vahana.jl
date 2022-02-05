@@ -4,17 +4,21 @@ export add_agents!, add_edge!
 export finish_init!
 
 const MAX_STEPS = 2 
-const MAX_TYPES = typemax(T_TypeNumber)
+const MAX_TYPES = typemax(TypeID)
+
+abstract type AgentContainer end
+
+
 
 Base.@kwdef struct TypeIDs
-    type2number = Dict{DataType, T_TypeNumber}()
-    id_counter = Vector{T_AgentNr}(undef, typemax(T_TypeNumber))
-    number2type = Vector{DataType}(undef, typemax(T_TypeNumber))
+    type2number = Dict{DataType, TypeID}()
+    id_counter = Vector{AgentNr}(undef, typemax(TypeID))
+    number2type = Vector{DataType}(undef, typemax(TypeID))
 end
 
 function add_type!(ids::TypeIDs, T::DataType)
     type_number = reduce(max, values(ids.type2number); init = 0) + 1
-    @assert type_number < typemax(T_TypeNumber) "Can not add new type, maximal number of types already registered"
+    @assert type_number < typemax(TypeID) "Can not add new type, maximal number of types already registered"
     push!(ids.type2number, T => type_number)
     ids.id_counter[type_number] = 0
     ids.number2type[type_number] = T
@@ -26,13 +30,13 @@ Base.@kwdef mutable struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
     # Any will be something like Vahala_Agent_Collection
-    # agents is a matrix with typemax(T_Typenumber) as first index
+    # agents is a matrix with typemax(Typenumber) as first index
     # and MAX_STEPS as second index
-    # The Values are the Dict{T_AgentID, Agent}
+    # The Values are the Dict{AgentID, Agent}
     # where Dict will be something like Vahala_Agent_Collection
-    agents = Array{Dict{T_AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
-    # The Values are the Dict{T_AgentID, Vector{Edges}}
-    edges = Array{Dict{T_AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
+    agents = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
+    # The Values are the Dict{AgentID, Vector{Edges}}
+    edges = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
     agent_type_ids::TypeIDs = TypeIDs()
     edge_type_ids::TypeIDs = TypeIDs()
     read = fill(1, MAX_TYPES)
@@ -62,9 +66,9 @@ function add_agenttype!(sim, ::Type{T}) where {T} #where { T <: Agent }
     # TODO: was ist mit privaten Daten
     type_number = add_type!(sim.agent_type_ids, T)
 
-    foreach(i -> sim.agents[type_number, i] = Dict{T_AgentID, T}(),
+    foreach(i -> sim.agents[type_number, i] = Dict{AgentID, T}(),
             1:MAX_STEPS)
-    #    push!(sim.agents[sim.next], T => Dict{T_AgentID, T}())
+    #    push!(sim.agents[sim.next], T => Dict{AgentID, T}())
     type_number
 end
 
@@ -72,11 +76,11 @@ end
 function add_edgetype!(sim, ::Type{T}) where { T } 
     type_number = add_type!(sim.edge_type_ids, T)
 
-    foreach(i -> sim.edges[type_number, i] = Dict{T_AgentID, Vector{Edge{T}}},
+    foreach(i -> sim.edges[type_number, i] = Dict{AgentID, Vector{Edge{T}}},
             1:MAX_STEPS)
     type_number
 #     push!(sim.edges[sim.next],
-#           T => Dict{T_AgentID,  Vector{Edge{T}}}())
+#           T => Dict{AgentID,  Vector{Edge{T}}}())
 end
 
 function add_agents!(sim::Simulation, agent::T) where { T <: Agent }
@@ -104,7 +108,7 @@ function add_edge!(sim, edge::Edge{T}) where { T }
     push!(dict, edge)
 end
 
-function add_edge!(sim, from::T_AgentID, to::T_AgentID, state::T) where { T }
+function add_edge!(sim, from::AgentID, to::AgentID, state::T) where { T }
     add_edge!(sim, Edge(from, to, state))
 end
 
