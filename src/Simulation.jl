@@ -8,7 +8,7 @@ const MAX_TYPES = typemax(TypeID)
 
 abstract type AgentContainer end
 
-
+######################################## TypeIDs
 
 Base.@kwdef struct TypeIDs
     type2number = Dict{DataType, TypeID}()
@@ -25,6 +25,13 @@ function add_type!(ids::TypeIDs, T::DataType)
     type_number
 end
 
+function new_agent_id!(ids::TypeIDs, type_nr::TypeID)::AgentID
+    current = ids.id_counter[type_nr]
+    ids.id_counter[type_nr] = ids.id_counter[type_nr] + 1
+    current
+end
+
+######################################## Simulation
 
 Base.@kwdef mutable struct Simulation
     name::String
@@ -86,8 +93,7 @@ end
 function add_agents!(sim::Simulation, agent::T) where { T <: Agent }
     ids = sim.agent_type_ids
     nr = ids.type2number[T]
-    id = agentId(nr, ids.id_counter[nr])
-    ids.id_counter[nr] = ids.id_counter[nr] + 1
+    id = new_agent_id!(ids, nr)
     sim.agents[nr, sim.write[nr]][id] = agent
     id
 end
