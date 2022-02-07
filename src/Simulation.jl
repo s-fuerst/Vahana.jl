@@ -1,12 +1,13 @@
 export Simulation
 export add_agenttype!, add_edgetype!
+export agenttypeid
 export add_agents!, add_edge!
 export finish_init!
 
-const MAX_STEPS = 2 
-const MAX_TYPES = typemax(TypeID)
+export BufferedAgentDict
 
-abstract type AgentContainer end
+const NUM_BUFFERS = 2 
+const MAX_TYPES = typemax(TypeID)
 
 ######################################## TypeIDs
 
@@ -28,28 +29,61 @@ end
 function new_agent_id!(ids::TypeIDs, type_nr::TypeID)::AgentID
     current = ids.id_counter[type_nr]
     ids.id_counter[type_nr] = ids.id_counter[type_nr] + 1
-    current
+    agent_id(type_nr, current)
 end
 
 ######################################## Simulation
 
+abstract type AgentContainer{T} end
+# AgentContainer interface:
+# setindex!
+# getindex
+# length
+
+function setindex!(::AgentContainer{T}, _, _) where {T}
+    @assert false "setIndex! is not defined for this AgentCointainer type"
+end
+
+function getindex(::AgentContainer{T}, _) where {T}
+    @assert false "getIndex is not defined for this AgentCointainer type"
+end
+
+# TODO: Disable all constructures beside ()
+Base.@kwdef struct BufferedAgentDict{T} <: AgentContainer{T}
+    containers = [ Dict{AgentID, T}() for i = 1:NUM_BUFFERS ]
+    read = 1
+    write = 1
+end
+
+function Base.setindex!(coll::BufferedAgentDict{T}, value::T, key::AgentID) where { T }
+    Base.setindex!(coll.containers[coll.write], value, key)
+end
+
+function Base.getindex(coll::BufferedAgentDict{T}, key::AgentID) where { T }
+    Base.getindex(coll.containers[coll.read], key)
+end
+
+function Base.iterate(coll::BufferedAgentDict{T}) where { T }
+    Base.iterate(coll.containers[coll.read])
+end
+
+function Base.iterate(coll::BufferedAgentDict{T}, state) where { T }
+    Base.iterate(coll.containers[coll.read], state)
+end
+
+function Base.length(coll::BufferedAgentDict{T}) where { T }
+    Base.length(coll.containers[coll.read])
+end
+    
+    
 Base.@kwdef mutable struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
-    # Any will be something like Vahala_Agent_Collection
-    # agents is a matrix with typemax(Typenumber) as first index
-    # and MAX_STEPS as second index
-    # The Values are the Dict{AgentID, Agent}
-    # where Dict will be something like Vahala_Agent_Collection
-    agents = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
+    agents = Vector{AgentContainer}(undef, MAX_TYPES)
     # The Values are the Dict{AgentID, Vector{Edges}}
-    edges = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, MAX_STEPS)
-    agent_type_ids::TypeIDs = TypeIDs()
-    edge_type_ids::TypeIDs = TypeIDs()
-    read = fill(1, MAX_TYPES)
-    write = fill(1, MAX_TYPES)
-    
-    next = 1
+    edges = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, NUM_BUFFERS)
+    agent_type_ids = TypeIDs()
+    edge_type_ids = TypeIDs()
 end
 
 # TOOD: when simulation structure is fixed, maybe make this
@@ -65,6 +99,8 @@ function Simulation(name::String,
     sim
 end
 
+agenttypeid(sim, type::DataType) = sim.agent_type_ids.type2number[type]
+
 # TODO: when simulation structure is fixed, add type annotations to sim
 # and return value
 # TODO: add data structure for type
@@ -73,9 +109,7 @@ function add_agenttype!(sim, ::Type{T}) where {T} #where { T <: Agent }
     # TODO: was ist mit privaten Daten
     type_number = add_type!(sim.agent_type_ids, T)
 
-    foreach(i -> sim.agents[type_number, i] = Dict{AgentID, T}(),
-            1:MAX_STEPS)
-    #    push!(sim.agents[sim.next], T => Dict{AgentID, T}())
+    sim.agents[type_number] = BufferedAgentDict{T}()
     type_number
 end
 
@@ -84,7 +118,7 @@ function add_edgetype!(sim, ::Type{T}) where { T }
     type_number = add_type!(sim.edge_type_ids, T)
 
     foreach(i -> sim.edges[type_number, i] = Dict{AgentID, Vector{Edge{T}}},
-            1:MAX_STEPS)
+            1:NUM_BUFFERS)
     type_number
 #     push!(sim.edges[sim.next],
 #           T => Dict{AgentID,  Vector{Edge{T}}}())
@@ -94,7 +128,7 @@ function add_agents!(sim::Simulation, agent::T) where { T <: Agent }
     ids = sim.agent_type_ids
     nr = ids.type2number[T]
     id = new_agent_id!(ids, nr)
-    sim.agents[nr, sim.write[nr]][id] = agent
+    sim.agents[nr][id] = agent
     id
 end
 
@@ -119,19 +153,4 @@ function add_edge!(sim, from::AgentID, to::AgentID, state::T) where { T }
 end
 
 function finish_init!(sim)
-    sim.next = 2
-    # sim.agents_t = sim.agents_tp1
-    for (k, v) in sim.agents[sim.current]
-        sim.agents[sim.next][k] = typeof(v)()
-    end
-
-    for (k, v) in sim.edges[sim.current]
-        sim.edges[sim.next][k] = typeof(v)()
-    end
-
-
-    # sim.edges_t = sim.edges_tp1
-    # for (k, v) in sim.edges_tp1
-    #     sim.edges_tp1[k] = typeof(v)()
-    # end
 end 

@@ -18,11 +18,14 @@ function createPersons(sim)
     [ Person(11), Person(12) ]
 end
 
-function getAgents(sim, T::DataType)
-    typenr = sim.agent_type_ids.type2number[T]
-    sim.agents[typenr, sim.write[typenr]]
+function getAgent(sim, id::AgentID)
+    sim.agents[type_nr(id)][id]
 end
 
+function numAgents(sim, type::DataType)
+    length(sim.agents[agenttypeid(sim, type)])
+end
+ 
 @testset "Initialization" begin
     sim = Simulation("Example", ())
 
@@ -33,7 +36,7 @@ end
     h2 = HH(2)
 
     add_agenttype!(sim, Person)
-    @test length(getAgents(sim, Person)) == 0
+    @test numAgents(sim, Person) == 0
     @test sim.agent_type_ids.type2number[Person] == 1
     @test sim.agent_type_ids.number2type[1] == Person
 
@@ -42,16 +45,15 @@ end
     @test sim.agent_type_ids.number2type[2] == HH
 
     p1id = add_agents!(sim, p1)
-    dpersons = getAgents(sim, Person)
-    @test length(dpersons) == 1
-    @test dpersons[p1id] == p1
+    @test numAgents(sim, Person) == 1
+    @test getAgent(sim, p1id) == p1
 
     ids = add_agents!(sim, p1, p2)
     p2id = ids[2]
-    @test length(dpersons) == 3
-    @test dpersons[p2id] == p2
+    @test numAgents(sim, Person) == 3
+    @test getAgent(sim, p2id) == p2
 
-    ids = add_agents!(sim, [[p1, p2], h1])
+    # ids = add_agents!(sim, [[p1, p2], h1])
     # @test length(sim.agents[sim.next][Person]) == 5
     # @test length(sim.agents[sim.next][HH]) == 1
     # @test sim.agents[1][Person][ids[1][1]] == p1
