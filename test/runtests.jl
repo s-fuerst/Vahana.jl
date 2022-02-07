@@ -23,7 +23,7 @@ function getAgent(sim, id::AgentID)
 end
 
 function numAgents(sim, type::DataType)
-    length(sim.agents[agenttypeid(sim, type)])
+    length(sim.agents[agent_typeid(sim, type)])
 end
  
 @testset "Initialization" begin
@@ -37,12 +37,10 @@ end
 
     add_agenttype!(sim, Person)
     @test numAgents(sim, Person) == 0
-    @test sim.agent_type_ids.type2number[Person] == 1
-    @test sim.agent_type_ids.number2type[1] == Person
+    @test sim.agent_typeids[Person] == 1
 
     add_agenttype!(sim, HH)
-    @test sim.agent_type_ids.type2number[HH] == 2
-    @test sim.agent_type_ids.number2type[2] == HH
+    @test sim.agent_typeids[HH] == 2
 
     p1id = add_agents!(sim, p1)
     @test numAgents(sim, Person) == 1

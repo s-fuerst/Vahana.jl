@@ -1,89 +1,21 @@
 export Simulation
 export add_agenttype!, add_edgetype!
-export agenttypeid
 export add_agents!, add_edge!
+export agent_typeid
 export finish_init!
-
-export BufferedAgentDict
 
 const NUM_BUFFERS = 2 
 const MAX_TYPES = typemax(TypeID)
 
-######################################## TypeIDs
-
-Base.@kwdef struct TypeIDs
-    type2number = Dict{DataType, TypeID}()
-    id_counter = Vector{AgentNr}(undef, typemax(TypeID))
-    number2type = Vector{DataType}(undef, typemax(TypeID))
-end
-
-function add_type!(ids::TypeIDs, T::DataType)
-    type_number = reduce(max, values(ids.type2number); init = 0) + 1
-    @assert type_number < typemax(TypeID) "Can not add new type, maximal number of types already registered"
-    push!(ids.type2number, T => type_number)
-    ids.id_counter[type_number] = 0
-    ids.number2type[type_number] = T
-    type_number
-end
-
-function new_agent_id!(ids::TypeIDs, type_nr::TypeID)::AgentID
-    current = ids.id_counter[type_nr]
-    ids.id_counter[type_nr] = ids.id_counter[type_nr] + 1
-    agent_id(type_nr, current)
-end
-
-######################################## Simulation
-
-abstract type AgentContainer{T} end
-# AgentContainer interface:
-# setindex!
-# getindex
-# length
-
-function setindex!(::AgentContainer{T}, _, _) where {T}
-    @assert false "setIndex! is not defined for this AgentCointainer type"
-end
-
-function getindex(::AgentContainer{T}, _) where {T}
-    @assert false "getIndex is not defined for this AgentCointainer type"
-end
-
-# TODO: Disable all constructures beside ()
-Base.@kwdef struct BufferedAgentDict{T} <: AgentContainer{T}
-    containers = [ Dict{AgentID, T}() for i = 1:NUM_BUFFERS ]
-    read = 1
-    write = 1
-end
-
-function Base.setindex!(coll::BufferedAgentDict{T}, value::T, key::AgentID) where { T }
-    Base.setindex!(coll.containers[coll.write], value, key)
-end
-
-function Base.getindex(coll::BufferedAgentDict{T}, key::AgentID) where { T }
-    Base.getindex(coll.containers[coll.read], key)
-end
-
-function Base.iterate(coll::BufferedAgentDict{T}) where { T }
-    Base.iterate(coll.containers[coll.read])
-end
-
-function Base.iterate(coll::BufferedAgentDict{T}, state) where { T }
-    Base.iterate(coll.containers[coll.read], state)
-end
-
-function Base.length(coll::BufferedAgentDict{T}) where { T }
-    Base.length(coll.containers[coll.read])
-end
-    
     
 Base.@kwdef mutable struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
-    agents = Vector{AgentContainer}(undef, MAX_TYPES)
+    agents = Vector{AgentCollection}(undef, MAX_TYPES)
+    agent_typeids = Dict{DataType, TypeID}()
     # The Values are the Dict{AgentID, Vector{Edges}}
     edges = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, NUM_BUFFERS)
-    agent_type_ids = TypeIDs()
-    edge_type_ids = TypeIDs()
+    edge_typeids = Dict{DataType, TypeID}()
 end
 
 # TOOD: when simulation structure is fixed, maybe make this
@@ -99,15 +31,40 @@ function Simulation(name::String,
     sim
 end
 
-agenttypeid(sim, type::DataType) = sim.agent_type_ids.type2number[type]
+
+function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
+    printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :blue)
+    println(io, "Parameters: ", sim.params)
+    printstyled(io, length(sim.agent_typeids), " Agent Type(s):";
+                color = :cyan)
+    for (k, v) in sim.agent_typeids
+        print(io, "\n\t", k, " (ID: ", agent_typeid(sim, k), ")",
+              " with ", length(sim.agents[v]), " Agent(s)")
+    end
+    # println(io, "Edges:")
+    # for (k, v) in sim.edge_typeids
+    #     println(io, "\t", k, " with ", length(sim.agents[v]), " Agent(s)")
+    # end
+end
+
+function add_type!(ids::Dict{DataType, TypeID}, T::DataType)
+    type_number = length(ids) + 1
+    @assert type_number < typemax(TypeID) "Can not add new type, 
+                                maximal number of types already registered"
+    push!(ids, T => type_number)
+    type_number
+end
+
+
+agent_typeid(sim, type::DataType) = sim.agent_typeids[type]
 
 # TODO: when simulation structure is fixed, add type annotations to sim
 # and return value
 # TODO: add data structure for type
-function add_agenttype!(sim, ::Type{T}) where {T} #where { T <: Agent }
+function add_agenttype!(sim, ::Type{T}) where { T <: Agent } 
     # TODO: check isbitstype incl. ignore optional
-    # TODO: was ist mit privaten Daten
-    type_number = add_type!(sim.agent_type_ids, T)
+    # TODO: check that the same type is not added twice
+    type_number = add_type!(sim.agent_typeids, T)
 
     sim.agents[type_number] = BufferedAgentDict{T}()
     type_number
@@ -115,7 +72,7 @@ end
 
 
 function add_edgetype!(sim, ::Type{T}) where { T } 
-    type_number = add_type!(sim.edge_type_ids, T)
+    type_number = add_type!(sim.edge_typeids, T)
 
     foreach(i -> sim.edges[type_number, i] = Dict{AgentID, Vector{Edge{T}}},
             1:NUM_BUFFERS)
@@ -124,10 +81,15 @@ function add_edgetype!(sim, ::Type{T}) where { T }
 #           T => Dict{AgentID,  Vector{Edge{T}}}())
 end
 
-function add_agents!(sim::Simulation, agent::T) where { T <: Agent }
-    ids = sim.agent_type_ids
-    nr = ids.type2number[T]
-    id = new_agent_id!(ids, nr)
+function new_agent_id!(sim, id::TypeID)
+    c = sim.agents[id]
+    c.id_counter = c.id_counter + 1
+    agent_id(id, c.id_counter)
+end
+
+function add_agents!(sim::Simulation, agent::T) where { T <: Agent } 
+    nr = sim.agent_typeids[T]
+    id = new_agent_id!(sim, nr)
     sim.agents[nr][id] = agent
     id
 end

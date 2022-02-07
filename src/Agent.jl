@@ -55,5 +55,20 @@ function type_nr(id::AgentID)::TypeID
     id >> (BITS_PROCESS + BITS_AGENTNR)
 end
 
+function process_nr(id::AgentID)::ProcessID
+    (id >> (BITS_AGENTNR)) & (2 ^ BITS_PROCESS - 1)
+end
+
+function agent_nr(id::AgentID)::AgentNr
+    id & (2 ^ BITS_AGENTNR - 1)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", id::AgentID)
+    print(io,
+          "Type: ", type_nr(id),
+          " Process: ", process_nr(id),
+          " AgentNr: ", agent_nr(id))
+end 
+
 @assert agent_id(3, 1) |> type_nr == 3
     
