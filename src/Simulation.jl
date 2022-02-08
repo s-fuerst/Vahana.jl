@@ -2,49 +2,68 @@ export Simulation
 export add_agenttype!, add_edgetype!
 export add_agents!, add_edge!
 export agent_typeid
+export get_edges
 export finish_init!
 
 const NUM_BUFFERS = 2 
 const MAX_TYPES = typemax(TypeID)
 
-    
+
 Base.@kwdef mutable struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
+
     agents = Vector{AgentCollection}(undef, MAX_TYPES)
     agent_typeids = Dict{DataType, TypeID}()
-    # The Values are the Dict{AgentID, Vector{Edges}}
-    edges = Array{Dict{AgentID, Any}}(undef, MAX_TYPES, NUM_BUFFERS)
+
+    edges = Array{EdgeCollection}(undef, MAX_TYPES)
     edge_typeids = Dict{DataType, TypeID}()
 end
 
-# TOOD: when simulation structure is fixed, maybe make this
-# an inner constructor
 function Simulation(name::String,
              params::Union{Tuple, NamedTuple})
     sim = Simulation(name = name,
                      params = params)
-    # TODO StatelessEdges
-    # push!(sim.edges[sim.next], StatelessEdge => Vector{StatelessEdge})
-    
-    #    add_edgetype!(sim, StatelessEdge(::UInt64, ::UInt64))
+    add_edgetype!(sim, StatelessEdge)
     sim
 end
 
 
+
 function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
+    function show_types(io::IO, typeids, coll, name)
+        function num_elements(coll::Vector{AgentCollection}, tnr)
+            length(coll[tnr])
+        end
+        
+        function num_elements(coll::Vector{EdgeCollection}, tnr)
+            if length(coll[tnr]) > 0
+                [ length(v) for (_, v) in coll[tnr] ] |> sum
+            else 
+                0
+            end
+        end
+        
+        len = length(typeids)
+        if len == 1 
+            printstyled(io, "$name Type: "; color = :cyan)
+            (k, v) = first(typeids)
+            print(io, "$k (ID: $(typeids[k])) \
+                       with $(num_elements(coll, v)) $(name)(s)\n")
+        elseif len > 1 
+            printstyled(io, "$name Types:"; color = :cyan)
+            for (k, v) in typeids
+                print(io, "\n\t $k (ID: $(typeids[k])) \
+                           with $(num_elements(coll, v)) $(name)(s)")
+            end
+            println()
+        end
+    end
+    
     printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :blue)
     println(io, "Parameters: ", sim.params)
-    printstyled(io, length(sim.agent_typeids), " Agent Type(s):";
-                color = :cyan)
-    for (k, v) in sim.agent_typeids
-        print(io, "\n\t", k, " (ID: ", agent_typeid(sim, k), ")",
-              " with ", length(sim.agents[v]), " Agent(s)")
-    end
-    # println(io, "Edges:")
-    # for (k, v) in sim.edge_typeids
-    #     println(io, "\t", k, " with ", length(sim.agents[v]), " Agent(s)")
-    # end
+    show_types(io, sim.agent_typeids, sim.agents, "Agent")
+    show_types(io, sim.edge_typeids, sim.edges, "Edge")
 end
 
 function add_type!(ids::Dict{DataType, TypeID}, T::DataType)
@@ -71,14 +90,13 @@ function add_agenttype!(sim, ::Type{T}) where { T <: Agent }
 end
 
 
-function add_edgetype!(sim, ::Type{T}) where { T } 
+function add_edgetype!(sim, ::Type{T}) where { T <: AbstractEdge } 
     type_number = add_type!(sim.edge_typeids, T)
 
-    foreach(i -> sim.edges[type_number, i] = Dict{AgentID, Vector{Edge{T}}},
-            1:NUM_BUFFERS)
+    sim.edges[type_number] = BufferedEdgeDict{T}()
     type_number
-#     push!(sim.edges[sim.next],
-#           T => Dict{AgentID,  Vector{Edge{T}}}())
+    #     push!(sim.edges[sim.next],
+    #           T => Dict{AgentID,  Vector{Edge{T}}}())
 end
 
 function new_agent_id!(sim, id::TypeID)
@@ -105,13 +123,21 @@ end
 add_agents!(f::Function) = sim -> add_agents!(sim, f(sim))
 
 
-function add_edge!(sim, edge::Edge{T}) where { T }
-    dict = get!(sim.edges[sim.next][T], edge.to, Vector{Edge{T}}())
+function add_edge!(sim, edge::T) where { T <: AbstractEdge }
+    dict = sim.edges[sim.edge_typeids[T]]
     push!(dict, edge)
 end
 
 function add_edge!(sim, from::AgentID, to::AgentID, state::T) where { T }
     add_edge!(sim, Edge(from, to, state))
+end
+
+function get_edges(sim, typeid::TypeID, agent::AgentID)
+    sim.edges[typeid][agent]
+end
+
+function get_edges(sim, ::Type{T}, agent::AgentID) where { T <: AbstractEdge }
+    get_edges(sim, sim.edge_typeids[T], agent)
 end
 
 function finish_init!(sim)

@@ -63,12 +63,5 @@ function agent_nr(id::AgentID)::AgentNr
     id & (2 ^ BITS_AGENTNR - 1)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", id::AgentID)
-    print(io,
-          "Type: ", type_nr(id),
-          " Process: ", process_nr(id),
-          " AgentNr: ", agent_nr(id))
-end 
-
 @assert agent_id(3, 1) |> type_nr == 3
     
