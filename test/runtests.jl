@@ -1,11 +1,11 @@
 using Vahana
 using Test
 
-struct Person <: Agent
+struct Person <: AbstractAgent
     foo::Int64
 end
 
-struct HH <: Agent
+struct HH <: AbstractAgent
     bar::Int64
 end
 
@@ -22,8 +22,8 @@ function getAgent(sim, id::AgentID)
     sim.agents[type_nr(id)][id]
 end
 
-function numAgents(sim, type::DataType)
-    length(sim.agents[agent_typeid(sim, type)])
+function numAgents(sim, ::Type{T}) where { T <: AbstractAgent }
+    sim.agents[typeid(sim, T)] |> length
 end
  
 @testset "Initialization" begin
@@ -72,6 +72,9 @@ end
     @test length(get_edges(sim, slet, h2id)) == 1
     
     @test length(get_edges(sim, StatelessEdge, h2id)) == 1
+
+ #   for i in sim.agents
+        
  end
 
 

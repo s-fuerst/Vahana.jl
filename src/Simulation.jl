@@ -1,23 +1,21 @@
 export Simulation
 export add_agenttype!, add_edgetype!
 export add_agents!, add_edge!
-export agent_typeid
+export typeid
 export get_edges
 export finish_init!
 
-const NUM_BUFFERS = 2 
 const MAX_TYPES = typemax(TypeID)
 
-
-Base.@kwdef mutable struct Simulation
+Base.@kwdef struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
 
-    agents = Vector{AgentCollection}(undef, MAX_TYPES)
-    agent_typeids = Dict{DataType, TypeID}()
+    agents::Vector{AgentCollection} = Vector{AgentCollection}(undef, MAX_TYPES)
+    agent_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
 
-    edges = Array{EdgeCollection}(undef, MAX_TYPES)
-    edge_typeids = Dict{DataType, TypeID}()
+    edges::Array{EdgeCollection} = Array{EdgeCollection}(undef, MAX_TYPES)
+    edge_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
 end
 
 function Simulation(name::String,
@@ -28,42 +26,17 @@ function Simulation(name::String,
     sim
 end
 
+function finish_init!(sim)
+end 
 
+######################################## Types
 
-function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
-    function show_types(io::IO, typeids, coll, name)
-        function num_elements(coll::Vector{AgentCollection}, tnr)
-            length(coll[tnr])
-        end
-        
-        function num_elements(coll::Vector{EdgeCollection}, tnr)
-            if length(coll[tnr]) > 0
-                [ length(v) for (_, v) in coll[tnr] ] |> sum
-            else 
-                0
-            end
-        end
-        
-        len = length(typeids)
-        if len == 1 
-            printstyled(io, "$name Type: "; color = :cyan)
-            (k, v) = first(typeids)
-            print(io, "$k (ID: $(typeids[k])) \
-                       with $(num_elements(coll, v)) $(name)(s)\n")
-        elseif len > 1 
-            printstyled(io, "$name Types:"; color = :cyan)
-            for (k, v) in typeids
-                print(io, "\n\t $k (ID: $(typeids[k])) \
-                           with $(num_elements(coll, v)) $(name)(s)")
-            end
-            println()
-        end
-    end
-    
-    printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :blue)
-    println(io, "Parameters: ", sim.params)
-    show_types(io, sim.agent_typeids, sim.agents, "Agent")
-    show_types(io, sim.edge_typeids, sim.edges, "Edge")
+function typeid(sim, ::Type{T})::TypeID where { T <: AbstractAgent }
+    sim.agent_typeids[T]
+end
+
+function typeid(sim, ::Type{T})::TypeID where { T <: AbstractEdge }
+    sim.edge_typeids[T]
 end
 
 function add_type!(ids::Dict{DataType, TypeID}, T::DataType)
@@ -74,13 +47,10 @@ function add_type!(ids::Dict{DataType, TypeID}, T::DataType)
     type_number
 end
 
-
-agent_typeid(sim, type::DataType) = sim.agent_typeids[type]
-
 # TODO: when simulation structure is fixed, add type annotations to sim
 # and return value
 # TODO: add data structure for type
-function add_agenttype!(sim, ::Type{T}) where { T <: Agent } 
+function add_agenttype!(sim, ::Type{T}) where { T <: AbstractAgent } 
     # TODO: check isbitstype incl. ignore optional
     # TODO: check that the same type is not added twice
     type_number = add_type!(sim.agent_typeids, T)
@@ -99,13 +69,16 @@ function add_edgetype!(sim, ::Type{T}) where { T <: AbstractEdge }
     #           T => Dict{AgentID,  Vector{Edge{T}}}())
 end
 
+######################################## Agents
+
 function new_agent_id!(sim, id::TypeID)
     c = sim.agents[id]
     c.id_counter = c.id_counter + 1
     agent_id(id, c.id_counter)
 end
 
-function add_agents!(sim::Simulation, agent::T) where { T <: Agent } 
+function add_agents!(sim::Simulation, agent::T) where { T <: AbstractAgent }
+    # TODO add a better error message if type is not registered
     nr = sim.agent_typeids[T]
     id = new_agent_id!(sim, nr)
     sim.agents[nr][id] = agent
@@ -122,13 +95,28 @@ end
 
 add_agents!(f::Function) = sim -> add_agents!(sim, f(sim))
 
+function get_agents(sim, typeid::TypeID)
+    coll = sim.agents[typeid]
+    coll.containers[coll.read]
+end
+
+function get_agents(sim, ::Type{T}) where { T <: AbstractAgent }
+    get_agents(sim, typeid(sim, T))
+end
+
+######################################## Edges
 
 function add_edge!(sim, edge::T) where { T <: AbstractEdge }
     dict = sim.edges[sim.edge_typeids[T]]
     push!(dict, edge)
+    nothing
 end
 
-function add_edge!(sim, from::AgentID, to::AgentID, state::T) where { T }
+function add_edge!(sim, from::AgentID, to::AgentID)
+    add_edge!(sim, StatelessEdge(from, to))
+end
+
+function add_edge!(sim, from::AgentID, to::AgentID, state)
     add_edge!(sim, Edge(from, to, state))
 end
 
@@ -137,8 +125,6 @@ function get_edges(sim, typeid::TypeID, agent::AgentID)
 end
 
 function get_edges(sim, ::Type{T}, agent::AgentID) where { T <: AbstractEdge }
-    get_edges(sim, sim.edge_typeids[T], agent)
+    get_edges(sim, typeid(sim, T), agent)
 end
 
-function finish_init!(sim)
-end 

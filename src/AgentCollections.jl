@@ -1,3 +1,5 @@
+include("Collections.jl")
+
 export AgentCollection
 
 export BufferedAgentDict
@@ -31,9 +33,6 @@ Base.@kwdef mutable struct BufferedAgentDict{T} <: AgentCollection{T}
     id_counter::AgentNr = 0
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", bad::BufferedAgentDict{T}) where { T }
-    show_buffered_collection(io, mime, bad)
-end
 
 function Base.setindex!(coll::BufferedAgentDict{T}, value::T, key::AgentID) where { T }
     # TODO: Understand LSP warning

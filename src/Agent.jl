@@ -1,5 +1,5 @@
 export AgentID, AgentNr
-export Agent
+export AbstractAgent
 export agent_id
 export TypeID
 export type_nr
@@ -21,24 +21,12 @@ const AgentID = UInt64
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
     BITS_PROCESS + BITS_AGENTNR 
 
-abstract type Agent end
+abstract type AbstractAgent end
 
 const shift_type = BITS_PROCESS + BITS_AGENTNR
 
-# function createId(sim, type::DataType)::AgentID
-#     rank = 1
-#     id = sim.id_counter[type] 
-#     sim.id_counter[type] = id + 1
-    
-#     AgentID(sim.type2number[type]) << shift_type +
-#         rank << BITS_AGENTNR +
-#         id
-# end
-
 function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
     rank = 1
-    # id = sim.id_counter[type] 
-    # sim.id_counter[type] = id + 1
     
     AgentID(typeID) << shift_type +
         rank << BITS_AGENTNR +
