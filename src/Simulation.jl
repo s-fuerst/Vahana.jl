@@ -4,6 +4,7 @@ export add_agents!, add_edge!
 export typeid
 export finish_init!
 export apply_transition!
+export agent_from
 
 const MAX_TYPES = typemax(TypeID)
 
@@ -117,16 +118,29 @@ end
 
 ######################################## Transition
 
-struct AgentEdges
-    sim::Simulation
-    id::AgentID
-end
+# TODO: Alternative for fn_access_edges, check performance compared to
+# fn_access_edges 
 
-function Base.getindex(ae::AgentEdges, key)
-    get(read_container(ae.sim.edges[key]),
-        ae.id,
-        Vector{statetype(ae.sim.edges[key])}())
-end
+# struct AgentEdges
+#     sim::Simulation
+#     id::AgentID
+# end
+
+# function Base.getindex(ae::AgentEdges, key)
+#     get(read_container(ae.sim.edges[key]),
+#         ae.id,
+#         Vector{statetype(ae.sim.edges[key])}())
+# end
+
+fn_access_edges(sim, id) = edgetype ->
+    get(read_container(sim.edges[edgetype]),
+        id,
+        Vector{statetype(sim.edges[edgetype])}())
+    
+agent_from(sim, edge::AbstractEdge) = sim.agents[type_nr(edge.from)][edge.from]
+
+# agent_from(sim) = edge::AbstractEdge ->
+#     sim.agents[type_nr(edge.from)][edge.from]
 
 
 # func(agent, edges, sim)
@@ -147,7 +161,7 @@ function apply_transition!(sim,
         for (id,state) in coll
             # the coll[id] writes into another container then
             # we use for the iteration
-            coll[id] = func(state, AgentEdges(sim, id), sim)
+            coll[id] = func(state, id, fn_access_edges(sim, id), sim)
         end 
     end
 

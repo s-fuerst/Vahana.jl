@@ -73,4 +73,4 @@ add_agents!(sim, Household())
 finish_init!(sim)
 
 # show(sim)
-apply_transition!(sim, transfoo2, [ Person ])
+#apply_transition!(sim, transfoo2, [ Person ])

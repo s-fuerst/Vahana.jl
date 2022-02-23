@@ -33,12 +33,22 @@ function numAgents(sim, ::Type{T}) where { T <: AbstractAgent }
         length
 end
 
-function transfoo(p::Person, networks, sim)
+function transfoo(p::Person, id, network, sim)
     Person(p.foo + 10)
 end
 
-function transfoo2(p::Person, networks, sim)
-    s = reduce((s,e) -> s = s + e.state.foo, networks[FooEdgeState]; init = 0) 
+function transfoo2(p::Person, id, network, sim)
+    s = reduce((s,e) -> s = s + e.state.foo, network(FooEdgeState); init = 0) 
+    Person(s)
+end
+
+function transfoo3(p::Person, id, network, sim)
+    n = network(FooEdgeState)
+    if length(n) > 0
+        s = agent_from(sim, n[1]).foo
+    else
+        s = -1
+    end
     Person(s)
 end
 
@@ -94,11 +104,16 @@ end
 
     @test get_write_agent(sim, p2id).foo == 12
 
-    apply_transition!(sim, transfoo2, [ Person ]; variant = [ FooEdgeState ])
+    apply_transition!(sim, transfoo2, [ Person ])
 
     @test get_write_agent(sim, p1id).foo == 0
     @test get_write_agent(sim, p2id).foo == 1
-    
+
+    apply_transition!(sim, transfoo3, [ Person ])
+
+    @test get_write_agent(sim, p1id).foo == -1
+    @test get_write_agent(sim, p2id).foo == 0
+
  end
 
 
