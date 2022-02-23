@@ -8,9 +8,7 @@ struct StatelessEdge{T} <: AbstractEdge
     to::AgentID
 end
 
-function statetype(::StatelessEdge{T}) where {T}
-    T
-end
+statetype(::StatelessEdge{T}) where {T} = T
 
 struct Edge{T} <: AbstractEdge
     from::AgentID
@@ -18,18 +16,11 @@ struct Edge{T} <: AbstractEdge
     state::T
 end
 
-function statetype(::Edge{T}) where {T}
-    T
-end
-
-
+statetype(::Edge{T}) where {T} = T
 
 struct CircularEdge{T} <: AbstractEdge
     to::AgentID
     state::T
 end
 
-function statetype(::CircularEdge{T}) where {T}
-    T
-end
-
+statetype(::CircularEdge{T}) where {T} = T

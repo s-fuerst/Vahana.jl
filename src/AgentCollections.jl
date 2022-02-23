@@ -1,5 +1,3 @@
-include("Collections.jl")
-
 export AgentCollection
 
 export BufferedAgentDict
@@ -11,6 +9,9 @@ abstract type AgentCollection{ T } end
 # Base.length
 # Base.iterate
 # finish_init!
+# prepare_write!
+# finish_write!
+
 # show_length for pretty printing
 
 # must have fields:
@@ -18,15 +19,23 @@ abstract type AgentCollection{ T } end
 
 is_agentcollection(coll) = eltype(coll) == AgentCollection
 
-function Base.setindex!(::AgentCollection{T}, _, _) where { T }
-    @assert false "setIndex! is not defined for this AgentCollection type"
-end
-
-function Base.getindex(::AgentCollection{T}, _) where { T }
-    @assert false "getIndex is not defined for this AgentCollection type"
-end
-
 function finish_init!(::AgentCollection)
+end
+
+function Base.getindex(coll::AgentCollection, key::AgentID)
+    Base.getindex(read_container(coll), key)
+end
+
+function Base.iterate(coll::AgentCollection) 
+    Base.iterate(read_container(coll))
+end
+
+function Base.iterate(coll::AgentCollection, state) 
+    Base.iterate(read_container(coll), state)
+end
+
+function Base.length(coll::AgentCollection) 
+    Base.length(read_container(coll))
 end
 
 ################################################## BufferedAgentDict
@@ -34,31 +43,41 @@ end
 # TODO: Disable all constructures beside ()
 Base.@kwdef mutable struct BufferedAgentDict{T} <: AgentCollection{T}
     containers = [ Dict{AgentID, T}() for i = 1:NUM_BUFFERS ]
-    read = 1
+    read = 2
     write = 1
     id_counter::AgentNr = 0
+end
+
+function read_container(coll::BufferedAgentDict{T}) where { T <: AbstractAgent }
+    coll.containers[coll.read]
 end
 
 
 function Base.setindex!(coll::BufferedAgentDict{T}, value::T, key::AgentID) where { T }
     # TODO: Understand LSP warning
+    @mayassert coll.read != coll.write "Can not add agents of type $T. " *
+        "Maybe you must add $T to the list of variant types in apply_transition!"
     Base.setindex!(coll.containers[coll.write], value, key)
 end
 
-function Base.getindex(coll::BufferedAgentDict{T}, key::AgentID) where { T }
-    Base.getindex(coll.containers[coll.read], key)
-end
+# function Base.getindex(coll::BufferedAgentDict{T}, key::AgentID) where { T }
+#     Base.getindex(coll.containers[coll.read], key)
+# end
 
-function Base.iterate(coll::BufferedAgentDict{T}) where { T }
-    Base.iterate(coll.containers[coll.read])
-end
+# function Base.iterate(coll::BufferedAgentDict{T}) where { T }
+#     Base.iterate(coll.containers[coll.read])
+# end
 
-function Base.iterate(coll::BufferedAgentDict{T}, state) where { T }
-    Base.iterate(coll.containers[coll.read], state)
-end
+# function Base.iterate(coll::BufferedAgentDict{T}, state) where { T }
+#     Base.iterate(coll.containers[coll.read], state)
+# end
 
-function Base.length(coll::BufferedAgentDict{T}) where { T }
-    Base.length(coll.containers[coll.read])
+# function Base.length(coll::BufferedAgentDict{T}) where { T }
+#     Base.length(coll.containers[coll.read])
+# end
+
+function finish_init!(coll::BufferedAgentDict{T}) where { T }
+    coll.read = 1
 end
 
 function prepare_write!(coll::BufferedAgentDict{T}) where { T }

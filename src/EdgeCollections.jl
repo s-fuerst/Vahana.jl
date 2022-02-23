@@ -1,14 +1,16 @@
-include("Collections.jl")
-
 export EdgeCollection
 
 export BufferedEdgeDict
 
 abstract type EdgeCollection{ T <: AbstractEdge } end
 # EdgeCollection interface:
-# push!
-# getindex
-# length? 
+# Base.push!
+# Base.getindex
+# Base.length
+# Base.iterate
+# finish_init!
+# prepare_write!
+# finish_write!
 
 # must have fields:
 #   id_counter::EdgeNr
@@ -39,11 +41,14 @@ end
 Base.@kwdef mutable struct BufferedEdgeDict{T} <: EdgeCollection{T}
     containers::Vector{Dict{AgentID, Vector{T}}} =
         [ Dict{AgentID, Vector{T}}() for i = 1:NUM_BUFFERS ]
-    read::Int8 = 1
+    read::Int8 = 2
     write::Int8 = 1
 end
 
 function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where { T <: AbstractEdge }
+    @mayassert coll.read != coll.write "Can not add edges of type " *
+        "$(statetype(edge)). Maybe you must add $(statetype(edge)) " *
+        "to the list of variant types in apply_transition!"
     c = get!(coll.containers[coll.write], edge.to, Vector{T}())
     push!(c, edge)
 end
@@ -68,8 +73,10 @@ end
 #     Base.length(coll.containers[coll.read])
 # end
 
-function statetype(::BufferedEdgeDict{T}) where {T}
-    T
+statetype(::BufferedEdgeDict{T}) where { T } = T
+
+function finish_init!(coll::BufferedEdgeDict{T}) where { T }
+    coll.read = 1
 end
 
 function prepare_write!(coll::BufferedEdgeDict{T}) where { T }
