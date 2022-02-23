@@ -17,30 +17,23 @@ end
 ######################################## Simulation
 
 function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
-    function show_types(io::IO, typeids, coll, name)
-        function num_elements(coll::Vector{AgentCollection}, tnr)
-            length(coll[tnr])
-        end
-        
-        function num_elements(coll::Vector{EdgeCollection}, tnr)
-            if length(coll[tnr]) > 0
-                [ length(v) for (_, v) in coll[tnr] ] |> sum
-            else 
-                0
-            end
-        end
-        
-        len = length(typeids)
-        if len == 1 
-            printstyled(io, "$name Type: "; color = :cyan)
-            (k, v) = first(typeids)
-            print(io, "$k (ID: $(typeids[k])) \
-                       with $(num_elements(coll, v)) $(name)(s)\n")
-        elseif len > 1 
-            printstyled(io, "$name Types:"; color = :cyan)
+    function show_agent_types(io::IO, typeids, coll)
+        if length(typeids) >= 1 
+            printstyled(io, "Agent Type(s):"; color = :cyan)
             for (k, v) in typeids
                 print(io, "\n\t $k (ID: $(typeids[k])) \
-                           with $(num_elements(coll, v)) $(name)(s)")
+                           with $(show_length(coll[v])) Agent(s)")
+            end
+            println()
+        end
+    end
+
+    function show_edge_types(io::IO, edges)
+        if length(edges) >= 1 
+            printstyled(io, "Network Type(s):"; color = :cyan)
+            for (k, v) in edges
+                print(io, "\n\t $k \
+                           with $(show_length(edges[k])) Agent(s)")
             end
             println()
         end
@@ -48,8 +41,8 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
     
     printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :blue)
     println(io, "Parameters: ", sim.params)
-    show_types(io, sim.agent_typeids, sim.agents, "Agent")
-    show_types(io, sim.edge_typeids, sim.edges, "Edge")
+    show_agent_types(io, sim.agent_typeids, sim.agents)
+    show_edge_types(io, sim.edges)
 end
 
 ######################################## Collections
@@ -64,6 +57,10 @@ function show_collection(io, mime, coll)
     if length(coll) > 5
         println("...")
     end
+end
+
+function show_length(coll)
+    string(length(coll))
 end
 
 ######################################## Buffered Collections
@@ -87,3 +84,22 @@ end
 function Base.show(io::IO, mime::MIME"text/plain", bed::BufferedEdgeDict{T}) where { T }
     show_buffered_collection(io, mime, bed)
 end
+
+function show_buffered_length(coll) 
+    cs = coll.containers
+    if coll.read != coll.write
+        "$(length(cs[coll.read]))/$(length(cs[coll.write])) (R/W)"
+    else
+        "$(length(cs[coll.read]))"
+    end
+end
+
+function show_length(coll::BufferedEdgeDict{T}) where { T }
+    show_buffered_length(coll)
+end
+
+function show_length(coll::BufferedAgentDict{T}) where { T }
+    show_buffered_length(coll)
+end
+
+

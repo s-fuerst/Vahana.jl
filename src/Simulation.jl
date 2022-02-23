@@ -2,8 +2,8 @@ export Simulation
 export add_agenttype!, add_edgetype!
 export add_agents!, add_edge!
 export typeid
-export get_edges
 export finish_init!
+export apply_transition!
 
 const MAX_TYPES = typemax(TypeID)
 
@@ -11,22 +11,39 @@ Base.@kwdef struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
 
+    # TODO: rename to agents_coll
     agents::Vector{AgentCollection} = Vector{AgentCollection}(undef, MAX_TYPES)
     agent_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
 
-    edges::Array{EdgeCollection} = Array{EdgeCollection}(undef, MAX_TYPES)
-    edge_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
+    edges::Dict{DataType, EdgeCollection} = Dict{DataType, EdgeCollection}()
 end
 
 function Simulation(name::String,
              params::Union{Tuple, NamedTuple})
-    sim = Simulation(name = name,
-                     params = params)
-    add_edgetype!(sim, StatelessEdge)
-    sim
+    Simulation(name = name, params = params)
 end
 
-function finish_init!(sim)
+function all_agent_colls(sim)
+    # TODO: Check if you could/should use genetors instead of comprehensions
+    # also for the other cases
+    [ sim.agents[i] for i in 1:length(sim.agent_typeids) ]
+end
+
+function some_agent_colls(sim, types)
+    [ sim.agents[v] for (k, v) in sim.agent_typeids if k in types ]
+end
+
+function all_edge_colls(sim)
+    values(sim.edges) |> collect
+end
+
+function some_edge_colls(sim, types)
+    [ v for (k, v) in sim.edges if k in types ]
+end
+
+function finish_init!(sim::Simulation)
+    foreach(finish_init!, all_agent_colls(sim))
+    foreach(finish_init!, all_edge_colls(sim))
 end 
 
 ######################################## Types
@@ -35,54 +52,38 @@ function typeid(sim, ::Type{T})::TypeID where { T <: AbstractAgent }
     sim.agent_typeids[T]
 end
 
-function typeid(sim, ::Type{T})::TypeID where { T <: AbstractEdge }
-    sim.edge_typeids[T]
-end
-
-function add_type!(ids::Dict{DataType, TypeID}, T::DataType)
-    type_number = length(ids) + 1
-    @assert type_number < typemax(TypeID) "Can not add new type, 
-                                maximal number of types already registered"
-    push!(ids, T => type_number)
-    type_number
-end
-
 # TODO: when simulation structure is fixed, add type annotations to sim
 # and return value
 # TODO: add data structure for type
 function add_agenttype!(sim, ::Type{T}) where { T <: AbstractAgent } 
     # TODO: check isbitstype incl. ignore optional
     # TODO: check that the same type is not added twice
-    type_number = add_type!(sim.agent_typeids, T)
+    ids =sim.agent_typeids
 
+    type_number = length(ids) + 1
+    @assert type_number < typemax(TypeID) "Can not add new type, 
+                                maximal number of types already registered"
+    push!(ids, T => type_number)
+    
     sim.agents[type_number] = BufferedAgentDict{T}()
     type_number
 end
 
-
-function add_edgetype!(sim, ::Type{T}) where { T <: AbstractEdge } 
-    type_number = add_type!(sim.edge_typeids, T)
-
-    sim.edges[type_number] = BufferedEdgeDict{T}()
-    type_number
-    #     push!(sim.edges[sim.next],
-    #           T => Dict{AgentID,  Vector{Edge{T}}}())
+function add_edgetype!(sim, ET::Type{T}, DT::DataType) where { T <: AbstractEdge } 
+    push!(sim.edges, DT => BufferedEdgeDict{ET{DT}}())
 end
 
 ######################################## Agents
 
-function new_agent_id!(sim, id::TypeID)
-    c = sim.agents[id]
-    c.id_counter = c.id_counter + 1
-    agent_id(id, c.id_counter)
-end
 
 function add_agents!(sim::Simulation, agent::T) where { T <: AbstractAgent }
     # TODO add a better error message if type is not registered
-    nr = sim.agent_typeids[T]
-    id = new_agent_id!(sim, nr)
-    sim.agents[nr][id] = agent
-    id
+    typeid = sim.agent_typeids[T]
+    coll = sim.agents[typeid]
+    coll.id_counter = coll.id_counter + 1
+    agentid = agent_id(typeid, coll.id_counter)
+    sim.agents[typeid][agentid] = agent
+    agentid
 end
 
 function add_agents!(sim::Simulation, agents)
@@ -95,20 +96,10 @@ end
 
 add_agents!(f::Function) = sim -> add_agents!(sim, f(sim))
 
-function get_agents(sim, typeid::TypeID)
-    coll = sim.agents[typeid]
-    coll.containers[coll.read]
-end
-
-function get_agents(sim, ::Type{T}) where { T <: AbstractAgent }
-    get_agents(sim, typeid(sim, T))
-end
-
 ######################################## Edges
 
 function add_edge!(sim, edge::T) where { T <: AbstractEdge }
-    dict = sim.edges[sim.edge_typeids[T]]
-    push!(dict, edge)
+    push!(sim.edges[statetype(edge)], edge)
     nothing
 end
 
@@ -120,11 +111,47 @@ function add_edge!(sim, from::AgentID, to::AgentID, state)
     add_edge!(sim, Edge(from, to, state))
 end
 
-function get_edges(sim, typeid::TypeID, agent::AgentID)
-    sim.edges[typeid][agent]
+# function get_edges(sim, T::DataType, agent::AgentID) 
+#     sim.edges[T][agent]
+# end
+
+######################################## Transition
+
+struct AgentEdges
+    sim::Simulation
+    id::AgentID
 end
 
-function get_edges(sim, ::Type{T}, agent::AgentID) where { T <: AbstractEdge }
-    get_edges(sim, typeid(sim, T), agent)
+function Base.getindex(ae::AgentEdges, key)
+    get(read_container(ae.sim.edges[key]),
+        ae.id,
+        Vector{statetype(ae.sim.edges[key])}())
 end
 
+
+# func(agent, edges, sim)
+# where edges is Dict{Type, Edges} for all networks
+# must calls add_agents for new agents (assuming agents without edges are
+# useless) and also add_edge! (TODO: add an add_edges! method)
+# returns agent, which gets the same id as agent input
+
+function apply_transition!(sim,
+                    func,
+                    compute::Vector{DataType};
+                    variant = Vector{DataType}())
+    foreach(prepare_write!, some_agent_colls(sim, compute))
+    foreach(prepare_write!, some_agent_colls(sim, variant))
+    foreach(prepare_write!, some_edge_colls(sim, variant))
+
+    for coll in some_agent_colls(sim, compute)
+        for (id,state) in coll
+            # the coll[id] writes into another container then
+            # we use for the iteration
+            coll[id] = func(state, AgentEdges(sim, id), sim)
+        end 
+    end
+
+    foreach(finish_write!, some_agent_colls(sim, compute))
+    foreach(finish_write!, some_agent_colls(sim, variant))
+    foreach(finish_write!, some_edge_colls(sim, variant))
+end
