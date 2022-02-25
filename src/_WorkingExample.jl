@@ -74,7 +74,8 @@ struct Info <: AbstractGlobal
     p::Float64
 end
 
-add_globalstate!(sim, Info(0))
+add_globalstatetype!(sim, Info)
+
 
 finish_init!(sim)
 

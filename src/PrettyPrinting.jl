@@ -46,6 +46,9 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
                 if typeof(v) == GlobalSeries{k}
                     print(io, "\n\t Series{$k} with $(length(all_states(v))) " *
                         "element(s). Current state: $(current_state(sim, k))")
+                elseif typeof(v) == EmptyGlobal{GlobalSeries, k} ||
+                    typeof(v) == EmptyGlobal{GlobalState, k}
+                    print(io, "\n\t $k (empty)")
                 else
                     print(io, "\n\t $(current_state(sim, k))")
                 end

@@ -139,7 +139,8 @@ end
 
     
     sim = Simulation("Globals Test", ())
-    add_globalstate!(sim, GlobalFoo(1.1, 1))
+    add_globalstatetype!(sim, GlobalFoo)
+    push_global!(sim, GlobalFoo(1.1, 1))
 
     @test current_state(sim, GlobalFoo) == GlobalFoo(1.1, 1)
 
@@ -147,7 +148,8 @@ end
     @test current_state(sim, GlobalFoo) == GlobalFoo(0, 2)
     @test all_states(sim, GlobalFoo) == GlobalFoo(0, 2)
 
-    add_globalseries!(sim, GlobalBar(0, 0))
+    add_globalseriestype!(sim, GlobalBar)
+    push_global!(sim, GlobalBar(0, 0))
     @test current_state(sim, GlobalBar) == GlobalBar(0, 0)
 
     push_global!(sim, GlobalBar(1, 1))

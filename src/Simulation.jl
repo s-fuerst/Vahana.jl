@@ -1,5 +1,6 @@
 export Simulation
-export add_agenttype!, add_edgetype!, add_globalstate!, add_globalseries!
+export add_agenttype!, add_edgetype!
+export add_globalstatetype!, add_globalseriestype!
 export add_agents!, add_edge!
 export typeid
 export finish_init!
@@ -82,16 +83,15 @@ function add_edgetype!(sim, DT::DataType)
     end
 end
 
-function add_globalstate!(sim, init::T) where { T <: AbstractGlobal }
+function add_globalstatetype!(sim, ::Type{T}) where { T <: AbstractGlobal }
     @assert isbitstype(T)
-    push!(sim.globals, T => GlobalState{T}(init))
+    push!(sim.globals, T => EmptyGlobal{GlobalState, T}())
 end
 
-function add_globalseries!(sim, init::T) where { T <: AbstractGlobal }
+function add_globalseriestype!(sim, ::Type{T}) where { T <: AbstractGlobal }
     @assert isbitstype(T)
-    push!(sim.globals, T => GlobalSeries{T}(fill(init, 1)))
+    push!(sim.globals, T => EmptyGlobal{GlobalSeries, T}())
 end
-
 
 ######################################## Agents
 
