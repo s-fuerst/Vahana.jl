@@ -6,7 +6,7 @@ function Base.show(io::IO, mime::MIME"text/plain", edge::StatelessEdge)
     show(io, mime, edge.to)
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where { T }
+function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
     show(io, mime, edge.from)
     print(io, " -> ")
     show(io, mime, edge.to)
@@ -33,7 +33,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
             printstyled(io, "Network Type(s):"; color = :cyan)
             for (k, v) in edges
                 print(io, "\n\t $k \
-                           with $(show_length(v)) Agent(s)")
+                           with Edges for $(show_length(v)) Agent(s)")
             end
             println()
         end
@@ -96,11 +96,11 @@ function show_buffered_collection(io::IO, mime::MIME"text/plain", coll)
     end
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", bad::BufferedAgentDict{T}) where { T }
+function Base.show(io::IO, mime::MIME"text/plain", bad::BufferedAgentDict{T}) where {T}
     show_buffered_collection(io, mime, bad)
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", bed::BufferedEdgeDict{T}) where { T }
+function Base.show(io::IO, mime::MIME"text/plain", bed::BufferedEdgeDict{T}) where {T}
     show_buffered_collection(io, mime, bed)
 end
 
@@ -113,11 +113,11 @@ function show_buffered_length(coll)
     end
 end
 
-function show_length(coll::BufferedEdgeDict{T}) where { T }
+function show_length(coll::BufferedEdgeDict{T}) where {T}
     show_buffered_length(coll)
 end
 
-function show_length(coll::BufferedAgentDict{T}) where { T }
+function show_length(coll::BufferedAgentDict{T}) where {T}
     show_buffered_length(coll)
 end
 

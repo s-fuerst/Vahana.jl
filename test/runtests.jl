@@ -28,7 +28,7 @@ function get_write_edges(sim, T::DataType, id::AgentID)
     sim.edges[T].containers[sim.edges[T].write][id]
 end
 
-function numAgents(sim, ::Type{T}) where { T <: AbstractAgent }
+function numAgents(sim, ::Type{T}) where {T <: AbstractAgent}
     sim.agents[typeid(sim, T)].containers[sim.agents[typeid(sim, T)].write] |>
         length
 end
@@ -38,12 +38,13 @@ function transfoo(p::Person, id, network, sim)
 end
 
 function transfoo2(p::Person, id, network, sim)
-    s = reduce((s,e) -> s = s + e.state.foo, network(FooEdgeState); init = 0) 
+    s = reduce((s,e) ->
+        s = s + e.state.foo, network(sim, FooEdgeState); init = 0) 
     Person(s)
 end
 
 function transfoo3(p::Person, id, network, sim)
-    n = network(FooEdgeState)
+    n = network(sim, FooEdgeState)
     if length(n) > 0
         s = agent_from(sim, n[1]).foo
     else
@@ -54,6 +55,16 @@ end
 
 function transnothing(p::Person, _, _, _)
     nothing
+end
+
+function transstateless(h::HH, id, network, sim)
+    n = network(sim, StatelessEdgeType)
+    if length(n) > 0
+        s = agent_from(sim, n[1]).foo
+    else
+        s = -1
+    end
+    HH(s)
 end
 
 @testset "Initialization" begin
@@ -82,6 +93,7 @@ end
     @test get_write_agent(sim, p2id) == p2
 
     ids = add_agents!(sim, [[p1, p2], h1])
+    h1id = ids[2][1]
     @test numAgents(sim, Person) == 5
     @test numAgents(sim, HH) == 1
     @test get_write_agent(sim, ids[1][1]) == p1
@@ -105,6 +117,11 @@ end
  #   for i in sim.agents
     finish_init!(sim)
 
+
+    apply_transition!(sim, transstateless, [ HH ])
+    @test get_write_agent(sim, h1id).bar == -1
+    @test get_write_agent(sim, h2id).bar == 1
+    
     apply_transition!(sim, transfoo, [ Person ])
 
     @test get_write_agent(sim, p2id).foo == 12
@@ -127,12 +144,12 @@ end
 
 
 @testset "Globals" begin
-    struct GlobalFoo <: AbstractGlobal
+    struct GlobalFoo 
         foo::Float64
         bar::Int64
     end
 
-    struct GlobalBar <: AbstractGlobal
+    struct GlobalBar 
         foo::Float64
         bar::Int64
     end
@@ -155,4 +172,20 @@ end
     push_global!(sim, GlobalBar(1, 1))
     @test current_state(sim, GlobalBar) == GlobalBar(1, 1)
     @test all_states(sim, GlobalBar) |> first == GlobalBar(0, 0)
+end
+
+@testset "Aggregate" begin
+    sim = Simulation("Aggregate", ())
+
+    add_agenttype!(sim, Person)
+    pids = add_agents!(sim, [ Person(i) for i in 1:10 ])
+
+    add_edgetype!(sim, FooEdgeState)
+    for i in pids
+        add_edge!(sim, i, last(pids), FooEdgeState(1))
+    end
+    finish_init!(sim)
+    
+    @test aggregate(sim, Person, p -> p.foo, +) == sum(1:10)
+    @test aggregate(sim, FooEdgeState, e -> e.foo, +) == 10
 end

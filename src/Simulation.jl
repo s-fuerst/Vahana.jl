@@ -2,10 +2,12 @@ export Simulation
 export add_agenttype!, add_edgetype!
 export add_globalstatetype!, add_globalseriestype!
 export add_agents!, add_edge!
-export typeid
 export finish_init!
-export apply_transition!, agent_from, param
+export typeid
+export apply_transition, apply_transition!, apply_transition_params
+export agent_from, param
 export aggregate
+export show_agents, show_network
 
 const MAX_TYPES = typemax(TypeID)
 
@@ -52,14 +54,11 @@ end
 
 ######################################## Types
 
-function typeid(sim, ::Type{T})::TypeID where { T <: AbstractAgent }
+function typeid(sim, ::Type{T})::TypeID where {T <: AbstractAgent}
     sim.agent_typeids[T]
 end
 
-# TODO: when simulation structure is fixed, add type annotations to sim
-# and return value
-# TODO: add data structure for type
-function add_agenttype!(sim, ::Type{T}) where { T <: AbstractAgent } 
+function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent} 
     # TODO: improve assertion error messages (for all adds)
     # TODO: check that the same type is not added twice (for all adds)
     @assert isbitstype(T)
@@ -74,7 +73,7 @@ function add_agenttype!(sim, ::Type{T}) where { T <: AbstractAgent }
     type_number
 end
 
-function add_edgetype!(sim, DT::DataType) 
+function add_edgetype!(sim::Simulation, DT::DataType) 
     @assert isbitstype(DT)
     if fieldnames(DT) == ()
         push!(sim.edges, DT => BufferedEdgeDict{StatelessEdge{DT}}())
@@ -83,12 +82,12 @@ function add_edgetype!(sim, DT::DataType)
     end
 end
 
-function add_globalstatetype!(sim, ::Type{T}) where { T <: AbstractGlobal }
+function add_globalstatetype!(sim::Simulation, ::Type{T}) where {T}
     @assert isbitstype(T)
     push!(sim.globals, T => EmptyGlobal{GlobalState, T}())
 end
 
-function add_globalseriestype!(sim, ::Type{T}) where { T <: AbstractGlobal }
+function add_globalseriestype!(sim::Simulation, ::Type{T}) where {T}
     @assert isbitstype(T)
     push!(sim.globals, T => EmptyGlobal{GlobalSeries, T}())
 end
@@ -96,7 +95,7 @@ end
 ######################################## Agents
 
 
-function add_agents!(sim::Simulation, agent::T) where { T <: AbstractAgent }
+function add_agents!(sim::Simulation, agent::T) where {T <: AbstractAgent}
     # TODO add a better error message if type is not registered
     typeid = sim.agent_typeids[T]
     coll = sim.agents[typeid]
@@ -116,24 +115,31 @@ end
 
 add_agents!(f::Function) = sim -> add_agents!(sim, f(sim))
 
+
+show_agents(sim, ::Type{T}) where {T} =
+    show(stdout, MIME"text/plain"(), sim.agents[typeid(sim, T)])
+
 ######################################## Edges
 
-function add_edge!(sim, edge::T) where { T <: AbstractEdge }
+function add_edge!(sim::Simulation, edge::T) where {T <: AbstractEdge}
     push!(sim.edges[statetype(edge)], edge)
     nothing
 end
 
-function add_edge!(sim, from::AgentID, to::AgentID)
+function add_edge!(sim::Simulation, from::AgentID, to::AgentID)
     add_edge!(sim, StatelessEdge(from, to))
 end
 
-function add_edge!(sim, from::AgentID, to::AgentID, state)
+function add_edge!(sim::Simulation, from::AgentID, to::AgentID, state)
     add_edge!(sim, Edge(from, to, state))
 end
 
-function add_edge!(sim, from::AgentID, to::AgentID, T::DataType)
+function add_edge!(sim::Simulation, from::AgentID, to::AgentID, T::DataType)
     add_edge!(sim, StatelessEdge{T}(from, to))
 end
+
+show_network(sim, ::Type{T}) where {T} =
+    show(stdout, MIME"text/plain"(), sim.edges[T])
 
 # function get_edges(sim, T::DataType, agent::AgentID) 
 #     sim.edges[T][agent]
@@ -155,14 +161,15 @@ end
 #         Vector{statetype(ae.sim.edges[key])}())
 # end
 
-fn_access_edges(sim, id) = edgetype ->
+fn_access_edges(id) = (sim, edgetype) ->
     get(read_container(sim.edges[edgetype]),
         id,
         Vector{statetype(sim.edges[edgetype])}())
     
-agent_from(sim, edge::AbstractEdge) = sim.agents[type_nr(edge.from)][edge.from]
+agent_from(sim::Simulation, edge::AbstractEdge) =
+    sim.agents[type_nr(edge.from)][edge.from]
 
-param(sim, name) = getproperty(sim.params, name)
+param(sim::Simulation, name) = getproperty(sim.params, name)
 # agent_from(sim) = edge::AbstractEdge ->
 #     sim.agents[type_nr(edge.from)][edge.from]
 
@@ -175,7 +182,7 @@ param(sim, name) = getproperty(sim.params, name)
 
 function maybeadd(coll::AgentCollection{T},
            id::AgentID,
-           agent::T) where { T <: AbstractAgent }
+           agent::T) where {T <: AbstractAgent}
     # the coll[id] writes into another container then
     # we use for the iteration
     coll[id] = agent
@@ -184,7 +191,7 @@ end
 
 function maybeadd(::AgentCollection{T},
            ::AgentID,
-           ::Nothing) where { T <: AbstractAgent }
+           ::Nothing) where {T <: AbstractAgent}
     nothing
 end
 
@@ -198,7 +205,7 @@ function apply_transition!(sim,
 
     for coll in some_agentcolls(sim, compute)
         for (id,state) in coll
-            maybeadd(coll, id, func(state, id, fn_access_edges(sim, id), sim))
+            maybeadd(coll, id, func(state, id, fn_access_edges(id), sim))
         end 
     end
 
@@ -207,10 +214,39 @@ function apply_transition!(sim,
     foreach(finish_write!, some_edgecolls(sim, variant))
 end
 
-######################################## aggregate!
+function apply_transition(sim,
+                   func,
+                   compute::Vector{DataType};
+                   kwargs...)
+    newsim = deepcopy(sim)
+    apply_transition!(newsim, func, compute; kwargs...)
+    newsim
+end
 
-function aggregate(sim::Simulation, agenttype::DataType, f, op; kwargs...)
-    agents = sim.agents[sim.agent_typeids[agenttype]] |> read_container |> values
+function apply_transition_params(sim, compute::DataType)
+    coll = some_agentcolls(sim, [ compute ])[1]
+    (id, state) = coll |> first
+    (state, id, fn_access_edges(id))
+end
+
+
+######################################## aggregate
+
+function aggregate(sim::Simulation, ::Type{T}, f, op;
+            kwargs...) where {T<:AbstractAgent}
+    agents = sim.agents[sim.agent_typeids[T]] |>
+        read_container |>
+        values
     mapreduce(f, op, agents; kwargs...)
 end
 
+function aggregate(sim::Simulation, ::Type{T}, f, op;
+            kwargs...) where {T}
+    edges = sim.edges[T] |>
+        read_container |>
+        values |>
+        Iterators.flatten |>
+        collect |>
+        states
+    mapreduce(f, op, edges; kwargs...)
+end

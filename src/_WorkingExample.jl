@@ -70,7 +70,7 @@ end
 
 add_agents!(sim, Household())
 
-struct Info <: AbstractGlobal
+struct Info 
     p::Float64
 end
 

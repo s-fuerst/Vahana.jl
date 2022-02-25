@@ -45,7 +45,7 @@ Base.@kwdef mutable struct BufferedEdgeDict{T} <: EdgeCollection{T}
     write::Int8 = 1
 end
 
-function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where { T <: AbstractEdge }
+function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where {T <: AbstractEdge}
     @mayassert coll.read != coll.write "Can not add edges of type " *
         "$(statetype(edge)). Maybe you must add $(statetype(edge)) " *
         "to the list of variant types in apply_transition!"
@@ -53,7 +53,7 @@ function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where { T <: AbstractEd
     push!(c, edge)
 end
 
-function read_container(coll::BufferedEdgeDict{T}) where { T <: AbstractEdge }
+function read_container(coll::BufferedEdgeDict{T}) where {T <: AbstractEdge}
     coll.containers[coll.read]
 end
  
@@ -73,17 +73,17 @@ end
 #     Base.length(coll.containers[coll.read])
 # end
 
-statetype(::BufferedEdgeDict{T}) where { T } = T
+statetype(::BufferedEdgeDict{T}) where {T} = T
 
-function finish_init!(coll::BufferedEdgeDict{T}) where { T }
+function finish_init!(coll::BufferedEdgeDict{T}) where {T}
     coll.read = 1
 end
 
-function prepare_write!(coll::BufferedEdgeDict{T}) where { T }
+function prepare_write!(coll::BufferedEdgeDict{T}) where {T}
     prepare_buffered_write!(coll)
     coll.containers[coll.write] = Dict{AgentID, Vector{T}}()
 end
 
-function finish_write!(coll::BufferedEdgeDict{T}) where { T }
+function finish_write!(coll::BufferedEdgeDict{T}) where {T}
     finish_buffered_write!(coll)
 end
