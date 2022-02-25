@@ -33,7 +33,22 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
             printstyled(io, "Network Type(s):"; color = :cyan)
             for (k, v) in edges
                 print(io, "\n\t $k \
-                           with $(show_length(edges[k])) Agent(s)")
+                           with $(show_length(v)) Agent(s)")
+            end
+            println()
+        end
+    end
+
+    function show_global_types(io::IO, globals)
+        if length(globals) >= 1 
+            printstyled(io, "Global(s):"; color = :cyan)
+            for (k, v) in globals
+                if typeof(v) == GlobalSeries{k}
+                    print(io, "\n\t Series{$k} with $(length(all_states(v))) " *
+                        "element(s). Current state: $(current_state(sim, k))")
+                else
+                    print(io, "\n\t $(current_state(sim, k))")
+                end
             end
             println()
         end
@@ -43,6 +58,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
     println(io, "Parameters: ", sim.params)
     show_agent_types(io, sim.agent_typeids, sim.agents)
     show_edge_types(io, sim.edges)
+    show_global_types(io, sim.globals)
 end
 
 ######################################## Collections
@@ -71,7 +87,7 @@ function show_buffered_collection(io::IO, mime::MIME"text/plain", coll)
         printstyled(io, "Read:\n"; color = :cyan)
         show_collection(io, mime, coll.containers[coll.read])
     end
-    if length(coll.containers[coll.write]) > 0 
+    if coll.read != coll.write
         printstyled(io, "Write:\n"; color = :cyan)
         show_collection(io, mime, coll.containers[coll.write])
     end

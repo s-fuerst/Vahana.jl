@@ -32,7 +32,7 @@ struct FooEdgeState
 end
 
 
-add_edgetype!(sim, Edge, FooEdgeState)
+add_edgetype!(sim,FooEdgeState)
 
 
 add_edge!(sim, p1id, p2id, FooEdgeState(0))
@@ -69,6 +69,12 @@ function transfoo2(p::Person, networks, sim)
 end
 
 add_agents!(sim, Household())
+
+struct Info <: AbstractGlobal
+    p::Float64
+end
+
+add_globalstate!(sim, Info(0))
 
 finish_init!(sim)
 

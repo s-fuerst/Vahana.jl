@@ -15,8 +15,8 @@ abstract type EdgeCollection{ T <: AbstractEdge } end
 # must have fields:
 #   id_counter::EdgeNr
 
-function finish_init!(::EdgeCollection)
-end
+finish_init!(::EdgeCollection) = nothing
+
 
 function Base.getindex(coll::EdgeCollection, key::AgentID)
     Base.getindex(read_container(coll), key)
@@ -81,6 +81,7 @@ end
 
 function prepare_write!(coll::BufferedEdgeDict{T}) where { T }
     prepare_buffered_write!(coll)
+    coll.containers[coll.write] = Dict{AgentID, Vector{T}}()
 end
 
 function finish_write!(coll::BufferedEdgeDict{T}) where { T }

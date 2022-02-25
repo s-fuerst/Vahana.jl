@@ -1,10 +1,10 @@
 export Simulation
-export add_agenttype!, add_edgetype!
+export add_agenttype!, add_edgetype!, add_globalstate!, add_globalseries!
 export add_agents!, add_edge!
 export typeid
 export finish_init!
-export apply_transition!
-export agent_from
+export apply_transition!, agent_from, param
+export aggregate
 
 const MAX_TYPES = typemax(TypeID)
 
@@ -12,11 +12,13 @@ Base.@kwdef struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
 
-    # TODO: rename to agents_coll
+    # TODO: rename to agent_colls
     agents::Vector{AgentCollection} = Vector{AgentCollection}(undef, MAX_TYPES)
     agent_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
 
     edges::Dict{DataType, EdgeCollection} = Dict{DataType, EdgeCollection}()
+
+    globals::Dict{DataType, Globals} = Dict{DataType, Globals}()
 end
 
 function Simulation(name::String,
@@ -24,27 +26,27 @@ function Simulation(name::String,
     Simulation(name = name, params = params)
 end
 
-function all_agent_colls(sim)
+function all_agentcolls(sim)
     # TODO: Check if you could/should use genetors instead of comprehensions
     # also for the other cases
     [ sim.agents[i] for i in 1:length(sim.agent_typeids) ]
 end
 
-function some_agent_colls(sim, types)
+function some_agentcolls(sim, types)
     [ sim.agents[v] for (k, v) in sim.agent_typeids if k in types ]
 end
 
-function all_edge_colls(sim)
+function all_edgecolls(sim)
     values(sim.edges) |> collect
 end
 
-function some_edge_colls(sim, types)
+function some_edgecolls(sim, types)
     [ v for (k, v) in sim.edges if k in types ]
 end
 
 function finish_init!(sim::Simulation)
-    foreach(finish_init!, all_agent_colls(sim))
-    foreach(finish_init!, all_edge_colls(sim))
+    foreach(finish_init!, all_agentcolls(sim))
+    foreach(finish_init!, all_edgecolls(sim))
 end 
 
 ######################################## Types
@@ -57,8 +59,9 @@ end
 # and return value
 # TODO: add data structure for type
 function add_agenttype!(sim, ::Type{T}) where { T <: AbstractAgent } 
-    # TODO: check isbitstype incl. ignore optional
-    # TODO: check that the same type is not added twice
+    # TODO: improve assertion error messages (for all adds)
+    # TODO: check that the same type is not added twice (for all adds)
+    @assert isbitstype(T)
     ids =sim.agent_typeids
 
     type_number = length(ids) + 1
@@ -70,9 +73,25 @@ function add_agenttype!(sim, ::Type{T}) where { T <: AbstractAgent }
     type_number
 end
 
-function add_edgetype!(sim, ET::Type{T}, DT::DataType) where { T <: AbstractEdge } 
-    push!(sim.edges, DT => BufferedEdgeDict{ET{DT}}())
+function add_edgetype!(sim, DT::DataType) 
+    @assert isbitstype(DT)
+    if fieldnames(DT) == ()
+        push!(sim.edges, DT => BufferedEdgeDict{StatelessEdge{DT}}())
+    else
+        push!(sim.edges, DT => BufferedEdgeDict{Edge{DT}}())
+    end
 end
+
+function add_globalstate!(sim, init::T) where { T <: AbstractGlobal }
+    @assert isbitstype(T)
+    push!(sim.globals, T => GlobalState{T}(init))
+end
+
+function add_globalseries!(sim, init::T) where { T <: AbstractGlobal }
+    @assert isbitstype(T)
+    push!(sim.globals, T => GlobalSeries{T}(fill(init, 1)))
+end
+
 
 ######################################## Agents
 
@@ -112,6 +131,10 @@ function add_edge!(sim, from::AgentID, to::AgentID, state)
     add_edge!(sim, Edge(from, to, state))
 end
 
+function add_edge!(sim, from::AgentID, to::AgentID, T::DataType)
+    add_edge!(sim, StatelessEdge{T}(from, to))
+end
+
 # function get_edges(sim, T::DataType, agent::AgentID) 
 #     sim.edges[T][agent]
 # end
@@ -139,33 +162,55 @@ fn_access_edges(sim, id) = edgetype ->
     
 agent_from(sim, edge::AbstractEdge) = sim.agents[type_nr(edge.from)][edge.from]
 
+param(sim, name) = getproperty(sim.params, name)
 # agent_from(sim) = edge::AbstractEdge ->
 #     sim.agents[type_nr(edge.from)][edge.from]
 
 
-# func(agent, edges, sim)
+# func(agent, id, networks, sim)
 # where edges is Dict{Type, Edges} for all networks
 # must calls add_agents for new agents (assuming agents without edges are
 # useless) and also add_edge! (TODO: add an add_edges! method)
 # returns agent, which gets the same id as agent input
 
+function maybeadd(coll::AgentCollection{T},
+           id::AgentID,
+           agent::T) where { T <: AbstractAgent }
+    # the coll[id] writes into another container then
+    # we use for the iteration
+    coll[id] = agent
+    nothing
+end
+
+function maybeadd(::AgentCollection{T},
+           ::AgentID,
+           ::Nothing) where { T <: AbstractAgent }
+    nothing
+end
+
 function apply_transition!(sim,
                     func,
                     compute::Vector{DataType};
                     variant = Vector{DataType}())
-    foreach(prepare_write!, some_agent_colls(sim, compute))
-    foreach(prepare_write!, some_agent_colls(sim, variant))
-    foreach(prepare_write!, some_edge_colls(sim, variant))
+    foreach(prepare_write!, some_agentcolls(sim, compute))
+    foreach(prepare_write!, some_agentcolls(sim, variant))
+    foreach(prepare_write!, some_edgecolls(sim, variant))
 
-    for coll in some_agent_colls(sim, compute)
+    for coll in some_agentcolls(sim, compute)
         for (id,state) in coll
-            # the coll[id] writes into another container then
-            # we use for the iteration
-            coll[id] = func(state, id, fn_access_edges(sim, id), sim)
+            maybeadd(coll, id, func(state, id, fn_access_edges(sim, id), sim))
         end 
     end
 
-    foreach(finish_write!, some_agent_colls(sim, compute))
-    foreach(finish_write!, some_agent_colls(sim, variant))
-    foreach(finish_write!, some_edge_colls(sim, variant))
+    foreach(finish_write!, some_agentcolls(sim, compute))
+    foreach(finish_write!, some_agentcolls(sim, variant))
+    foreach(finish_write!, some_edgecolls(sim, variant))
 end
+
+######################################## aggregate!
+
+function aggregate(sim::Simulation, agenttype::DataType, f, op; kwargs...)
+    agents = sim.agents[sim.agent_typeids[agenttype]] |> read_container |> values
+    mapreduce(f, op, agents; kwargs...)
+end
+

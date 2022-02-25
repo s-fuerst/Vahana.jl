@@ -52,6 +52,10 @@ function transfoo3(p::Person, id, network, sim)
     Person(s)
 end
 
+function transnothing(p::Person, _, _, _)
+    nothing
+end
+
 @testset "Initialization" begin
     sim = Simulation("Example", ())
 
@@ -85,12 +89,13 @@ end
 
     h2id = add_agents!(sim, h2)
 
-    add_edgetype!(sim, Edge, FooEdgeState)
-    add_edgetype!(sim, StatelessEdge, StatelessEdgeType)
+    add_edgetype!(sim, FooEdgeState)
+    add_edgetype!(sim, StatelessEdgeType)
 
     add_edge!(sim, p1id, p2id, FooEdgeState(1))
-    edge = StatelessEdge{StatelessEdgeType}(p1id, h2id)
-    add_edge!(sim, edge)
+    # edge = StatelessEdge{StatelessEdgeType}(p1id, h2id)
+    # add_edge!(sim, edge)
+    add_edge!(sim, p1id, h2id, StatelessEdgeType)
 
 
     @test length(get_write_edges(sim, FooEdgeState, p2id)) == 1
@@ -114,7 +119,38 @@ end
     @test get_write_agent(sim, p1id).foo == -1
     @test get_write_agent(sim, p2id).foo == 0
 
+    apply_transition!(sim, transnothing, [ Person ])
+    @test numAgents(sim, Person) == 0
+    
  end
 
 
 
+@testset "Globals" begin
+    struct GlobalFoo <: AbstractGlobal
+        foo::Float64
+        bar::Int64
+    end
+
+    struct GlobalBar <: AbstractGlobal
+        foo::Float64
+        bar::Int64
+    end
+
+    
+    sim = Simulation("Globals Test", ())
+    add_globalstate!(sim, GlobalFoo(1.1, 1))
+
+    @test current_state(sim, GlobalFoo) == GlobalFoo(1.1, 1)
+
+    push_global!(sim, GlobalFoo(0, 2))
+    @test current_state(sim, GlobalFoo) == GlobalFoo(0, 2)
+    @test all_states(sim, GlobalFoo) == GlobalFoo(0, 2)
+
+    add_globalseries!(sim, GlobalBar(0, 0))
+    @test current_state(sim, GlobalBar) == GlobalBar(0, 0)
+
+    push_global!(sim, GlobalBar(1, 1))
+    @test current_state(sim, GlobalBar) == GlobalBar(1, 1)
+    @test all_states(sim, GlobalBar) |> first == GlobalBar(0, 0)
+end
