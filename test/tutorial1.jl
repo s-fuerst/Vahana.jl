@@ -56,11 +56,11 @@ function init_simulation(sim)
 end
 
 function calc_demand(b::Buyer, id, network, sim)
-    sedge = rand(network(sim, KnownSellers))
-    s = agent_from(sim, sedge)
+    seller_edge = rand(network(sim, KnownSellers))
+    s = agent_from(sim, seller_edge)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
-    add_edge!(sim, id, sedge.from, Bought(x, y))
+    add_edge!(sim, id, seller_edge.from, Bought(x, y))
     b
 end
 
@@ -107,8 +107,7 @@ init_simulation(sim)
 
 apply_transition!(sim, calc_demand, [ Buyer ]; variant = [ Bought ])
 
-push_global!(sim, ExcessDemand(
-    aggregate(sim, Bought, b -> b.x - b.y, +)))
+push_global!(sim, ExcessDemand(aggregate(sim, Bought, b -> b.x - b.y, +)))
 
 apply_transition!(sim, calc_price, [ Seller ]; variant = [ Bought ])
 
