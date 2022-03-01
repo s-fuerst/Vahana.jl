@@ -8,7 +8,6 @@ struct Buyer <: AbstractAgent
     α::Float64
     B::Int64
 end
-
 Buyer() = Buyer(rand(), rand((1:100)))
 
 
@@ -18,16 +17,20 @@ struct Seller <: AbstractAgent
 end
 Seller() = Seller(rand() + 0.5, 0)
 
-struct KnownSellers end
+struct KnownSellers <: AbstractEdge end
 
-struct Bought
+struct Bought <: AbstractEdge
     x::Float64
     y::Float64
 end
 
-struct ExcessDemand x_minus_y::Float64 end
+struct ExcessDemand <: AbstractGlobal
+    x_minus_y::Float64
+end
 
-struct AveragePrice p::Float64 end
+struct AveragePrice <: AbstractGlobal
+    p::Float64
+end
 
 
 +(a::Bought, b::Bought) = Bought(a.x + b.x, a.y + b.y)
@@ -64,7 +67,6 @@ function calc_demand(b::Buyer, id, network, sim)
     b
 end
 
-
 function calc_price(s::Seller, _, network, sim)
     edges = network(sim, Bought)
     if length(edges) == 0
@@ -96,34 +98,3 @@ function run_simulation(steps, params)
     sim
 end
 
-params = (numBuyer = 50000, numSeller = 5, knownSellers = 2)
-
-sim = run_simulation(100, params)
-
-
-sim = Simulation("Tutorial1", params)
-
-init_simulation(sim)
-
-apply_transition!(sim, calc_demand, [ Buyer ]; variant = [ Bought ])
-
-push_global!(sim, ExcessDemand(aggregate(sim, Bought, b -> b.x - b.y, +)))
-
-apply_transition!(sim, calc_price, [ Seller ]; variant = [ Bought ])
-
-push_global!(sim, AveragePrice(calc_average_price(sim)))
-
-    
-
-# init_simulation(sim)
-
-# sim2 = apply_transition(sim, calc_demand, [ Buyer ]; variant = [ Bought ])
-
-# sim3 = deepcopy(sim2)
-
-# push_global!(sim3, ExcessDemand(aggregate(sim3, Bought, b -> b.x - b.y, +)))
-
-# sim4 = 
-
-# push_global!(sim4, AveragePrice(calc_average_price(sim4)))
-#push_global!(sim4, aggregate(sim4, Seller, s -> s.p * s.)

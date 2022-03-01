@@ -2,7 +2,7 @@ export EdgeCollection
 
 export BufferedEdgeDict
 
-abstract type EdgeCollection{ T <: AbstractEdge } end
+abstract type EdgeCollection{ T } end
 # EdgeCollection interface:
 # Base.push!
 # Base.getindex
@@ -45,7 +45,7 @@ Base.@kwdef mutable struct BufferedEdgeDict{T} <: EdgeCollection{T}
     write::Int8 = 1
 end
 
-function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where {T <: AbstractEdge}
+function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where {T} 
     @mayassert coll.read != coll.write "Can not add edges of type " *
         "$(statetype(edge)). Maybe you must add $(statetype(edge)) " *
         "to the list of variant types in apply_transition!"
@@ -53,7 +53,7 @@ function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where {T <: AbstractEdg
     push!(c, edge)
 end
 
-function read_container(coll::BufferedEdgeDict{T}) where {T <: AbstractEdge}
+function read_container(coll::BufferedEdgeDict{T}) where {T}
     coll.containers[coll.read]
 end
  

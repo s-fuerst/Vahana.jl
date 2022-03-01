@@ -81,3 +81,33 @@ finish_init!(sim)
 
 # show(sim)
 #apply_transition!(sim, transfoo2, [ Person ])
+
+
+struct A <: AbstractAgent end
+
+struct E <: AbstractEdge end
+
+struct ES <: AbstractEdge
+    foo::Int64
+end
+
+sim2 = Simulation("ae", ())
+
+add_agenttype!(sim2, A)
+add_edgetype!(sim2, E)
+
+using BenchmarkTools
+
+id = add_agents!(sim2, A())
+
+@code_warntype add_agents!(sim2, A())
+
+@benchmark add_agents!(sim2, A())
+
+@code_warntype add_edge!(sim2, id, id, E)
+
+@code_warntype add_edge!(sim2, StatelessEdge{E}(id, id))
+
+
+@benchmark add_edge!(sim2, id, id, ES(1))
+

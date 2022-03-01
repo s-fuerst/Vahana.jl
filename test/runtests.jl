@@ -10,11 +10,11 @@ struct HH <: AbstractAgent
 end
 
  
-struct FooEdgeState 
+struct FooEdgeState <: AbstractEdge
     foo::Int64
 end
 
-struct StatelessEdgeType end
+struct StatelessEdgeType <: AbstractEdge end
 
 function createPersons(sim)
     [ Person(11), Person(12) ]
@@ -92,12 +92,13 @@ end
     @test numAgents(sim, Person) == 3
     @test get_write_agent(sim, p2id) == p2
 
-    ids = add_agents!(sim, [[p1, p2], h1])
-    h1id = ids[2][1]
+    ids = add_agents!(sim, p1, p2)
+    
+    h1id = add_agents!(sim, h1)
     @test numAgents(sim, Person) == 5
     @test numAgents(sim, HH) == 1
-    @test get_write_agent(sim, ids[1][1]) == p1
-    @test get_write_agent(sim, ids[2]) == h1
+    @test get_write_agent(sim, ids[1]) == p1
+    @test get_write_agent(sim, h1id) == h1
 
     h2id = add_agents!(sim, h2)
 
@@ -144,12 +145,12 @@ end
 
 
 @testset "Globals" begin
-    struct GlobalFoo 
+    struct GlobalFoo <: AbstractGlobal
         foo::Float64
         bar::Int64
     end
 
-    struct GlobalBar 
+    struct GlobalBar <: AbstractGlobal
         foo::Float64
         bar::Int64
     end
@@ -188,4 +189,15 @@ end
     
     @test aggregate(sim, Person, p -> p.foo, +) == sum(1:10)
     @test aggregate(sim, FooEdgeState, e -> e.foo, +) == 10
+end
+
+
+@testset "Tutorial1" begin
+    
+    include("tutorial1.jl")
+    params = (numBuyer = 500, numSeller = 2, knownSellers = 2)
+    
+    sim = run_simulation(5, params)
+
+    @test 0.8 < current_state(sim, AveragePrice).p < 1.2
 end

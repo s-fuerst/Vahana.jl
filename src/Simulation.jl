@@ -73,12 +73,12 @@ function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent}
     type_number
 end
 
-function add_edgetype!(sim::Simulation, DT::DataType) 
-    @assert isbitstype(DT)
-    if fieldnames(DT) == ()
-        push!(sim.edges, DT => BufferedEdgeDict{StatelessEdge{DT}}())
+function add_edgetype!(sim::Simulation, ::Type{T}) where { T<: AbstractEdge } 
+    @assert isbitstype(T)
+    if fieldnames(T) == ()
+        push!(sim.edges, T => BufferedEdgeDict{StatelessEdge{T}}())
     else
-        push!(sim.edges, DT => BufferedEdgeDict{Edge{DT}}())
+        push!(sim.edges, T => BufferedEdgeDict{Edge{T}}())
     end
 end
 
@@ -105,11 +105,11 @@ function add_agents!(sim::Simulation, agent::T) where {T <: AbstractAgent}
     agentid
 end
 
-function add_agents!(sim::Simulation, agents)
+function add_agents!(sim::Simulation, agents::Vector{T}) where { T <: AbstractAgent }
     [ add_agents!(sim, a) for a in agents ]
 end
 
-function add_agents!(sim::Simulation, agents...)
+function add_agents!(sim::Simulation, agents::T...) where {T <: AbstractAgent}
     [ add_agents!(sim, a) for a in agents ]
 end
 
@@ -121,22 +121,28 @@ show_agents(sim, ::Type{T}) where {T} =
 
 ######################################## Edges
 
-function add_edge!(sim::Simulation, edge::T) where {T <: AbstractEdge}
+function add_edge!(sim::Simulation, edge::T) where {T <: AbstractCompleteEdge}
     push!(sim.edges[statetype(edge)], edge)
     nothing
 end
 
-function add_edge!(sim::Simulation, from::AgentID, to::AgentID)
-    add_edge!(sim, StatelessEdge(from, to))
-end
-
-function add_edge!(sim::Simulation, from::AgentID, to::AgentID, state)
-    add_edge!(sim, Edge(from, to, state))
-end
-
-function add_edge!(sim::Simulation, from::AgentID, to::AgentID, T::DataType)
+function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
+            ::Type{T}) where {T<:AbstractEdge}
     add_edge!(sim, StatelessEdge{T}(from, to))
 end
+
+function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
+            state::T) where {T<:AbstractEdge}
+    # This if is optimized away by the compiler for the concrete types
+    # so the comfort to allow also T() for StatelessEdges does not
+    # come with a performance peanalty
+    if fieldnames(T) == ()
+        add_edge!(sim, StatelessEdge{T}(from, to))
+    else
+        add_edge!(sim, Edge{T}(from, to, state))
+    end
+end
+
 
 show_network(sim, ::Type{T}) where {T} =
     show(stdout, MIME"text/plain"(), sim.edges[T])
@@ -166,7 +172,7 @@ fn_access_edges(id) = (sim, edgetype) ->
         id,
         Vector{statetype(sim.edges[edgetype])}())
     
-agent_from(sim::Simulation, edge::AbstractEdge) =
+agent_from(sim::Simulation, edge::AbstractCompleteEdge) =
     sim.agents[type_nr(edge.from)][edge.from]
 
 param(sim::Simulation, name) = getproperty(sim.params, name)

@@ -1,16 +1,18 @@
-export AbstractEdge, StatelessEdge, Edge, CirularEdge, states
+export AbstractEdge, StatelessEdge, Edge, CircularEdge, states
+
+abstract type AbstractCompleteEdge end
 
 abstract type AbstractEdge end
 # All AbstractEdges must have a to field (but from is optional)
 
-struct StatelessEdge{T} <: AbstractEdge
+struct StatelessEdge{T <: AbstractEdge} <: AbstractCompleteEdge
     from::AgentID
     to::AgentID
 end
 
 statetype(::StatelessEdge{T}) where {T} = T
 
-struct Edge{T} <: AbstractEdge
+struct Edge{T <: AbstractEdge} <: AbstractCompleteEdge
     from::AgentID
     to::AgentID
     state::T
@@ -20,7 +22,7 @@ statetype(::Edge{T}) where {T} = T
 
 states(v::Vector{Edge{T}}) where {T} = map(e -> e.state, v)
 
-struct CircularEdge{T} <: AbstractEdge
+struct CircularEdge{T <: AbstractEdge} <: AbstractCompleteEdge
     to::AgentID
     state::T
 end
