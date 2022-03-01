@@ -33,6 +33,8 @@ struct AveragePrice <: AbstractGlobal
 end
 
 
+import Base.+
+    
 +(a::Bought, b::Bought) = Bought(a.x + b.x, a.y + b.y)
 
 

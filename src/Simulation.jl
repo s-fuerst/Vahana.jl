@@ -1,7 +1,7 @@
 export Simulation
 export add_agenttype!, add_edgetype!
 export add_globalstatetype!, add_globalseriestype!
-export add_agents!, add_edge!
+export add_agent!, add_agents!, add_edge!, add_edges!
 export finish_init!
 export typeid
 export apply_transition, apply_transition!, apply_transition_params
@@ -95,7 +95,7 @@ end
 ######################################## Agents
 
 
-function add_agents!(sim::Simulation, agent::T) where {T <: AbstractAgent}
+function add_agent!(sim::Simulation, agent::T) where {T <: AbstractAgent}
     # TODO add a better error message if type is not registered
     typeid = sim.agent_typeids[T]
     coll = sim.agents[typeid]
@@ -106,15 +106,12 @@ function add_agents!(sim::Simulation, agent::T) where {T <: AbstractAgent}
 end
 
 function add_agents!(sim::Simulation, agents::Vector{T}) where { T <: AbstractAgent }
-    [ add_agents!(sim, a) for a in agents ]
+    [ add_agent!(sim, a) for a in agents ]
 end
 
 function add_agents!(sim::Simulation, agents::T...) where {T <: AbstractAgent}
-    [ add_agents!(sim, a) for a in agents ]
+    [ add_agent!(sim, a) for a in agents ]
 end
-
-add_agents!(f::Function) = sim -> add_agents!(sim, f(sim))
-
 
 show_agents(sim, ::Type{T}) where {T} =
     show(stdout, MIME"text/plain"(), sim.agents[typeid(sim, T)])
@@ -143,6 +140,15 @@ function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
     end
 end
 
+function add_edges!(sim::Simulation, edges::Vector{T}) where {T <: AbstractCompleteEdge}
+    [ add_edge!(sim, e) for e in edges ]
+    nothing
+end
+
+function add_edges!(sim::Simulation, edges::T...) where {T <: AbstractCompleteEdge}
+    [ add_edge!(sim, e) for e in edges ]
+    nothing
+end
 
 show_network(sim, ::Type{T}) where {T} =
     show(stdout, MIME"text/plain"(), sim.edges[T])

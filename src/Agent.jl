@@ -34,8 +34,8 @@ function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
 end
 
 function agent_id(typeID::Int64, agent_nr::Int64)::AgentID
-    @assert typeID <= typemax(TypeID)
-    @assert agent_nr <= typemax(AgentNr)
+    @mayassert typeID <= typemax(TypeID)
+    @mayassert agent_nr <= typemax(AgentNr)
     agent_id(TypeID(typeID), AgentNr(agent_nr))
 end
 

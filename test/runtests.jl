@@ -67,6 +67,11 @@ function transstateless(h::HH, id, network, sim)
     HH(s)
 end
 
+function transaddedges(p::Person, _, network, sim)
+    add_edges!(sim, network(sim, FooEdgeState))
+    p
+end
+
 @testset "Initialization" begin
     sim = Simulation("Example", ())
 
@@ -83,7 +88,7 @@ end
     add_agenttype!(sim, HH)
     @test sim.agent_typeids[HH] == 2
 
-    p1id = add_agents!(sim, p1)
+    p1id = add_agent!(sim, p1)
     @test numAgents(sim, Person) == 1
     @test get_write_agent(sim, p1id) == p1
 
@@ -94,13 +99,13 @@ end
 
     ids = add_agents!(sim, p1, p2)
     
-    h1id = add_agents!(sim, h1)
+    h1id = add_agent!(sim, h1)
     @test numAgents(sim, Person) == 5
     @test numAgents(sim, HH) == 1
     @test get_write_agent(sim, ids[1]) == p1
     @test get_write_agent(sim, h1id) == h1
 
-    h2id = add_agents!(sim, h2)
+    h2id = add_agent!(sim, h2)
 
     add_edgetype!(sim, FooEdgeState)
     add_edgetype!(sim, StatelessEdgeType)
@@ -115,9 +120,17 @@ end
     
     @test length(get_write_edges(sim, StatelessEdgeType, h2id)) == 1
 
+
+    anotherpid = add_agent!(sim, Person(1))
+    add_edges!(sim, Edge(anotherpid, anotherpid, FooEdgeState(1)),
+                    Edge(anotherpid, anotherpid, FooEdgeState(2)))
+    
+    
  #   for i in sim.agents
     finish_init!(sim)
 
+    # this should not change anything, but test the add_edges method
+    apply_transition!(sim, transaddedges, [ Person ]; rebuild = [ FooEdgeState ])
 
     apply_transition!(sim, transstateless, [ HH ])
     @test get_write_agent(sim, h1id).bar == -1
@@ -132,6 +145,8 @@ end
     @test get_write_agent(sim, p1id).foo == 0
     @test get_write_agent(sim, p2id).foo == 1
 
+    @test get_write_agent(sim, anotherpid) == Person(3)
+    
     apply_transition!(sim, transfoo3, [ Person ])
 
     @test get_write_agent(sim, p1id).foo == -1
