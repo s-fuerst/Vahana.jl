@@ -48,7 +48,7 @@ end
 function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where {T} 
     @mayassert coll.read != coll.write "Can not add edges of type " *
         "$(statetype(edge)). Maybe you must add $(statetype(edge)) " *
-        "to the list of variant types in apply_transition!"
+        "to the list of rebuild types in apply_transition!"
     c = get!(coll.containers[coll.write], edge.to, Vector{T}())
     push!(c, edge)
 end

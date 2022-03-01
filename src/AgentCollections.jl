@@ -55,7 +55,7 @@ end
 function Base.setindex!(coll::BufferedAgentDict{T}, value::T, key::AgentID) where { T }
     # TODO: Understand LSP warning
     @mayassert coll.read != coll.write "Can not add agents of type $T. " *
-        "Maybe you must add $T to the list of variant types in apply_transition!"
+        "Maybe you must add $T to the list of rebuild types in apply_transition!"
     Base.setindex!(coll.containers[coll.write], value, key)
 end
 

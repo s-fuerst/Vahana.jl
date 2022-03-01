@@ -88,11 +88,11 @@ function run_simulation(steps, params)
     init_simulation(sim)
 
     for _ in 1:steps
-        apply_transition!(sim, calc_demand, [ Buyer ]; variant = [ Bought ])
-        push_global!(sim, ExcessDemand(
+        apply_transition!(sim, calc_demand, [ Buyer ]; rebuild = [ Bought ])
+        add_globalstate!(sim, ExcessDemand(
             aggregate(sim, Bought, b -> b.x - b.y, +)))
-        apply_transition!(sim, calc_price, [ Seller ]; variant = [ Bought ])
-        push_global!(sim, AveragePrice(calc_average_price(sim)))
+        apply_transition!(sim, calc_price, [ Seller ]; rebuild = [ Bought ])
+        add_globalstate!(sim, AveragePrice(calc_average_price(sim)))
     end
 
     sim

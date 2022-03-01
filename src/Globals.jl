@@ -1,5 +1,5 @@
 export AbstractGlobal
-export current_state, all_states, push_global!
+export current_state, all_states, add_globalstate!
 export aggregate!
 
 abstract type AbstractGlobal end
@@ -10,8 +10,8 @@ current_state(sim, T::DataType) = current_state(sim.globals[T])
 
 all_states(sim, T::DataType) = all_states(sim.globals[T])
 
-function push_global!(sim, value::T) where {T <: AbstractGlobal}
-    push_global!(sim, sim.globals[T], value)
+function add_globalstate!(sim, value::T) where {T <: AbstractGlobal}
+    add_globalstate!(sim, sim.globals[T], value)
 end
 
 ######################################## EmptyGlobal
@@ -22,7 +22,7 @@ current_state(g::EmptyGlobal) = g
 
 all_states(g::EmptyGlobal) = g
 
-function push_global!(sim,
+function add_globalstate!(sim,
                ::EmptyGlobal{U, T},
                value::T) where {U, T <: AbstractGlobal}
     first_value(sim, U, value)
@@ -42,7 +42,7 @@ current_state(g::GlobalState) = g.state
 
 all_states(g::GlobalState) = g.state
 
-function push_global!(sim, ::GlobalState, value::T) where {T <: AbstractGlobal}
+function add_globalstate!(sim, ::GlobalState, value::T) where {T <: AbstractGlobal}
     sim.globals[T] = GlobalState(value)
 end
 
@@ -60,7 +60,7 @@ current_state(g::GlobalSeries) = g.values |> last
 
 all_states(g::GlobalSeries) = g.values
 
-function push_global!(_, g::GlobalSeries, value::T) where {T <: AbstractGlobal}
+function add_globalstate!(_, g::GlobalSeries, value::T) where {T <: AbstractGlobal}
     push!(g.values, value)
 end
 

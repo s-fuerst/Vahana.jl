@@ -204,10 +204,10 @@ end
 function apply_transition!(sim,
                     func,
                     compute::Vector{DataType};
-                    variant = Vector{DataType}())
+                    rebuild = Vector{DataType}())
     foreach(prepare_write!, some_agentcolls(sim, compute))
-    foreach(prepare_write!, some_agentcolls(sim, variant))
-    foreach(prepare_write!, some_edgecolls(sim, variant))
+    foreach(prepare_write!, some_agentcolls(sim, rebuild))
+    foreach(prepare_write!, some_edgecolls(sim, rebuild))
 
     for coll in some_agentcolls(sim, compute)
         for (id,state) in coll
@@ -216,8 +216,8 @@ function apply_transition!(sim,
     end
 
     foreach(finish_write!, some_agentcolls(sim, compute))
-    foreach(finish_write!, some_agentcolls(sim, variant))
-    foreach(finish_write!, some_edgecolls(sim, variant))
+    foreach(finish_write!, some_agentcolls(sim, rebuild))
+    foreach(finish_write!, some_edgecolls(sim, rebuild))
 end
 
 function apply_transition(sim,
