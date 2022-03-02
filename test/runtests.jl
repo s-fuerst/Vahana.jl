@@ -46,7 +46,7 @@ end
 function transfoo3(p::Person, id, network, sim)
     n = network(sim, FooEdgeState)
     if length(n) > 0
-        s = agent_from(sim, n[1]).foo
+        s = agentstate_from(sim, n[1]).foo
     else
         s = -1
     end
@@ -60,7 +60,7 @@ end
 function transstateless(h::HH, id, network, sim)
     n = network(sim, StatelessEdgeType)
     if length(n) > 0
-        s = agent_from(sim, n[1]).foo
+        s = agentstate_from(sim, n[1]).foo
     else
         s = -1
     end

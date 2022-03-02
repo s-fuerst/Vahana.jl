@@ -19,29 +19,27 @@ end
 function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
     function show_agent_types(io::IO, typeids, coll)
         if length(typeids) >= 1 
-            printstyled(io, "Agent Type(s):"; color = :cyan)
+            printstyled(io, "\nAgent Type(s):"; color = :cyan)
             for (k, v) in typeids
                 print(io, "\n\t $k (ID: $(typeids[k])) \
                            with $(show_length(coll[v])) Agent(s)")
             end
-            println()
         end
     end
 
     function show_edge_types(io::IO, edges)
         if length(edges) >= 1 
-            printstyled(io, "Network Type(s):"; color = :cyan)
+            printstyled(io, "\nNetwork Type(s):"; color = :cyan)
             for (k, v) in edges
                 print(io, "\n\t $k \
                            with Edges for $(show_length(v)) Agent(s)")
             end
-            println()
         end
     end
 
     function show_global_types(io::IO, globals)
         if length(globals) >= 1 
-            printstyled(io, "Global(s):"; color = :cyan)
+            printstyled(io, "\nGlobal(s):"; color = :cyan)
             for (k, v) in globals
                 if typeof(v) == GlobalSeries{k}
                     print(io, "\n\t Series{$k} with $(length(all_states(v))) " *
@@ -53,12 +51,12 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
                     print(io, "\n\t $(current_state(sim, k))")
                 end
             end
-            println()
+#            println()
         end
     end
     
-    printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :blue)
-    println(io, "Parameters: ", sim.params)
+    printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :green)
+    print(io, "Parameters: ", sim.params)
     show_agent_types(io, sim.agent_typeids, sim.agents)
     show_edge_types(io, sim.edges)
     show_global_types(io, sim.globals)

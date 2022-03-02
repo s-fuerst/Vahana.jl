@@ -62,7 +62,7 @@ end
 
 function calc_demand(b::Buyer, id, network, sim)
     seller_edge = rand(network(sim, KnownSellers))
-    s = agent_from(sim, seller_edge)
+    s = agentstate_from(sim, seller_edge)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
     add_edge!(sim, id, seller_edge.from, Bought(x, y))

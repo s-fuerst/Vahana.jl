@@ -5,7 +5,7 @@ export add_agent!, add_agents!, add_edge!, add_edges!
 export finish_init!
 export typeid
 export apply_transition, apply_transition!, apply_transition_params
-export agent_from, param
+export agentstate, agentstate_from, param
 export aggregate
 export show_agents, show_network
 
@@ -178,12 +178,13 @@ fn_access_edges(id) = (sim, edgetype) ->
         id,
         Vector{statetype(sim.edges[edgetype])}())
     
-agent_from(sim::Simulation, edge::AbstractCompleteEdge) =
+agentstate_from(sim::Simulation, edge::AbstractCompleteEdge) =
     sim.agents[type_nr(edge.from)][edge.from]
 
+agentstate(sim::Simulation, id::AgentID) =
+    sim.agents[type_nr(id)][id]
+
 param(sim::Simulation, name) = getproperty(sim.params, name)
-# agent_from(sim) = edge::AbstractEdge ->
-#     sim.agents[type_nr(edge.from)][edge.from]
 
 
 # func(agent, id, networks, sim)
