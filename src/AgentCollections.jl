@@ -77,6 +77,7 @@ end
 
 function finish_init!(coll::BufferedAgentDict{T}) where { T }
     coll.read = 1
+    nothing
 end
 
 function prepare_write!(coll::BufferedAgentDict{T}) where { T }

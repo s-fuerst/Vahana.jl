@@ -50,6 +50,7 @@ end
 function finish_init!(sim::Simulation)
     foreach(finish_init!, all_agentcolls(sim))
     foreach(finish_init!, all_edgecolls(sim))
+    sim
 end 
 
 ######################################## Types
@@ -173,7 +174,7 @@ show_network(sim, ::Type{T}) where {T} =
 #         Vector{statetype(ae.sim.edges[key])}())
 # end
 
-fn_access_edges(id) = (sim, edgetype) ->
+fn_access_edges(networks, id) = (sim, edgetype) ->
     get(read_container(sim.edges[edgetype]),
         id,
         Vector{statetype(sim.edges[edgetype])}())
@@ -210,36 +211,39 @@ end
 
 function apply_transition!(sim,
                     func,
-                    compute::Vector{DataType};
-                    rebuild = Vector{DataType}())
-    foreach(prepare_write!, some_agentcolls(sim, compute))
-    foreach(prepare_write!, some_agentcolls(sim, rebuild))
-    foreach(prepare_write!, some_edgecolls(sim, rebuild))
+                    compute::Vector,
+                    networks::Vector,
+                    rebuild::Vector)
+    writeable = [ compute; rebuild ]
+    
+    foreach(prepare_write!, some_agentcolls(sim, writeable))
+    foreach(prepare_write!, some_edgecolls(sim, writeable))
 
     for coll in some_agentcolls(sim, compute)
-        for (id,state) in coll
-            maybeadd(coll, id, func(state, id, fn_access_edges(id), sim))
+        for (id, state) in coll
+            maybeadd(coll, id, func(state, id, fn_access_edges(networks, id), sim))
         end 
     end
 
-    foreach(finish_write!, some_agentcolls(sim, compute))
-    foreach(finish_write!, some_agentcolls(sim, rebuild))
-    foreach(finish_write!, some_edgecolls(sim, rebuild))
+    foreach(finish_write!, some_agentcolls(sim, writeable))
+    foreach(finish_write!, some_edgecolls(sim, writeable))
+    sim
 end
 
 function apply_transition(sim,
                    func,
-                   compute::Vector{DataType};
-                   kwargs...)
+                   compute::Vector,
+                   networks::Vector,
+                   rebuild::Vector) 
     newsim = deepcopy(sim)
-    apply_transition!(newsim, func, compute; kwargs...)
+    apply_transition!(newsim, func, compute, networks, rebuild)
     newsim
 end
 
-function apply_transition_params(sim, compute::DataType)
+function apply_transition_params(sim, compute::DataType, networks::Vector)
     coll = some_agentcolls(sim, [ compute ])[1]
     (id, state) = coll |> first
-    (state, id, fn_access_edges(id))
+    (state, id, fn_access_edges(networks, id))
 end
 
 

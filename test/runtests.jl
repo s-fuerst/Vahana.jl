@@ -130,29 +130,29 @@ end
     finish_init!(sim)
 
     # this should not change anything, but test the add_edges method
-    apply_transition!(sim, transaddedges, [ Person ]; rebuild = [ FooEdgeState ])
+    apply_transition!(sim, transaddedges, [ Person ], [ FooEdgeState ], [ FooEdgeState ])
 
-    apply_transition!(sim, transstateless, [ HH ])
+    apply_transition!(sim, transstateless, [ HH ], [ StatelessEdgeType ], [])
     @test get_write_agent(sim, h1id).bar == -1
     @test get_write_agent(sim, h2id).bar == 1
     
-    apply_transition!(sim, transfoo, [ Person ])
+    apply_transition!(sim, transfoo, [ Person ], [], [])
 
     @test get_write_agent(sim, p2id).foo == 12
 
-    apply_transition!(sim, transfoo2, [ Person ])
+    apply_transition!(sim, transfoo2, [ Person ], [ FooEdgeState ], [])
 
     @test get_write_agent(sim, p1id).foo == 0
     @test get_write_agent(sim, p2id).foo == 1
 
     @test get_write_agent(sim, anotherpid) == Person(3)
     
-    apply_transition!(sim, transfoo3, [ Person ])
+    apply_transition!(sim, transfoo3, [ Person ], [ FooEdgeState ], [])
 
     @test get_write_agent(sim, p1id).foo == -1
     @test get_write_agent(sim, p2id).foo == 0
 
-    apply_transition!(sim, transnothing, [ Person ])
+    apply_transition!(sim, transnothing, [ Person ], [], [])
     @test numAgents(sim, Person) == 0
     
  end

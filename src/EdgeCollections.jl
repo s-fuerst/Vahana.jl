@@ -77,6 +77,7 @@ statetype(::BufferedEdgeDict{T}) where {T} = T
 
 function finish_init!(coll::BufferedEdgeDict{T}) where {T}
     coll.read = 1
+    nothing
 end
 
 function prepare_write!(coll::BufferedEdgeDict{T}) where {T}

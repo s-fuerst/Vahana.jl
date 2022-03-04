@@ -19,9 +19,9 @@ end
 function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
     function show_agent_types(io::IO, typeids, coll)
         if length(typeids) >= 1 
-            printstyled(io, "\nAgent Type(s):"; color = :cyan)
+            printstyled(io, "\nAgent(s):"; color = :cyan)
             for (k, v) in typeids
-                print(io, "\n\t $k (ID: $(typeids[k])) \
+                print(io, "\n\t Type $k (ID: $(typeids[k])) \
                            with $(show_length(coll[v])) Agent(s)")
             end
         end
@@ -29,10 +29,10 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
 
     function show_edge_types(io::IO, edges)
         if length(edges) >= 1 
-            printstyled(io, "\nNetwork Type(s):"; color = :cyan)
+            printstyled(io, "\nNetwork(s):"; color = :cyan)
             for (k, v) in edges
                 print(io, "\n\t $k \
-                           with Edges for $(show_length(v)) Agent(s)")
+                           with $(show_num_edges(v)) Edges for $(show_length(v)) Agent(s)")
             end
         end
     end
@@ -111,12 +111,30 @@ function show_buffered_length(coll)
     end
 end
 
-function show_length(coll::BufferedEdgeDict{T}) where {T}
-    show_buffered_length(coll)
-end
-
 function show_length(coll::BufferedAgentDict{T}) where {T}
     show_buffered_length(coll)
 end
 
+
+function show_length(coll::BufferedEdgeDict{T}) where {T}
+    show_buffered_length(coll)
+end
+
+function show_num_edges(coll::BufferedEdgeDict{T}) where {T}
+    function l(coll)
+        if length(coll) > 0
+            mapreduce(length, +, values(coll))
+        else
+            0
+        end
+    end
+
+    cs = coll.containers
+    if coll.read != coll.write
+        "$(l(cs[coll.read]))/$(l(cs[coll.write])) (R/W)"
+    else
+        "$(l(cs[coll.read]))"
+    end
+end
+    
 
