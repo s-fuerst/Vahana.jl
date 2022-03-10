@@ -11,6 +11,12 @@ export show_agents, show_network
 
 const MAX_TYPES = typemax(TypeID)
 
+"""
+    struct Simulation
+
+The internal structure of a simulation. Model developers should not
+access these fields directly.
+"""
 Base.@kwdef struct Simulation
     name::String
     params::Union{Tuple, NamedTuple}
@@ -24,6 +30,28 @@ Base.@kwdef struct Simulation
     globals::Dict{DataType, Globals} = Dict{DataType, Globals}()
 end
 
+"""
+    Simulation(name::String, params::Union{Tuple, NamedTuple})
+
+Create a new simulation object, which stores the complete state of a simulation.
+
+`name` is used as meta-information about the simulation and has no
+effect on the dynamics, since `name` is not accessible in the
+transition functions. The `param`eter`s` of the simulation can be
+accessed via the [`param`](@ref) function. (Hint: If a NamedTupe has
+only one element, it must have a ',' after the value,
+e.g. Simulation("Name", (steps = 100,)) )
+
+The simulation starts in an uninitialized state. After registering all
+types of the simulation and adding the agents and edges for the initial
+state, it is necessary to call [`finish_init!`](@ref) before applying
+a transition function for the first time.
+
+See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref), 
+[`add_globalstatetype!`](@ref), [`add_globalseriestype!`](@ref), 
+[`add_agent!`](@ref), [`add_agents!`](@ref), [`add_edge!`](@ref), 
+[`add_edges!`](@ref) and [`finish_init!`](@ref)
+"""
 function Simulation(name::String,
              params::Union{Tuple, NamedTuple})
     Simulation(name = name, params = params)
@@ -59,11 +87,25 @@ function typeid(sim, ::Type{T})::TypeID where {T <: AbstractAgent}
     sim.agent_typeids[T]
 end
 
+"""
+    add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent}
+
+Register an additional agent type to `sim`. 
+
+An agent type is an struct that define the state for agents of type `T`.
+These structs must be a subtype of `AbstractAgent`, and also a
+isbitstype type, meaning the type is immutable and contains no
+references to other values, only primitive types and other isbitstype
+types.
+
+Can only be called before [`finish_init!`](@ref)
+"""
 function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent} 
     # TODO: improve assertion error messages (for all adds)
     # TODO: check that the same type is not added twice (for all adds)
+    # TODO: check that finish_init! is not called
     @assert isbitstype(T)
-    ids =sim.agent_typeids
+    ids = sim.agent_typeids
 
     type_number = length(ids) + 1
     @assert type_number < typemax(TypeID) "Can not add new type, 
@@ -74,6 +116,19 @@ function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent}
     type_number
 end
 
+"""
+    add_edgetype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent}
+
+Register an additional edge type to `sim`. 
+
+An agent type is an struct that define the state for agents of type `T`.
+These structs must be a subtype of `AbstractAgent`, and also a
+isbitstype type, meaning the type is immutable and contains no
+references to other values, only primitive types and other isbitstype
+types.
+
+Can only be called before [`finish_init!`](@ref)
+"""
 function add_edgetype!(sim::Simulation, ::Type{T}) where { T<: AbstractEdge } 
     @assert isbitstype(T)
     if fieldnames(T) == ()
@@ -228,6 +283,8 @@ function apply_transition!(sim,
     foreach(finish_write!, some_agentcolls(sim, writeable))
     foreach(finish_write!, some_edgecolls(sim, writeable))
     sim
+
+    add_agenttype!
 end
 
 function apply_transition(sim,
