@@ -43,9 +43,9 @@ only one element, it must have a ',' after the value,
 e.g. Simulation("Name", (steps = 100,)) )
 
 The simulation starts in an uninitialized state. After registering all
-types of the simulation and adding the agents and edges for the initial
-state, it is necessary to call [`finish_init!`](@ref) before applying
-a transition function for the first time.
+types of the simulation and adding the agents and edges for the
+initial state, it is necessary to call [`finish_init!`](@ref) before
+applying a transition function for the first time.
 
 See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref), 
 [`add_globalstatetype!`](@ref), [`add_globalseriestype!`](@ref), 
@@ -76,8 +76,8 @@ function some_edgecolls(sim, types)
 end
 
 function finish_init!(sim::Simulation)
-    foreach(finish_init!, all_agentcolls(sim))
-    foreach(finish_init!, all_edgecolls(sim))
+    foreach(finishinit!, all_agentcolls(sim))
+    foreach(finishinit!, all_edgecolls(sim))
     sim
 end 
 
@@ -93,12 +93,13 @@ end
 Register an additional agent type to `sim`. 
 
 An agent type is an struct that define the state for agents of type `T`.
-These structs must be a subtype of `AbstractAgent`, and also a
-isbitstype type, meaning the type is immutable and contains no
-references to other values, only primitive types and other isbitstype
-types.
+These structs must be a subtype of `AbstractAgent`, and also bits
+types, meaning the type is immutable and contains only primitive types
+and other bits types.
 
 Can only be called before [`finish_init!`](@ref)
+
+See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
 function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent} 
     # TODO: improve assertion error messages (for all adds)
@@ -117,19 +118,20 @@ function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent}
 end
 
 """
-    add_edgetype!(sim::Simulation, ::Type{T}) where {T <: AbstractAgent}
+    add_edgetype!(sim::Simulation, ::Type{T}) where {T <: AbstractEdge}
 
 Register an additional edge type to `sim`. 
 
-An agent type is an struct that define the state for agents of type `T`.
-These structs must be a subtype of `AbstractAgent`, and also a
-isbitstype type, meaning the type is immutable and contains no
-references to other values, only primitive types and other isbitstype
-types.
+An edge type is an struct that define the state for edges of type `T`.
+These structs must be a subtype of `AbstractEdge`, and also bits
+types, meaning the type is immutable and contains only primitive types
+and other bits types.
 
 Can only be called before [`finish_init!`](@ref)
+
+See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
 """
-function add_edgetype!(sim::Simulation, ::Type{T}) where { T<: AbstractEdge } 
+function add_edgetype!(sim::Simulation, ::Type{T}) where {T <: AbstractEdge}
     @assert isbitstype(T)
     if fieldnames(T) == ()
         push!(sim.edges, T => BufferedEdgeDict{StatelessEdge{T}}())
@@ -138,19 +140,89 @@ function add_edgetype!(sim::Simulation, ::Type{T}) where { T<: AbstractEdge }
     end
 end
 
-function add_globalstatetype!(sim::Simulation, ::Type{T}) where {T}
+"""
+    add_globalstatetype!(sim::Simulation, ::Type{T}) where {T <: AbstractGlobal}
+
+Registration of an additional global type for `sim` that stores a single value.
+
+The values of global types are accessible to all agents. In terms of
+the graph structure of Vahana, this can be interpreted as there being
+an implicit edge from a single node per global type to all agents.
+
+For global types registered with add_globalstatetype! only one
+instance of this type is stored in the simulation. This is often
+useful for a global state used by the simulation itself, e.g. the GDP
+of an economy. The current value of global types can be updated via
+[`add_globalstate`](@ref) and retreived via [`current_state`](@ref).
+
+Global types can also used for (time) series, see [`add_globalseriestype!`](@ref).
+
+These global types must be a subtype of `AbstractGlobal`, and also bits
+types, meaning the type is immutable and contains only primitive types
+and other bits types.
+
+Can only be called before [`finish_init!`](@ref)
+
+See also [`add_globalseriestype!`](@ref), [`add_globalstate!`](@ref)
+and [`current_state`](@ref)
+
+"""
+function add_globalstatetype!(sim::Simulation, ::Type{T}) where {T <: AbstractGlobal}
     @assert isbitstype(T)
     push!(sim.globals, T => EmptyGlobal{GlobalState, T}())
 end
 
-function add_globalseriestype!(sim::Simulation, ::Type{T}) where {T}
+"""
+    add_globalseriestype!(sim::Simulation, ::Type{T}) where {T <: AbstractGlobal}
+
+Register an additional global type to `sim` that stores a series of values.
+
+The values of global types are accessible to all agents. In terms of
+the graph structure of Vahana, this can be interpreted as there being
+an implicit edge from a single node per global type to all agents.
+
+For global types registered with add_globalseriestype!, all values
+added via [`add_globalstate!`](@ref) are stored in a vector of type T in
+the simulation. The most recently added value can be retrieved via
+[`current_state`](@ref), and the entire vector via
+[`all_states`](@ref).
+
+If only the last value is needed, [`add_globalstatetype!`](@ref) can
+also be used to register the type.
+
+These global types must be a subtype of `AbstractGlobal`, and also bits
+types, meaning the type is immutable and contains only primitive types
+and other bits types.
+
+Can only be called before [`finish_init!`](@ref)
+
+See also [`add_globalstatetype!`](@ref), [`add_globalstate!`](@ref),
+[`aggregate`](@ref) [`all_states`](@ref) and [`current_state`](@ref)
+
+"""
+function add_globalseriestype!(sim::Simulation, ::Type{T}) where {T <: AbstractGlobal}
     @assert isbitstype(T)
     push!(sim.globals, T => EmptyGlobal{GlobalSeries, T}())
 end
 
 ######################################## Agents
 
+"""
+    add_agent!(sim::Simulation, agent::T) -> AgentID
 
+Add a single agent of type T to the simulation `sim`.
+
+T must have been previously registered in the simulation by calling
+[`add_agenttype!`](@ref).
+
+`add_agent!` returns a new AgentID, which can be used to create edges
+from or to this agent. Do not use the ID for other purposes, they are
+not guaranteed to be stable.
+
+See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
+[`add_edge!`](@ref) and [`add_edges!`](@ref)
+
+"""
 function add_agent!(sim::Simulation, agent::T) where {T <: AbstractAgent}
     # TODO add a better error message if type is not registered
     typeid = sim.agent_typeids[T]
@@ -161,7 +233,26 @@ function add_agent!(sim::Simulation, agent::T) where {T <: AbstractAgent}
     agentid
 end
 
-function add_agents!(sim::Simulation, agents::Vector{T}) where { T <: AbstractAgent }
+"""
+    add_agents!(sim::Simulation, agents) -> Vector{AgentID}
+
+Add multiple agents at once to the simulation `sim`.
+
+`agents` can be any iterable set of agents, or an arbitrary number of
+agents as arguments. 
+
+The types of the agents must have been previously registered in the
+simulation by calling [`add_agenttype!`](@ref).
+
+`add_agents!` returns a vector of AgentIDs, which can be used
+to create edges from or to this agents. Do not use the ID for other
+purposes, they are not guaranteed to be stable.
+
+See also [`add_agent!`](@ref), [`add_agenttype!`](@ref),
+[`add_edge!`](@ref) and [`add_edges!`](@ref)
+
+"""
+function add_agents!(sim::Simulation, agents) 
     [ add_agent!(sim, a) for a in agents ]
 end
 
@@ -169,16 +260,45 @@ function add_agents!(sim::Simulation, agents::T...) where {T <: AbstractAgent}
     [ add_agent!(sim, a) for a in agents ]
 end
 
-show_agents(sim, ::Type{T}) where {T} =
+"""
+    show_agents(sim, ::Type{T}) where {T <: AbstractAgent}
+
+Print (some of) the agents of the type T.
+
+In a parallized simulation, only the agents that are in the partition
+of the graph associated with the function calling process are printed.
+
+"""
+show_agents(sim, ::Type{T}) where {T <: AbstractAgent} =
     show(stdout, MIME"text/plain"(), sim.agents[typeid(sim, T)])
 
 ######################################## Edges
 
+"""
+    add_edge!(sim::Simulation, edge)
+
+Add a single edge to the simulation `sim`.
+
+`edge` can be either a [`StatelessEdge{T}`](@ref) or a
+[`Edge{T}`](@ref), where T must have been previously registered in the
+simulation by calling [`add_edgetype!`](@ref).
+ 
+See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
+[`add_edge!`](@ref) and [`add_edges!`](@ref)
+
+"""
 function add_edge!(sim::Simulation, edge::T) where {T <: AbstractCompleteEdge}
     push!(sim.edges[statetype(edge)], edge)
     nothing
 end
 
+"""
+    add_edge!(sim::Simulation, from::AgentID, to::AgentID, state::T) where {T<:AbstractEdge}
+
+Add a single edge to the simulation `sim`.
+
+HIER WEITERMACHEN
+"""
 function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
             ::Type{T}) where {T<:AbstractEdge}
     add_edge!(sim, StatelessEdge{T}(from, to))
@@ -233,13 +353,19 @@ fn_access_edges(networks, id) = (sim, edgetype) ->
     get(read_container(sim.edges[edgetype]),
         id,
         Vector{statetype(sim.edges[edgetype])}())
-    
+
+"""
+"""
 agentstate_from(sim::Simulation, edge::AbstractCompleteEdge) =
     sim.agents[type_nr(edge.from)][edge.from]
 
+"""
+"""
 agentstate(sim::Simulation, id::AgentID) =
     sim.agents[type_nr(id)][id]
 
+"""
+"""
 param(sim::Simulation, name) = getproperty(sim.params, name)
 
 
@@ -264,6 +390,8 @@ function maybeadd(::AgentCollection{T},
     nothing
 end
 
+"""
+"""
 function apply_transition!(sim,
                     func,
                     compute::Vector,
@@ -287,6 +415,8 @@ function apply_transition!(sim,
     add_agenttype!
 end
 
+"""
+"""
 function apply_transition(sim,
                    func,
                    compute::Vector,
@@ -306,6 +436,8 @@ end
 
 ######################################## aggregate
 
+"""
+"""
 function aggregate(sim::Simulation, ::Type{T}, f, op;
             kwargs...) where {T<:AbstractAgent}
     agents = sim.agents[sim.agent_typeids[T]] |>

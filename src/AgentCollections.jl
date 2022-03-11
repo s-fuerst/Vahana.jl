@@ -8,7 +8,7 @@ abstract type AgentCollection{ T } end
 # Base.getindex
 # Base.length
 # Base.iterate
-# finish_init!
+# finishinit!
 # prepare_write!
 # finish_write!
 
@@ -19,7 +19,7 @@ abstract type AgentCollection{ T } end
 
 is_agentcollection(coll) = eltype(coll) == AgentCollection
 
-finish_init!(::AgentCollection) = nothing
+finishinit!(::AgentCollection) = nothing
 
 function Base.getindex(coll::AgentCollection, key::AgentID)
     Base.getindex(read_container(coll), key)
@@ -75,7 +75,7 @@ end
 #     Base.length(coll.containers[coll.read])
 # end
 
-function finish_init!(coll::BufferedAgentDict{T}) where { T }
+function finishinit!(coll::BufferedAgentDict{T}) where { T }
     coll.read = 1
     nothing
 end

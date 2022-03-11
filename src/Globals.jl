@@ -4,7 +4,7 @@ export aggregate!
 
 abstract type AbstractGlobal end
 
-abstract type Globals{ T } end
+abstract type Globals{T} end
 
 current_state(sim, T::DataType) = current_state(sim.globals[T])
 

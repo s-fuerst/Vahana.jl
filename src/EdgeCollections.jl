@@ -8,14 +8,14 @@ abstract type EdgeCollection{ T } end
 # Base.getindex
 # Base.length
 # Base.iterate
-# finish_init!
+# finishinit!
 # prepare_write!
 # finish_write!
 
 # must have fields:
 #   id_counter::EdgeNr
 
-finish_init!(::EdgeCollection) = nothing
+finishinit!(::EdgeCollection) = nothing
 
 
 function Base.getindex(coll::EdgeCollection, key::AgentID)
@@ -75,7 +75,7 @@ end
 
 statetype(::BufferedEdgeDict{T}) where {T} = T
 
-function finish_init!(coll::BufferedEdgeDict{T}) where {T}
+function finishinit!(coll::BufferedEdgeDict{T}) where {T}
     coll.read = 1
     nothing
 end
