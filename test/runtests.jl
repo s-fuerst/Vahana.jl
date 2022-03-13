@@ -58,9 +58,9 @@ function transnothing(p::Person, _, _)
 end
 
 function transstateless(h::HH, id, sim)
-    n = edges_to(sim, id, StatelessEdgeType)
+    n = edges_to(sim, id, StatelessEdgeType) |> neighbors
     if length(n) > 0
-        s = agentstate_from(sim, n[1]).foo
+        s = agentstate(sim, n[1]).foo
     else
         s = -1
     end

@@ -1,17 +1,14 @@
 ######################################## <: AbstractEdge
 
-function Base.show(io::IO, mime::MIME"text/plain", edge::StatelessEdge)
-    show(io, mime, edge.from)
-    print(" -> ")
-    show(io, mime, edge.to)
-end
 
 function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
     show(io, mime, edge.from)
     print(io, " -> ")
     show(io, mime, edge.to)
-    print(io, ": ")
-    show(io, mime, edge.state)
+    if fieldnames(T) != ()
+        print(io, ": ")
+        show(io, mime, edge.state)
+    end
 end 
 
 ######################################## Simulation

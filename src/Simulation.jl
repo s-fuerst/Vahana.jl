@@ -134,11 +134,7 @@ See also [`add_edge!`](@ref) and [`add_edges!`](@ref)
 """
 function add_edgetype!(sim::Simulation, ::Type{T}) where {T <: AbstractEdge}
     @assert isbitstype(T)
-    if fieldnames(T) == ()
-        push!(sim.edges, T => BufferedEdgeDict{StatelessEdge{T}}())
-    else
-        push!(sim.edges, T => BufferedEdgeDict{Edge{T}}())
-    end
+    push!(sim.edges, T => BufferedEdgeDict{Edge{T}}())
 end
 
 """
@@ -276,19 +272,13 @@ show_agents(sim, ::Type{T}) where {T <: AbstractAgent} =
 ######################################## Edges
 
 """
-    add_edge!(sim::Simulation, edge)
+    add_edge!(sim::Simulation, edge::Edge{T}) where {T <: AbstractEdge}
 
-Add a single edge to the simulation `sim`.
+Add a single edge to the simulation `sim`. HIER AUCH WEITERMACHEN
 
-`edge` can be either a [`StatelessEdge{T}`](@ref) or a
-[`Edge{T}`](@ref), where T must have been previously registered in the
-simulation by calling [`add_edgetype!`](@ref).
- 
-See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
-[`add_edge!`](@ref) and [`add_edges!`](@ref)
-
+See also [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
-function add_edge!(sim::Simulation, edge::T) where {T <: AbstractCompleteEdge}
+function add_edge!(sim::Simulation, edge::Edge{T}) where {T <: AbstractEdge }
     push!(sim.edges[statetype(edge)], edge)
     nothing
 end
@@ -302,27 +292,20 @@ HIER WEITERMACHEN
 """
 function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
             ::Type{T}) where {T<:AbstractEdge}
-    add_edge!(sim, StatelessEdge{T}(from, to))
+    add_edge!(sim, Edge{T}(from, to, T()))
 end
 
 function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
             state::T) where {T<:AbstractEdge}
-    # This if is optimized away by the compiler for the concrete types
-    # so the comfort to allow also T() for StatelessEdges does not
-    # come with a performance peanalty
-    if fieldnames(T) == ()
-        add_edge!(sim, StatelessEdge{T}(from, to))
-    else
-        add_edge!(sim, Edge{T}(from, to, state))
-    end
+    add_edge!(sim, Edge{T}(from, to, state))
 end
 
-function add_edges!(sim::Simulation, edges::Vector{T}) where {T <: AbstractCompleteEdge}
+function add_edges!(sim::Simulation, edges::Vector{Edge{T}}) where {T <: AbstractEdge}
     [ add_edge!(sim, e) for e in edges ]
     nothing
 end
 
-function add_edges!(sim::Simulation, edges::T...) where {T <: AbstractCompleteEdge}
+function add_edges!(sim::Simulation, edges::Edge{T}...) where {T <: AbstractEdge}
     [ add_edge!(sim, e) for e in edges ]
     nothing
 end
@@ -330,26 +313,28 @@ end
 show_network(sim, ::Type{T}) where {T} =
     show(stdout, MIME"text/plain"(), sim.edges[T])
 
-# function get_edges(sim, T::DataType, agent::AgentID) 
-#     sim.edges[T][agent]
-# end
-
 ######################################## Transition
 
 """
-    edges_to(sim::Simulation, id::AgentID, edgetype)
+    edges_to(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Edges{T}}
+
+Returns all incoming edges for agent `id` of network `T`.
+
+Should only be used inside a transition function and only for the ID specified
+as a transition function parameter. Calling edges_to outside a transition function
+or with other IDs may result in undefined behavior.
+
+See also [`apply_transition!`](@ref), [`states`](@ref) and
+[`neighbors`](@ref)
 """
 edges_to(sim::Simulation, id::AgentID, edgetype) = 
     get(read_container(sim.edges[edgetype]),
         id,
         Vector{statetype(sim.edges[edgetype])}())
 
-# neighbors(sim, id, edgetypes) =
-    
-
 """
 """
-agentstate_from(sim::Simulation, edge::AbstractCompleteEdge) =
+agentstate_from(sim::Simulation, edge::Edge{T}) where {T<:AbstractEdge} =
     sim.agents[type_nr(edge.from)][edge.from]
 
 """
