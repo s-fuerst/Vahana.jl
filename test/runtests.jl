@@ -1,20 +1,20 @@
 using Vahana
 using Test
 
-struct Person <: AbstractAgent
+struct Person <: Agent
     foo::Int64
 end
 
-struct HH <: AbstractAgent
+struct HH <: Agent
     bar::Int64
 end
 
  
-struct FooEdgeState <: AbstractEdge
+struct FooEdgeState <: EdgeState
     foo::Int64
 end
 
-struct StatelessEdgeType <: AbstractEdge end
+struct StatelessEdgeType <: EdgeState end
 
 function createPersons(sim)
     [ Person(11), Person(12) ]
@@ -28,7 +28,7 @@ function get_write_edges(sim, T::DataType, id::AgentID)
     sim.edges[T].containers[sim.edges[T].write][id]
 end
 
-function numAgents(sim, ::Type{T}) where {T <: AbstractAgent}
+function numAgents(sim, ::Type{T}) where {T <: Agent}
     sim.agents[typeid(sim, T)].containers[sim.agents[typeid(sim, T)].write] |>
         length
 end
@@ -161,12 +161,12 @@ end
 
 
 @testset "Globals" begin
-    struct GlobalFoo <: AbstractGlobal
+    struct GlobalFoo <: GlobalState
         foo::Float64
         bar::Int64
     end
 
-    struct GlobalBar <: AbstractGlobal
+    struct GlobalBar <: GlobalState
         foo::Float64
         bar::Int64
     end

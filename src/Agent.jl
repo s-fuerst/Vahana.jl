@@ -1,5 +1,5 @@
 export AgentID, AgentNr
-export AbstractAgent
+export Agent
 export agent_id
 export TypeID
 export type_nr
@@ -21,7 +21,7 @@ const AgentID = UInt64
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
     BITS_PROCESS + BITS_AGENTNR 
 
-abstract type AbstractAgent end
+abstract type Agent end
 
 const shift_type = BITS_PROCESS + BITS_AGENTNR
 

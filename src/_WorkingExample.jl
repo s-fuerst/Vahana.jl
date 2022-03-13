@@ -2,11 +2,11 @@ using Vahana
 
 sim = Simulation("Example", ())
 
-struct Person <: AbstractAgent
+struct Person <: Agent
     foo::Int64
 end
 
-struct Household <: AbstractAgent
+struct Household <: Agent
 end
 
 p1 = Person(1)
@@ -83,11 +83,11 @@ finish_init!(sim)
 #apply_transition!(sim, transfoo2, [ Person ])
 
 
-struct A <: AbstractAgent end
+struct A <: Agent end
 
-struct E <: AbstractEdge end
+struct E <: EdgeState end
 
-struct ES <: AbstractEdge
+struct ES <: EdgeState
     foo::Int64
 end
 

@@ -53,7 +53,7 @@ function read_container(coll::BufferedEdgeDict{T}) where {T}
     coll.containers[coll.read]
 end
  
-# function Base.getindex(coll::BufferedEdgeDict{T}, key::AgentID) where { T <: AbstractEdge } 
+# function Base.getindex(coll::BufferedEdgeDict{T}, key::AgentID) where { T <: EdgeState } 
 #     Base.getindex(coll.containers[coll.read], key)
 # end
 

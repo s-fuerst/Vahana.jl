@@ -43,7 +43,7 @@ Base.@kwdef mutable struct BufferedAgentDict{T} <: AgentCollection{T}
     id_counter::AgentNr = 0
 end
 
-function read_container(coll::BufferedAgentDict{T}) where { T <: AbstractAgent }
+function read_container(coll::BufferedAgentDict{T}) where { T <: Agent }
     coll.containers[coll.read]
 end
 

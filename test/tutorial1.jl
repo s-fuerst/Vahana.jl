@@ -4,31 +4,31 @@ using Random
 
 import Base.+
 
-struct Buyer <: AbstractAgent
+struct Buyer <: Agent
     α::Float64
     B::Int64
 end
 Buyer() = Buyer(rand(), rand((1:100)))
 
 
-struct Seller <: AbstractAgent
+struct Seller <: Agent
     p::Float64
     sum_y::Float64
 end
 Seller() = Seller(rand() + 0.5, 0)
 
-struct KnownSellers <: AbstractEdge end
+struct KnownSellers <: EdgeState end
 
-struct Bought <: AbstractEdge
+struct Bought <: EdgeState
     x::Float64
     y::Float64
 end
 
-struct ExcessDemand <: AbstractGlobal
+struct ExcessDemand <: GlobalState
     x_minus_y::Float64
 end
 
-struct AveragePrice <: AbstractGlobal
+struct AveragePrice <: GlobalState
     p::Float64
 end
 
