@@ -6,6 +6,7 @@ export finish_init!
 export typeid
 export apply_transition, apply_transition!, apply_transition_params
 export agentstate, agentstate_from, param
+export edges_to
 export aggregate
 export show_agents, show_network
 
@@ -335,24 +336,16 @@ show_network(sim, ::Type{T}) where {T} =
 
 ######################################## Transition
 
-# TODO: Alternative for fn_access_edges, check performance compared to
-# fn_access_edges 
-
-# struct AgentEdges
-#     sim::Simulation
-#     id::AgentID
-# end
-
-# function Base.getindex(ae::AgentEdges, key)
-#     get(read_container(ae.sim.edges[key]),
-#         ae.id,
-#         Vector{statetype(ae.sim.edges[key])}())
-# end
-
-fn_access_edges(networks, id) = (sim, edgetype) ->
+"""
+    edges_to(sim::Simulation, id::AgentID, edgetype)
+"""
+edges_to(sim::Simulation, id::AgentID, edgetype) = 
     get(read_container(sim.edges[edgetype]),
         id,
         Vector{statetype(sim.edges[edgetype])}())
+
+# neighbors(sim, id, edgetypes) =
+    
 
 """
 """
@@ -404,7 +397,7 @@ function apply_transition!(sim,
 
     for coll in some_agentcolls(sim, compute)
         for (id, state) in coll
-            maybeadd(coll, id, func(state, id, fn_access_edges(networks, id), sim))
+            maybeadd(coll, id, func(state, id, sim))
         end 
     end
 

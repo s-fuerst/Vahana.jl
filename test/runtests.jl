@@ -33,18 +33,18 @@ function numAgents(sim, ::Type{T}) where {T <: AbstractAgent}
         length
 end
 
-function transfoo(p::Person, id, network, sim)
+function transfoo(p::Person, id, sim)
     Person(p.foo + 10)
 end
 
-function transfoo2(p::Person, id, network, sim)
+function transfoo2(p::Person, id, sim)
     s = reduce((s,e) ->
-        s = s + e.state.foo, network(sim, FooEdgeState); init = 0) 
+        s = s + e.state.foo, edges_to(sim, id, FooEdgeState); init = 0) 
     Person(s)
 end
 
-function transfoo3(p::Person, id, network, sim)
-    n = network(sim, FooEdgeState)
+function transfoo3(p::Person, id, sim)
+    n = edges_to(sim, id, FooEdgeState)
     if length(n) > 0
         s = agentstate_from(sim, n[1]).foo
     else
@@ -53,12 +53,12 @@ function transfoo3(p::Person, id, network, sim)
     Person(s)
 end
 
-function transnothing(p::Person, _, _, _)
+function transnothing(p::Person, _, _)
     nothing
 end
 
-function transstateless(h::HH, id, network, sim)
-    n = network(sim, StatelessEdgeType)
+function transstateless(h::HH, id, sim)
+    n = edges_to(sim, id, StatelessEdgeType)
     if length(n) > 0
         s = agentstate_from(sim, n[1]).foo
     else
@@ -67,8 +67,8 @@ function transstateless(h::HH, id, network, sim)
     HH(s)
 end
 
-function transaddedges(p::Person, _, network, sim)
-    add_edges!(sim, network(sim, FooEdgeState))
+function transaddedges(p::Person, id, sim)
+    add_edges!(sim, edges_to(sim, id, FooEdgeState))
     p
 end
 

@@ -60,8 +60,8 @@ function init_simulation(sim)
     finish_init!(sim)
 end
 
-function calc_demand(b::Buyer, id, network, sim)
-    seller_edge = rand(network(sim, KnownSellers))
+function calc_demand(b::Buyer, id, sim)
+    seller_edge = rand(edges_to(sim, id, KnownSellers))
     s = agentstate_from(sim, seller_edge)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
@@ -69,8 +69,8 @@ function calc_demand(b::Buyer, id, network, sim)
     b
 end
 
-function calc_price(s::Seller, _, network, sim)
-    edges = network(sim, Bought)
+function calc_price(s::Seller, id, sim)
+    edges = edges_to(sim, id, Bought)
     if length(edges) == 0
         return s
     end
