@@ -76,6 +76,11 @@ function some_edgecolls(sim, types)
     [ v for (k, v) in sim.edges if k in types ]
 end
 
+"""
+    finish_init!(sim::Simulation)
+
+TODO DOC
+"""
 function finish_init!(sim::Simulation)
     foreach(finishinit!, all_agentcolls(sim))
     foreach(finishinit!, all_edgecolls(sim))
@@ -257,14 +262,14 @@ function add_agents!(sim::Simulation, agents::T...) where {T <: AbstractAgent}
     [ add_agent!(sim, a) for a in agents ]
 end
 
+
 """
     show_agents(sim, ::Type{T}) where {T <: AbstractAgent}
 
 Print (some of) the agents of the type T.
 
 In a parallized simulation, only the agents that are in the partition
-of the graph associated with the function calling process are printed.
-
+of the graph associated with the function calling process are shown.
 """
 show_agents(sim, ::Type{T}) where {T <: AbstractAgent} =
     show(stdout, MIME"text/plain"(), sim.agents[typeid(sim, T)])
@@ -272,44 +277,80 @@ show_agents(sim, ::Type{T}) where {T <: AbstractAgent} =
 ######################################## Edges
 
 """
-    add_edge!(sim::Simulation, edge::Edge{T}) where {T <: AbstractEdge}
+    add_edge!(sim::Simulation, to::AgentID, edge::Edge{T}) where {T <: AbstractEdge}
 
-Add a single edge to the simulation `sim`. HIER AUCH WEITERMACHEN
+Add a single edge to the simulation `sim`. The edges is directed from
+the agent with ID `edge.from` to the agent with ID `to`.
 
-See also [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
+T must have been previously registered in the simulation by calling
+[`add_edgetype!`](@ref).
+
+See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
-function add_edge!(sim::Simulation, edge::Edge{T}) where {T <: AbstractEdge }
-    push!(sim.edges[statetype(edge)], edge)
+function add_edge!(sim::Simulation, to::AgentID, edge::Edge{T}) where
+    {T <: AbstractEdge }
+    add!(sim.edges[statetype(edge)], edge, to)
     nothing
 end
 
 """
     add_edge!(sim::Simulation, from::AgentID, to::AgentID, state::T) where {T<:AbstractEdge}
 
-Add a single edge to the simulation `sim`.
+Add a single edge to the simulation `sim`. The edge is directed
+from the agent with ID `from` to the agent with ID `to` and has the
+state `state`. 
 
-HIER WEITERMACHEN
+T must have been previously registered in the simulation by calling
+[`add_edgetype!`](@ref).
+
+In the case, that the AbstractEdge type T does not have any fields, it
+is also possible to just use T as forth parameter instead of T.
+
+See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
 function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
             ::Type{T}) where {T<:AbstractEdge}
-    add_edge!(sim, Edge{T}(from, to, T()))
+    add_edge!(sim, to, Edge{T}(from, T()))
 end
 
 function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
             state::T) where {T<:AbstractEdge}
-    add_edge!(sim, Edge{T}(from, to, state))
+    add_edge!(sim, to, Edge{T}(from, state))
 end
 
-function add_edges!(sim::Simulation, edges::Vector{Edge{T}}) where {T <: AbstractEdge}
-    [ add_edge!(sim, e) for e in edges ]
+"""
+    add_edges!(sim::Simulation, to::AgentID, edges)
+
+Add multiple `edges` at once to the simulation `sim`, with all edges
+are directed to `to`.
+
+`edges` can be any iterable set of agents, or an arbitrary number of
+edges as arguments. 
+
+T must have been previously registered in the simulation by calling
+[`add_edgetype!`](@ref).
+
+See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edge!`](@ref)
+"""
+function add_edges!(sim::Simulation, to::AgentID, edges::Vector{Edge{T}}) where {T <: AbstractEdge}
+    [ add_edge!(sim, to, e) for e in edges ]
     nothing
 end
 
-function add_edges!(sim::Simulation, edges::Edge{T}...) where {T <: AbstractEdge}
-    [ add_edge!(sim, e) for e in edges ]
+function add_edges!(sim::Simulation, to::AgentID, edges::Edge{T}...) where {T <: AbstractEdge}
+    [ add_edge!(sim, to, e) for e in edges ]
     nothing
 end
 
+"""
+    show_network(sim, ::Type{T}) where {T <: AbstractAgent}
+
+Print (some of) the edges of  type T.
+
+In a parallized simulation, only the edges that are in the partition
+of the graph associated with the function calling process are shown.
+
+"""
 show_network(sim, ::Type{T}) where {T} =
     show(stdout, MIME"text/plain"(), sim.edges[T])
 
@@ -333,16 +374,32 @@ edges_to(sim::Simulation, id::AgentID, edgetype) =
         Vector{statetype(sim.edges[edgetype])}())
 
 """
+    agentstate_from(sim::Simulation, edge::Edge) -> T<:AbstractAgent
+
+Returns the agent at the tail of `edge`.
+
+See also [`agentstate`](@ref)
 """
 agentstate_from(sim::Simulation, edge::Edge{T}) where {T<:AbstractEdge} =
     sim.agents[type_nr(edge.from)][edge.from]
 
 """
+    agentstate_from(sim::Simulation, id::AgentID) -> T<:AbstractAgent
+
+Returns the agent with `id`.
+
+See also [`agentstate_from`](@ref)
 """
 agentstate(sim::Simulation, id::AgentID) =
     sim.agents[type_nr(id)][id]
 
 """
+    param(sim::Simulation, name)
+
+Returns the parameter from the parameter tuple given to `sim` in the
+constructor of the simulation.
+
+See also [`Simulation`](@ref)
 """
 param(sim::Simulation, name) = getproperty(sim.params, name)
 
@@ -369,6 +426,9 @@ function maybeadd(::AgentCollection{T},
 end
 
 """
+    apply_transition!(sim, func, compute, networks, rebuild)
+
+TODO DOC
 """
 function apply_transition!(sim,
                     func,
@@ -394,6 +454,9 @@ function apply_transition!(sim,
 end
 
 """
+    apply_transition(sim, func, compute, networks, rebuild)
+
+TODO DOC
 """
 function apply_transition(sim,
                    func,
@@ -415,6 +478,9 @@ end
 ######################################## aggregate
 
 """
+    aggregate(sim, ::Type{T}, f, op; kwargs ...)
+
+TODO DOC
 """
 function aggregate(sim::Simulation, ::Type{T}, f, op;
             kwargs...) where {T<:AbstractAgent}

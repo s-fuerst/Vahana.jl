@@ -1,7 +1,3 @@
-export AgentCollection
-
-export BufferedAgentDict
-
 abstract type AgentCollection{ T } end
 # AgentCollection interface:
 # Base.setindex!

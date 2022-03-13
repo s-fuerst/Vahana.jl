@@ -3,8 +3,6 @@
 
 function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
     show(io, mime, edge.from)
-    print(io, " -> ")
-    show(io, mime, edge.to)
     if fieldnames(T) != ()
         print(io, ": ")
         show(io, mime, edge.state)

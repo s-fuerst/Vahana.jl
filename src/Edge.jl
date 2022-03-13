@@ -19,11 +19,15 @@ abstract type AbstractEdge end
 An edge between to agents with (optionally) additional state. T can be
 also a struct without any field.
 
+To save memory (and reduce cache misses), the AgentID of the agent at
+the head of the edge is not a field of `Edge` itself, since this
+information is already part of the containers in which the edges are
+stored.
+
 See also [`AbstractEdge`](@ref) and [`add_edgetype!`](@ref)
 """
 struct Edge{T <: AbstractEdge} 
     from::AgentID
-    to::AgentID
     state::T
 end
 

@@ -1,7 +1,3 @@
-export EdgeCollection
-
-export BufferedEdgeDict
-
 abstract type EdgeCollection{ T } end
 # EdgeCollection interface:
 # Base.push!
@@ -45,11 +41,11 @@ Base.@kwdef mutable struct BufferedEdgeDict{T} <: EdgeCollection{T}
     write::Int8 = 1
 end
 
-function Base.push!(coll::BufferedEdgeDict{T}, edge::T ) where {T} 
+function add!(coll::BufferedEdgeDict{T}, edge::T, to) where {T} 
     @mayassert coll.read != coll.write "Can not add edges of type " *
         "$(statetype(edge)). Maybe you must add $(statetype(edge)) " *
         "to the list of rebuild types in apply_transition!"
-    c = get!(coll.containers[coll.write], edge.to, Vector{T}())
+    c = get!(coll.containers[coll.write], to, Vector{T}())
     push!(c, edge)
 end
 

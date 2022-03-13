@@ -68,7 +68,7 @@ function transstateless(h::HH, id, sim)
 end
 
 function transaddedges(p::Person, id, sim)
-    add_edges!(sim, edges_to(sim, id, FooEdgeState))
+    add_edges!(sim, id, edges_to(sim, id, FooEdgeState))
     p
 end
 
@@ -122,8 +122,9 @@ end
 
 
     anotherpid = add_agent!(sim, Person(1))
-    add_edges!(sim, Edge(anotherpid, anotherpid, FooEdgeState(1)),
-                    Edge(anotherpid, anotherpid, FooEdgeState(2)))
+    add_edges!(sim, anotherpid,
+               Edge(anotherpid, FooEdgeState(1)),
+               Edge(anotherpid, FooEdgeState(2)))
     
     
  #   for i in sim.agents

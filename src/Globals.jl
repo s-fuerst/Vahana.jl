@@ -1,15 +1,31 @@
 export AbstractGlobal
 export current_state, all_states, add_globalstate!
-export aggregate!
 
 abstract type AbstractGlobal end
 
 abstract type Globals{T} end
 
-current_state(sim, T::DataType) = current_state(sim.globals[T])
+"""
+    current_state(sim, ::Type{T})
 
-all_states(sim, T::DataType) = all_states(sim.globals[T])
+TODO DOC
+"""
+current_state(sim, ::Type{T}) where {T<:AbstractGlobal} =
+    current_state(sim.globals[T])
 
+"""
+    all_states(sim, ::Type{T})
+
+TODO DOC
+"""
+all_states(sim, ::Type{T}) where {T<:AbstractGlobal} =
+    all_states(sim.globals[T])
+
+"""
+    add_globalstate!(sim, value::T) where {T <: AbstractGlobal}
+
+TODO DOC
+"""
 function add_globalstate!(sim, value::T) where {T <: AbstractGlobal}
     add_globalstate!(sim, sim.globals[T], value)
 end
