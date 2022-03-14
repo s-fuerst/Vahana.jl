@@ -9,6 +9,7 @@ export agentstate, agentstate_from, param
 export edges_to
 export aggregate
 export show_agents, show_network
+export next_iteration, globals
 
 const MAX_TYPES = typemax(TypeID)
 
@@ -18,7 +19,7 @@ const MAX_TYPES = typemax(TypeID)
 The internal structure of a simulation. Model developers should not
 access these fields directly.
 """
-Base.@kwdef struct Simulation
+Base.@kwdef struct Simulation{T}
     name::String
     params::Union{Tuple, NamedTuple}
 
@@ -28,7 +29,11 @@ Base.@kwdef struct Simulation
 
     edges::Dict{DataType, EdgeCollection} = Dict{DataType, EdgeCollection}()
 
-    globals::Dict{DataType, Globals} = Dict{DataType, Globals}()
+    globals::Dict{DataTypxe, Globals} = Dict{DataType, Globals}()
+
+    iteration::Int32 = Int32(0)
+
+    globalstruct::T
 end
 
 """
@@ -54,9 +59,31 @@ See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref),
 [`add_edges!`](@ref) and [`finish_init!`](@ref)
 """
 function Simulation(name::String,
-             params::Union{Tuple, NamedTuple})
-    Simulation(name = name, params = params)
+             params::Union{Tuple, NamedTuple},
+             globals::T) where {T}
+    Simulation(name = name, params = params, globalstruct = globals)
 end
+
+struct NoGlobals end
+
+function Simulation(name::String,
+             params::Union{Tuple, NamedTuple})
+    Simulation(name = name, params = params, globalstruct = NoGlobals)
+end
+
+
+function next_iteration(sim)
+    Simulation(sim.name,
+               sim.params,
+               sim.agents,
+               sim.agent_typeids,
+               sim.edges,
+               sim.globals,
+               Int32(sim.iteration + 1),
+               sim.globalstruct)
+end
+
+globals(sim::Simulation) = sim.globalstruct
 
 function all_agentcolls(sim)
     # TODO: Check if you could/should use genetors instead of comprehensions

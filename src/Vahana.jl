@@ -2,7 +2,7 @@ module Vahana
 
 export enable_asserts
 
-asserting() = true #making this a function results in code being invalidated and recompiled when this gets changed
+asserting() = false #making this a function results in code being invalidated and recompiled when this gets changed
 
 macro mayassert(test)
   esc(:(if $(@__MODULE__).asserting()

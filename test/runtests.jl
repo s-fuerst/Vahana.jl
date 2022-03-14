@@ -72,8 +72,10 @@ function transaddedges(p::Person, id, sim)
     p
 end
 
+struct EmptyGlobals end
+
 @testset "Initialization" begin
-    sim = Simulation("Example", ())
+    sim = Simulation("Example", (), EmptyGlobals())
 
     p1 = Person(1)
     p2 = Person(2)
