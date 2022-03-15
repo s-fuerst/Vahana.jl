@@ -72,10 +72,9 @@ function transaddedges(p::Person, id, sim)
     p
 end
 
-struct EmptyGlobals end
 
 @testset "Initialization" begin
-    sim = Simulation("Example", (), EmptyGlobals())
+    sim = Simulation("Example", nothing, nothing)
 
     p1 = Person(1)
     p2 = Person(2)
@@ -163,38 +162,22 @@ struct EmptyGlobals end
 
 
 @testset "Globals" begin
-    struct GlobalFoo <: GlobalState
+    mutable struct TestGlobals
         foo::Float64
-        bar::Int64
+        bar::Vector{Int64}
     end
-
-    struct GlobalBar <: GlobalState
-        foo::Float64
-        bar::Int64
-    end
-
     
-    sim = Simulation("Globals Test", ())
-    add_globalstatetype!(sim, GlobalFoo)
-    add_globalstate!(sim, GlobalFoo(1.1, 1))
+    sim = Simulation("Globals Test", nothing, TestGlobals(0,Vector{Int64}()))
+    setglobal!(sim, :foo, 1.1)
+    pushglobal!(sim, :bar, 1)
+    pushglobal!(sim, :bar, 2)
 
-    @test current_state(sim, GlobalFoo) == GlobalFoo(1.1, 1)
-
-    add_globalstate!(sim, GlobalFoo(0, 2))
-    @test current_state(sim, GlobalFoo) == GlobalFoo(0, 2)
-    @test all_states(sim, GlobalFoo) == GlobalFoo(0, 2)
-
-    add_globalseriestype!(sim, GlobalBar)
-    add_globalstate!(sim, GlobalBar(0, 0))
-    @test current_state(sim, GlobalBar) == GlobalBar(0, 0)
-
-    add_globalstate!(sim, GlobalBar(1, 1))
-    @test current_state(sim, GlobalBar) == GlobalBar(1, 1)
-    @test all_states(sim, GlobalBar) |> first == GlobalBar(0, 0)
+    @test getglobal(sim, :foo) == 1.1
+    @test getglobal(sim, :bar) == [1, 2]
 end
 
 @testset "Aggregate" begin
-    sim = Simulation("Aggregate", ())
+    sim = Simulation("Aggregate", nothing, nothing)
 
     add_agenttype!(sim, Person)
     pids = add_agents!(sim, [ Person(i) for i in 1:10 ])
@@ -211,11 +194,10 @@ end
 
 
 @testset "Tutorial1" begin
-    
     include("tutorial1.jl")
-    params = (numBuyer = 500, numSeller = 2, knownSellers = 2)
+    params = Params(numBuyer = 500, numSeller = 2, knownSellers = 2)
     
     sim = run_simulation(5, params)
 
-    @test 0.8 < current_state(sim, AveragePrice).p < 1.2
+    @test 0.8 < last(getglobal(sim, :p)) < 1.2
 end

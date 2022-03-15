@@ -1,6 +1,5 @@
 export Simulation
 export add_agenttype!, add_edgetype!
-export add_globalstatetype!, add_globalseriestype!
 export add_agent!, add_agents!, add_edge!, add_edges!
 export finish_init!
 export typeid
@@ -9,7 +8,7 @@ export agentstate, agentstate_from, param
 export edges_to
 export aggregate
 export show_agents, show_network
-export next_iteration, globals
+export setglobal!, getglobal, pushglobal!
 
 const MAX_TYPES = typemax(TypeID)
 
@@ -19,21 +18,16 @@ const MAX_TYPES = typemax(TypeID)
 The internal structure of a simulation. Model developers should not
 access these fields directly.
 """
-Base.@kwdef struct Simulation{T}
+Base.@kwdef struct Simulation{P, G}
     name::String
-    params::Union{Tuple, NamedTuple}
+    params::P
+    globals::G
 
     # TODO: rename to agent_colls
     agents::Vector{AgentCollection} = Vector{AgentCollection}(undef, MAX_TYPES)
     agent_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
 
     edges::Dict{DataType, EdgeCollection} = Dict{DataType, EdgeCollection}()
-
-    globals::Dict{DataTypxe, Globals} = Dict{DataType, Globals}()
-
-    iteration::Int32 = Int32(0)
-
-    globalstruct::T
 end
 
 """
@@ -59,31 +53,27 @@ See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref),
 [`add_edges!`](@ref) and [`finish_init!`](@ref)
 """
 function Simulation(name::String,
-             params::Union{Tuple, NamedTuple},
-             globals::T) where {T}
-    Simulation(name = name, params = params, globalstruct = globals)
+             params::P,
+             globals::G) where {P, G}
+    Simulation(name = name, params = params, globals = globals)
 end
 
-struct NoGlobals end
+"""
+TODO DOC
+"""
+getglobal(sim::Simulation, name) = getfield(sim.globals, name)
 
-function Simulation(name::String,
-             params::Union{Tuple, NamedTuple})
-    Simulation(name = name, params = params, globalstruct = NoGlobals)
-end
+"""
+TODO DOC
+"""
+setglobal!(sim::Simulation, name, value) = setfield!(sim.globals, name, value)
 
+"""
+TODO DOC
+"""
+pushglobal!(sim::Simulation, name, value) =
+    setfield!(sim.globals, name, push!(getfield(sim.globals, name), value))
 
-function next_iteration(sim)
-    Simulation(sim.name,
-               sim.params,
-               sim.agents,
-               sim.agent_typeids,
-               sim.edges,
-               sim.globals,
-               Int32(sim.iteration + 1),
-               sim.globalstruct)
-end
-
-globals(sim::Simulation) = sim.globalstruct
 
 function all_agentcolls(sim)
     # TODO: Check if you could/should use genetors instead of comprehensions
@@ -167,71 +157,6 @@ See also [`add_edge!`](@ref) and [`add_edges!`](@ref)
 function add_edgetype!(sim::Simulation, ::Type{T}) where {T <: EdgeState}
     @assert isbitstype(T)
     push!(sim.edges, T => BufferedEdgeDict{Edge{T}}())
-end
-
-"""
-    add_globalstatetype!(sim::Simulation, ::Type{T}) where {T <: GlobalState}
-
-Registration of an additional global type for `sim` that stores a single value.
-
-The values of global types are accessible to all agents. In terms of
-the graph structure of Vahana, this can be interpreted as there being
-an implicit edge from a single node per global type to all agents.
-
-For global types registered with add_globalstatetype! only one
-instance of this type is stored in the simulation. This is often
-useful for a global state used by the simulation itself, e.g. the GDP
-of an economy. The current value of global types can be updated via
-[`add_globalstate`](@ref) and retreived via [`current_state`](@ref).
-
-Global types can also used for (time) series, see [`add_globalseriestype!`](@ref).
-
-These global types must be a subtype of `GlobalState`, and also bits
-types, meaning the type is immutable and contains only primitive types
-and other bits types.
-
-Can only be called before [`finish_init!`](@ref)
-
-See also [`add_globalseriestype!`](@ref), [`add_globalstate!`](@ref)
-and [`current_state`](@ref)
-
-"""
-function add_globalstatetype!(sim::Simulation, ::Type{T}) where {T <: GlobalState}
-    @assert isbitstype(T)
-    push!(sim.globals, T => EmptyGlobal{GlobalSingle, T}())
-end
-
-"""
-    add_globalseriestype!(sim::Simulation, ::Type{T}) where {T <: GlobalState}
-
-Register an additional global type to `sim` that stores a series of values.
-
-The values of global types are accessible to all agents. In terms of
-the graph structure of Vahana, this can be interpreted as there being
-an implicit edge from a single node per global type to all agents.
-
-For global types registered with add_globalseriestype!, all values
-added via [`add_globalstate!`](@ref) are stored in a vector of type T in
-the simulation. The most recently added value can be retrieved via
-[`current_state`](@ref), and the entire vector via
-[`all_states`](@ref).
-
-If only the last value is needed, [`add_globalstatetype!`](@ref) can
-also be used to register the type.
-
-These global types must be a subtype of `GlobalState`, and also bits
-types, meaning the type is immutable and contains only primitive types
-and other bits types.
-
-Can only be called before [`finish_init!`](@ref)
-
-See also [`add_globalstatetype!`](@ref), [`add_globalstate!`](@ref),
-[`aggregate`](@ref) [`all_states`](@ref) and [`current_state`](@ref)
-
-"""
-function add_globalseriestype!(sim::Simulation, ::Type{T}) where {T <: GlobalState}
-    @assert isbitstype(T)
-    push!(sim.globals, T => EmptyGlobal{GlobalSeries, T}())
 end
 
 ######################################## Agents
@@ -428,7 +353,7 @@ constructor of the simulation.
 
 See also [`Simulation`](@ref)
 """
-param(sim::Simulation, name) = getproperty(sim.params, name)
+param(sim::Simulation, name) = getfield(sim.params, name)
 
 
 # func(agent, id, networks, sim)

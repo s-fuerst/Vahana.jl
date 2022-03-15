@@ -24,14 +24,16 @@ struct Bought <: EdgeState
     y::Float64
 end
 
-struct ExcessDemand <: GlobalState
-    x_minus_y::Float64
+Base.@kwdef struct Params
+    numBuyer::Int64
+    numSeller::Int64
+    knownSellers::Int64
 end
 
-struct AveragePrice <: GlobalState
-    p::Float64
+mutable struct Globals
+    x_minus_y::Vector{Float64}
+    p::Vector{Float64}
 end
-
 
 import Base.+
     
@@ -44,9 +46,6 @@ function init_simulation(sim)
     add_edgetype!(sim, KnownSellers)
     add_edgetype!(sim, Bought)
 
-    add_globalseriestype!(sim, ExcessDemand)
-    add_globalseriestype!(sim, AveragePrice)
-    
     buyerids = add_agents!(sim, [ Buyer() for _ in 1:param(sim, :numBuyer)])
 
     sellerids = add_agents!(sim, [ Seller() for _ in 1:param(sim, :numSeller)])
@@ -85,16 +84,15 @@ function calc_average_price(sim)
 end
 
 function run_simulation(steps, params)
-    sim = Simulation("Tutorial1", params)
+    sim = Simulation("Tutorial1", params, Globals(Vector(), Vector()))
 
     init_simulation(sim)
 
     for _ in 1:steps
         apply_transition!(sim, calc_demand, [ Buyer ], [ KnownSellers], [ Bought ])
-        add_globalstate!(sim, ExcessDemand(
-            aggregate(sim, Bought, b -> b.x - b.y, +)))
+        pushglobal!(sim, :x_minus_y, aggregate(sim, Bought, b -> b.x - b.y, +))
         apply_transition!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
-        add_globalstate!(sim, AveragePrice(calc_average_price(sim)))
+        pushglobal!(sim, :p, calc_average_price(sim))
     end
 
     sim

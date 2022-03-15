@@ -32,8 +32,6 @@ include("Collections.jl")
 include("AgentCollections.jl")
 include("EdgeCollections.jl")
 
-include("Globals.jl")
-
 include("Simulation.jl")
 
 include("PrettyPrinting.jl")
