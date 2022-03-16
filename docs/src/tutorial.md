@@ -147,9 +147,7 @@ namely the development of the average price and excess demand.
 We now have all the elements needed to initialize a simulation. So the
 first thing we need to do is create a `Simulation` object. The the
 `Simulation` constructor needs two parameters, first the name of the
-simulation and second the parameters for the simulation in the form of
-a named tuple. (Hint: If a NamedTupe has only one element, it must
-have a ',' after the value, e.g. Simulation("Name", (steps = 100,))
+simulation, second the parameters struct and third the globals struct.
 
     sim = Simulation("Excess Demand",
     		 Params(numBuyer = 50, numSeller = 5, knownSellers = 2),
