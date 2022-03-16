@@ -32,14 +32,14 @@ end
 """
     Simulation(name::String, params, globals)
 
-Create a new simulation object, which stores the complete state of a simulation.
+Create a new simulation object, which stores the complete state of a simulation. 
 
 `name` is used as meta-information about the simulation and has no
 effect on the dynamics, since `name` is not accessible in the
 transition functions. 
 
 `params` must be a struct (or `nothing`) that contains all parameters of a
-simulation. Parameter values are constant via in simulation and can be
+simulation. Parameter values are constant in a simulation run and can be
 retrieved via the [`param`](@ref) function.
 
 `globals` must be a mutable struct (or `nothing`). The values of these fields are
@@ -368,7 +368,7 @@ agentstate_from(sim::Simulation, edge::Edge{T}) where {T<:EdgeState} =
     sim.agents[type_nr(edge.from)][edge.from]
 
 """
-    agentstate_from(sim::Simulation, id::AgentID) -> T<:Agent
+    agentstate(sim::Simulation, id::AgentID) -> T<:Agent
 
 Returns the agent with `id`.
 
@@ -457,7 +457,7 @@ function apply_transition!(sim,
 end
 
 """
-    apply_transition(sim, func, compute, networks, rebuild)
+    apply_transition(sim, func, compute, networks, rebuild) -> Simulation
 
 Wraps [`apply_transition!`](@ref) with a deepcopy so that the state of
 `sim` itself is not changed.
@@ -496,11 +496,11 @@ edges of type T.
 `f` is applied to all of these agents or edges and then `op` is used to
 reduce (aggregate) the values returned by `f`.
 
-aggregate is based on [`mapreduce`](@ref), `f`, `op` and `kwargs` are
+aggregate is based on [`Base.mapreduce`](@ref), `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
 
-See also [`mapreduce`](@ref)
+See also [`Base.mapreduce`](@ref)
 """
 function aggregate(sim::Simulation, ::Type{T}, f, op;
             kwargs...) where {T<:Agent}

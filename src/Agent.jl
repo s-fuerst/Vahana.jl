@@ -21,6 +21,15 @@ const AgentID = UInt64
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
     BITS_PROCESS + BITS_AGENTNR 
 
+"""
+    abstract type Agent
+
+The different agent types must be concrete subtypes of
+~Agent~. These structs define the state of an
+edge, but not their (internal) IDs.
+
+See also [`add_agenttype!`](@ref) and [`add_agents!`](@ref)
+"""
 abstract type Agent end
 
 const shift_type = BITS_PROCESS + BITS_AGENTNR
