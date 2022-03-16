@@ -32,29 +32,21 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
         end
     end
 
-    function show_global_types(io::IO, globals)
-        if length(globals) >= 1 
-            printstyled(io, "\nGlobal(s):"; color = :cyan)
-            for (k, v) in globals
-                if typeof(v) == GlobalSeries{k}
-                    print(io, "\n\t Series{$k} with $(length(all_states(v))) " *
-                        "element(s). Current state: $(current_state(sim, k))")
-                elseif typeof(v) == EmptyGlobal{GlobalSeries, k} ||
-                    typeof(v) == EmptyGlobal{GlobalSingle, k}
-                    print(io, "\n\t $k (empty)")
-                else
-                    print(io, "\n\t $(current_state(sim, k))")
-                end
+    function show_struct(io::IO, s, name)
+        if nfields(s) >= 1 
+            printstyled(io, "\n$(name)(s):"; color = :cyan)
+            for k in typeof(s) |> fieldnames
+                print(io, "\n\t $k: $(getfield(s, k))")
             end
-#            println()
         end
     end
     
-    printstyled(io, "Simulation Name: ", sim.name, "\n"; color = :green)
-    print(io, "Parameters: ", sim.params)
+    printstyled(io, "Simulation Name: ", sim.name; color = :green)
+    show_struct(io, sim.params, "Parameter")
     show_agent_types(io, sim.agent_typeids, sim.agents)
     show_edge_types(io, sim.edges)
-    show_global_types(io, sim.globals)
+ #   print(io, "Globals: ", sim.globals)
+    show_struct(io, sim.globals, "Global")
 end
 
 ######################################## Collections
@@ -78,7 +70,7 @@ end
 ######################################## Buffered Collections
 
 function show_buffered_collection(io::IO, mime::MIME"text/plain", coll) 
-    printstyled(io, typeof(coll), "\n"; color = :blue)
+    printstyled(io, typeof(coll), "\n"; color = :green)
     if length(coll.containers[coll.read]) > 0 
         printstyled(io, "Read:\n"; color = :cyan)
         show_collection(io, mime, coll.containers[coll.read])

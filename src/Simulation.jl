@@ -11,7 +11,6 @@ export show_agents, show_network
 export setglobal!, getglobal, pushglobal!
 
 const MAX_TYPES = typemax(TypeID)
-
 """
     struct Simulation
 
@@ -31,26 +30,30 @@ Base.@kwdef struct Simulation{P, G}
 end
 
 """
-    Simulation(name::String, params::Union{Tuple, NamedTuple})
+    Simulation(name::String, params, globals)
 
 Create a new simulation object, which stores the complete state of a simulation.
 
 `name` is used as meta-information about the simulation and has no
 effect on the dynamics, since `name` is not accessible in the
-transition functions. The `param`eter`s` of the simulation can be
-accessed via the [`param`](@ref) function. (Hint: If a NamedTupe has
-only one element, it must have a ',' after the value,
-e.g. Simulation("Name", (steps = 100,)) )
+transition functions. 
+
+`params` must be a struct (or `nothing`) that contains all parameters of a
+simulation. Parameter values are constant via in simulation and can be
+retrieved via the [`param`](@ref) function.
+
+`globals` must be a mutable struct (or `nothing`). The values of these fields are
+accessible for all agents via the [`getglobal`](@ref) function. The values can
+be changed by calling [`setglobal!`](@ref) or [`pushglobal!`](@ref). 
 
 The simulation starts in an uninitialized state. After registering all
 types of the simulation and adding the agents and edges for the
 initial state, it is necessary to call [`finish_init!`](@ref) before
 applying a transition function for the first time.
 
-See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref), 
-[`add_globalstatetype!`](@ref), [`add_globalseriestype!`](@ref), 
-[`add_agent!`](@ref), [`add_agents!`](@ref), [`add_edge!`](@ref), 
-[`add_edges!`](@ref) and [`finish_init!`](@ref)
+See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref), [`param`](@ref),
+[`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
+and [`finish_init!`](@ref)
 """
 function Simulation(name::String,
              params::P,
@@ -59,17 +62,40 @@ function Simulation(name::String,
 end
 
 """
-TODO DOC
+    getglobal(sim::Simulation, name)
+
+Returns the value of the field `name` of the `globals` struct from the
+[`Simulation`](@ref) constructor.
+
+See also [`Simulation`](@ref), [`setglobal!`](@ref) and [`pushglobal!`](@ref)
 """
 getglobal(sim::Simulation, name) = getfield(sim.globals, name)
 
 """
-TODO DOC
+    setglobal!(sim::Simulation, name, value)
+
+Set the value of the field `name` of the `globals` struct from the
+[`Simulation`](@ref) constructor. 
+
+`setglobal!` must not be called within a transition function. 
+
+See also [`Simulation`](@ref), [`aggregate`](@ref), [`pushglobal!`](@ref) and
+[`getglobal`](@ref)
 """
 setglobal!(sim::Simulation, name, value) = setfield!(sim.globals, name, value)
 
 """
-TODO DOC
+    pushglobal!(sim::Simulation, name, value)
+
+In the case that a field of the `globals` struct from the Simulation
+constructor is a vector (e.g. for time series data), `pushglobal!` can
+be used to add a value to this vector, instead of writing
+`setglobal!(sim, name, push!(getglobal(sim, name), value)`.
+
+`pushglobal!` must not be called within a transition function. 
+
+See also [`Simulation`](@ref), [`aggregate`](@ref), [`setglobal!`](@ref) and
+[`getglobal`](@ref)
 """
 pushglobal!(sim::Simulation, name, value) =
     setfield!(sim.globals, name, push!(getfield(sim.globals, name), value))
@@ -96,7 +122,13 @@ end
 """
     finish_init!(sim::Simulation)
 
-TODO DOC
+Finish the initialization phase of the simulation. 
+
+Must be called before applying a transition function. All types of agents and
+edges must be registered before `finish_init!` is called.
+
+See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref) and
+[`apply_transition!`](@ref)
 """
 function finish_init!(sim::Simulation)
     foreach(finishinit!, all_agentcolls(sim))
@@ -348,8 +380,8 @@ agentstate(sim::Simulation, id::AgentID) =
 """
     param(sim::Simulation, name)
 
-Returns the parameter from the parameter tuple given to `sim` in the
-constructor of the simulation.
+Returns the value of the field `name` of the `params` struct from the
+Simulation constructor.
 
 See also [`Simulation`](@ref)
 """
@@ -380,7 +412,28 @@ end
 """
     apply_transition!(sim, func, compute, networks, rebuild)
 
-TODO DOC
+Apply the transition function `func` to the simulation state. 
+
+A transition function must have the following signature: `function(agent::T,
+id::AgentID, sim::Simulation)` and must return either an agent of type
+T or `nothing`. If `nothing` is returned, the agent will be removed
+from the simulation, otherwise the agent with id `id` will have
+(starting with the next apply_transition! call) the returned state.
+
+`compute` is a vector of Agent types. `func` is called for every agent
+with a type that is listed in `compute`, so a method for each of this types
+must be implemented.
+
+`network` is a vector of Edge types. Inside of `func`
+[`edges_to`](@ref) can be only called for types in `network`.
+
+`rebuild` is a vector of Agent and/or Edge types. All the instances of
+agents or edges with a type in `rebuild` will be removed and must be
+added again inside of `func`. Also [`add_agent!`](@ref),
+[`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
+can be only called for types in `network` or `compute`.
+
+See also [`apply_transition`](@ref)
 """
 function apply_transition!(sim,
                     func,
@@ -401,14 +454,19 @@ function apply_transition!(sim,
     foreach(finish_write!, some_agentcolls(sim, writeable))
     foreach(finish_write!, some_edgecolls(sim, writeable))
     sim
-
-    add_agenttype!
 end
 
 """
     apply_transition(sim, func, compute, networks, rebuild)
 
-TODO DOC
+Wraps [`apply_transition!`](@ref) with a deepcopy so that the state of
+`sim` itself is not changed.
+
+Can be very useful during development, especially if Vahana is used in
+the REPL. However, for performance reasons, this function should not
+be used in the final code.
+
+See also [`apply_transition!`](@ref)
 """
 function apply_transition(sim,
                    func,
@@ -423,7 +481,7 @@ end
 function apply_transition_params(sim, compute::DataType, networks::Vector)
     coll = some_agentcolls(sim, [ compute ])[1]
     (id, state) = coll |> first
-    (state, id, fn_access_edges(networks, id))
+    (state, id)
 end
 
 
@@ -432,7 +490,17 @@ end
 """
     aggregate(sim, ::Type{T}, f, op; kwargs ...)
 
-TODO DOC
+Calculate an aggregated value, based on the state of all agents or
+edges of type T.
+
+`f` is applied to all of these agents or edges and then `op` is used to
+reduce (aggregate) the values returned by `f`.
+
+aggregate is based on [`mapreduce`](@ref), `f`, `op` and `kwargs` are
+passed directly to mapreduce, while `sim` and `T` are used to determine the
+iterator.
+
+See also [`mapreduce`](@ref)
 """
 function aggregate(sim::Simulation, ::Type{T}, f, op;
             kwargs...) where {T<:Agent}
