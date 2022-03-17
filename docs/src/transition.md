@@ -3,6 +3,7 @@ CurrentModule = Vahana
 ```
 
 ```@docs
+apply_transition!
 apply_transition
 ```
 
