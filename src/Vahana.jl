@@ -35,4 +35,6 @@ include("EdgeCollections.jl")
 include("Simulation.jl")
 
 include("PrettyPrinting.jl")
+
+include("REPL.jl")
 end

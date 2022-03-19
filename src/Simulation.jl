@@ -7,7 +7,6 @@ export apply_transition, apply_transition!, apply_transition_params
 export agentstate, agentstate_from, param
 export edges_to
 export aggregate
-export show_agents, show_network
 export setglobal!, getglobal, pushglobal!
 
 const MAX_TYPES = typemax(TypeID)
@@ -247,17 +246,6 @@ function add_agents!(sim::Simulation, agents::T...) where {T <: Agent}
 end
 
 
-"""
-    show_agents(sim, ::Type{T}) where {T <: Agent}
-
-Print (some of) the agents of the type T.
-
-In a parallized simulation, only the agents that are in the partition
-of the graph associated with the function calling process are shown.
-"""
-show_agents(sim, ::Type{T}) where {T <: Agent} =
-    show(stdout, MIME"text/plain"(), sim.agents[typeid(sim, T)])
-
 ######################################## Edges
 
 """
@@ -325,18 +313,6 @@ function add_edges!(sim::Simulation, to::AgentID, edges::Edge{T}...) where {T <:
     [ add_edge!(sim, to, e) for e in edges ]
     nothing
 end
-
-"""
-    show_network(sim, ::Type{T}) where {T <: Agent}
-
-Print (some of) the edges of  type T.
-
-In a parallized simulation, only the edges that are in the partition
-of the graph associated with the function calling process are shown.
-
-"""
-show_network(sim, ::Type{T}) where {T} =
-    show(stdout, MIME"text/plain"(), sim.edges[T])
 
 ######################################## Transition
 

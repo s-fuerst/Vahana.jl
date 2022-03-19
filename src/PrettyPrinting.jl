@@ -27,7 +27,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
             printstyled(io, "\nNetwork(s):"; color = :cyan)
             for (k, v) in edges
                 print(io, "\n\t $k \
-                           with $(show_num_edges(v)) Edges for $(show_length(v)) Agent(s)")
+                           with $(show_num_edges(v)) Edge(s) for $(show_length(v)) Agent(s)")
             end
         end
     end
@@ -41,7 +41,7 @@ function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
         end
     end
     
-    printstyled(io, "Simulation Name: ", sim.name; color = :green)
+    printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
     show_struct(io, sim.params, "Parameter")
     show_agent_types(io, sim.agent_typeids, sim.agents)
     show_edge_types(io, sim.edges)
@@ -70,7 +70,7 @@ end
 ######################################## Buffered Collections
 
 function show_buffered_collection(io::IO, mime::MIME"text/plain", coll) 
-    printstyled(io, typeof(coll), "\n"; color = :green)
+#    printstyled(io, typeof(coll), "\n"; color = :magenta)
     if length(coll.containers[coll.read]) > 0 
         printstyled(io, "Read:\n"; color = :cyan)
         show_collection(io, mime, coll.containers[coll.read])
@@ -107,20 +107,21 @@ function show_length(coll::BufferedEdgeDict{T}) where {T}
     show_buffered_length(coll)
 end
 
-function show_num_edges(coll::BufferedEdgeDict{T}) where {T}
-    function l(coll)
-        if length(coll) > 0
-            mapreduce(length, +, values(coll))
-        else
-            0
-        end
+function _num_edges(coll)
+    if length(coll) > 0
+        mapreduce(length, +, values(coll))
+    else
+        0
     end
+end
 
+function show_num_edges(coll::BufferedEdgeDict{T}) where {T}
+ 
     cs = coll.containers
     if coll.read != coll.write
-        "$(l(cs[coll.read]))/$(l(cs[coll.write])) (R/W)"
+        "$(_num_edges(cs[coll.read]))/$(_num_edges(cs[coll.write])) (R/W)"
     else
-        "$(l(cs[coll.read]))"
+        "$(_num_edges(cs[coll.read]))"
     end
 end
     
