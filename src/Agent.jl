@@ -3,6 +3,7 @@ export Agent
 export agent_id
 export TypeID
 export type_nr
+export agentstates
 
 const TypeID = UInt8
 const BITS_TYPE = 8
@@ -61,4 +62,6 @@ function agent_nr(id::AgentID)::AgentNr
 end
 
 @assert agent_id(3, 1) |> type_nr == 3
-    
+
+
+

@@ -297,8 +297,7 @@ e.g. to `from` IDs of edges derived by `edges_to`.
 One of the available edges to a sellers is selected using the `rand`
 function.
 
-For this seller the state is accessed via the `agentstate_from`
-function (or alternatively via `agentstate(sim, seller_edge.from)`).
+For this seller the state is accessed via the `agentstate` function.
 Then the agent calculates it's demand for the goods $x$ and $y$, and
 adds an edge with the information about the demand to the `Bought`
 network, which is then used in the next transition function by the
@@ -312,7 +311,7 @@ got as function parameter.
 
     function calc_demand(b::Buyer, id, sim)
         seller_edge = rand(edges_to(sim, id, KnownSellers))
-        s = agentstate_from(sim, seller_edge)
+        s = agentstate(sim, seller_edge.from)
         x = b.B * b.α
         y = b.B * (1 - b.α) / s.p
         add_edge!(sim, id, seller_edge.from, Bought(x, y))
@@ -328,7 +327,7 @@ edges that are pointing to them via the `network(sim, Bought)`.
 
 In the case that they sold nothing, and therefore no edge (or to be
 more exact, a Vector with the lenght 0) is returned, they do not
-change there state. Otherwise the `states` function is used get a
+change there state. Otherwise the `edgestates` function is used get a
 Vector that only contain the states of all the edges. Remember that we
 defined addition for `Bought`. This allows us to use the + Operator in
 reduce to calculate the sum of all sold goods.
@@ -341,7 +340,7 @@ price as shown in equation (\ref{eqn:price}).
         if length(edges) == 0
     	return s
         end
-        q = reduce(+, states(edges))
+        q = reduce(+, edgestates(edges))
         Seller(q.y / q.x * s.p, q.y)
     end
 

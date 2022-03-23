@@ -4,7 +4,8 @@ export add_agent!, add_agents!, add_edge!, add_edges!
 export finish_init!
 export typeid
 export apply_transition, apply_transition!, apply_transition_params
-export agentstate, agentstate_from, param
+export agentstate, param
+export neighborstates
 export edges_to
 export aggregate
 export setglobal!, getglobal, pushglobal!
@@ -325,33 +326,44 @@ Should only be used inside a transition function and only for the ID specified
 as a transition function parameter. Calling edges_to outside a transition function
 or with other IDs may result in undefined behavior.
 
-See also [`apply_transition!`](@ref), [`states`](@ref) and
-[`neighbors`](@ref)
+See also [`apply_transition!`](@ref), [`neighborstates`](@ref),
+[`edgestates`](@ref) and [`neighbors`](@ref)
 """
 edges_to(sim::Simulation, id::AgentID, edgetype) = 
     get(read_container(sim.edges[edgetype]),
         id,
         Vector{statetype(sim.edges[edgetype])}())
 
-"""
-    agentstate_from(sim::Simulation, edge::Edge) -> T<:Agent
-
-Returns the agent at the tail of `edge`.
-
-See also [`agentstate`](@ref)
-"""
-agentstate_from(sim::Simulation, edge::Edge{T}) where {T<:EdgeState} =
-    sim.agents[type_nr(edge.from)][edge.from]
 
 """
     agentstate(sim::Simulation, id::AgentID) -> T<:Agent
 
 Returns the agent with `id`.
-
-See also [`agentstate_from`](@ref)
 """
 agentstate(sim::Simulation, id::AgentID) =
     sim.agents[type_nr(id)][id]
+
+"""
+    neighborstates(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Agent}
+
+Returns all incoming neighbors of agent `id` for the network `T`.
+
+Should only be used inside a transition function and only for the ID specified
+as a transition function parameter. Calling agents_to outside a transition function
+or with other IDs may result in undefined behavior.
+
+In a parallel run, this function can trigger communication between
+processes. In the case that the state of ALL agents is not needed in
+the transition function, the performance can be likely increased by
+using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
+for the agents whose state is actually used in the transition
+function.
+
+See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
+[`neighbors`](@ref)
+"""
+neighborstates(sim::Simulation, id::AgentID, edgetype) =
+    map(e -> agentstate(sim, e.from), edges_to(sim, id, edgetype))  
 
 """
     param(sim::Simulation, name)
@@ -493,6 +505,6 @@ function aggregate(sim::Simulation, ::Type{T}, f, op;
         values |>
         Iterators.flatten |>
         collect |>
-        states
+        edgestates
     mapreduce(f, op, edges; kwargs...)
 end

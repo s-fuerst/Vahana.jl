@@ -1,4 +1,4 @@
-export EdgeState, Edge, states, neighbors
+export EdgeState, Edge, edgestates, neighbors
 
 """
     abstract type EdgeState
@@ -13,6 +13,9 @@ abstract type EdgeState end
 
 """
     struct Edge{T <: EdgeState} 
+        from::AgentID
+        state::T
+    end
 
 An edge between to agents with (optionally) additional state. T can be
 also a struct without any field.
@@ -38,21 +41,18 @@ Returns all IDs of the agents at the tail of the edges in `v`.
 
 Used mainly in combination with [`edges_to`](@ref).
 
-See also [`edges_to`](@ref) 
+See also [`neighborstates`](@ref) 
 """
 neighbors(v::Vector{Edge{T}}) where {T<:EdgeState} = map(e -> e.from, v)
 
-
 """
-    states(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{EdgeState}
+    edgestates(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{EdgeState}
 
 Return all states from a vector of edges. 
 
 Used mainly in combination with [`edges_to`](@ref).
-
-See also [`edges_to`](@ref) 
 """
-states(v::Vector{Edge{T}}) where {T<:EdgeState} = map(e -> e.state, v)
+edgestates(v::Vector{Edge{T}}) where {T<:EdgeState} = map(e -> e.state, v)
 
 # struct CircularEdge{T <: EdgeState} <: AbstractCompleteEdge
 #     to::AgentID

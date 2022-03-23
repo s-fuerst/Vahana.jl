@@ -18,14 +18,8 @@ add_edgetype!
 add_edge!
 add_edges!
 
+add_graph!
+add_grid!
+
 finish_init!
 ```
-
-<!-- Sometimes it's necessary to calculate some global values before calling the first transition function: -->
-
-<!-- ```@docs -->
-<!-- aggregate -->
-
-<!-- setglobal! -->
-<!-- pushglobal! -->
-<!-- ``` -->

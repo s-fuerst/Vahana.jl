@@ -10,5 +10,6 @@ makedocs(sitename="Vahana Documentation",
                  "Between transitions" => "between.md",
                  "REPL helpers" => "repl.md"
                  # "All" => "index.md"
-             ]
+             ],
+             "Change Log" => "changelog.md"
          ])

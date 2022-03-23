@@ -46,7 +46,7 @@ end
 function transfoo3(p::Person, id, sim)
     n = edges_to(sim, id, FooEdgeState)
     if length(n) > 0
-        s = agentstate_from(sim, n[1]).foo
+        s = agentstate(sim, n[1].from).foo
     else
         s = -1
     end
@@ -201,3 +201,6 @@ end
 
     @test 0.8 < last(getglobal(sim, :p)) < 1.2
 end
+
+include("graphs.jl")
+include("grid.jl")

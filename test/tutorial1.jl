@@ -61,7 +61,7 @@ end
 
 function calc_demand(b::Buyer, id, sim)
     seller_edge = rand(edges_to(sim, id, KnownSellers))
-    s = agentstate_from(sim, seller_edge)
+    s = agentstate(sim, seller_edge.from)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
     add_edge!(sim, id, seller_edge.from, Bought(x, y))
@@ -73,7 +73,7 @@ function calc_price(s::Seller, id, sim)
     if length(edges) == 0
         return s
     end
-    q = reduce(+, states(edges))
+    q = reduce(+, edgestates(edges))
     Seller(q.y / q.x * s.p, q.y)
 end
 

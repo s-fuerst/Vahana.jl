@@ -14,11 +14,11 @@ param
 getglobal
 
 edges_to
-agentstate_from
 
-neighbors
 agentstate
+neighbors
+neighborstates
 
-states
+edgestates
 
 ```
