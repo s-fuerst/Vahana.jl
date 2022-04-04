@@ -3,9 +3,8 @@ CurrentModule = Vahana
 ```
 
 ```@docs
-aggregate
-calc_raster
+Agent
 
-setglobal!
-pushglobal!
+Edge
+EdgeState
 ```

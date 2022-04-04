@@ -27,6 +27,8 @@ Base.@kwdef struct Simulation{P, G}
     agent_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
 
     edges::Dict{DataType, EdgeCollection} = Dict{DataType, EdgeCollection}()
+
+    rasters::Dict{Symbol, Array{AgentID,2}} = Dict{Symbol, Array{AgentID,2}}()
 end
 
 """

@@ -5,6 +5,7 @@ makedocs(sitename="Vahana Documentation",
          pages = [
              "Tutorial" => "tutorial.md",
              "API" => [
+                 "Types" => "types.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
                  "Between transitions" => "between.md",

@@ -21,4 +21,6 @@ neighborstates
 
 edgestates
 
+raster_nodeid
 ```
+
