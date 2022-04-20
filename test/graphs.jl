@@ -33,5 +33,9 @@ import Graphs
 
     apply_transition!(sim, sumids, [GraphA], [GraphE], [])
 
-    @test aggregate(sim, GraphA, a -> a.sum, +) == sum(1:nagents) * (nagents - 1)
+    # we have a complete graph, and all agents sum the
+    # ids of the neighbors (but ignoring the own)
+    # so in overall we have the nagents-1 times the sum of all ids
+    @test aggregate(sim, GraphA, a -> a.sum, +) ==
+        sum(1:nagents) * (nagents - 1)
 end
