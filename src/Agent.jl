@@ -14,13 +14,15 @@ const BITS_PROCESS = 24
 const AgentNr = UInt32
 const BITS_AGENTNR = 32
 
-const AgentID = UInt64
+# TODO: Check if the performance difference is reproducable when
+# switchung to UInt64
+const AgentID = Int64
 
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE
 @assert round(log2(typemax(ProcessID))) >= BITS_PROCESS
 @assert round(log2(typemax(AgentNr))) >= BITS_AGENTNR
-@assert round(log2(typemax(AgentID))) >= BITS_TYPE +
-    BITS_PROCESS + BITS_AGENTNR 
+# @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
+#     BITS_PROCESS + BITS_AGENTNR 
 
 """
     abstract type Agent
