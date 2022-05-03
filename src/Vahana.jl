@@ -28,16 +28,19 @@ end
 include("Agent.jl")
 include("Edge.jl")
 
-include("Collections.jl")
-include("AgentCollections.jl")
-include("EdgeCollections.jl")
+include("ModelTypes.jl")
+
+include("FactoryHelpers.jl")
+include("EdgeFieldFactory.jl")
+include("NodeFieldFactory.jl")
 
 include("Simulation.jl")
+#include("Global.jl")
 
-include("PrettyPrinting.jl")
+# include("PrettyPrinting.jl")
 
-include("REPL.jl")
+# include("REPL.jl")
 
-include("GraphsSupport.jl")
-include("Raster.jl")
+#include("GraphsSupport.jl")
+#include("Raster.jl")
 end

@@ -3,7 +3,9 @@ export Agent
 export agent_id
 export TypeID
 export type_nr
-export agentstates
+
+export add_agent!, add_agents!
+export agentstate, agentstate_flexible
 
 const TypeID = UInt8
 const BITS_TYPE = 8
@@ -66,4 +68,70 @@ end
 @assert agent_id(3, 1) |> type_nr == 3
 
 
+"""
+    add_agent!(sim::Simulation, agent::T) -> AgentID
 
+Add a single agent of type T to the simulation `sim`.
+
+T must have been previously registered in the simulation by calling
+[`add_agenttype!`](@ref).
+
+`add_agent!` returns a new AgentID, which can be used to create edges
+from or to this agent. Do not use the ID for other purposes, they are
+not guaranteed to be stable.
+
+See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
+[`add_edge!`](@ref) and [`add_edges!`](@ref)
+
+"""
+function add_agent! end
+
+"""
+    add_agents!(sim::Simulation, agents) -> Vector{AgentID}
+
+Add multiple agents at once to the simulation `sim`.
+
+`agents` can be any iterable set of agents, or an arbitrary number of
+agents as arguments. 
+
+The types of the agents must have been previously registered in the
+simulation by calling [`add_agenttype!`](@ref).
+
+`add_agents!` returns a vector of AgentIDs, which can be used
+to create edges from or to this agents. Do not use the ID for other
+purposes, they are not guaranteed to be stable.
+
+See also [`add_agent!`](@ref), [`add_agenttype!`](@ref),
+[`add_edge!`](@ref) and [`add_edges!`](@ref)
+
+"""
+function add_agents!(sim, agents) 
+    [ add_agent!(sim, a) for a in agents ]
+end
+
+function add_agents!(sim, agents...) 
+    [ add_agent!(sim, a) for a in agents ]
+end
+
+"""
+    agentstate(sim::Simulation, id::AgentID) -> T<:Agent
+
+Returns the agent with `id`.
+"""
+function agentstate end
+
+"""
+TODO DOC
+"""
+agentstate_flexible(sim, id::AgentID) =
+     sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
+
+function finish_write_node!(sim, t::Symbol)
+    c = sim.typeinfos.nodes[t]
+    
+    if c == :Dict || c == :Vector
+        @eval $sim.$(readfield(t)) = $sim.$(writefield(t))
+    end
+end
+
+finish_write_node!(sim) = t -> finish_write_node!(sim, t)
