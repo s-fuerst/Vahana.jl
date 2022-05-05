@@ -8,12 +8,12 @@ Base.@kwdef struct ModelTypes
     edges_types = Vector{DataType}()
     nodes = Dict{Symbol, Symbol}()
     nodes_attr = Dict{Symbol, Dict{Symbol, Any}}()
-    nodes_type2id::Dict{DataType, Int} = Dict{DataType, Int}()
-    nodes_id2type::Vector{DataType} = Vector{DataType}(undef, typemax(TypeID))
+    nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
+    nodes_id2type::Vector{DataType} = Vector{DataType}(undef, 256)
 end
 
 """
-    add_agenttype!(types::Simulation, ::Type{T}, ::Type{C}; size) where { T, C }
+    add_agenttype!(types, ::Type{T}, ::Type{C}; size) where { T, C }
 
 TODO DOC
 
@@ -53,7 +53,7 @@ add_agenttype!(t::Type{T}, c::Type{C}; kwargs...) where T where C =
     types -> add_agenttype!(types, t, c; kwargs...) 
 
 """
-    add_edgetype!(sim::Simulation, ::Type{T}) where {T <: EdgeState}
+    add_edgetype!(sim, ::Type{T}) where {T <: EdgeState}
 
 TODO DOC
 

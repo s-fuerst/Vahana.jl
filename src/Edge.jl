@@ -87,7 +87,7 @@ function add_edges!(sim, to::AgentID, edges::Edge{T}...) where T
 end
 
 """
-    edges_to(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Edges{T}}
+    edges_to(sim::Simulation, id::AgentID, edgetype::Val{T}) -> Vector{Edges{T}}
 
 Returns all incoming edges for agent `id` of network `T`.
 

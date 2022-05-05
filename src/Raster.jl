@@ -1,7 +1,7 @@
 export add_raster!, calc_raster, raster_nodeid, move_to!
 
 """
-    add_raster!(sim::Simulation, dims, agent_constructor, edge_constructor)
+    add_raster!(sim, dims, agent_constructor, edge_constructor)
 
 Adds a 2-dimensional grid to `sim`, incl. a new agents per cell and
 edges between the cells. 
@@ -22,7 +22,7 @@ type via [`add_edgetype!`](@ref).
 
 Returns a vector with the IDs of the created agents.
 """
-function add_raster!(sim::Simulation,
+function add_raster!(sim,
               dims::Tuple{Int64, Int64},
               agent_constructor,
               edge_constructor;
@@ -60,7 +60,7 @@ end
 
 
 """
-    calc_raster(sim::Simulation, name::Symbol, f)
+    calc_raster(sim, name::Symbol, f)
 
 Calculate the values for a raster `name` by applying `f` to each
 agentstate of the agents constructed by the `add_raster!` function.
@@ -69,13 +69,13 @@ Returns a matrix with those values.
 
 See also [`add_raster!`](@ref)
 """
-function calc_raster(sim::Simulation, name::Symbol, f)
+function calc_raster(sim, name::Symbol, f)
     map(id -> agentstate(sim, id) |> f, sim.rasters[name])
 end
 
 
 """
-    raster_nodeid(sim::Simulation, name::Symbol, pos)
+    raster_nodeid(sim, name::Symbol, pos)
 
 Returns the ID of the agent (node) from the raster `name` at the
 position `pos`, where `pos` must be a Tuple{Int64,Int64}.
@@ -83,7 +83,7 @@ position `pos`, where `pos` must be a Tuple{Int64,Int64}.
 See also [`add_raster!`](@ref), [`move_to!`](@ref),
 [`add_edge!`](@ref) and [`agentstate`](@ref)
 """
-function raster_nodeid(sim::Simulation, name::Symbol, pos)
+function raster_nodeid(sim, name::Symbol, pos)
     sim.rasters[name][pos[1], pos[2]]
 end
 
@@ -96,7 +96,7 @@ Creates two edges of type `T` between the agent with ID `id` and the agent (node
 
 See also [`add_raster!`](@ref), [`raster_nodeid`](@ref) and [`add_edge!`](@ref) 
 """
-function move_to!(sim::Simulation,
+function move_to!(sim,
            name::Symbol,
            id::AgentID,
            pos,

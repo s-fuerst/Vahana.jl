@@ -16,13 +16,13 @@ macro mayassert(test, msgs)
    end))
 end
 
-# function enable_asserts(enable::Bool)
-#     if enable 
-#         eval(asserting() = true)
-#     else
-#         eval(asserting() = false)
-#     end
-# end
+function enable_asserts(enable::Bool)
+    if enable 
+        @eval asserting() = true
+    else
+        @eval asserting() = false
+    end
+end
 
 
 include("Agent.jl")

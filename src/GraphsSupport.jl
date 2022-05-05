@@ -20,7 +20,7 @@ type via [`add_edgetype!`](@ref).
 
 Returns a vector with the IDs of the created agents.
 """
-function add_graph!(sim::Simulation, graph, agent_constructor, edge_constructor) 
+function add_graph!(sim, graph, agent_constructor, edge_constructor) 
     agents = add_agents!(sim,
                          [ agent_constructor(v) for v in Graphs.vertices(graph) ])
 

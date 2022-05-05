@@ -3,10 +3,10 @@ export finish_init!
 #export typeid
 export apply_transition, apply_transition!, apply_transition_params
 export param
-export neighborstates
+export neighborstates, neighborstates_flexible
 export aggregate
 
-const MAX_TYPES = typemax(TypeID)
+const MAX_TYPES = 256 #typemax(TypeID) (also changed in ModelTypes)
 
 """
     construct(types::ModelTypes, name::String, params, globals)
@@ -55,8 +55,8 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
 
     nodeids = [
         Expr(Symbol("="),
-             :($(Symbol(T, "_nextid"))::AgentID),
-             :(1))
+             :($(Symbol(T, "_nextid"))::AgentNr),
+             :(AgentNr(1)))
         for (T,_) in types.nodes ]
 
     fields = Expr(:block,
@@ -64,11 +64,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                   :(params::P),
                   :(globals::G),
                   :(typeinfos::ModelTypes),
-                  # :(edges_type2read::Dict{DataType, Function}),
-                  # :(edges_type2write::Dict{DataType, Function}),
                   :(nodes_id2read::Vector{Function}),
-                  # :(nodes_type2read::Dict{DataType, Function}),
-                  # :(nodes_type2write::Dict{DataType, Function}),
                   edgefields...,
                   nodefields...,
                   nodeids...)
@@ -76,8 +72,6 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     # the true in the second arg makes the struct mutable
     strukt = Expr(:struct, true, :(Simulation{P, G}), fields)
 
-    # dump(strukt)
-    
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
@@ -89,11 +83,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                            params = $params,
                            globals = $globals,
                            typeinfos = $types,
-                           # edges_type2read = Dict{DataType, Function}(),
-                           # edges_type2write = Dict{DataType, Function}(),
                            nodes_id2read = Vector{Function}(undef, MAX_TYPES)
-                           # nodes_type2read = Dict{DataType, Function}(),
-                           # nodes_type2write = Dict{DataType, Function}()
                            )
 
     for (T, C) in sim.typeinfos.edges
@@ -194,8 +184,12 @@ function.
 See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
 [`neighbors`](@ref)
 """
-neighborstates(sim, id::AgentID, edgetype) =
-    map(e -> agentstate(sim, e.from), edges_to(sim, id, edgetype))  
+neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
+    map(e -> agentstate(sim, e.from, agenttype), edges_to(sim, id, edgetype))  
+
+# TODO DOC
+neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
+    map(e -> agentstate_flexible(sim, e.from), edges_to(sim, id, edgetype))  
 
 """
     param(sim::Simulation, name)

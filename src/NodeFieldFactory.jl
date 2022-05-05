@@ -6,22 +6,28 @@ Base.@kwdef struct NodeFieldFactory
     agentstate
 end
 
+AGENTSTATE_MSG = "The id of the agent does not match the given type in agentstate"
+
 #################### Dict
 nff_dict = NodeFieldFactory(
-    type = (T, _) -> :(Dict{AgentID, Main.$T}),
-    constructor = (T, _) -> :(Dict{AgentID, Main.$T}()),
+    type = (T, _) -> :(Dict{AgentNr, Main.$T}),
+    constructor = (T, _) -> :(Dict{AgentNr, Main.$T}()),
     init = (_, _) -> :(),
 
-    add_agent = (T, _) ->
-        :(function add_agent!(sim::Simulation, agent::Main.$T)
-              agentid = sim.$(nextidfield(T))
-              sim.$(writefield(T))[agentid] = agent
-              sim.$(nextidfield(T)) = agentid + 1
-              agent_id(sim.typeinfos.nodes_type2id[Main.$T], agentid)
-          end),
+    add_agent = (T, info) ->
+        begin
+            @eval typeid = $info.nodes_type2id[Main.$T]
+            :(function add_agent!(sim, agent::Main.$T)
+                  nextid = sim.$(nextidfield(T))
+                  sim.$(nextidfield(T)) = nextid + 1
+                  sim.$(writefield(T))[nextid] = agent
+                  agent_id($typeid, nextid)
+              end)
+        end,
 
     agentstate = (T, _) ->
         :(function agentstate(sim, id::AgentID, ::Val{Main.$T})
+              @mayassert type_nr(id) == sim.typeinfos.nodes_type2id[Main.$T] AGENTSTATE_MSG
               sim.$(readfield(T))[agent_nr(id)]
           end),
 )
@@ -33,13 +39,12 @@ end
 
 #################### Vec
 nff_vec = NodeFieldFactory(
-    type = (T, _) -> :(Vector{$T}),
-    constructor = (T, _) -> :(Vector{$T}()),
-     init = (T, info) -> 
+    type = (T, _) -> :(Vector{Main.$T}),
+    constructor = (T, _) -> :(Vector{Main.$T}()),
+    init = (T, info) -> 
         if haskey(info.nodes_attr[T], :size)
             s = info.nodes_attr[T][:size]
-            :(function init_type!(sim::Simulation, ::Val{Symbol($T)})
-                  println($T)
+            :(function init_type!(sim, ::Val{Symbol(Main.$T)})
                   resize!(sim.$(writefield(T)), $s)
               end)
         else
@@ -48,30 +53,31 @@ nff_vec = NodeFieldFactory(
 
     add_agent = (T, info) ->
         if haskey(info.nodes_attr[T], :size)
-            :(function add_agent!(sim::Simulation, agent::$T)
+            @eval typeid = $info.nodes_type2id[Main.$T]
+            :(function add_agent!(sim, agent::Main.$T)
                   agentid = sim.$(nextidfield(T))
-                  sim.$(writefield(T))[agentid] = agent
                   sim.$(nextidfield(T)) = agentid + 1
-                  agent_id(sim.typeinfos.nodes_type2id[$T], agentid)
+                  @inbounds sim.$(writefield(T))[agentid] = agent
+                  agent_id($typeid, agentid)
               end)
-#            nff_dict.add_agent
         else
-            :(function add_agent!(sim::Simulation, agent::$T)
+            @eval typeid = $info.nodes_type2id[Main.$T]
+            :(function add_agent!(sim, agent::Main.$T)
                   agentid = sim.$(nextidfield(T))
+                  sim.$(nextidfield(T)) = agentid + 1
                   if agentid > size(sim.$(writefield(T)), 1)
                       resize!(sim.$(writefield(T)), agentid)
                   end
-                  sim.$(writefield(T))[agentid] = agent
-                  sim.$(nextidfield(T)) = agentid + 1
-                  agent_id(sim.typeinfos.nodes_type2id[$T], agentid)
+                  @inbounds sim.$(writefield(T))[agentid] = agent
+                  agent_id($typeid, agentid)
               end)
         end,
 
     agentstate = (T, _) ->
-        :(function agentstate(sim, id::AgentID, ::Val{$T})
-              sim.$(readfield(T))[agent_nr(id)]
+        :(function agentstate(sim, id::AgentID, ::Val{Main.$T})
+              @mayassert type_nr(id) == sim.typeinfos.nodes_type2id[Main.$T] AGENTSTATE_MSG
+              @inbounds sim.$(readfield(T))[agent_nr(id)]
           end),
-#    agentstate = nff_dict.agentstate
 )
 
 nffs = Dict(:Dict => nff_dict, :Vector => nff_vec)

@@ -15,131 +15,92 @@
 #         length
 # end
 
-function transfoo(p::AgentBar, id, sim)
-    AgentBar(p.foo + 10)
-end
 
-function transfoo2(p::AgentBar, id, sim)
-    s = reduce((s,e) ->
-        s = s + e.state.foo, edges_to(sim, id, FooEdgeState); init = 0) 
-    AgentBar(s)
-end
+# function transfoo(p::AgentBar, id, sim)
+#     AgentBar(p.foo + 10)
+# end
 
-function transfoo3(p::AgentBar, id, sim)
-    n = edges_to(sim, id, FooEdgeState)
-    if length(n) > 0
-        s = agentstate(sim, n[1].from).foo
-    else
-        s = -1
-    end
-    AgentBar(s)
-end
+# function transfoo2(p::AgentBar, id, sim)
+#     s = reduce((s,e) ->
+#         s = s + e.state.foo, edges_to(sim, id, FooEdgeState); init = 0) 
+#     AgentBar(s)
+# end
 
-function transnothing(p::AgentBar, _, _)
-    nothing
-end
+# function transfoo3(p::AgentBar, id, sim)
+#     n = edges_to(sim, id, FooEdgeState)
+#     if length(n) > 0
+#         s = agentstate(sim, n[1].from).foo
+#     else
+#         s = -1
+#     end
+#     AgentBar(s)
+# end
 
-function transstateless(h::AgentFoo, id, sim)
-    n = edges_to(sim, id, StatelessEdgeType) |> neighbors
-    if length(n) > 0
-        s = agentstate(sim, n[1]).foo
-    else
-        s = -1
-    end
-    AgentFoo(s)
-end
+# function transnothing(p::AgentBar, _, _)
+#     nothing
+# end
 
-function transaddedges(p::AgentBar, id, sim)
-    add_edges!(sim, id, edges_to(sim, id, FooEdgeState))
-    p
-end
+# function transstateless(h::AgentFoo, id, sim)
+#     n = edges_to(sim, id, StatelessEdgeType) |> neighbors
+#     if length(n) > 0
+#         s = agentstate(sim, n[1]).foo
+#     else
+#         s = -1
+#     end
+#     AgentFoo(s)
+# end
 
-if false
-    struct AgentFoo
-        foo::Int64
-    end
-
-    struct AgentBar 
-        bar::Int64
-    end
-
-    struct FooEdgeState 
-        foo::Int64
-    end
-
-    struct StatelessEdgeType end
-end
+# function transaddedges(p::AgentBar, id, sim)
+#     add_edges!(sim, id, edges_to(sim, id, FooEdgeState))
+#     p
+# end
 
 
-@testset "Initialization" begin
-    sim = ModelTypes() |>
-        add_agenttype!(AgentBar) |>
-        add_agenttype!(AgentFoo) |>
-        add_edgetype!(StatelessEdgeType) |>
-        add_edgetype!(FooEdgeState) |>
-        construct("Test", nothing, nothing)
 
-    p1 = AgentBar(1)
-    p2 = AgentBar(2)
 
-    h1 = AgentFoo(1)
-    h2 = AgentFoo(2)
-
-    #    @test numAgents(sim, AgentBar) == 0
-    #    @test sim.typeinfos.nodes_type2id[AgentBar] == 1
-    #    @test sim.typeinfos.nodes_type2id[AgentFoo] == 2
-
-    p1id = add_agent!(sim, p1)
-    h1id = add_agent!(sim, h1)
-    h2id, p2id = add_agents!(sim, h2, p2)
-    fooids = add_agents!(sim, [ AgentFoo(i) for i in 10:20])
-
-    add_edge!(sim, p1id, h1id, StatelessEdgeType)
-    add_edge!(sim, h2id, Edge(p1id, StatelessEdgeType()))
-    add_edge!(sim, h2id, Edge(p1id, FooEdgeState(1)))
-    add_edges!(sim, h2id, [ Edge(i, FooEdgeState(i)) for i in fooids])
-
-    #finish_init!(sim)
-#    sim.AgentBar_read = sim.AgentBar_write
-
+@testset "Core" begin
+    sim = construct(model, "Test", nothing, nothing)
+    
+    (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
+    
     finish_init!(sim)
 
+    @testset "agentstate" begin
+        @test agentstate_flexible(sim, a1id) == ADict(1)
+        @test agentstate(sim, a2id, Val(ADict)) == ADict(2)
+        @test agentstate(sim, avids[1], Val(AVec)) == AVec(1)
+        @test agentstate(sim, avfids[1], Val(AVecFixed)) == AVecFixed(1)
+        @test agentstate(sim, avids[10], Val(AVec)) == AVec(10)
+        @test agentstate(sim, avfids[10], Val(AVecFixed)) == AVecFixed(10)
+        # calling agentstate with the wrong typ should throw an AssertionError
+        @test_throws AssertionError agentstate(sim, a2id, Val(AVec))
+        @test_throws AssertionError agentstate(sim, avids[1], Val(ADict))
+    end
 
-    @test agentstate_flexible(sim, p1id) == p1
-    @test agentstate(sim, p1id, Val(AgentBar)) == p1
-    @test agentstate(sim, last(fooids), Val(AgentFoo)) == AgentFoo(20)
+    @testset "edges_to" begin
+        @test size(edges_to(sim, a1id, Val(ESDict)), 1) == 4
+        @test size(edges_to(sim, a1id, Val(ESLDict1)), 1) == 10
+        @test size(edges_to(sim, avids[1], Val(ESLDict2)), 1) == 1
+        @test size(edges_to(sim, avids[10], Val(ESLDict2)), 1) == 1
+        # Check that we can call edges_to also for an empty set of neighbors
+        @test size(edges_to(sim, a2id, Val(ESDict)), 1) == 0
+        @test size(edges_to(sim, a2id, Val(ESLDict1)), 1) == 0
+        @test size(edges_to(sim, a2id, Val(ESLDict2)), 1) == 0
+    end
 
-    @test size(edges_to(sim, h1id, Val(StatelessEdgeType)), 1) == 1
-    @test size(edges_to(sim, h2id, Val(StatelessEdgeType)), 1) == 1
-    @test size(edges_to(sim, h2id, Val(FooEdgeState)), 1) == 12
+    @testset "neighbors & edgestates" begin
+        edges = edges_to(sim, a1id, Val(ESLDict1))
+        @test neighbors(edges)[1] == avids[1]
+        @test neighbors(edges)[10] == avids[10]
+        edges = edges_to(sim, avids[10], Val(ESLDict2))
+        @test neighbors(edges)[1] == avfids[10]
+    end
 
-    return 
-    # this should not change anything, but test the add_edges method
-    apply_transition!(sim, transaddedges, [ AgentBar ], [ FooEdgeState ], [ FooEdgeState ])
-
-    apply_transition!(sim, transstateless, [ AgentFoo ], [ StatelessEdgeType ], [])
-    @test get_write_agent(sim, h1id).bar == -1
-    @test get_write_agent(sim, h2id).bar == 1
-    
-    apply_transition!(sim, transfoo, [ AgentBar ], [], [])
-
-    @test get_write_agent(sim, p2id).foo == 12
-
-    apply_transition!(sim, transfoo2, [ AgentBar ], [ FooEdgeState ], [])
-
-    @test get_write_agent(sim, p1id).foo == 0
-    @test get_write_agent(sim, p2id).foo == 1
-
-    @test get_write_agent(sim, anotherpid) == AgentBar(3)
-    
-    apply_transition!(sim, transfoo3, [ AgentBar ], [ FooEdgeState ], [])
-
-    @test get_write_agent(sim, p1id).foo == -1
-    @test get_write_agent(sim, p2id).foo == 0
-
-    apply_transition!(sim, transnothing, [ AgentBar ], [], [])
-    @test numAgents(sim, AgentBar) == 0
-    
+    @testset "neighborstates" begin
+        @test neighborstates(sim, a1id, Val(ESLDict1), Val(AVec))[1] == AVec(1)
+        @test neighborstates_flexible(sim, a1id, Val(ESDict))[2] == ADict(3)
+    end
 end
+
 
 
