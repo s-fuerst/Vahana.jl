@@ -2,6 +2,7 @@ Base.@kwdef struct NodeFieldFactory
     type # Function Symbol -> Expr
     constructor # Function Symbol -> Expr
     init
+    prepare_write_node
     add_agent
     agentstate
 end
@@ -14,6 +15,11 @@ nff_dict = NodeFieldFactory(
     constructor = (T, _) -> :(Dict{AgentNr, Main.$T}()),
     init = (_, _) -> :(),
 
+    prepare_write_node = (T, _) ->
+        :(function prepare_write_node!(sim, ::Val{Symbol(Main.$T)})
+              sim.$(writefield(T)) = Dict{AgentNr, Main.$T}()
+          end),
+    
     add_agent = (T, info) ->
         begin
             @eval typeid = $info.nodes_type2id[Main.$T]
@@ -51,6 +57,19 @@ nff_vec = NodeFieldFactory(
             :()
         end,
 
+    prepare_write_node = (T, info) ->
+        if haskey(info.nodes_attr[T], :size)
+            s = info.nodes_attr[T][:size]
+            :(function prepare_write_node!(sim, ::Val{Symbol(Main.$T)})
+                  sim.$(writefield(T)) = Vector{Main.$T}()
+                  resize!(sim.$(writefield(T)), $s)
+              end)
+        else
+            :(function prepare_write_node!(sim, ::Val{Main.$T})
+                  sim.$(writefield(T)) = Vector{Main.$T}()
+              end)
+        end,
+    
     add_agent = (T, info) ->
         if haskey(info.nodes_attr[T], :size)
             @eval typeid = $info.nodes_type2id[Main.$T]

@@ -133,3 +133,5 @@ function finish_write_node!(sim, t::Symbol)
 end
 
 finish_write_node!(sim) = t -> finish_write_node!(sim, t)
+
+prepare_write_node!(sim) = t -> prepare_write_node!(sim, Val(t))

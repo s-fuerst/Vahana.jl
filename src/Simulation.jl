@@ -89,12 +89,14 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     for (T, C) in sim.typeinfos.edges
         effs[C].add_edge(T, sim.typeinfos) |> eval
         effs[C].init(T, sim.typeinfos) |> eval
+        effs[C].prepare_write_edge |> eval
         effs[C].edges_to(T, sim.typeinfos) |> eval
     end
 
     for (T, C) in sim.typeinfos.nodes
         nffs[C].add_agent(T, sim.typeinfos) |> eval
         nffs[C].init(T, sim.typeinfos) |> eval
+        nffs[C].prepare_write_node |> eval
         nffs[C].agentstate(T, sim.typeinfos) |> eval
     end
 
@@ -133,11 +135,18 @@ function _init_all_types(sim)
 end
 
 function some_agentcolls(sim, types)
-    [ sim.agents[v] for (k, v) in sim.agent_typeids if k in types ]
+    println(types)
+    for t in keys(sim.typeinfos.nodes)
+        println(t)
+        println(t in types)
+    end
+    
+    filter(t -> Symbol(t) in types, keys(sim.typeinfos.nodes))
 end
 
 function some_edgecolls(sim, types)
-    [ v for (k, v) in sim.edges if k in types ]
+    filter(t -> Symbol(t) in types, keys(sim.typeinfos.edges))
+#    [ v for (k, v) in sim.edges if k in types ]
 end
 
 """
@@ -201,20 +210,20 @@ See also [`construct`](@ref)
 """
 param(sim, name) = getfield(sim.params, name)
 
-# function maybeadd(coll::AgentCollection{T},
-#            id::AgentID,
-#            agent::T) where {T <: Agent}
-#     # the coll[id] writes into another container then
-#     # we use for the iteration
-#     coll[id] = agent
-#     nothing
-# end
+function maybeadd(coll,
+           id::AgentID,
+           agent::T) where {T <: Agent}
+    # the coll[id] writes into another container then
+    # we use for the iteration
+    coll[id] = agent
+    nothing
+end
 
-# function maybeadd(::AgentCollection{T},
-#            ::AgentID,
-#            ::Nothing) where {T <: Agent}
-#     nothing
-# end
+function maybeadd(_,
+           ::AgentID,
+           ::Nothing) where {T <: Agent}
+    nothing
+end
 
 """
     apply_transition!(sim, func, compute, networks, rebuild)
@@ -247,19 +256,20 @@ function apply_transition!(sim,
                     compute::Vector,
                     networks::Vector,
                     rebuild::Vector)
-    # writeable = [ compute; rebuild ]
+    writeable = [ compute; rebuild ]
     
-    # foreach(prepare_write!, some_agentcolls(sim, writeable))
-    # foreach(prepare_write!, some_edgecolls(sim, writeable))
+    foreach(prepare_write_node!, some_agentcolls(sim, writeable))
+    foreach(prepare_write_edge!, some_edgecolls(sim, writeable))
 
-    # for coll in some_agentcolls(sim, compute)
-    #     for (id, state) in coll
-    #         maybeadd(coll, id, func(state, id, sim))
-    #     end 
-    # end
+    for coll in some_agentcolls(sim, compute)
+        print(coll)
+        for (id, state) in coll
+            maybeadd(coll, id, func(state, id, sim))
+        end 
+    end
 
-    # foreach(finish_write_node!, some_agentcolls(sim, writeable))
-    # foreach(finish_write_edge!, some_edgecolls(sim, writeable))
+    foreach(finish_write_node!, some_agentcolls(sim, writeable))
+    foreach(finish_write_edge!, some_edgecolls(sim, writeable))
     sim
 end
 

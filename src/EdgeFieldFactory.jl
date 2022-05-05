@@ -2,6 +2,7 @@ Base.@kwdef struct EdgeFieldFactory
     type # Function Symbol -> Expr
     constructor # Function Symbol -> Expr
     init
+    prepare_write_edge
     add_edge
     edges_to
 end
@@ -13,6 +14,11 @@ eff_dict = EdgeFieldFactory(
     constructor = (T, _) -> :(Dict{AgentID, Vector{Edge{Main.$T}}}()),
     init = (_, _) -> :(),
 
+    prepare_write_edge = (T, _) ->
+        :(function prepare_write_node!(sim, ::Val{Symbol(Main.$T)})
+              sim.$(writefield(T)) = Dict{AgentNr, Vector{Edge{Main.$T}}}()
+          end),
+    
     add_edge = (T, _) ->
         :(function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
               push!(get!(Vector{Main.$T}, sim.$(writefield(T)), to), edge)
@@ -21,7 +27,7 @@ eff_dict = EdgeFieldFactory(
     edges_to = (T, _) ->
         :(function edges_to(sim, to::AgentID, ::Val{Main.$T}) 
               get(Vector{Main.$T}, sim.$(readfield(T)), to)
-          end) 
+          end),
 )
 
 #################### Edge Vec

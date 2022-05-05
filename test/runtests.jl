@@ -24,14 +24,11 @@ model = ModelTypes() |>
     add_edgetype!(ESLDict2)  
 
 function add_example_network!(sim)
-
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
     a1id = add_agent!(sim, ADict(1))
     a2id, a3id = add_agents!(sim, ADict(2), ADict(3))
     avids = add_agents!(sim, [ AVec(i) for i in 1:10])
     avfids = add_agents!(sim, [ AVecFixed(i) for i in 1:10])
-    
-    
 
     # we construct the following network for ESDict:
     # a2 & a3 & avids[1] & avfids[10] -> a1
@@ -51,7 +48,14 @@ function add_example_network!(sim)
     (a1id, a2id, a3id, avids, avfids)
 end
 
-include("initialization.jl")
+function create_sum_state_neighbors(edgetypeval) 
+    function sum_state_neighbors(agent, id, sim)
+        s = mapreduce(a -> a.foo, +, neighborstates_flexible(sim, id, edgetypeval))
+        typeof(agent)(s)
+    end
+end
+
+include("core.jl")
 
 # include("aggregate.jl")
 # include("globals.jl")

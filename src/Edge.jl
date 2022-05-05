@@ -130,3 +130,5 @@ function finish_write_edge!(sim, t::Symbol)
 end
 
 finish_write_edge!(sim) = t -> finish_write_edge!(sim, t)
+
+prepare_write_edge!(sim) = t -> prepare_write_edge!(sim, Val(t))
