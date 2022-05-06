@@ -295,6 +295,7 @@ function runstep!(sim)
                       [])
 
     report = aggregate(sim, Person, Report, +)
+    println(report)
     pushglobal!(sim, :reports, report)
     sim
 end
@@ -307,11 +308,11 @@ function runsimulation()
     sim = init(Params(θ=-0.001, tracing=0.25))
 
     for _ in 1:20
-        runstep!(sim)
+        @time runstep!(sim)
     end
     sim
 end
 
 #@report_opt runsimulation()
 #@profilehtml runsimulation()
-#runsimulation()
+runsimulation()
