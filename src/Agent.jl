@@ -124,14 +124,14 @@ TODO DOC
 agentstate_flexible(sim, id::AgentID) =
      sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
 
-function finish_write_node!(sim, t::Symbol)
-    c = sim.typeinfos.nodes[t]
+# function finish_write_node!(sim, t)
+#     symt = Symbol(t)
+#     c = sim.typeinfos.nodes[symt]
     
-    if c == :Dict || c == :Vector
-        @eval $sim.$(readfield(t)) = $sim.$(writefield(t))
-    end
-end
+#     if c == :Dict || c == :Vector
+#         @eval $sim.$(readfield(symt)) = $sim.$(writefield(symt))
+#     end
+# end
 
-finish_write_node!(sim) = t -> finish_write_node!(sim, t)
+# finish_write_node!(sim) = t -> finish_write_node!(sim, t)
 
-prepare_write_node!(sim) = t -> prepare_write_node!(sim, Val(t))

@@ -14,6 +14,13 @@ struct ESDict  foo::Int64 end
 struct ESLDict1 end
 struct ESLDict2 end
 
+# needed for raster
+struct GridA 
+    pos::Tuple{Int64, Int64}
+    active::Bool
+end
+struct GridE end
+
 model = ModelTypes() |>
     add_agenttype!(ADict) |>
     add_agenttype!(AVec, Vector) |>
@@ -21,7 +28,9 @@ model = ModelTypes() |>
     add_agenttype!(ASLDict) |>
     add_edgetype!(ESDict) |>
     add_edgetype!(ESLDict1) |> 
-    add_edgetype!(ESLDict2)  
+    add_edgetype!(ESLDict2) |>
+    add_agenttype!(GridA) |>
+    add_edgetype!(GridE)
 
 function add_example_network!(sim)
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
@@ -50,15 +59,23 @@ end
 
 function create_sum_state_neighbors(edgetypeval) 
     function sum_state_neighbors(agent, id, sim)
-        s = mapreduce(a -> a.foo, +, neighborstates_flexible(sim, id, edgetypeval))
+        s = 0
+        for n in neighborstates_flexible(sim, id, edgetypeval)
+            s = s + n.foo
+        end
         typeof(agent)(s)
     end
 end
 
+function nothing_transition(agent, id, sim)
+    nothing
+end
+
+include("aggregate.jl")
+
 include("core.jl")
 
-# include("aggregate.jl")
-# include("globals.jl")
+include("globals.jl")
 # include("graphs.jl")
 # include("raster.jl")
 

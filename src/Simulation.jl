@@ -2,11 +2,12 @@ export construct
 export finish_init!
 #export typeid
 export apply_transition, apply_transition!, apply_transition_params
+export apply_transition2!
 export param
 export neighborstates, neighborstates_flexible
 export aggregate
 
-const MAX_TYPES = 256 #typemax(TypeID) (also changed in ModelTypes)
+const MAX_TYPES = typemax(TypeID) 
 
 """
     construct(types::ModelTypes, name::String, params, globals)
@@ -65,6 +66,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                   :(globals::G),
                   :(typeinfos::ModelTypes),
                   :(nodes_id2read::Vector{Function}),
+                  :(nodes_id2write::Vector{Function}),
                   edgefields...,
                   nodefields...,
                   nodeids...)
@@ -75,29 +77,33 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
-    
-    
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
 
     sim = @eval Simulation(name = $name,
                            params = $params,
                            globals = $globals,
                            typeinfos = $types,
-                           nodes_id2read = Vector{Function}(undef, MAX_TYPES)
+                           nodes_id2read = Vector{Function}(undef, MAX_TYPES),
+                           nodes_id2write = Vector{Function}(undef, MAX_TYPES)
                            )
 
     for (T, C) in sim.typeinfos.edges
-        effs[C].add_edge(T, sim.typeinfos) |> eval
         effs[C].init(T, sim.typeinfos) |> eval
-        effs[C].prepare_write_edge |> eval
+        effs[C].add_edge(T, sim.typeinfos) |> eval
         effs[C].edges_to(T, sim.typeinfos) |> eval
+        effs[C].prepare_write(T, sim.typeinfos) |> eval
+        effs[C].finish_write(T, sim.typeinfos) |> eval
+        effs[C].aggregate(T, sim.typeinfos) |> eval
     end
 
     for (T, C) in sim.typeinfos.nodes
-        nffs[C].add_agent(T, sim.typeinfos) |> eval
+        nffs[C].add_agent(T, sim.typeinfos) |> eval 
         nffs[C].init(T, sim.typeinfos) |> eval
-        nffs[C].prepare_write_node |> eval
         nffs[C].agentstate(T, sim.typeinfos) |> eval
+        nffs[C].prepare_write(T, sim.typeinfos) |> eval
+        nffs[C].transition(T, sim.typeinfos) |> eval
+        nffs[C].finish_write(T, sim.typeinfos) |> eval
+        nffs[C].aggregate(T, sim.typeinfos) |> eval
     end
 
     @eval _init_all_types($sim)
@@ -115,38 +121,14 @@ function _init_all_types(sim)
         init_type!(sim, Val(T))
     end
 
-    # for T in sim.typeinfos.edges_types
-    #     sim.edges_type2read[T] =
-    #         @eval sim  -> sim.$(readfield(Symbol(T)))
-    #     sim.edges_type2write[T] =
-    #         @eval sim  -> sim.$(writefield(Symbol(T)))
-    # end
-    
     for (T, _) in sim.typeinfos.nodes_type2id
         sim.nodes_id2read[sim.typeinfos.nodes_type2id[T]] =
             @eval sim -> sim.$(readfield(Symbol(T)))
-        # sim.nodes_type2read[T] =
-        #     @eval sim  -> sim.$(readfield(Symbol(T)))
-        # sim.nodes_type2write[T] =
-        #     @eval sim  -> sim.$(writefield(Symbol(T)))
+        sim.nodes_id2write[sim.typeinfos.nodes_type2id[T]] =
+            @eval sim -> sim.$(writefield(Symbol(T)))
     end
     
     sim
-end
-
-function some_agentcolls(sim, types)
-    println(types)
-    for t in keys(sim.typeinfos.nodes)
-        println(t)
-        println(t in types)
-    end
-    
-    filter(t -> Symbol(t) in types, keys(sim.typeinfos.nodes))
-end
-
-function some_edgecolls(sim, types)
-    filter(t -> Symbol(t) in types, keys(sim.typeinfos.edges))
-#    [ v for (k, v) in sim.edges if k in types ]
 end
 
 """
@@ -161,8 +143,8 @@ See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
 """
 function finish_init!(sim)
-    foreach(finish_write_node!(sim), keys(sim.typeinfos.nodes))
-    foreach(finish_write_edge!(sim), keys(sim.typeinfos.edges))
+    foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
+    foreach(finish_write!(sim), sim.typeinfos.edges_types)
     sim
 end 
 
@@ -211,8 +193,8 @@ See also [`construct`](@ref)
 param(sim, name) = getfield(sim.params, name)
 
 function maybeadd(coll,
-           id::AgentID,
-           agent::T) where {T <: Agent}
+           id::AgentNr,
+           agent) 
     # the coll[id] writes into another container then
     # we use for the iteration
     coll[id] = agent
@@ -220,10 +202,15 @@ function maybeadd(coll,
 end
 
 function maybeadd(_,
-           ::AgentID,
-           ::Nothing) where {T <: Agent}
+           ::AgentNr,
+           ::Nothing)
     nothing
 end
+
+prepare_write!(sim) = t -> prepare_write!(sim, Val(t))
+
+finish_write!(sim) = t -> finish_write!(sim, Val(t))
+
 
 """
     apply_transition!(sim, func, compute, networks, rebuild)
@@ -257,19 +244,17 @@ function apply_transition!(sim,
                     networks::Vector,
                     rebuild::Vector)
     writeable = [ compute; rebuild ]
-    
-    foreach(prepare_write_node!, some_agentcolls(sim, writeable))
-    foreach(prepare_write_edge!, some_edgecolls(sim, writeable))
+    # writeable_nodes = intersect(writeable, keys(sim.typeinfos.nodes_type2id))
+    # writeable_edges = intersect(writeable, sim.typeinfos.edges_types)
 
-    for coll in some_agentcolls(sim, compute)
-        print(coll)
-        for (id, state) in coll
-            maybeadd(coll, id, func(state, id, sim))
-        end 
+    foreach(prepare_write!(sim), writeable)
+
+    for c in compute
+        transition!(sim, func, Val(c))
     end
 
-    foreach(finish_write_node!, some_agentcolls(sim, writeable))
-    foreach(finish_write_edge!, some_edgecolls(sim, writeable))
+    foreach(finish_write!(sim), writeable)
+#    foreach(finish_write_edge!(sim), writeable_edges)
     sim
 end
 
@@ -295,13 +280,6 @@ function apply_transition(sim,
     newsim
 end
 
-function apply_transition_params(sim, compute::DataType, networks::Vector)
-    coll = some_agentcolls(sim, [ compute ])[1]
-    (id, state) = coll |> first
-    (state, id)
-end
-
-
 ######################################## aggregate
 
 """
@@ -319,21 +297,27 @@ iterator.
 
 See also [`Base.mapreduce`](@ref)
 """
-# function aggregate(sim, ::Type{T}, f, op;
+function aggregate(sim, ::Val{T}, f, op; kwargs...) where T end
+
+
+# function aggregate(sim, ::Val{T}, f, op;
 #             kwargs...) where T
-#     # agents = sim.agents[sim.agent_typeids[T]] |>
-#     #     read_container |>
-#     #     values
-#     # mapreduce(f, op, agents; kwargs...)
+#     sim.nodes_id2read[sim.typeinfos.nodes_type2id[T]](sim) |>
+    
+#     agents = sim.agents[sim.agent_typeids[T]] |>
+#         read_container |>
+#         values
+#     mapreduce(f, op, agents; kwargs...)
 # end
 
 # function aggregate(sim, ::Type{T}, f, op;
 #             kwargs...) where T
-#     # edges = sim.edges[T] |>
-#     #     read_container |>
-#     #     values |>
-#     #     Iterators.flatten |>
-#     #     collect |>
-#     #     edgestates
-#     # mapreduce(f, op, edges; kwargs...)
+#     edges = sim.edges[T] |>
+#         read_container |>
+#         values |>
+#         Iterators.flatten |>
+#         collect |>
+#         edgestates
+#     mapreduce(f, op, edges; kwargs...)
 # end
+

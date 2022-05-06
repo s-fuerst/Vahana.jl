@@ -1,31 +1,3 @@
-# function createAgentBars(sim)
-#     [ AgentBar(11), AgentBar(12) ]
-# end
-
-# function get_write_agent(sim, id::AgentID)
-#     sim.agents[type_nr(id)].containers[sim.agents[type_nr(id)].write][id]
-# end
-
-# function get_write_edges(sim, T::DataType, id::AgentID)
-#     sim.edges[T].containers[sim.edges[T].write][id]
-# end
-
-# function numAgents(sim, ::Type{T}) where {T <: Agent}
-#     sim.agents[typeid(sim, T)].containers[sim.agents[typeid(sim, T)].write] |>
-#         length
-# end
-
-
-# function transfoo(p::AgentBar, id, sim)
-#     AgentBar(p.foo + 10)
-# end
-
-# function transfoo2(p::AgentBar, id, sim)
-#     s = reduce((s,e) ->
-#         s = s + e.state.foo, edges_to(sim, id, FooEdgeState); init = 0) 
-#     AgentBar(s)
-# end
-
 # function transfoo3(p::AgentBar, id, sim)
 #     n = edges_to(sim, id, FooEdgeState)
 #     if length(n) > 0
@@ -34,10 +6,6 @@
 #         s = -1
 #     end
 #     AgentBar(s)
-# end
-
-# function transnothing(p::AgentBar, _, _)
-#     nothing
 # end
 
 # function transstateless(h::AgentFoo, id, sim)
@@ -54,9 +22,6 @@
 #     add_edges!(sim, id, edges_to(sim, id, FooEdgeState))
 #     p
 # end
-
-
-
 
 @testset "Core" begin
     sim = construct(model, "Test", nothing, nothing)
@@ -101,12 +66,71 @@
         @test neighborstates_flexible(sim, a1id, Val(ESDict))[2] == ADict(3)
     end
 
+    # working on a deepcopy should be possible and not change the
+    # original state
+    @testset "deepcopy" begin
+        copy = deepcopy(sim)
+        add_edge!(copy, a2id, a1id, ESDict(20))
+        add_edge!(copy, a2id, avids[1], ESLDict2())
+        add_edge!(copy, a2id, avfids[1], ESLDict2())
+        @test size(edges_to(sim, a1id, Val(ESDict)), 1) == 4
+        @test size(edges_to(copy, a1id, Val(ESDict)), 1) == 5
+        @test size(edges_to(sim, avids[1], Val(ESLDict2)), 1) == 1
+        @test size(edges_to(copy, avids[1], Val(ESLDict2)), 1) == 2
+        @test size(edges_to(sim, avfids[1], Val(ESLDict2)), 1) == 0
+        @test size(edges_to(copy, avfids[1], Val(ESLDict2)), 1) == 1
+    end
+    
     @testset "transition" begin
         # we need this for each node factory
-        apply_transition!(sim, create_sum_state_neighbors(Val(ESLDict1)),
+        copy = deepcopy(sim)
+        # we want to check two iterations with the sum_state_neighbors,
+        # so we just add an edge loop for the agents where we check the sum
+        add_edge!(copy, a1id, a1id, ESLDict1)
+        add_edge!(copy, avids[1], avids[1], ESLDict2)
+        add_edge!(copy, avfids[1], avfids[1], ESLDict1)
+        # for avfids[1] we need a second edge
+        add_edge!(copy, avfids[2], avfids[1], ESLDict1)
+        # and also avfids[2] should keep its value
+        add_edge!(copy, avfids[2], avfids[2], ESLDict1)
+
+        # now check apply_transtition! for the different nodefieldfactories
+        copydict = deepcopy(copy)
+        apply_transition!(copydict, create_sum_state_neighbors(Val(ESLDict1)),
                           [ ADict ], [ ESLDict1 ], [])
-        @test agentstate(sim, a1id, Val(ADict)) == ADict(sum(1:10))
+        @test agentstate(copydict, a1id, Val(ADict)) == ADict(sum(1:10) + 1)
+        apply_transition!(copydict, create_sum_state_neighbors(Val(ESLDict1)),
+                          [ ADict ], [ ESLDict1 ], [])
+        @test agentstate(copydict, a1id, Val(ADict)) == ADict(2 * sum(1:10) + 1)
+
+        copyvec = deepcopy(copy)
+        apply_transition!(copyvec, create_sum_state_neighbors(Val(ESLDict2)),
+                          [ AVec ], [ ESLDict2 ], [])
+        @test agentstate(copyvec, avids[1], Val(AVec)) == AVec(2)
+        apply_transition!(copyvec, create_sum_state_neighbors(Val(ESLDict2)),
+                          [ AVec ], [ ESLDict2 ], [])
+        @test agentstate(copyvec, avids[1], Val(AVec)) == AVec(3)
+        apply_transition!(copyvec, create_sum_state_neighbors(Val(ESLDict2)),
+                          [ AVec ], [ ESLDict2 ], [])
+        @test agentstate(copyvec, avids[1], Val(AVec)) == AVec(4)
+
+        copyvecfix = deepcopy(copy)
+        apply_transition!(copyvecfix, create_sum_state_neighbors(Val(ESLDict1)),
+                          [ AVecFixed ], [ ESLDict1 ], [])
+        @test agentstate(copyvecfix, avfids[1], Val(AVecFixed)) == AVecFixed(3)
+        apply_transition!(copyvecfix, create_sum_state_neighbors(Val(ESLDict1)),
+                          [ AVecFixed ], [ ESLDict1 ], [])
+        @test agentstate(copyvecfix, avfids[1], Val(AVecFixed)) == AVecFixed(5)
+        apply_transition!(copyvecfix, create_sum_state_neighbors(Val(ESLDict1)),
+                          [ AVecFixed ], [ ESLDict1 ], [])
+        @test agentstate(copyvecfix, avfids[1], Val(AVecFixed)) == AVecFixed(7)
+
+        # check return nothing (currently only supported by Dicts)
+        apply_transition!(copydict, nothing_transition, [ ADict ], [], [])
+        @test_throws KeyError agentstate_flexible(copydict, a1id)
     end
+
+    # TODO transition with add_agent! and add_edge!
 end
 
 

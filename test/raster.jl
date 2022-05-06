@@ -1,9 +1,3 @@
-struct GridA <: Agent
-    pos::Tuple{Int64, Int64}
-    active::Bool
-end
-
-struct GridE <: EdgeState end
 
 @testset "Raster" begin
     # calculate the sum of all ids
@@ -12,10 +6,7 @@ struct GridE <: EdgeState end
             mapreduce(a -> a.active, |, neighborstates(sim, id, GridE)))
     end
 
-    sim = Simulation("Test Grid right botton", nothing, nothing)
-
-    add_agenttype!(sim, GridA)
-    add_edgetype!(sim, GridE)
+    sim = construct("Test Grid right botton", nothing, nothing)
 
     add_raster!(sim,
                 (10,8),

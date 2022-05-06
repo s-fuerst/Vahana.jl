@@ -1,15 +1,11 @@
 @testset "Aggregate" begin
-    sim = Simulation("Aggregate", nothing, nothing)
+    sim = construct(model, "Aggregate", nothing, nothing)
 
-    add_agenttype!(sim, Person)
-    pids = add_agents!(sim, [ Person(i) for i in 1:10 ])
-
-    add_edgetype!(sim, FooEdgeState)
-    for i in pids
-        add_edge!(sim, i, last(pids), FooEdgeState(1))
-    end
+    (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
+    
     finish_init!(sim)
     
-    @test aggregate(sim, Person, p -> p.foo, +) == sum(1:10)
-    @test aggregate(sim, FooEdgeState, e -> e.foo, +) == 10
+    @test aggregate(sim, Val(ADict), a -> a.foo, +) == 6
+    @test aggregate(sim, Val(AVec), a -> a.foo, +) == sum(1:10)
+    @test aggregate(sim, Val(ESDict), e -> e.foo, +) == 10
 end

@@ -9,7 +9,7 @@ Base.@kwdef struct ModelTypes
     nodes = Dict{Symbol, Symbol}()
     nodes_attr = Dict{Symbol, Dict{Symbol, Any}}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
-    nodes_id2type::Vector{DataType} = Vector{DataType}(undef, 256)
+    nodes_id2type::Vector{DataType} = Vector{DataType}(undef, typemax(TypeID))
 end
 
 """

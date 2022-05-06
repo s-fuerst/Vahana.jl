@@ -3,8 +3,9 @@
         foo::Float64
         bar::Vector{Int64}
     end
-    
-    sim = Simulation("Globals Test", nothing, TestGlobals(0,Vector{Int64}()))
+
+    sim = construct(model, "Globals", nothing, TestGlobals(0,Vector{Int64}()))
+
     setglobal!(sim, :foo, 1.1)
     pushglobal!(sim, :bar, 1)
     pushglobal!(sim, :bar, 2)
