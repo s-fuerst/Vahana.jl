@@ -1,3 +1,4 @@
 /Manifest.toml
 *.cov
 /docs/build/
+/examples/episim/src/statprof/
