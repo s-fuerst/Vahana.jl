@@ -23,7 +23,7 @@ eff_dict = EdgeFieldFactory(
 
     edges_to = (T, _) ->
         :(function edges_to(sim, to::AgentID, ::Val{Main.$T}) 
-              get(Vector{Main.$T}, sim.$(readfield(T)), to)
+              get(Vector{Edge{Main.$T}}, sim.$(readfield(T)), to)
           end),
 
     prepare_write = (T, _) ->

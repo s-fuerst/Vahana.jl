@@ -51,6 +51,10 @@
         @test size(edges_to(sim, a2id, Val(ESDict)), 1) == 0
         @test size(edges_to(sim, a2id, Val(ESLDict1)), 1) == 0
         @test size(edges_to(sim, a2id, Val(ESLDict2)), 1) == 0
+        # Check that edges_to for empty sets return the correct type for the empty vector
+        @test edges_to(sim, a2id, Val(ESDict)) |> typeof ==  Vector{Edge{ESDict}}
+        @test edges_to(sim, a2id, Val(ESLDict1)) |> typeof == Vector{Edge{ESLDict1}}
+        @test edges_to(sim, a2id, Val(ESLDict2)) |> typeof == Vector{Edge{ESLDict2}}
     end
 
     @testset "neighbors & edgestates" begin
