@@ -1,5 +1,6 @@
 export Edge, edgestates, neighbors
 export add_edge!, add_edges!, edges_to
+export num_neighbors
 
 """
     struct Edge{T} 
@@ -125,13 +126,6 @@ Used mainly in combination with [`edges_to`](@ref).
 """
 edgestates(v::Vector{Edge{T}}) where T = map(e -> e.state, v)
 
-# function finish_write_edge!(sim, t::Symbol)
-#     c = sim.typeinfos.edges[t]
-    
-#     if c == :Dict || c == :Vector
-#         @eval $sim.$(readfield(t)) = $sim.$(writefield(t))
-#     end
-# end
 
-# finish_write_edge!(sim) = t -> finish_write_edge!(sim, t)
-
+# TODO DOC
+function num_neighbors end

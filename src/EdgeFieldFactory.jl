@@ -12,6 +12,15 @@ Base.@kwdef struct EdgeFieldFactory
         end
     end 
     aggregate
+    num_neighbors = (T, _) -> begin
+        @eval function num_neighbors(sim, to::AgentID, t::Val{Main.$T})
+            if haskey(sim.$(readfield(T)), to)
+                length(sim.$(readfield(T))[to])
+            else
+                0
+            end
+        end
+    end
 end
 
 #################### Edge Dict
@@ -31,6 +40,8 @@ eff_dict = EdgeFieldFactory(
             get(Vector{Edge{Main.$T}}, sim.$(readfield(T)), to)
         end
     end,
+
+
 
     prepare_write = (T, _) -> begin
         @eval function prepare_write!(sim, ::Val{Main.$T})

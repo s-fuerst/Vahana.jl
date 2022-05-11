@@ -96,6 +96,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
         effs[C].prepare_write(T, sim.typeinfos)
         effs[C].finish_write(T, sim.typeinfos)
         effs[C].aggregate(T, sim.typeinfos)
+        effs[C].num_neighbors(T, sim.typeinfos)
     end
 
     # Construct all type specific functions for the agent types

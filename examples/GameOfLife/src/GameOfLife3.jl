@@ -36,12 +36,12 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    n = edges_to(sim, id, Val(ActiveNeighbor)) |> length
+    n = num_neighbors(sim, id, Val(ActiveNeighbor))
     rules = param(sim, :rules)
     if (c.active == true && n <= rules[4] && n >= rules[1]) ||
         (c.active == false && n >= rules[3] && n <= rules[4])
 
-        foreach(e -> add_edge!(sim, id, e, ActiveNeighbor()),
+        foreach(from -> add_edge!(sim, id, from, ActiveNeighbor()),
                 edges_to(sim, id, Val(Neighbor)))
 
         return Cell(true)
@@ -68,11 +68,6 @@ function init!(sim)
                 name = :raster)
 
     finish_init!(sim)
-
-    apply_transition!(sim, initial_active,
-                      [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
-
-    sim
 end
 
 function step!(sim)
@@ -86,4 +81,6 @@ sim = new_sim(Params(rules = SA[2,3,3,3],
 
 init!(sim)
 
-@profilehtml for i in 1:20 step!(sim) end
+step!(sim)
+
+#@profilehtml for i in 1:20 step!(sim) end

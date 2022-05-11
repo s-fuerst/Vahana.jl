@@ -109,6 +109,14 @@
         @test_throws KeyError agentstate_flexible(copydict, a1id)
     end
 
+    @testset "num_neighbors" begin
+        @test num_neighbors(sim, a1id, Val(ESDict)) == 4
+        @test num_neighbors(sim, a2id, Val(ESDict)) == 0
+        @test num_neighbors(sim, a2id, Val(ESLDict2)) == 0
+        @test num_neighbors(sim, avids[1], Val(ESLDict2)) == 1
+    end
+    
+
     # TODO transition with add_agent! and add_edge!
 end
 
