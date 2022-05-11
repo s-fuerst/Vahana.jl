@@ -14,23 +14,37 @@ struct ESDict  foo::Int64 end
 struct ESLDict1 end
 struct ESLDict2 end
 
-# needed for raster
+# the following structs are needed for the raster tests
 struct GridA 
     pos::Tuple{Int64, Int64}
     active::Bool
 end
+
 struct GridE end
+
+struct Position 
+    sum::Int64
+end
+
+struct MovingAgent 
+    value::Int64
+end
+
+struct OnPosition  end
 
 model = ModelTypes() |>
     add_agenttype!(ADict) |>
-    add_agenttype!(AVec, Vector) |>
-    add_agenttype!(AVecFixed, Vector; size = 10) |>
+    add_agenttype!(AVec, :Vector) |>
+    add_agenttype!(AVecFixed, :Vector; size = 10) |>
     add_agenttype!(ASLDict) |>
     add_edgetype!(ESDict) |>
     add_edgetype!(ESLDict1) |> 
-    add_edgetype!(ESLDict2) |>
+    add_edgetype!(ESLDict2, :Stateless) |>
     add_agenttype!(GridA) |>
-    add_edgetype!(GridE)
+    add_edgetype!(GridE) |>
+    add_agenttype!(Position) |>
+    add_agenttype!(MovingAgent) |>
+    add_edgetype!(OnPosition)
 
 function add_example_network!(sim)
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
@@ -67,6 +81,17 @@ function create_sum_state_neighbors(edgetypeval)
     end
 end
 
+function create_sum_state_neighbors_stateless(edgetypeval) 
+    function sum_state_neighbors_stateless(agent, id, sim)
+        s = 0
+        for n in neighborstates_flexible(sim, id, edgetypeval)
+            s = s + n.foo
+        end
+        typeof(agent)(s)
+    end
+end
+
+
 function nothing_transition(agent, id, sim)
     nothing
 end
@@ -77,7 +102,7 @@ include("core.jl")
 
 include("globals.jl")
 # include("graphs.jl")
-# include("raster.jl")
+include("raster.jl")
 
 # @testset "Tutorial1" begin
 #     include("tutorial1.jl")

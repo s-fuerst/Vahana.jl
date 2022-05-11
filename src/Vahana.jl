@@ -42,5 +42,5 @@ include("Global.jl")
 # include("REPL.jl")
 
 #include("GraphsSupport.jl")
-#include("Raster.jl")
+include("Raster.jl")
 end

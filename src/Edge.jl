@@ -112,6 +112,10 @@ See also [`neighborstates`](@ref)
 """
 neighbors(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
 
+neighbors(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
+
+
+
 """
     edgestates(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{EdgeState}
 

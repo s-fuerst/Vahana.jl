@@ -1,4 +1,4 @@
-export add_raster!, calc_raster, raster_nodeid, move_to!
+export add_raster!, calc_raster, calc_raster_flexible, raster_nodeid, move_to!
 
 """
     add_raster!(sim, dims, agent_constructor, edge_constructor)
@@ -69,8 +69,12 @@ Returns a matrix with those values.
 
 See also [`add_raster!`](@ref)
 """
-function calc_raster(sim, name::Symbol, f)
-    map(id -> agentstate(sim, id) |> f, sim.rasters[name])
+function calc_raster(sim, name::Symbol, f, t::Val{T}) where T
+    map(id -> agentstate(sim, id, t) |> f, sim.rasters[name])
+end
+
+function calc_raster_flexible(sim, name::Symbol, f)
+    map(id -> agentstate_flexible(sim, id) |> f, sim.rasters[name])
 end
 
 
@@ -88,7 +92,7 @@ function raster_nodeid(sim, name::Symbol, pos)
 end
 
 """
-    move_to!(sim, name::Symbol, id::AgentID, pos, ::Type{T}) where {T<:EdgeState}
+    move_to!(sim, name::Symbol, id::AgentID, pos, ::Type{T}) where T
 
 Creates two edges of type `T` between the agent with ID `id` and the agent (node) from the raster `name` at the position `pos`.
 
@@ -100,7 +104,7 @@ function move_to!(sim,
            name::Symbol,
            id::AgentID,
            pos,
-           ::Type{T}) where {T<:EdgeState}
+           ::Type{T}) where T
     posid = raster_nodeid(sim, name, pos)
     add_edge!(sim, id, posid, T)
     add_edge!(sim, posid, id, T)

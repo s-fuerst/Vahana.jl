@@ -1,8 +1,7 @@
 export construct
 export finish_init!
 #export typeid
-export apply_transition, apply_transition!, apply_transition_params
-export apply_transition2!
+export apply_transition, apply_transition!
 export param
 export neighborstates, neighborstates_flexible
 export aggregate
@@ -65,6 +64,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                   :(params::P),
                   :(globals::G),
                   :(typeinfos::ModelTypes),
+                  :(rasters::Dict{Symbol, Array{AgentID,2}}),
                   :(nodes_id2read::Vector{Function}),
                   :(nodes_id2write::Vector{Function}),
                   edgefields...,
@@ -83,53 +83,54 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                            params = $params,
                            globals = $globals,
                            typeinfos = $types,
+                           rasters = Dict{Symbol, Array{AgentID,2}}(),
                            nodes_id2read = Vector{Function}(undef, MAX_TYPES),
                            nodes_id2write = Vector{Function}(undef, MAX_TYPES)
                            )
 
+    # Construct all type specific functions for the edgeg types
     for (T, C) in sim.typeinfos.edges
-        effs[C].init(T, sim.typeinfos) |> eval
-        effs[C].add_edge(T, sim.typeinfos) |> eval
-        effs[C].edges_to(T, sim.typeinfos) |> eval
-        effs[C].prepare_write(T, sim.typeinfos) |> eval
-        effs[C].finish_write(T, sim.typeinfos) |> eval
-        effs[C].aggregate(T, sim.typeinfos) |> eval
+        effs[C].init_field(T, sim.typeinfos) 
+        effs[C].add_edge(T, sim.typeinfos) 
+        effs[C].edges_to(T, sim.typeinfos) 
+        effs[C].prepare_write(T, sim.typeinfos)
+        effs[C].finish_write(T, sim.typeinfos)
+        effs[C].aggregate(T, sim.typeinfos)
     end
 
+    # Construct all type specific functions for the agent types
     for (T, C) in sim.typeinfos.nodes
-        nffs[C].add_agent(T, sim.typeinfos) |> eval 
-        nffs[C].init(T, sim.typeinfos) |> eval
-        nffs[C].agentstate(T, sim.typeinfos) |> eval
-        nffs[C].prepare_write(T, sim.typeinfos) |> eval
-        nffs[C].transition(T, sim.typeinfos) |> eval
-        nffs[C].finish_write(T, sim.typeinfos) |> eval
-        nffs[C].aggregate(T, sim.typeinfos) |> eval
+        nffs[C].init_field(T, sim.typeinfos) 
+        nffs[C].add_agent(T, sim.typeinfos)  
+        nffs[C].agentstate(T, sim.typeinfos) 
+        nffs[C].prepare_write(T, sim.typeinfos) 
+        nffs[C].transition(T, sim.typeinfos) 
+        nffs[C].finish_write(T, sim.typeinfos) 
+        nffs[C].aggregate(T, sim.typeinfos) 
     end
 
     @eval _init_all_types($sim)
 end
 
-construct(name::String, params::P, globals::G) where {P, G} =
-    types -> construct(types, name, params, globals)
-    
 function _init_all_types(sim)
-    for (T, _) in sim.typeinfos.edges
-        init_type!(sim, Val(T))
+    for T in sim.typeinfos.edges_types
+        init_field!(sim, Val(T))
     end
 
-    for (T, _) in sim.typeinfos.nodes
-        init_type!(sim, Val(T))
-    end
-
-    for (T, _) in sim.typeinfos.nodes_type2id
+    for T in sim.typeinfos.nodes_types
+        init_field!(sim, Val(T))
         sim.nodes_id2read[sim.typeinfos.nodes_type2id[T]] =
             @eval sim -> sim.$(readfield(Symbol(T)))
         sim.nodes_id2write[sim.typeinfos.nodes_type2id[T]] =
             @eval sim -> sim.$(writefield(Symbol(T)))
     end
-    
+
     sim
 end
+
+construct(name::String, params::P, globals::G) where {P, G} =
+    types -> construct(types, name, params, globals)
+    
 
 """
     finish_init!(sim::Simulation)

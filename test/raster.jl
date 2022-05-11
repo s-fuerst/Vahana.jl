@@ -3,10 +3,10 @@
     # calculate the sum of all ids
     function diffuse(a, id, sim)
         GridA(a.pos, a.active ||
-            mapreduce(a -> a.active, |, neighborstates(sim, id, GridE)))
+            mapreduce(a -> a.active, |, neighborstates(sim, id, Val(GridE), Val(GridA))))
     end
 
-    sim = construct("Test Grid right botton", nothing, nothing)
+    sim = construct(model, "Test Grid right botton", nothing, nothing)
 
     add_raster!(sim,
                 (10,8),
@@ -17,22 +17,18 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, GridA, a -> a.active, +) == 1
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 9
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 25
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
 
-    raster = calc_raster(sim, :grid, c -> c.active)
+    raster = calc_raster(sim, :grid, c -> c.active, Val(GridA))
     @test raster[1,3] == false
     @test raster[1,1] == true
     @test raster[4,4] == false
     
-
-    sim = Simulation("Test Grid center", nothing, nothing)
-
-    add_agenttype!(sim, GridA)
-    add_edgetype!(sim, GridE)
+    sim = construct(model, "Test Grid center", nothing, nothing)
 
     add_raster!(sim,
                 (7,9),
@@ -42,17 +38,13 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, GridA, a -> a.active, +) == 1
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 9
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 25
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
 
-
-    sim = Simulation("Test Grid top center", nothing, nothing)
-
-    add_agenttype!(sim, GridA)
-    add_edgetype!(sim, GridE)
+    sim = construct(model, "Test Grid top center", nothing, nothing)
 
     add_raster!(sim,
                 (17,6),
@@ -62,16 +54,13 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, GridA, a -> a.active, +) == 1
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 9
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 25
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
 
-    sim = Simulation("Test Grid top left", nothing, nothing)
-
-    add_agenttype!(sim, GridA)
-    add_edgetype!(sim, GridE)
+    sim = construct(model, "Test Grid top left", nothing, nothing)
 
     add_raster!(sim,
                 (6,7),
@@ -81,48 +70,33 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, GridA, a -> a.active, +) == 1
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 9
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, GridA, a -> a.active, +) == 25
+    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
     
     
 end
-
-struct Position <: Agent
-    sum::Int64
-end
-
-struct MovingAgent <: Agent
-    value::Int64
-end
-
-struct OnPosition <: EdgeState end
 
 @testset "Raster_NodeID" begin
     function sum_on_pos(cell::Position, id, sim)
-        if length(edges_to(sim, id, OnPosition)) > 0
+        if length(edges_to(sim, id, Val(OnPosition))) > 0
             Position(mapreduce(c -> c.value, +,
-                               neighborstates(sim, id, OnPosition)))
+                               neighborstates_flexible(sim, id, Val(OnPosition))))
         else
             Position(0)
         end
     end
 
     function value_on_pos(a::MovingAgent, id, sim)
-        value = first(neighborstates(sim, id, OnPosition)).sum
+        value = first(neighborstates_flexible(sim, id, Val(OnPosition))).sum
         move_to!(sim, :raster, id, (value, value), OnPosition)
         MovingAgent(value)
     end
 
-    sim = Simulation("Raster_NodeID", nothing, nothing)
+    sim = construct(model, "Raster NodeID", nothing, nothing)
 
-    add_agenttype!(sim, Position)
-    add_agenttype!(sim, MovingAgent)
-    add_edgetype!(sim, GridE)
-    add_edgetype!(sim, OnPosition)
-    
     add_raster!(sim,
                 (10,10),
                 _ -> Position(0),
@@ -144,7 +118,7 @@ struct OnPosition <: EdgeState end
     finish_init!(sim)
 
     apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
-    raster = calc_raster(sim, :raster, c -> c.sum)
+    raster = calc_raster_flexible(sim, :raster, c -> c.sum)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
@@ -156,7 +130,7 @@ struct OnPosition <: EdgeState end
                       [ OnPosition ],
                       [ OnPosition ])
     apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
-    raster = calc_raster(sim, :raster, c -> c.sum)
+    raster = calc_raster_flexible(sim, :raster, c -> c.sum)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 0

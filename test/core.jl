@@ -1,28 +1,3 @@
-# function transfoo3(p::AgentBar, id, sim)
-#     n = edges_to(sim, id, FooEdgeState)
-#     if length(n) > 0
-#         s = agentstate(sim, n[1].from).foo
-#     else
-#         s = -1
-#     end
-#     AgentBar(s)
-# end
-
-# function transstateless(h::AgentFoo, id, sim)
-#     n = edges_to(sim, id, StatelessEdgeType) |> neighbors
-#     if length(n) > 0
-#         s = agentstate(sim, n[1]).foo
-#     else
-#         s = -1
-#     end
-#     AgentFoo(s)
-# end
-
-# function transaddedges(p::AgentBar, id, sim)
-#     add_edges!(sim, id, edges_to(sim, id, FooEdgeState))
-#     p
-# end
-
 @testset "Core" begin
     sim = construct(model, "Test", nothing, nothing)
     
@@ -54,7 +29,7 @@
         # Check that edges_to for empty sets return the correct type for the empty vector
         @test edges_to(sim, a2id, Val(ESDict)) |> typeof ==  Vector{Edge{ESDict}}
         @test edges_to(sim, a2id, Val(ESLDict1)) |> typeof == Vector{Edge{ESLDict1}}
-        @test edges_to(sim, a2id, Val(ESLDict2)) |> typeof == Vector{Edge{ESLDict2}}
+        @test edges_to(sim, a2id, Val(ESLDict2)) |> typeof == Vector{AgentID}
     end
 
     @testset "neighbors & edgestates" begin
@@ -62,7 +37,7 @@
         @test neighbors(edges)[1] == avids[1]
         @test neighbors(edges)[10] == avids[10]
         edges = edges_to(sim, avids[10], Val(ESLDict2))
-        @test neighbors(edges)[1] == avfids[10]
+        @test edges[1] == avfids[10]
     end
 
     @testset "neighborstates" begin
