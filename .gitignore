@@ -2,3 +2,4 @@
 *.cov
 /docs/build/
 /examples/episim/src/statprof/
+/examples/episim/src/events-small.txt
