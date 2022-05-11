@@ -6,53 +6,61 @@
 # In this version the transition function send a message to all surrounding
 # Cell (where send a message means: creates an edge of type
 # ActiveNeighbor). 
-using Vahana, Random
+using Vahana, Random, BenchmarkTools, StaticArrays, StatProfilerHTML
 
-struct Cell <: Agent
+enable_asserts(false)
+
+struct Cell 
     active::Bool
 end
 
-struct Neighbor <: EdgeState end
+struct Neighbor end
 
-struct ActiveNeighbor <: EdgeState end
+struct ActiveNeighbor end
 
 Base.@kwdef struct Params
     dims::Tuple{Int64, Int64}
-    rules::Tuple
+    rules::SVector{4, Int64}
 end
 
 # We need to create the ActiveNeighbor edges after the initialization
 # of the Cells
 function initial_active(c::Cell, id, sim)
     if c.active
-        foreach(e -> add_edge!(sim, id, e.from, ActiveNeighbor),
-                edges_to(sim, id, Neighbor))
+        foreach(e -> add_edge!(sim, id, e, ActiveNeighbor()),
+                edges_to(sim, id, Val(Neighbor)))
     end
     c
- end
+end
 
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    n = edges_to(sim, id, ActiveNeighbor) |> length
+    n = edges_to(sim, id, Val(ActiveNeighbor)) |> length
     rules = param(sim, :rules)
     if (c.active == true && n <= rules[4] && n >= rules[1]) ||
         (c.active == false && n >= rules[3] && n <= rules[4])
 
-        foreach(e -> add_edge!(sim, id, e.from, ActiveNeighbor),
-                edges_to(sim, id, Neighbor))
+        foreach(e -> add_edge!(sim, id, e, ActiveNeighbor()),
+                edges_to(sim, id, Val(Neighbor)))
 
         return Cell(true)
     end
     Cell(false)
- end
+end
 
-function init(params::Params)
-    sim = Simulation("Game of Life", params, nothing)
-    add_agenttype!(sim, Cell)
-    add_edgetype!(sim, Neighbor)
-    add_edgetype!(sim, ActiveNeighbor)
+const model = ModelTypes() |>    
+    add_agenttype!(Cell, :Vector) |> 
+#    add_agenttype!(Cell) |> 
+    add_edgetype!(Neighbor, :Stateless) |>
+    add_edgetype!(ActiveNeighbor, :Stateless)
 
+
+function new_sim(params)
+    construct(model, "Game of Life", params, nothing)
+end
+
+function init!(sim)
     add_raster!(sim, 
                 param(sim, :dims),
                 _ -> rand() < 0.2 ? Cell(true) : Cell(false),
@@ -70,10 +78,12 @@ end
 function step!(sim)
     apply_transition!(sim, transition,
                       [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
-    calc_raster(sim, :raster, c -> c.active)
+    calc_raster(sim, :raster, c -> c.active, Val(Cell))
 end
 
-sim = init(Params(rules = (2,3,3,3),
-                  dims = (200,200)))
+sim = new_sim(Params(rules = SA[2,3,3,3],
+                     dims = (200,200)))
 
-step!(sim)
+init!(sim)
+
+@profilehtml for i in 1:20 step!(sim) end
