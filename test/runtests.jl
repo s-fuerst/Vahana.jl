@@ -39,7 +39,7 @@ model = ModelTypes() |>
     add_agenttype!(ASLDict) |>
     add_edgetype!(ESDict) |>
     add_edgetype!(ESLDict1) |> 
-    add_edgetype!(ESLDict2, :Stateless) |>
+    add_edgetype!(ESLDict2, :Vec; to = AVec) |>
     add_agenttype!(GridA) |>
     add_edgetype!(GridE) |>
     add_agenttype!(Position) |>

@@ -66,11 +66,6 @@ nff_dict = NodeFieldFactory(
     end, 
 )
 
-function _add_node_vec!(coll, id, node::T) where T
-    resize!(coll, id)
-    push!(coll[id], node)
-end
-
 #################### Vec
 nff_vec = NodeFieldFactory(
     type = (T, _) -> :(Vector{Main.$T}),

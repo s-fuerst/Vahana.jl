@@ -103,7 +103,7 @@ See also [`apply_transition!`](@ref), [`neighborstates`](@ref),
 function edges_to end
 
 """
-    neighbors(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{AgentID}
+    neighborids(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{AgentID}
 
 Returns all IDs of the agents at the tail of the edges in `v`. 
 
@@ -113,8 +113,11 @@ See also [`neighborstates`](@ref)
 """
 neighbors(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
 
-neighbors(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
+# TODO write tests, update doc, move to factory?
 
+function neighbors(sim, to::AgentID, type)
+    neighborids(edges_to(sim, to, type))
+end
 
 
 """
