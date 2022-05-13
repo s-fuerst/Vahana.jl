@@ -10,12 +10,12 @@ using Vahana, Random, SparseArrays
 
 import Graphs
 
-struct Cell <: Agent
+struct Cell 
     active::Bool
     pos::Tuple{Int64, Int64}
 end
 
-struct Neighbor <: EdgeState end
+struct Neighbor  end
 
 Base.@kwdef struct Params
     dims::Tuple{Int64, Int64}

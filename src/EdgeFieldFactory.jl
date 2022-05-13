@@ -110,34 +110,36 @@ eff_stateless = EdgeFieldFactory(
 
 #################### Edge Dict
 
+function check_agenttype(sim, to::AgentID, ::Val{T}) where T
+    sim.typeinfos.nodes_id2type[type_nr(to)] ==
+        sim.typeinfos.edges_attr[Symbol(T)][:to_agenttype]
+end
+
 eff_stateless_vec = EdgeFieldFactory(
     type = (_, _) -> :(Vector{Vector{AgentID}}),
     constructor = (_, _) -> :(Vector{Vector{AgentID}}()),
 
     add_edge = (T, _) -> begin
         @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
-            resize!(sim.$(writefield(T)), agent_nr(to))
-            if ! isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-                sim.$(writefield(T))[agent_nr(to)] = Vector{AgentID}()
-            end
-            push!(sim.$(writefield(T))[agent_nr(to)], edge.from)
+            #            @mayassert check_agenttype(sim, to, Val(Main.$T)) AGENTSTATE_MSG 
+            add_edge!(sim, edge.from, to, Main.$T())
+            # nr = agent_nr(to)
+            # resize!(sim.$(writefield(T)), nr)
+            # if ! isassigned(sim.$(readfield(T)), Int64(nr))
+            #     sim.$(writefield(T))[nr] = Vector{AgentID}()
+            # end
+            # push!(sim.$(writefield(T))[nr], edge.from)
         end
-        # @eval function add_edge!(sim, from::AgentID, to::AgentID, ::Type{Main.$T})
-        #     resize!(sim.$(writefield(T)), agent_nr(to))
-        #     if ! isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-        #         sim.$(writefield(T))[agent_nr(to)] = Vector{AgentID}()
-        #     end
-        #     push!(sim.$(writefield(T))[agent_nr(to)], from)
-        # end
         @eval function add_edge!(sim, from::AgentID, to::AgentID, ::Main.$T)
-            resize!(sim.$(writefield(T)), agent_nr(to))
-            if ! isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-                sim.$(writefield(T))[agent_nr(to)] = Vector{AgentID}()
+            @mayassert check_agenttype(sim, to, Val(Main.$T)) AGENTSTATE_MSG 
+
+            nr = agent_nr(to)
+            #            check_size(nr, sim.$(writefield(T)))
+            resize!(sim.$(writefield(T)), nr)
+            if ! isassigned(sim.$(readfield(T)), Int64(nr))
+                sim.$(writefield(T))[nr] = Vector{AgentID}()
             end
-            push!(sim.$(writefield(T))[agent_nr(to)], from)
-            println("added!")
-            println(agent_nr(to))
-            println(sim.$(writefield(T))[agent_nr(to)])
+            push!(sim.$(writefield(T))[nr], from)
         end
     end,
 
@@ -145,22 +147,23 @@ eff_stateless_vec = EdgeFieldFactory(
         @eval function edges_to(sim, to::AgentID, ::Val{Main.$T}) 
             @assert false "edges_to can not be called for Stateless edges, use neighbors instead"
         end
-        @eval function neighbors(sim, to::AgentID, ::Val{Main.$T}, A::DataType)
- #           if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-#                sim.$(readfield(T))[agent_nr(to)]
- #           else
- #               Vector{AgentID}()
-            #           end
-            @mayassert type_nr(to) == sim.typeinfos.nodes_type2id[A] AGENTSTATE_MSG 
+        @eval function neighbors(sim, to::AgentID, edgetype::Val{Main.$T})
+            if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
+                sim.$(readfield(T))[agent_nr(to)]
+            else
+                Vector{AgentID}()
+            end
+            @mayassert check_agenttype(sim, to, edgetype) AGENTSTATE_MSG 
 
             get(Vector{AgentID}, sim.$(readfield(T)), agent_nr(to))
         end
-        @eval function neighbors(sim, to::AgentID, ::Val{Main.$T})
- #           if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-#                sim.$(readfield(T))[agent_nr(to)]
- #           else
- #               Vector{AgentID}()
-            #           end
+        @eval function neighbors(sim, to::AgentID, edgetype::Val{Main.$T})
+            if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
+                sim.$(readfield(T))[agent_nr(to)]
+            else
+                Vector{AgentID}()
+            end
+            @mayassert check_agenttype(sim, to, edgetype) AGENTSTATE_MSG 
 
             get(Vector{AgentID}, sim.$(readfield(T)), agent_nr(to))
         end
@@ -183,8 +186,10 @@ eff_stateless_vec = EdgeFieldFactory(
     end,
 
     num_neighbors = (T, _) -> begin
-        @eval function num_neighbors(sim, to::AgentID, ::Val{Main.$T})
-            if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
+        @eval function num_neighbors(sim, to::AgentID, edgetype::Val{Main.$T})
+            @mayassert check_agenttype(sim, to, edgetype) AGENTSTATE_MSG 
+            
+            if isassigned(sim.$(readfield(T)), Int64(agent_nr(to)))
                 length(sim.$(readfield(T))[agent_nr(to)])
             else
                 0

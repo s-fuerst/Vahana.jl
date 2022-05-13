@@ -17,22 +17,24 @@
         @test_throws AssertionError agentstate(sim, avids[1], Val(ADict))
     end
 
-    @testset "edges_to / neighbors" begin
+    @testset "edges_to" begin
         @test size(edges_to(sim, a1id, Val(ESDict)), 1) == 4
         @test size(edges_to(sim, a1id, Val(ESLDict1)), 1) == 10
-        @test size(neighbors(sim, avids[1], Val(ESLDict2), ), 1) == 1
-        @test size(neighbors(sim, avids[10], Val(ESLDict2)), 1) == 1
         # Check that we can call edges_to also for an empty set of neighbors
         @test size(edges_to(sim, a2id, Val(ESDict)), 1) == 0
         @test size(edges_to(sim, a2id, Val(ESLDict1)), 1) == 0
-        @test size(neighbors(sim, a2id, Val(ESLDict2)), 1) == 0
         # Check that edges_to for empty sets return the correct type for the empty vector
         @test edges_to(sim, a2id, Val(ESDict)) |> typeof ==  Vector{Edge{ESDict}}
         @test edges_to(sim, a2id, Val(ESLDict1)) |> typeof == Vector{Edge{ESLDict1}}
-        @test neighbors(sim, a2id, Val(ESLDict2)) |> typeof == Vector{AgentID}
+        @test neighbors(sim, avids[1], Val(ESLDict2)) |> typeof == Vector{AgentID}
     end
 
     @testset "neighbors & edgestates" begin
+        @test size(neighbors(sim, avids[1], Val(ESLDict2)), 1) == 1
+        @test size(neighbors(sim, avids[10], Val(ESLDict2)), 1) == 1
+
+        @test_throws AssertionError neighbors(sim, a2id, Val(ESLDict2))
+
         edges = edges_to(sim, a1id, Val(ESLDict1))
         @test neighbors(edges)[1] == avids[1]
         @test neighbors(edges)[10] == avids[10]
@@ -51,13 +53,11 @@
         copy = deepcopy(sim)
         add_edge!(copy, a2id, a1id, ESDict(20))
         add_edge!(copy, a2id, avids[1], ESLDict2())
-        add_edge!(copy, a2id, avfids[1], ESLDict2())
+        @test_throws AssertionError add_edge!(copy, a2id, avfids[1], ESLDict2())
         @test size(edges_to(sim, a1id, Val(ESDict)), 1) == 4
         @test size(edges_to(copy, a1id, Val(ESDict)), 1) == 5
         @test size(neighbors(sim, avids[1], Val(ESLDict2)), 1) == 1
         @test size(neighbors(copy, avids[1], Val(ESLDict2)), 1) == 2
-        @test size(neighbors(sim, avfids[1], Val(ESLDict2)), 1) == 0
-        @test size(neighbors(copy, avfids[1], Val(ESLDict2)), 1) == 1
     end
     
     @testset "transition" begin
@@ -112,7 +112,7 @@
     @testset "num_neighbors" begin
         @test num_neighbors(sim, a1id, Val(ESDict)) == 4
         @test num_neighbors(sim, a2id, Val(ESDict)) == 0
-        @test num_neighbors(sim, a2id, Val(ESLDict2)) == 0
+        @test_throws AssertionError num_neighbors(sim, a2id, Val(ESLDict2))
         @test num_neighbors(sim, avids[1], Val(ESLDict2)) == 1
     end
     

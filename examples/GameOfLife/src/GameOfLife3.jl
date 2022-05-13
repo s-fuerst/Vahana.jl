@@ -28,7 +28,7 @@ end
 function initial_active(c::Cell, id, sim)
     if c.active
         foreach(e -> add_edge!(sim, id, e, ActiveNeighbor()),
-                edges_to(sim, id, Val(Neighbor)))
+                neighbors(sim, id, Val(Neighbor)))
     end
     c
 end
@@ -42,7 +42,7 @@ function transition(c::Cell, id, sim)
         (c.active == false && n >= rules[3] && n <= rules[4])
 
         foreach(from -> add_edge!(sim, id, from, ActiveNeighbor()),
-                edges_to(sim, id, Val(Neighbor)))
+                neighbors(sim, id, Val(Neighbor)))
 
         return Cell(true)
     end
@@ -67,7 +67,12 @@ function init!(sim)
                 Neighbor();
                 name = :raster)
 
+
     finish_init!(sim)
+
+    apply_transition!(sim, initial_active,
+                      [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+    
 end
 
 function step!(sim)

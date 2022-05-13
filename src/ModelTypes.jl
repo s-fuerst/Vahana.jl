@@ -71,21 +71,18 @@ Can only be called before [`finish_init!`](@ref)
 See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
 """
 function add_edgetype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
-                size::Int64 = 0) where T  
+                kwargs...)  where T  
     @assert !(Symbol(T) in keys(types.edges)) "Each type can be added only once"
     @assert isbitstype(T)
     types.edges[Symbol(T)] = C
     push!(types.edges_types, T)
     attr = Dict{Symbol,Any}()
-    types.edges_attr[Symbol(T)] = attr
-    if size > 0
-        attr[:size] = size
-    end
+    types.edges_attr[Symbol(T)] = kwargs
     types
 end
 
 add_edgetype!(t::Type{T}) where T = types -> add_edgetype!(types, t) 
 
-add_edgetype!(t::Type{T}, c::Symbol; kwargs...) where T where C =
+add_edgetype!(t::Type{T}, c::Symbol; kwargs...) where T =
     types -> add_edgetype!(types, t, c; kwargs...) 
 

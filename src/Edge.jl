@@ -116,7 +116,7 @@ neighbors(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
 # TODO write tests, update doc, move to factory?
 
 function neighbors(sim, to::AgentID, type)
-    neighborids(edges_to(sim, to, type))
+    neighbors(edges_to(sim, to, type))
 end
 
 
