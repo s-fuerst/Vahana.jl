@@ -1,6 +1,8 @@
 export Edge, edgestates, neighbors
 export add_edge!, add_edges!, edges_to
 export num_neighbors
+export neighborstates, neighborstates_flexible
+export neighborids, neighborids_flexible
 
 """
     struct Edge{T} 
@@ -55,13 +57,13 @@ is also possible to just use T as forth parameter instead of T.
 
 See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
-function add_edge!(sim, from::AgentID, to::AgentID, ::Type{T}) where T
-    add_edge!(sim, to, Edge{T}(from, T()))
-end
+# function add_edge!(sim, from::AgentID, to::AgentID, ::Type{T}) where T
+#     add_edge!(sim, to, Edge{T}(from, T()))
+# end
 
-function add_edge!(sim, from::AgentID, to::AgentID, state::T) where T
-    add_edge!(sim, to, Edge{T}(from, state))
-end
+# function add_edge!(sim, from::AgentID, to::AgentID, state::T) where T
+#     add_edge!(sim, to, Edge{T}(from, state))
+# end
 
 """
     add_edges!(sim::Simulation, to::AgentID, edges)
@@ -128,6 +130,32 @@ Return all states from a vector of edges.
 Used mainly in combination with [`edges_to`](@ref).
 """
 edgestates(v::Vector{Edge{T}}) where T = map(e -> e.state, v)
+
+"""
+    neighborstates(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Agent}
+
+Returns all incoming neighbors of agent `id` for the network `T`.
+
+Should only be used inside a transition function and only for the ID specified
+as a transition function parameter. Calling agents_to outside a transition function
+or with other IDs may result in undefined behavior.
+
+In a parallel run, this function can trigger communication between
+processes. In the case that the state of ALL agents is not needed in
+the transition function, the performance can be likely increased by
+using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
+for the agents whose state is actually used in the transition
+function.
+
+See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
+[`neighbors`](@ref)
+"""
+neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
+    map(e -> agentstate(sim, e.from, agenttype), edges_to(sim, id, edgetype))  
+
+# TODO DOC
+neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
+    map(e -> agentstate_flexible(sim, e.from), edges_to(sim, id, edgetype))  
 
 
 # TODO DOC

@@ -3,7 +3,6 @@ export finish_init!
 #export typeid
 export apply_transition, apply_transition!
 export param
-export neighborstates, neighborstates_flexible
 export aggregate
 
 const MAX_TYPES = typemax(TypeID) 
@@ -40,10 +39,10 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     edgefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(effs[C].type(T, types))),
-                 :($(effs[C].constructor(T, types))))
+                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[Symbol(T)]))),
+                 :($(edgefield_constructor(T, types.edges_attr[Symbol(T)]))))
         end 
-        for (T,C) in types.edges ] |> Iterators.flatten |> collect
+        for T in types.edges_types ] |> Iterators.flatten |> collect
 
     nodefields = [
         map(["_read", "_write"]) do RW
@@ -88,15 +87,9 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                            nodes_id2write = Vector{Function}(undef, MAX_TYPES)
                            )
 
-    # Construct all type specific functions for the edgeg types
-    for (T, C) in sim.typeinfos.edges
-        effs[C].init_field(T, sim.typeinfos) 
-        effs[C].add_edge(T, sim.typeinfos) 
-        effs[C].edges_to(T, sim.typeinfos) 
-        effs[C].prepare_write(T, sim.typeinfos)
-        effs[C].finish_write(T, sim.typeinfos)
-        effs[C].aggregate(T, sim.typeinfos)
-        effs[C].num_neighbors(T, sim.typeinfos)
+    # Construct all type specific functions for the edge types
+    for T in sim.typeinfos.edges_types
+        construct_edge_functions(Symbol(T), types.edges_attr[Symbol(T)])
     end
 
     # Construct all type specific functions for the agent types
@@ -150,39 +143,9 @@ function finish_init!(sim)
     sim
 end 
 
-######################################## Types
-
-# function typeid(sim, ::Type{T})::TypeID where T
-#     sim.agent_typeids[T]
-# end
 
 ######################################## Transition
 
-"""
-    neighborstates(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Agent}
-
-Returns all incoming neighbors of agent `id` for the network `T`.
-
-Should only be used inside a transition function and only for the ID specified
-as a transition function parameter. Calling agents_to outside a transition function
-or with other IDs may result in undefined behavior.
-
-In a parallel run, this function can trigger communication between
-processes. In the case that the state of ALL agents is not needed in
-the transition function, the performance can be likely increased by
-using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
-for the agents whose state is actually used in the transition
-function.
-
-See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
-[`neighbors`](@ref)
-"""
-neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
-    map(e -> agentstate(sim, e.from, agenttype), edges_to(sim, id, edgetype))  
-
-# TODO DOC
-neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
-    map(e -> agentstate_flexible(sim, e.from), edges_to(sim, id, edgetype))  
 
 """
     param(sim::Simulation, name)

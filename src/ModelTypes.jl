@@ -3,7 +3,6 @@ export add_agenttype!, add_edgetype!
 
 # TODO DOC
 Base.@kwdef struct ModelTypes
-    edges = Dict{Symbol, Symbol}()
     edges_attr = Dict{Symbol, Dict{Symbol, Any}}()
     edges_types = Vector{DataType}()
     nodes = Dict{Symbol, Symbol}()
@@ -68,21 +67,34 @@ and other bits types.
 
 Can only be called before [`finish_init!`](@ref)
 
+Props:
+SingleAgentType
+SingleEdge
+IgnoreFrom
+
+kwargs (for SingleTAgentype):
+num_agents (optional)
+agent_type (optional?)
+
 See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
 """
-function add_edgetype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
+function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
                 kwargs...)  where T  
-    @assert !(Symbol(T) in keys(types.edges)) "Each type can be added only once"
+    @assert !(T in types.edges_types) "Each type can be added only once"
     @assert isbitstype(T)
-    types.edges[Symbol(T)] = C
     push!(types.edges_types, T)
-    attr = Dict{Symbol,Any}()
     types.edges_attr[Symbol(T)] = kwargs
+    p = Set{Symbol}(props)
+    if fieldcount(T) == 0
+        push!(p, :Stateless)
+    end
+    types.edges_attr[Symbol(T)][:props] = p
     types
 end
 
-add_edgetype!(t::Type{T}) where T = types -> add_edgetype!(types, t) 
 
-add_edgetype!(t::Type{T}, c::Symbol; kwargs...) where T =
-    types -> add_edgetype!(types, t, c; kwargs...) 
+#add_edgetype!(t::Type{T}) where T = types -> add_edgetype!(types, t) 
+
+add_edgetype!(t::Type{T}, props...; kwargs...) where T =
+    types -> add_edgetype!(types, t, props...; kwargs...) 
 
