@@ -53,6 +53,9 @@ add_agenttype!(t::Type{T}) where T = types -> add_agenttype!(types, t)
 add_agenttype!(t::Type{T}, c::Symbol; kwargs...) where T where C =
     types -> add_agenttype!(types, t, c; kwargs...) 
 
+
+show_single_edge_and_type_warning = true
+
 """
     add_edgetype!(sim, ::Type{T}) where {T <: EdgeState}
 
@@ -79,15 +82,43 @@ agent_type (optional?)
 See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
 """
 function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
-                kwargs...)  where T  
+                kwargs...)  where T
+    global show_single_edge_and_type_warning
     @assert !(T in types.edges_types) "Each type can be added only once"
     @assert isbitstype(T)
     push!(types.edges_types, T)
     types.edges_attr[Symbol(T)] = kwargs
     p = Set{Symbol}(props)
-    if fieldcount(T) == 0
-        push!(p, :Stateless)
+    for prop in p
+        @assert prop in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleAgentType] """
+
+        The edge type property $prop is unknown. The following properties are
+        supported: 
+            :Stateless
+            :IgnoreFrom
+            :SingleEdge
+            :SingleAgentType    
+        """
     end
+    if :SingleEdge in p && :SingleAgentType in p && show_single_edge_and_type_warning
+        show_single_edge_and_type_warning = false
+        printstyled("""
+
+        Using the :SingleEdge and :SingleAgentType property at the same time 
+        is risky. Please read the documentation (TODO add link) and make
+        sure that you understand the possible pitfalls. 
+
+        """; color = :red)
+    end
+    if :SingleAgentType in p
+        @assert haskey(kwargs, :to_agenttype) """
+        If the :SingleAgentType property is set, the agent type must also be 
+        specified via the to_agenttype keyword.        
+        """
+    end
+    # if fieldcount(T) == 0
+    #     push!(p, :Stateless)
+    # end
     types.edges_attr[Symbol(T)][:props] = p
     types
 end

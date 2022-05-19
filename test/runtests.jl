@@ -1,5 +1,6 @@
 using Vahana
 using Test
+using BenchmarkTools
 
 enable_asserts(true)
 
@@ -22,7 +23,7 @@ struct ESLDict2 end
 # (I) IgnoreFrom
 # so EdgeET means an Edge(State) with the SingleEdge and SingleAgentType property
 
-struct DefaultEdge foo::Int64 end
+struct EdgeD foo::Int64 end # D for default (no property is set)
 struct EdgeS end
 struct EdgeE foo::Int64 end
 struct EdgeT foo::Int64 end
@@ -40,13 +41,20 @@ struct EdgeETI foo::Int64 end
 struct EdgeSETI end
 
 struct EdgeTs foo::Int64 end
+struct EdgeETs foo::Int64 end
+struct EdgeTsI foo::Int64 end
+struct EdgeETsI foo::Int64 end
+
+struct EdgeSTs end
+struct EdgeSETs end
+struct EdgeSTsI end
 struct EdgeSETsI end
 
 statelessEdgeTypes = [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
-                       EdgeSETsI ]
+                       EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
 
-statefulEdgeTypes = [ DefaultEdge, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeETI,
-                      EdgeTs ]
+statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeETI,
+                      EdgeTs, EdgeETs, EdgeTsI, EdgeETsI ]
 
 
 # the following structs are needed for the raster tests
@@ -80,25 +88,31 @@ model = ModelTypes() |>
     add_agenttype!(Position) |>
     add_agenttype!(MovingAgent) |>
     add_edgetype!(OnPosition) |>
-    add_edgetype!(DefaultEdge) |>
-    add_edgetype!(EdgeS) |>
+    add_edgetype!(EdgeD) |>
+    add_edgetype!(EdgeS, :Stateless) |>
     add_edgetype!(EdgeE, :SingleEdge) |>
-    add_edgetype!(EdgeT, :SingleAgentType; to_agenttype = ADict) |>
+    add_edgetype!(EdgeT, :SingleAgentType; to_agenttype = AVec) |>
     add_edgetype!(EdgeI, :IgnoreFrom) |>
-    add_edgetype!(EdgeSE, :SingleEdge) |>
-    add_edgetype!(EdgeST, :SingleAgentType; to_agenttype = ADict) |>
-    add_edgetype!(EdgeSI, :IgnoreFrom) |>
-    add_edgetype!(EdgeET, :SingleEdge, :SingleAgentType; to_agenttype = ADict) |>
+    add_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
+    add_edgetype!(EdgeST, :Stateless, :SingleAgentType; to_agenttype = AVec) |>
+    add_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
+    add_edgetype!(EdgeET, :SingleEdge, :SingleAgentType; to_agenttype = AVec) |>
     add_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
-    add_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = ADict) |>
-    add_edgetype!(EdgeSET, :SingleEdge, :SingleAgentType; to_agenttype = ADict) |>
-    add_edgetype!(EdgeSEI, :SingleEdge, :IgnoreFrom) |>
-    add_edgetype!(EdgeSTI, :SingleAgentType, :IgnoreFrom; to_agenttype = ADict) |>
-    add_edgetype!(EdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = ADict) |>
-    add_edgetype!(EdgeSETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = ADict) |>
-    add_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = ADict, size = 10) |>
-    add_edgetype!(EdgeSETsI, :SingleEdge, :SingleAgentType, :IgnoreFrom;
-                  to_agenttype = ADict, size = 10) 
+    add_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec) |>
+    add_edgetype!(EdgeSET, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = AVec) |>
+    add_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    add_edgetype!(EdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec) |>
+    add_edgetype!(EdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec) |>
+    add_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec) |>
+    add_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeETs, :SingleEdge, :SingleAgentType; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeETsI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeSETs, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec, size = 10) |>
+    add_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom;
+                  to_agenttype = AVec, size = 10) 
 
 function add_example_network!(sim)
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
@@ -151,32 +165,56 @@ function nothing_transition(agent, id, sim)
 end
 
 # we must construct it once on the here to avoid the "world" problem
-const sim = construct(model, "Test", nothing, nothing)
+construct(model, "Test", nothing, nothing)
 
 #include("edges.jl")
 
-(a1id, a2id, a3id) = add_agents!(sim, AVec(1), AVec(2), AVec(3))
+#(a1id, a2id, a3id) = add_agents!(sim, AVec(1), AVec(2), AVec(3))
+
+filtertypes(typeidents::String, typelist::Vector) =
+    filter(x -> occursin(typeidents, SubString(String(Symbol(x)),5)), typelist)
+
+hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
+
+    # for t in statelessEdgeTypes
+    #     println(t)
+    #     add_edge!(sim, a2id, a3id, t())
+    #     # if hasprop(t, "E") && !hasprop(t, "T") && !(hasprop(t, "S") && hasprop(t, "I"))
+    #     #     println("assertion")
+    #     #     @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
+    #     # else
+    #     #     println("no")
+    #     #     add_edge!(sim, a1id, a3id, t())
+    #     # end
+    #     add_edge!(sim, a3id, a1id, t())
+
+    #     @eval println(sim.$(Symbol(t,"_write")))
+    #     println()
+    # end
 
 
+# for t in statelessEdgeTypes
+#     println(t)
+#     add_edge!(sim, a2id, a3id, t())
+#     # if hasprop(t, "E") && !hasprop(t, "T")
+#     #     add_edge!(sim, a1id, a3id, t())
+#     # add_edge!(sim, a3id, a1id, t())
 
-for t in statelessEdgeTypes
-    println(t)
-    add_edge!(sim, a1id, a2id, t())
-    add_edge!(sim, a3id, a2id, t())
+#     @eval println(sim.$(Symbol(t,"_write")))
+#     println()
+# end
 
-    @eval println(sim.$(Symbol(t,"_write")))
-    println()
-end
-
-for t in statefulEdgeTypes
-    println(t)
-    add_edge!(sim, a1id, a2id, t(1))
-    add_edge!(sim, a3id, a2id, t(3))
-    @eval println(sim.$(Symbol(t,"_write")))
-    println()
-end
+# for t in statefulEdgeTypes
+#     println(t)
+#     add_edge!(sim, a2id, a3id, t(2))
+#     add_edge!(sim, a1id, a3id, t(1))
+#     add_edge!(sim, a3id, a1id, t(3))
+#     @eval println(sim.$(Symbol(t,"_write")))
+#     println()
+# end
 
 
+include("edges.jl")
 
 #include("aggregate.jl")
 

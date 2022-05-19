@@ -32,11 +32,11 @@ import Base.zero
 # | Vector{AgentID}                      | x     | x         | x     |        |
 # | Dict{AgentID, Vector{Main.$T}}       |       |           |       | x      |
 # | Dict{AgentID, Main.$T}               |       |           | x     | x      |
-# | Dict{AgentID, EdgeCount}             |       | x         |       | x      |
+# | Dict{AgentID, Int64}                 |       | x         |       | x      |
 # | Dict{AgentID, Bool}                  |       | x         | x     | x      |
 # | Vector{Vector{Main.$T}}              | x     |           |       | x      |
 # | Vector{Main.$T}                      | x     |           | x     | x      |
-# | Vector{EdgeCount}                    | x     | x         |       | x      |
+# | Vector{Int64}                        | x     | x         |       | x      |
 # | Vector{Bool}                         | x     | x         | x     | x      |
 #
 #
@@ -77,7 +77,11 @@ function construct_types(T, attr::Dict{Symbol, Any})
     A*C(B)*"}", C(B)
 end
 
-function construct_edge_functions(T, attr)
+edgefield_type(T, info) = Meta.parse(construct_types(T, info)[1])
+
+edgefield_constructor(T, info) = Meta.parse(construct_types(T, info)[1] * "()")
+
+function construct_edge_functions(T::Symbol, attr)
     ignorefrom = :IgnoreFrom in attr[:props]
     singleedge = :SingleEdge in attr[:props]
     singletype = :SingleAgentType in attr[:props]
@@ -106,10 +110,10 @@ function construct_edge_functions(T, attr)
         @eval _valuetostore(from::AgentID, edgestate::Main.$T) = true
     elseif ignorefrom
         @eval _valuetostore(edge::Edge{Main.$T}) = edge.state
-        @eval _valuetostore(from::AgentID, edgestate::Main.$T) = edgestate
+        @eval _valuetostore(::AgentID, edgestate::Main.$T) = edgestate
     elseif stateless
         @eval _valuetostore(edge::Edge{Main.$T}) = edge.from
-        @eval _valuetostore(from::AgentID, edgestate::Main.$T) = from
+        @eval _valuetostore(from::AgentID, ::Main.$T) = from
     else
         @eval _valuetostore(edge::Edge{Main.$T}) = edge
         @eval _valuetostore(from::AgentID, edgestate::Main.$T) = Edge(from, edgestate)
@@ -125,105 +129,130 @@ function construct_edge_functions(T, attr)
 
     @eval _construct_container_func(::Type{$CT}) = () -> zero($CT)
     
-    # init_field is used for the :SingleEdge property in combination with a given
-    # size to preallocation the vector
-    if singletype && singletype_size > 0
-        @eval function init_field!(sim, ::Val{Main.$T})
-            resize!(sim.$(writefield(T)), $singletype_size)
-            for i in 1:$singletype_size
-                sim.$(writefield(T))[i] = zero($CT)
-            end
-        end
-    else
-        @eval init_field!(_, ::Val{Main.$T}) = nothing
-    end
+    if singletype
+        if isbitstype(CT)
+            # for bitstype we must initialize the new memory
+            if singletype_size == 0
+                @eval function _check_size!(field, nr::AgentNr, ::Type{$(Val{T})})
+                    s = size(field, 1)
+                    if (s < nr)
+                        resize!(field, nr)
+                        ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
+                              pointer(field, s+1), 0, (nr-s) * sizeof($CT))
+                    end
+                end
 
-    if singletype && singletype_size == 0
-        # for primitivetypes (the Val{true}) we must initialize the new memory
-        @eval function _check_size!(field, nr::AgentNr, ::Type{$(Val{T})}, ::Val{true})
-            s = size(field, 1)
-            if (s < nr)
-                resize!(field, nr)
-                ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
-                      pointer(field, s+1), 0, (nr-s) * sizeof($CT))
-            end
-        end
-        if singleedge 
-            @eval function _check_size!(field, nr::AgentNr, ::Type{$(Val{T})}, ::Val{false})
-                # resize!(field, nr)
-DAS GEHT SO NICHT, DA IM ETI FALL NICHT ERKANNT WERDEN KANN, WELCHE WIEDER RAUSGEFILTERT WERDEN MÜSSEN                
-                s = size(field, 1)
-                if (s < nr)
-                    resize!(field, nr)
+                @eval init_field!(_, ::Val{Main.$T}) = nothing
+            else 
+                @eval _check_size!(_, _, ::Type{$(Val{T})}) = nothing
+
+                @eval function init_field!(sim, ::Val{Main.$T})
+                    field = sim.$(writefield(T))
+                    resize!(field, $singletype_size)
                     ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
-                          pointer(field, s+1), 0, (nr-s) * sizeof($CT))
+                          pointer(field), 0, $singletype_size * sizeof($CT))
+                end
+            end            
+            # and we cannot check if something was allready assigned
+            @eval _check_assigned!(_, _, ::Type{$(Val{T})}) = nothing
+        else
+            if singletype_size == 0
+                @eval function _check_size!(field, nr::AgentNr, ::Type{$(Val{T})})
+                    resize!(field, nr)
+                end
+                @eval init_field!(_, ::Val{Main.$T}) = nothing
+            else
+                @eval _check_size!(_, _, ::Type{$(Val{T})}) = nothing
+
+                @eval init_field!(sim, ::Val{Main.$T}) =
+                    resize!(sim.$(writefield(T)), $singletype_size)
+            end
+            
+            @eval function _check_assigned!(field, nr::AgentNr, ::Type{$(Val{T})})     
+                if ! isassigned(field, Int64(nr))
+                    field[nr] = zero($CT)
                 end
             end
-        else 
-            @eval function _check_size!(field, nr::AgentNr, ::Type{$(Val{T})}, ::Val{false})
-                resize!(field, nr)
-            end
         end
-        @eval function _check_assigned!(field, nr::AgentNr, ::Type{$(Val{T})})     
-            if ! isassigned(field, Int64(nr))
-                field[nr] = zero($CT)
-            end
+    else 
+        @eval _check_size!(_, _, ::Type{$(Val{T})}) = nothing
+        @eval _check_assigned!(_, _, ::Type{$(Val{T})}) = nothing
+        @eval init_field!(sim, ::Val{Main.$T}) = nothing
+    end
+
+    if singleedge && !singletype && !(ignorefrom && stateless)
+        @eval function _can_add(field, to::AgentID, ::Type{$(Val{T})})
+            !haskey(field, to)
         end
     else
-        @eval _check_size!(_, _, ::Type{$(Val{T})}, _) = nothing
-        @eval _check_assigned!(_, _, ::Type{$(Val{T})}) = nothing
+        @eval _can_add(_, _, ::Type{$(Val{T})}) = true
     end
 
     if singletype
-        @eval function _get_agent_container(nr::AgentNr, field, ::Type{$(Val{T})})
-            _check_size!(field, nr, $(Val{T}), Val(($(isprimitivetype(CT)))))
+        # @eval function _check_agenttype(sim, to::AgentID, t::Type{$(Val{T})})
+        #     sim.typeinfos.nodes_id2type[type_nr(to)] == $(attr[:to_agenttype])
+        # end
+        
+        @eval function _get_agent_container(sim, to::AgentID, ::Type{$(Val{T})})
+            # @mayassert _check_agenttype(sim, to, $(Val{T})) AGENTSTATE_MSG 
+            field = sim.$(writefield(T))
+            nr = _to2idx(to, $(Val{T}))
+            @mayassert begin
+                at = $(attr[:to_agenttype])
+                tnr = type_nr(to)
+                sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
+            end """
+            The :SingleAgentType property is set, and the agent type is specified as $(at).
+            But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
+            """
+            _check_size!(field, nr, $(Val{T}))
             _check_assigned!(field, nr, $(Val{T}))
             field[nr]
         end
     else
-        @eval function _get_agent_container(to::AgentID, field, ::Type{$(Val{T})})
-            get!(_construct_container_func($CT), field, to)
+        @eval function _get_agent_container(sim, to::AgentID, ::Type{$(Val{T})})
+            get!(_construct_container_func($CT), sim.$(writefield(T)), to)
         end
     end
 
 
     #### The exported functions
     if stateless && ignorefrom && !singleedge
-        @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
+        @eval function add_edge!(sim, to::AgentID, ::Edge{Main.$T})
             nr = _to2idx(to, $(Val{T}))
             sim.$(writefield(T))[nr] =
-                _get_agent_container(nr, sim.$(writefield(T)), $(Val{T})) + 1
+                _get_agent_container(sim, to, $(Val{T})) + 1
         end
 
-        @eval function add_edge!(sim, from::AgentID, to::AgentID, edgestate::Main.$T)
+        @eval function add_edge!(sim, ::AgentID, to::AgentID, ::Main.$T)
             nr = _to2idx(to, $(Val{T}))
             sim.$(writefield(T))[nr] =
-                _get_agent_container(nr, sim.$(writefield(T)), $(Val{T})) + 1
+                _get_agent_container(sim, to, $(Val{T})) + 1
         end
     elseif singleedge
         @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
+            @mayassert _can_add(sim.$(writefield(T)), to, $(Val{T}))
             nr = _to2idx(to, $(Val{T}))
-            _check_size!(sim.$(writefield(T)), nr, $(Val{T}),
-                         Val($(isprimitivetype(CT))))
+            _check_size!(sim.$(writefield(T)), nr, $(Val{T}))
             sim.$(writefield(T))[nr] = _valuetostore(edge)
         end
 
         @eval function add_edge!(sim, from::AgentID, to::AgentID, edgestate::Main.$T)
+            @mayassert _can_add(sim.$(writefield(T)), to, $(Val{T}))
             nr = _to2idx(to, $(Val{T}))
-            _check_size!(sim.$(writefield(T)), nr, $(Val{T}),
-                         Val($(isprimitivetype(CT))))
+            _check_size!(sim.$(writefield(T)), nr, $(Val{T}))
             sim.$(writefield(T))[nr] = _valuetostore(from, edgestate)
         end
     else
         @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
             nr = _to2idx(to, $(Val{T}))
-            push!(_get_agent_container(nr, sim.$(writefield(T)), $(Val{T})),
+            push!(_get_agent_container(sim, to, $(Val{T})),
                   _valuetostore(edge))
         end
 
         @eval function add_edge!(sim, from::AgentID, to::AgentID, edgestate::Main.$T)
             nr = _to2idx(to, $(Val{T}))
-            push!(_get_agent_container(nr, sim.$(writefield(T)), $(Val{T})),
+            push!(_get_agent_container(sim, to, $(Val{T})),
                   _valuetostore(from, edgestate))
         end
     end
@@ -258,9 +287,6 @@ DAS GEHT SO NICHT, DA IM ETI FALL NICHT ERKANNT WERDEN KANN, WELCHE WIEDER RAUSG
     end
 end    
 
-edgefield_type(T, info) = Meta.parse(construct_types(T, info)[1])
-
-edgefield_constructor(T, info) = Meta.parse(construct_types(T, info)[1] * "()")
 
 # Base.@kwdef struct EdgeFieldFactory 
 #     constructor = (T, info) -> Meta.parse(construct_types(T, info)[1] * "()")
