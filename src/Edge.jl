@@ -1,6 +1,6 @@
-export Edge, edgestates, neighbors
+export Edge, edgestates
 export add_edge!, add_edges!, edges_to
-export num_neighbors
+export num_neighbors, has_neighbor
 export neighborstates, neighborstates_flexible
 export neighborids, neighborids_flexible
 

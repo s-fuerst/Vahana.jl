@@ -57,6 +57,8 @@ statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeET
                       EdgeTs, EdgeETs, EdgeTsI, EdgeETsI ]
 
 
+
+
 # the following structs are needed for the raster tests
 struct GridA 
     pos::Tuple{Int64, Int64}

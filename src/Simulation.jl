@@ -262,7 +262,7 @@ iterator.
 
 See also [`Base.mapreduce`](@ref)
 """
-function aggregate(sim, ::Val{T}, f, op; kwargs...) where T end
+#function aggregate(sim, ::Val{T}, f, op; kwargs...) where T end
 
 
 # function aggregate(sim, ::Val{T}, f, op;
