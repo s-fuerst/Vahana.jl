@@ -75,6 +75,13 @@ struct MovingAgent
     value::Int64
 end
 
+struct GraphA 
+    id::Int64
+    sum::Int64
+end
+
+struct GraphE end
+
 struct OnPosition  end
 
 model = ModelTypes() |>
@@ -113,8 +120,9 @@ model = ModelTypes() |>
     add_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = AVec, size = 10) |>
     add_edgetype!(EdgeSETs, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = AVec, size = 10) |>
     add_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec, size = 10) |>
-    add_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom;
-                  to_agenttype = AVec, size = 10) 
+    add_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AVec, size = 10) |>
+    add_agenttype!(GraphA) |>
+    add_edgetype!(GraphE)
 
 function add_example_network!(sim)
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
@@ -144,7 +152,7 @@ end
 function create_sum_state_neighbors(edgetypeval) 
     function sum_state_neighbors(agent, id, sim)
         s = 0
-        for n in neighborstates_flexible(sim, id, edgetypeval)
+        for n in neighborstates(sim, id, edgetypeval)
             s = s + n.foo
         end
         typeof(agent)(s)
@@ -154,7 +162,7 @@ end
 function create_sum_state_neighbors_stateless(edgetypeval) 
     function sum_state_neighbors_stateless(agent, id, sim)
         s = 0
-        for n in neighborstates_flexible(sim, id, edgetypeval)
+        for n in neighborstates(sim, id, edgetypeval)
             s = s + n.foo
         end
         typeof(agent)(s)
@@ -216,15 +224,17 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
 # end
 
 
+include("core.jl")
+
 include("edges.jl")
 
-#include("aggregate.jl")
+include("aggregate.jl")
 
-#include("core.jl")
+include("globals.jl")
 
-#include("globals.jl")
-# include("graphs.jl")
-#include("raster.jl")
+include("raster.jl")
+
+include("graphs.jl")
 
 # @testset "Tutorial1" begin
 #     include("tutorial1.jl")

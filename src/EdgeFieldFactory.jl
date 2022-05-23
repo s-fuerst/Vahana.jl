@@ -293,11 +293,11 @@ function construct_edge_functions(T::Symbol, attr)
 
     #- edges_to
     if !stateless && !ignorefrom
-        @eval function edges_to(sim, to::AgentID, ::Type{Val{Main.$T}})
+        @eval function edges_to(sim, to::AgentID, ::Val{Main.$T})
             _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
         end
     else
-        @eval function edges_to(_, ::AgentID, t::Type{Val{Main.$T}})
+        @eval function edges_to(_, ::AgentID, t::Val{Main.$T})
             @assert false """
             edges_to is not defined for the property combination of $t
             """
@@ -307,51 +307,51 @@ function construct_edge_functions(T::Symbol, attr)
     #- neighborids
     if !ignorefrom
         if stateless
-            @eval function neighborids(sim, to::AgentID, ::Type{Val{Main.$T}})
+            @eval function neighborids(sim, to::AgentID, ::Val{Main.$T})
                 _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
             end
         else
             if singleedge
-                @eval function neighborids(sim, to::AgentID, ::Type{Val{Main.$T}})
+                @eval function neighborids(sim, to::AgentID, ::Val{Main.$T})
                     _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))).from
                 end
             else
-                @eval function neighborids(sim, to::AgentID, ::Type{Val{Main.$T}})
+                @eval function neighborids(sim, to::AgentID, ::Val{Main.$T})
                     map(e -> e.from,
                         _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))))
                 end
             end
         end
     else
-        @eval function neighborids(_, ::AgentID, t::Type{Val{Main.$T}})
+        @eval function neighborids(_, ::AgentID, t::Val{Main.$T})
             @assert false """
             neighborids is not defined for the property combination of $t
             """
         end
     end
 
-    #- neighborstates
+    #- edgestates
     if !stateless
         if ignorefrom
-            @eval function neighborstates(sim, to::AgentID, ::Type{Val{Main.$T}})
+            @eval function edgestates(sim, to::AgentID, ::Val{Main.$T})
                 _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
             end
         else
             if singleedge
-                @eval function neighborstates(sim, to::AgentID, ::Type{Val{Main.$T}})
+                @eval function edgestates(sim, to::AgentID, ::Val{Main.$T})
                     _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))).state
                 end
             else
-                @eval function neighborstates(sim, to::AgentID, ::Type{Val{Main.$T}})
+                @eval function edgestates(sim, to::AgentID, ::Val{Main.$T})
                     map(e -> e.state,
                         _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))))
                 end
             end
         end
     else
-        @eval function neighborstates(_, ::AgentID, t::Type{Val{Main.$T}})
+        @eval function edgestates(_, ::AgentID, t::Val{Main.$T})
             @assert false """
-            neighborstates is not defined for the property combination of $t
+            edgestates is not defined for the property combination of $t
             """
         end
     end
@@ -359,16 +359,16 @@ function construct_edge_functions(T::Symbol, attr)
     #- num_neighbors
     if !singleedge
         if ignorefrom && stateless
-            @eval function num_neighbors(sim, to::AgentID, ::Type{Val{Main.$T}})
+            @eval function num_neighbors(sim, to::AgentID, ::Val{Main.$T})
                 _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
             end
         else
-            @eval function num_neighbors(sim, to::AgentID, ::Type{Val{Main.$T}})
+            @eval function num_neighbors(sim, to::AgentID, ::Val{Main.$T})
                 size(_get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))),1)
             end
         end
     else
-        @eval function num_neighbors(_, ::AgentID, t::Type{Val{Main.$T}})
+        @eval function num_neighbors(_, ::AgentID, t::Val{Main.$T})
             @assert false """
             num_neighbors is not defined for the property combination of $t
             """
@@ -378,19 +378,19 @@ function construct_edge_functions(T::Symbol, attr)
 
     #- has_neighbor
     if ignorefrom && stateless
-        @eval function has_neighbor(sim, to::AgentID, ::Type{Val{Main.$T}})
+        @eval function has_neighbor(sim, to::AgentID, ::Val{Main.$T})
             _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))) >= 1
         end
     elseif !singleedge
-        @eval function has_neighbor(sim, to::AgentID, t::Type{Val{Main.$T}})
+        @eval function has_neighbor(sim, to::AgentID, t::Val{Main.$T})
             num_neighbors(sim,to, t) >= 1
         end
     elseif !singletype 
-        @eval function has_neighbor(sim, to::AgentID, ::Type{Val{Main.$T}})
+        @eval function has_neighbor(sim, to::AgentID, ::Val{Main.$T})
             haskey(sim.$(readfield(T)), to)
         end
     else
-        @eval function has_neighbor(_, ::AgentID, t::Type{Val{Main.$T}})
+        @eval function has_neighbor(_, ::AgentID, t::Val{Main.$T})
             @assert false """
             has_neighbor is not defined for the property combination of $t
             """
@@ -442,197 +442,3 @@ function construct_edge_functions(T::Symbol, attr)
 end    
 
 
-# Base.@kwdef struct EdgeFieldFactory 
-#     constructor = (T, info) -> Meta.parse(construct_types(T, info)[1] * "()")
-#     # Functions:
-#     init_field = (T, _) -> @eval init_field!(_, ::Val{Main.$T}) = nothing
-
-#     add_edge = (T, info) -> begin
-#         t = Meta.parse(construct_types(T, info)[2]) |> eval
-#         @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
-#             push!(get!($t, sim.$(writefield(T)), to), edge)
-#         end
-#     end
-
-#     edges_to = (T, info) -> begin
-#         t = Meta.parse(construct_types(T, info)[2]) |> eval
-#         @eval function edges_to(sim, to::AgentID, ::Val{Main.$T}) 
-#             get($t, sim.$(readfield(T)), to)
-#         end
-#     end
-
-#     prepare_write = (T, _) -> begin
-#         @eval function prepare_write!(sim, ::Val{Main.$T})
-#             sim.$(writefield(T)) = Dict{AgentNr, Vector{Edge{Main.$T}}}()
-#         end
-#     end
-
-#     finish_write = (T, _) -> begin 
-#         @eval function finish_write!(sim, ::Val{Main.$T})
-#             sim.$(readfield(T)) = sim.$(writefield(T))
-#         end
-#     end 
-#     aggregate = (T, _) -> begin
-#         @eval function aggregate(sim, ::Val{Main.$T}, f, op; kwargs...)
-#             estates = sim.$(readfield(T)) |>
-#                 values |>
-#                 Iterators.flatten |>
-#                 collect |>
-#                 edgestates
-#             mapreduce(f, op, estates; kwargs...)
-#         end
-#     end 
-#     # neighborids
-#     # neighborstates
-#     num_neighbors = (T, _) -> begin
-#         @eval function num_neighbors(sim, to::AgentID, ::Val{Main.$T})
-#             if haskey(sim.$(readfield(T)), to)
-#                 length(sim.$(readfield(T))[to])
-#             else
-#                 0
-#             end
-#         end
-#     end
-# end
-
-#################### Edge Dict
-
-# eff = EdgeFieldFactory()
-
-
-#################### Edge Dict
-
-# eff_stateless = EdgeFieldFactory(
-#     add_edge = (T, _) -> begin
-#         @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
-#             push!(get!(Vector{AgentID}, sim.$(writefield(T)), to), edge.from)
-#         end
-#         @eval function add_edge!(sim, from::AgentID, to::AgentID, ::Type{Main.$T})
-#             push!(get!(Vector{AgentID}, sim.$(writefield(T)), to), from)
-#         end
-#         @eval function add_edge!(sim, from::AgentID, to::AgentID, ::Main.$T)
-#             push!(get!(Vector{AgentID}, sim.$(writefield(T)), to), from)
-#         end
-#     end,
-
-#     edges_to = (T, _) -> begin
-#         @eval function edges_to(sim, to::AgentID, ::Val{Main.$T}) 
-#             @assert false "edges_to can not be called for Stateless edges, use neighbors instead"
-#         end
-#         @eval function neighbors(sim, to::AgentID, ::Val{Main.$T}) 
-#             get(Vector{AgentID}, sim.$(readfield(T)), to)
-#         end
-#         @eval neighborstates(sim, to::AgentID, edgetype::Val{Main.$T}, agenttype::Val) = 
-#             map(e -> agentstate(sim, e, agenttype), neighbors(sim, id, edgetype))  
-#         @eval neighborstates_flexible(sim, id::AgentID, edgetype::Val{Main.$T}) =
-#             map(e -> agentstate_flexible(sim, e), neighbors(sim, id, edgetype))  
-#     end,
-
-#     prepare_write = (T, _) -> begin
-#         @eval function prepare_write!(sim, ::Val{Main.$T})
-#             sim.$(writefield(T)) = Dict{AgentNr, Vector{AgentID}}()
-#         end
-#     end,
-
-#     aggregate = (T, _) -> begin
-#         @eval function aggregate(sim, ::Val{Main.$T}, f, op; kwargs...)
-#             @assert false "aggregate can not be called for Stateless edges"
-#         end
-#     end 
-
-# )
-
-
-# #################### Edge Dict
-
-# function check_agenttype(sim, to::AgentID, ::Val{T}) where T
-#     sim.typeinfos.nodes_id2type[type_nr(to)] ==
-#         sim.typeinfos.edges_attr[Symbol(T)][:to_agenttype]
-# end
-
-# eff_stateless_vec = EdgeFieldFactory(
-#     add_edge = (T, _) -> begin
-#         @eval function add_edge!(sim, to::AgentID, edge::Edge{Main.$T})
-#             #            @mayassert check_agenttype(sim, to, Val(Main.$T)) AGENTSTATE_MSG 
-#             add_edge!(sim, edge.from, to, Main.$T())
-#             # nr = agent_nr(to)
-#             # resize!(sim.$(writefield(T)), nr)
-#             # if ! isassigned(sim.$(readfield(T)), Int64(nr))
-#             #     sim.$(writefield(T))[nr] = Vector{AgentID}()
-#             # end
-#             # push!(sim.$(writefield(T))[nr], edge.from)
-#         end
-#         @eval function add_edge!(sim, from::AgentID, to::AgentID, ::Main.$T)
-#             @mayassert check_agenttype(sim, to, Val(Main.$T)) AGENTSTATE_MSG 
-
-#             nr = agent_nr(to)
-#             #            check_size(nr, sim.$(writefield(T)))
-#             resize!(sim.$(writefield(T)), nr)
-#             if ! isassigned(sim.$(readfield(T)), Int64(nr))
-#                 sim.$(writefield(T))[nr] = Vector{AgentID}()
-#             end
-#             push!(sim.$(writefield(T))[nr], from)
-#         end
-#     end,
-
-#     edges_to = (T, _) -> begin
-#         @eval function edges_to(sim, to::AgentID, ::Val{Main.$T}) 
-#             @assert false "edges_to can not be called for Stateless edges, use neighbors instead"
-#         end
-#         @eval function neighbors(sim, to::AgentID, edgetype::Val{Main.$T})
-#             if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-#                 sim.$(readfield(T))[agent_nr(to)]
-#             else
-#                 Vector{AgentID}()
-#             end
-#             @mayassert check_agenttype(sim, to, edgetype) AGENTSTATE_MSG 
-
-#             get(Vector{AgentID}, sim.$(readfield(T)), agent_nr(to))
-#         end
-#         @eval function neighbors(sim, to::AgentID, edgetype::Val{Main.$T})
-#             if isdefined(sim.$(readfield(T)), Int64(agent_nr(to)))
-#                 sim.$(readfield(T))[agent_nr(to)]
-#             else
-#                 Vector{AgentID}()
-#             end
-#             @mayassert check_agenttype(sim, to, edgetype) AGENTSTATE_MSG 
-
-#             get(Vector{AgentID}, sim.$(readfield(T)), agent_nr(to))
-#         end
-#         @eval neighborstates(sim, id::AgentID, edgetype::Val{Main.$T}, agenttype::Val) = 
-#             map(e -> agentstate(sim, e, agenttype), neighbors(sim, id, edgetype))  
-#         @eval neighborstates_flexible(sim, id::AgentID, edgetype::Val{Main.$T}) =
-#             map(e -> agentstate_flexible(sim, e), neighbors(sim, id, edgetype))  
-#     end,
-
-#     prepare_write = (T, _) -> begin
-#         @eval function prepare_write!(sim, ::Val{Main.$T})
-#             sim.$(writefield(T)) = Vector{Vector{AgentID}}()
-#         end
-#     end,
-
-#     aggregate = (T, _) -> begin
-#         @eval function aggregate(sim, ::Val{Main.$T}, f, op; kwargs...)
-#             @assert false "aggregate can not be called for Stateless edges"
-#         end
-#     end,
-
-#     num_neighbors = (T, _) -> begin
-#         @eval function num_neighbors(sim, to::AgentID, edgetype::Val{Main.$T})
-#             @mayassert check_agenttype(sim, to, edgetype) AGENTSTATE_MSG 
-
-#             if isassigned(sim.$(readfield(T)), Int64(agent_nr(to)))
-#                 length(sim.$(readfield(T))[agent_nr(to)])
-#             else
-#                 0
-#             end
-#         end
-#     end
-# )
-
-
-#################### EdgeFieldFactory Dict
-
-#effs = Dict(:Dict => eff_dict, :Stateless => eff_stateless, :Vec => eff_stateless_vec)
-
-#eff = eff_dict

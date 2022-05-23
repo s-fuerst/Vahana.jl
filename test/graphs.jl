@@ -1,25 +1,14 @@
 import Graphs
 
 @testset "Graphs" begin
-    struct GraphA <: Agent
-        id::Int64
-        sum::Int64
-    end
-
-    struct GraphE <: EdgeState
-    end
-
     # calculate the sum of all ids
     function sumids(a, id, sim)
         GraphA(a.id,
-               mapreduce(a -> a.id, +, neighborstates(sim, id, GraphE)))
+               mapreduce(a -> a.id, +, neighborstates(sim, id, Val(GraphE))))
     end
 
 
-    sim = Simulation("Test Graphs", nothing, nothing)
-
-    add_agenttype!(sim, GraphA)
-    add_edgetype!(sim, GraphE)
+    sim = construct(model, "Test Graphs", nothing, nothing)
 
     nagents = 4
     
@@ -36,6 +25,6 @@ import Graphs
     # we have a complete graph, and all agents sum the
     # ids of the neighbors (but ignoring the own)
     # so in overall we have the nagents-1 times the sum of all ids
-    @test aggregate(sim, GraphA, a -> a.sum, +) ==
+    @test aggregate(sim, Val(GraphA), a -> a.sum, +) ==
         sum(1:nagents) * (nagents - 1)
 end

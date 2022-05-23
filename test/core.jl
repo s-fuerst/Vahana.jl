@@ -26,25 +26,25 @@
         # Check that edges_to for empty sets return the correct type for the empty vector
         @test edges_to(sim, a2id, Val(ESDict)) |> typeof ==  Vector{Edge{ESDict}}
         @test edges_to(sim, a2id, Val(ESLDict1)) |> typeof == Vector{Edge{ESLDict1}}
-        @test neighbors(sim, avids[1], Val(ESLDict2)) |> typeof == Vector{AgentID}
+        @test neighborids(sim, avids[1], Val(ESLDict2)) |> typeof == Vector{AgentID}
     end
 
     @testset "neighbors & edgestates" begin
-        @test size(neighbors(sim, avids[1], Val(ESLDict2)), 1) == 1
-        @test size(neighbors(sim, avids[10], Val(ESLDict2)), 1) == 1
+        @test size(neighborids(sim, avids[1], Val(ESLDict2)), 1) == 1
+        @test size(neighborids(sim, avids[10], Val(ESLDict2)), 1) == 1
 
-        @test_throws AssertionError neighbors(sim, a2id, Val(ESLDict2))
+        @test_throws AssertionError neighborids(sim, a2id, Val(ESLDict2))
 
         edges = edges_to(sim, a1id, Val(ESLDict1))
-        @test neighbors(edges)[1] == avids[1]
-        @test neighbors(edges)[10] == avids[10]
-        edges = neighbors(sim, avids[10], Val(ESLDict2))
+        @test neighborids(edges)[1] == avids[1]
+        @test neighborids(edges)[10] == avids[10]
+        edges = neighborids(sim, avids[10], Val(ESLDict2))
         @test edges[1] == avfids[10]
     end
 
     @testset "neighborstates" begin
         @test neighborstates(sim, a1id, Val(ESLDict1), Val(AVec))[1] == AVec(1)
-        @test neighborstates_flexible(sim, a1id, Val(ESDict))[2] == ADict(3)
+        @test neighborstates(sim, a1id, Val(ESDict))[2] == ADict(3)
     end
 
     # working on a deepcopy should be possible and not change the
@@ -56,8 +56,8 @@
         @test_throws AssertionError add_edge!(copy, a2id, avfids[1], ESLDict2())
         @test size(edges_to(sim, a1id, Val(ESDict)), 1) == 4
         @test size(edges_to(copy, a1id, Val(ESDict)), 1) == 5
-        @test size(neighbors(sim, avids[1], Val(ESLDict2)), 1) == 1
-        @test size(neighbors(copy, avids[1], Val(ESLDict2)), 1) == 2
+        @test size(neighborids(sim, avids[1], Val(ESLDict2)), 1) == 1
+        @test size(neighborids(copy, avids[1], Val(ESLDict2)), 1) == 2
     end
     
     @testset "transition" begin
@@ -65,13 +65,13 @@
         copy = deepcopy(sim)
         # we want to check two iterations with the sum_state_neighbors,
         # so we just add an edge loop for the agents where we check the sum
-        add_edge!(copy, a1id, a1id, ESLDict1)
-        add_edge!(copy, avids[1], avids[1], ESLDict2)
-        add_edge!(copy, avfids[1], avfids[1], ESLDict1)
+        add_edge!(copy, a1id, a1id, ESLDict1())
+        add_edge!(copy, avids[1], avids[1], ESLDict2())
+        add_edge!(copy, avfids[1], avfids[1], ESLDict1())
         # for avfids[1] we need a second edge
-        add_edge!(copy, avfids[2], avfids[1], ESLDict1)
+        add_edge!(copy, avfids[2], avfids[1], ESLDict1())
         # and also avfids[2] should keep its value
-        add_edge!(copy, avfids[2], avfids[2], ESLDict1)
+        add_edge!(copy, avfids[2], avfids[2], ESLDict1())
 
         # now check apply_transtition! for the different nodefieldfactories
         copydict = deepcopy(copy)

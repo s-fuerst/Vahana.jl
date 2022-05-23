@@ -1,8 +1,8 @@
 export Edge, edgestates
 export add_edge!, add_edges!, edges_to
 export num_neighbors, has_neighbor
-export neighborstates, neighborstates_flexible
-export neighborids, neighborids_flexible
+export neighborstates
+export neighborids
 
 """
     struct Edge{T} 
@@ -113,13 +113,13 @@ Used mainly in combination with [`edges_to`](@ref).
 
 See also [`neighborstates`](@ref) 
 """
-neighbors(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
+neighborids(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
 
 # TODO write tests, update doc, move to factory?
 
-function neighbors(sim, to::AgentID, type)
-    neighbors(edges_to(sim, to, type))
-end
+# function neighborids(sim, to::AgentID, type)
+#     neighborids(edges_to(sim, to, type))
+# end
 
 
 """
@@ -150,12 +150,14 @@ function.
 See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
 [`neighbors`](@ref)
 """
+function neighborstates end
+
 neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
-    map(e -> agentstate(sim, e.from, agenttype), edges_to(sim, id, edgetype))  
+    map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
 
 # TODO DOC
-neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
-    map(e -> agentstate_flexible(sim, e.from), edges_to(sim, id, edgetype))  
+neighborstates(sim, id::AgentID, edgetype::Val) =
+    map(id -> agentstate_flexible(sim, id), neighborids(sim, id, edgetype))  
 
 
 # TODO DOC

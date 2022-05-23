@@ -104,10 +104,10 @@ function move_to!(sim,
            name::Symbol,
            id::AgentID,
            pos,
-           ::Type{T}) where T
+           ::Val{T}) where T
     posid = raster_nodeid(sim, name, pos)
-    add_edge!(sim, id, posid, T)
-    add_edge!(sim, posid, id, T)
+    add_edge!(sim, id, posid, T())
+    add_edge!(sim, posid, id, T())
 end
 
 # add_edge for grid position?
