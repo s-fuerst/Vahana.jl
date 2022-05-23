@@ -75,8 +75,11 @@ T must have been previously registered in the simulation by calling
 [`add_agenttype!`](@ref).
 
 `add_agent!` returns a new AgentID, which can be used to create edges
-from or to this agent. Do not use the ID for other purposes, they are
-not guaranteed to be stable.
+from or to this agent before [`finish_init!`](@ref) is called (in the
+case that add_agent! is called in the initialization phase), or before
+the transition funcion is finished (in the case that add_agent! is
+called in an [`apply_transition!`](@ref) callback). Do not use the ID
+for other purposes, they are not guaranteed to be stable.
 
 See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
 [`add_edge!`](@ref) and [`add_edges!`](@ref)
@@ -95,9 +98,13 @@ agents as arguments.
 The types of the agents must have been previously registered in the
 simulation by calling [`add_agenttype!`](@ref).
 
-`add_agents!` returns a vector of AgentIDs, which can be used
-to create edges from or to this agents. Do not use the ID for other
-purposes, they are not guaranteed to be stable.
+
+`add_agents!` returns a vector of AgentIDs, which can be used to
+create edges from or to this agents before [`finish_init!`](@ref) is
+called (in the case that add_agents! is called in the initialization
+phase), or before the transition funcion is finished (in the case that
+add_agents!  is called in an [`apply_transition!`](@ref) callback). Do
+not use the ID for other purposes, they are not guaranteed to be stable.
 
 See also [`add_agent!`](@ref), [`add_agenttype!`](@ref),
 [`add_edge!`](@ref) and [`add_edges!`](@ref)
