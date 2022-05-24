@@ -1,7 +1,7 @@
 export Edge, edgestates
 export add_edge!, add_edges!, edges_to
 export num_neighbors, has_neighbor
-export neighborstates
+export neighborstates, neighborstates_flexible
 export neighborids
 
 """
@@ -155,8 +155,10 @@ function neighborstates end
 neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
     map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
 
+function neighborstates_flexible end
+
 # TODO DOC
-neighborstates(sim, id::AgentID, edgetype::Val) =
+neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
     map(id -> agentstate_flexible(sim, id), neighborids(sim, id, edgetype))  
 
 

@@ -1,5 +1,7 @@
-######################################## <: EdgeState
+_getread(sim, ::Val{T}) where {T} = getproperty(sim, readfield(Symbol(T)))
+_getwrite(sim, ::Val{T}) where {T} = getproperty(sim, writefield(Symbol(T)))
 
+######################################## <: EdgeState
 
 function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
     show(io, mime, edge.from)
@@ -51,60 +53,52 @@ end
 
 ######################################## Collections
 
-function show_collection(io, mime, coll)
-    for (k, v) in first(coll, 5)
-        show(io, mime, k)
-        print(io, " => ")
-        show(io, mime, v)
+function show_collection(coll)
+    count = 1
+    for (k, v) in edges_iterator(coll)
+        show(k)
+        print(" => ")
+        show(v)
         println()
+        count += 1
+        if count > 5
+            break
+        end
     end
-    if length(coll) > 5
+    if count > 5
         println("...")
     end
 end
 
-function show_length(coll)
-    string(length(coll))
+function show_network(sim, mime, t::Val{T}) where {T}
+    read = _getread(sim, t)
+    if length(read) > 0
+        printstyled("Read:\n"; color = :cyan)
+        show_collection(read)
+    end
+
+    write = _getwrite(sim, t)
+    if length(write) > 0
+        printstyled("Write:\n"; color = :cyan)
+        show_collection(write)
+    end
 end
+
+# function show_length(coll)
+#     string(length(coll))
+# end
 
 ######################################## Buffered Collections
 
-function show_buffered_collection(io::IO, mime::MIME"text/plain", coll) 
-#    printstyled(io, typeof(coll), "\n"; color = :magenta)
-    if length(coll.containers[coll.read]) > 0 
-        printstyled(io, "Read:\n"; color = :cyan)
-        show_collection(io, mime, coll.containers[coll.read])
-    end
-    if coll.read != coll.write
-        printstyled(io, "Write:\n"; color = :cyan)
-        show_collection(io, mime, coll.containers[coll.write])
-    end
-end
 
-function Base.show(io::IO, mime::MIME"text/plain", bad::BufferedAgentDict{T}) where {T}
-    show_buffered_collection(io, mime, bad)
-end
-
-function Base.show(io::IO, mime::MIME"text/plain", bed::BufferedEdgeDict{T}) where {T}
-    show_buffered_collection(io, mime, bed)
-end
-
-function show_buffered_length(coll) 
-    cs = coll.containers
-    if coll.read != coll.write
-        "$(length(cs[coll.read]))/$(length(cs[coll.write])) (R/W)"
+function show_length(sim, ::Val{T}) where {T} 
+    read = getproperty(sim, readfield(Symbol(T)))
+    write = getproperty(sim, writefield(Symbol(T)))
+    if read != write
+        "$(length(read))/$(length(write)) (R/W)"
     else
-        "$(length(cs[coll.read]))"
+        "$(length(read))"
     end
-end
-
-function show_length(coll::BufferedAgentDict{T}) where {T}
-    show_buffered_length(coll)
-end
-
-
-function show_length(coll::BufferedEdgeDict{T}) where {T}
-    show_buffered_length(coll)
 end
 
 function _num_edges(coll)
@@ -115,14 +109,14 @@ function _num_edges(coll)
     end
 end
 
-function show_num_edges(coll::BufferedEdgeDict{T}) where {T}
- 
-    cs = coll.containers
-    if coll.read != coll.write
-        "$(_num_edges(cs[coll.read]))/$(_num_edges(cs[coll.write])) (R/W)"
+function show_num_edges(sim, ::Val{T}) where {T}
+    read = getproperty(sim, readfield(Symbol(T)))
+    write = getproperty(sim, writefield(Symbol(T)))
+    # cs = coll.containers
+    if read != write
+        "$(_num_edges(read))/$(_num_edges(write)) (R/W)"
     else
-        "$(_num_edges(cs[coll.read]))"
+        "$(_num_edges(read))"
     end
 end
     
-

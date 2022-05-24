@@ -37,7 +37,9 @@ include("NodeFieldFactory.jl")
 include("Simulation.jl")
 include("Global.jl")
 
-# include("PrettyPrinting.jl")
+include("EdgesIterator.jl")
+
+include("PrettyPrinting.jl")
 
 # include("REPL.jl")
 

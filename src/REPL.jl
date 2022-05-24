@@ -12,8 +12,8 @@ In a parallized simulation, only the edges that are in the partition
 of the graph associated with the function calling process are shown.
 
 """
-show_network(sim, ::Type{T}) where {T} =
-    show(stdout, MIME"text/plain"(), sim.edges[T])
+show_network(sim, ::Val{T}) where {T} =
+    show_network(sim, MIME"text/plain"(), Val(T))
 
 """
     show_agents(sim, ::Type{T}) where {T <: Agent}

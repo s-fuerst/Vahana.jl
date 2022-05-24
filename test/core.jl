@@ -44,7 +44,7 @@
 
     @testset "neighborstates" begin
         @test neighborstates(sim, a1id, Val(ESLDict1), Val(AVec))[1] == AVec(1)
-        @test neighborstates(sim, a1id, Val(ESDict))[2] == ADict(3)
+        @test neighborstates_flexible(sim, a1id, Val(ESDict))[2] == ADict(3)
     end
 
     # working on a deepcopy should be possible and not change the

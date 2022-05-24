@@ -83,14 +83,14 @@ end
     function sum_on_pos(cell::Position, id, sim)
         if length(edges_to(sim, id, Val(OnPosition))) > 0
             Position(mapreduce(c -> c.value, +,
-                               neighborstates(sim, id, Val(OnPosition))))
+                               neighborstates_flexible(sim, id, Val(OnPosition))))
         else
             Position(0)
         end
     end
 
     function value_on_pos(a::MovingAgent, id, sim)
-        value = first(neighborstates(sim, id, Val(OnPosition))).sum
+        value = first(neighborstates_flexible(sim, id, Val(OnPosition))).sum
         move_to!(sim, :raster, id, (value, value), Val(OnPosition))
         MovingAgent(value)
     end

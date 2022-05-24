@@ -4,7 +4,7 @@ import Graphs
     # calculate the sum of all ids
     function sumids(a, id, sim)
         GraphA(a.id,
-               mapreduce(a -> a.id, +, neighborstates(sim, id, Val(GraphE))))
+               mapreduce(a -> a.id, +, neighborstates_flexible(sim, id, Val(GraphE))))
     end
 
 

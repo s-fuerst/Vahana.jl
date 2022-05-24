@@ -30,7 +30,7 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    n = mapreduce(a -> a.active, +, neighborstates(sim, id, Neighbor))
+    n = mapreduce(a -> a.active, +, neighborstates_flexible(sim, id, Neighbor))
     rules = param(sim, :rules)
     if c.active == true && n <= rules[4] && n >= rules[1]
         return Cell(true, c.pos)
