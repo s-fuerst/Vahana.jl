@@ -27,8 +27,8 @@ end
 # of the Cells
 function initial_active(c::Cell, id, sim)
     if c.active
-        foreach(e -> add_edge!(sim, id, e, ActiveNeighbor()),
-                neighbors(sim, id, Val(Neighbor)))
+        foreach(nid -> add_edge!(sim, id, nid, ActiveNeighbor()),
+                neighborids(sim, id, Val(Neighbor)))
     end
     c
 end
@@ -41,8 +41,8 @@ function transition(c::Cell, id, sim)
     if (c.active == true && n <= rules[4] && n >= rules[1]) ||
         (c.active == false && n >= rules[3] && n <= rules[4])
 
-        foreach(from -> add_edge!(sim, id, from, ActiveNeighbor()),
-                neighbors(sim, id, Val(Neighbor)))
+        foreach(nid -> add_edge!(sim, id, nid, ActiveNeighbor()),
+                neighborids(sim, id, Val(Neighbor)))
 
         return Cell(true)
     end
@@ -50,14 +50,14 @@ function transition(c::Cell, id, sim)
 end
 
 const model = ModelTypes() |>    
-    add_agenttype!(Cell, :Vector) |> 
+    add_agenttype!(Cell) |> 
 #    add_agenttype!(Cell) |> 
     add_edgetype!(Neighbor, :Stateless) |>
     add_edgetype!(ActiveNeighbor, :Stateless)
 
 
 function new_sim(params)
-    construct(model, "Game of Life", params, nothing)
+    construct(model, "Game of Life", params, Cell(true))
 end
 
 function init!(sim)
@@ -86,6 +86,7 @@ sim = new_sim(Params(rules = SA[2,3,3,3],
 
 init!(sim)
 
-step!(sim)
+num_edges(sim, Val(Neighbor))
+# step!(sim)
 
 #@profilehtml for i in 1:20 step!(sim) end

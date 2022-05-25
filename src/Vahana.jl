@@ -41,7 +41,7 @@ include("EdgesIterator.jl")
 
 include("PrettyPrinting.jl")
 
-# include("REPL.jl")
+include("REPL.jl")
 
 include("GraphsSupport.jl")
 include("Raster.jl")

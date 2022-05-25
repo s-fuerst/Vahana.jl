@@ -4,6 +4,7 @@ export finish_init!
 export apply_transition, apply_transition!
 export param
 export aggregate
+export Simulation
 
 const MAX_TYPES = typemax(TypeID) 
 
@@ -103,6 +104,8 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
         nffs[C].aggregate(T, sim.typeinfos) 
     end
 
+    construct_prettyprinting_functions()
+
     @eval _init_all_types($sim)
 end
 
@@ -158,7 +161,7 @@ See also [`construct`](@ref)
 param(sim, name) = getfield(sim.params, name)
 
 function maybeadd(coll,
-           id::AgentNr,
+           id,
            agent) 
     # the coll[id] writes into another container then
     # we use for the iteration

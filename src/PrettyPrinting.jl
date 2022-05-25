@@ -13,85 +13,118 @@ end
 
 ######################################## Simulation
 
-function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
-    function show_agent_types(io::IO, typeids, coll)
-        if length(typeids) >= 1 
-            printstyled(io, "\nAgent(s):"; color = :cyan)
-            for (k, v) in typeids
-                print(io, "\n\t Type $k (ID: $(typeids[k])) \
-                           with $(show_length(coll[v])) Agent(s)")
+function construct_prettyprinting_functions()
+    @eval function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
+        function show_agent_types(io::IO, sim)
+            nodes_types = sim.typeinfos.nodes_types
+            if length(nodes_types) >= 1
+                printstyled(io, "\nAgent(s):"; color = :cyan)
+            end
+            for t in nodes_types
+                print(io, "\n\t Type $t \
+                           with $(_show_length(sim, Val(t))) Agent(s)")
             end
         end
-    end
 
-    function show_edge_types(io::IO, edges)
-        if length(edges) >= 1 
-            printstyled(io, "\nNetwork(s):"; color = :cyan)
-            for (k, v) in edges
-                print(io, "\n\t $k \
-                           with $(show_num_edges(v)) Edge(s) for $(show_length(v)) Agent(s)")
+        function show_edge_types(io::IO, sim)
+            edges_types = sim.typeinfos.edges_types
+            if length(edges_types) >= 1
+                printstyled(io, "\nNetworks(s):"; color = :cyan)
             end
+            for t in edges_types
+                try 
+                    print(io, "\n\t Type $t \
+                               with $(_show_num_edges(sim, Val(t))) Edges(s) for $(_show_length(sim, Val(t))) Agent(s)")
+                catch  e
+                    print(io, "\n\t Type $t \
+                               (for fixed sized agent types the actual numbers are unknown)")
+                end
+            end
+            # if length(edges) >= 1 
+            #     printstyled(io, "\nNetwork(s):"; color = :cyan)
+            #     for (k, v) in edges
+            #         print(io, "\n\t $k \
+            #                with $(show_num_edges(v)) Edge(s) for $(show_length(v)) Agent(s)")
+            #     end
+            # end
         end
-    end
 
-    function show_struct(io::IO, s, name)
-        if nfields(s) >= 1 
-            printstyled(io, "\n$(name)(s):"; color = :cyan)
-            for k in typeof(s) |> fieldnames
-                print(io, "\n\t $k: $(getfield(s, k))")
+        function show_struct(io::IO, s, name)
+            if nfields(s) >= 1 
+                printstyled(io, "\n$(name)(s):"; color = :cyan)
+                for k in typeof(s) |> fieldnames
+                    print(io, "\n\t $k: $(getfield(s, k))")
+                end
             end
         end
+        
+        printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
+        show_struct(io, sim.params, "Parameter")
+        show_agent_types(io, sim)
+        show_edge_types(io, sim)
+        #   print(io, "Globals: ", sim.globals)
+        show_struct(io, sim.globals, "Global")
     end
-    
-    printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
-    show_struct(io, sim.params, "Parameter")
-    show_agent_types(io, sim.agent_typeids, sim.agents)
-    show_edge_types(io, sim.edges)
- #   print(io, "Globals: ", sim.globals)
-    show_struct(io, sim.globals, "Global")
 end
 
 ######################################## Collections
 
-function show_collection(coll)
+
+function _show_collection(iter, max)
     count = 1
-    for (k, v) in edges_iterator(coll)
-        show(k)
+    for (k, v) in iter
+        _printid(k)
         print(" => ")
-        show(v)
-        println()
+        println(v)
         count += 1
-        if count > 5
+        if count > max
             break
         end
     end
-    if count > 5
+    if count > max
         println("...")
     end
 end
 
-function show_network(sim, mime, t::Val{T}) where {T}
-    read = _getread(sim, t)
-    if length(read) > 0
-        printstyled("Read:\n"; color = :cyan)
-        show_collection(read)
+# we assume that :IgnoreFrom ist not set, as we can not construct
+# the edge in this case
+function _reconstruct_edge(e, edgetypeprops, edgeT)
+    if :Stateless in edgetypeprops
+        Edge(e, edgeT())
+    else
+        e
     end
+end        
 
-    write = _getwrite(sim, t)
-    if length(write) > 0
-        printstyled("Write:\n"; color = :cyan)
-        show_collection(write)
+function _show_edge(e, edgetypeprops, stateof, edgeT) 
+    print("\n\t")
+    if :Ignorefrom in edgetypeprops
+        print("unknown           ")
+    elseif :Stateless in edgetypeprops
+        _printid(e)
+    else
+        _printid(e.from)
     end
+    if stateof == :Edge || :IgnoreFrom in edgetypeprops
+        if :Stateless in edgetypeprops
+            print(" $edgeT()")
+        else
+            print(" $(e.state)")
+        end
+    else
+        if :Stateless in edgetypeprops
+            print(" $(agentstate_flexible(sim, e))")
+        else
+            print(" $(agentstate_flexible(sim, e.from))")
+        end
+    end
+    
 end
-
-# function show_length(coll)
-#     string(length(coll))
-# end
 
 ######################################## Buffered Collections
 
 
-function show_length(sim, ::Val{T}) where {T} 
+function _show_length(sim, ::Val{T}) where {T} 
     read = getproperty(sim, readfield(Symbol(T)))
     write = getproperty(sim, writefield(Symbol(T)))
     if read != write
@@ -109,7 +142,7 @@ function _num_edges(coll)
     end
 end
 
-function show_num_edges(sim, ::Val{T}) where {T}
+function _show_num_edges(sim, ::Val{T}) where {T}
     read = getproperty(sim, readfield(Symbol(T)))
     write = getproperty(sim, writefield(Symbol(T)))
     # cs = coll.containers
@@ -119,4 +152,4 @@ function show_num_edges(sim, ::Val{T}) where {T}
         "$(_num_edges(read))"
     end
 end
-    
+

@@ -224,17 +224,17 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
 # end
 
 
-include("core.jl")
+# include("core.jl")
 
-include("edges.jl")
+# include("edges.jl")
 
-include("aggregate.jl")
+# include("aggregate.jl")
 
-include("globals.jl")
+# include("globals.jl")
 
-include("raster.jl")
+# include("raster.jl")
 
-include("graphs.jl")
+# include("graphs.jl")
 
 # @testset "Tutorial1" begin
 #     include("tutorial1.jl")
