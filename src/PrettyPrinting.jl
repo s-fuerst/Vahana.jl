@@ -32,21 +32,17 @@ function construct_prettyprinting_functions()
                 printstyled(io, "\nNetworks(s):"; color = :cyan)
             end
             for t in edges_types
-                try 
+                edgetypeprops = sim.typeinfos.edges_attr[Symbol(t)][:props]
+                if (:SingleEdge in edgetypeprops &&
+                    :SingleAgentType in edgetypeprops) ||
+                    (:SingleAgentType in edgetypeprops &&
+                    :size in keys(sim.typeinfos.edges_attr[Symbol(t)]))
+                    print(io, "\n\t Type $t") 
+                else 
                     print(io, "\n\t Type $t \
                                with $(_show_num_edges(sim, Val(t))) Edges(s) for $(_show_length(sim, Val(t))) Agent(s)")
-                catch  e
-                    print(io, "\n\t Type $t \
-                               (for fixed sized agent types the actual numbers are unknown)")
                 end
             end
-            # if length(edges) >= 1 
-            #     printstyled(io, "\nNetwork(s):"; color = :cyan)
-            #     for (k, v) in edges
-            #         print(io, "\n\t $k \
-            #                with $(show_num_edges(v)) Edge(s) for $(show_length(v)) Agent(s)")
-            #     end
-            # end
         end
 
         function show_struct(io::IO, s, name)
@@ -86,39 +82,46 @@ function _show_collection(iter, max)
     end
 end
 
-# we assume that :IgnoreFrom ist not set, as we can not construct
-# the edge in this case
+# In the :IgnoreFrom case we set edge.from to 0.
 function _reconstruct_edge(e, edgetypeprops, edgeT)
     if :Stateless in edgetypeprops
-        Edge(e, edgeT())
+        if :IgnoreFrom in edgetypeprops
+            Edge(AgentID(0), edgeT())
+        else
+            Edge(e, edgeT())
+        end
+    elseif :IgnoreFrom in edgetypeprops
+        Edge(AgentID(0), e)
     else
         e
     end
 end        
 
-function _show_edge(e, edgetypeprops, stateof, edgeT) 
+function _show_edge(sim, e, edgetypeprops, stateof, edgeT)
+    e = _reconstruct_edge(e, edgetypeprops, edgeT)
+    if !(:IgnoreFrom in edgetypeprops) && e.from == 0
+        return
+    end
     print("\n\t")
-    if :Ignorefrom in edgetypeprops
+    if :IgnoreFrom in edgetypeprops
         print("unknown           ")
-    elseif :Stateless in edgetypeprops
-        _printid(e)
     else
         _printid(e.from)
     end
     if stateof == :Edge || :IgnoreFrom in edgetypeprops
-        if :Stateless in edgetypeprops
-            print(" $edgeT()")
-        else
-            print(" $(e.state)")
-        end
+        print(" $(e.state)")
     else
-        if :Stateless in edgetypeprops
-            print(" $(agentstate_flexible(sim, e))")
+        # for the to edges we get an empty edgetype props, as we constructed
+        # those edges they don't have the same properties
+        # But here we need the original props, so we access them directly
+        if :SingleAgentType in sim.typeinfos.edges_attr[Symbol(edgeT)][:props]
+            agentT = sim.typeinfos.edges_attr[Symbol(edgeT)][:to_agenttype]
+            aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
+            print(" $(agentstate(sim, aid, Val(agentT)))")
         else
-            print(" $(agentstate_flexible(sim, e.from))")
+            print(" $(agentstate_flexible(sim, e.from)))")
         end
     end
-    
 end
 
 ######################################## Buffered Collections
@@ -127,29 +130,18 @@ end
 function _show_length(sim, ::Val{T}) where {T} 
     read = getproperty(sim, readfield(Symbol(T)))
     write = getproperty(sim, writefield(Symbol(T)))
-    if read != write
+    if !sim.initialized 
         "$(length(read))/$(length(write)) (R/W)"
     else
         "$(length(read))"
     end
 end
 
-function _num_edges(coll)
-    if length(coll) > 0
-        mapreduce(length, +, values(coll))
+function _show_num_edges(sim, t::Val{T}) where {T}
+    if !sim.initialized 
+        "$(_num_edges(sim, t))/$(_num_edges(sim, t, true)) (R/W)"
     else
-        0
-    end
-end
-
-function _show_num_edges(sim, ::Val{T}) where {T}
-    read = getproperty(sim, readfield(Symbol(T)))
-    write = getproperty(sim, writefield(Symbol(T)))
-    # cs = coll.containers
-    if read != write
-        "$(_num_edges(read))/$(_num_edges(write)) (R/W)"
-    else
-        "$(_num_edges(read))"
+        "$(_num_edges(sim, t))"
     end
 end
 

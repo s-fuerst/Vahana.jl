@@ -67,6 +67,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                   :(rasters::Dict{Symbol, Array{AgentID,2}}),
                   :(nodes_id2read::Vector{Function}),
                   :(nodes_id2write::Vector{Function}),
+                  :(initialized::Bool),
                   edgefields...,
                   nodefields...,
                   nodeids...)
@@ -84,6 +85,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                            globals = $globals,
                            typeinfos = $types,
                            rasters = Dict{Symbol, Array{AgentID,2}}(),
+                           initialized = false,
                            nodes_id2read = Vector{Function}(undef, MAX_TYPES),
                            nodes_id2write = Vector{Function}(undef, MAX_TYPES)
                            )
@@ -143,6 +145,7 @@ See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref) and
 function finish_init!(sim)
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
+    sim.initialized = true
     sim
 end 
 

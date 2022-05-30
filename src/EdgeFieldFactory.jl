@@ -397,7 +397,61 @@ function construct_edge_functions(T::Symbol, attr)
         end
     end
 
+    #- _vectorized_container
+    # if !singleedge
+    #     @eval function _vectorized_container_read(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #         _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))) 
+    #     end
+    #     @eval function _vectorized_container_write(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #         _get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))) 
+    #     end
+    # else
+    #     @eval function _vectorized_container_read(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #         [ _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))) ]
+    #     end
+    #     @eval function _vectorized_container_write(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #         [ _get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))) ]
+    #     end
+    # end
 
+
+    if singletype
+        @eval _removeundef(::Val{Main.$T}) = edges ->
+            [ edges[i] for i=1:length(edges) if isassigned(edges, i)]
+    else
+        @eval _removeundef(::Val{Main.$T}) = edges -> edges
+    end
+
+    if !singleedge
+        if !singletype
+            @eval function _num_edges(sim::Simulation, t::Val{Main.$T}, write = false)
+                field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+                if length(field) == 0
+                    return 0
+                end
+                mapreduce(id -> length(field[id]), +, keys(field))
+            end
+        else
+            @eval function _num_edges(sim::Simulation, t::Val{Main.$T}, write = false)
+                field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+                if length(field) == 0
+                    return 0
+                end
+                n = 0
+                for i in 1:length(field)
+                    if isassigned(field, i)
+                        n += length(field[i])
+                    end
+                end
+                n
+            end
+        end 
+    else
+        @eval function _num_edges(sim::Simulation, t::Val{Main.$T}, write = false)
+            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            length(_removeundef(t)(field))
+        end
+    end
     
     #- aggregate
     if !stateless
@@ -405,12 +459,6 @@ function construct_edge_functions(T::Symbol, attr)
             @eval _edgestates(::Val{Main.$T}) = edges -> edges
         else
             @eval _edgestates(::Val{Main.$T}) = edges -> map(e -> e.state, edges)
-        end
-        if singletype
-            @eval _removeundef(::Val{Main.$T}) = edges ->
-                [ edges[i] for i=1:size(edges, 1) if isassigned(edges, i)]
-        else
-            @eval _removeundef(::Val{Main.$T}) = edges -> edges
         end
         if singleedge
             @eval function aggregate(sim::Simulation, t::Val{Main.$T}, f, op; kwargs...)

@@ -186,43 +186,61 @@ filtertypes(typeidents::String, typelist::Vector) =
 
 hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
 
-    # for t in statelessEdgeTypes
-    #     println(t)
-    #     add_edge!(sim, a2id, a3id, t())
-    #     # if hasprop(t, "E") && !hasprop(t, "T") && !(hasprop(t, "S") && hasprop(t, "I"))
-    #     #     println("assertion")
-    #     #     @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
-    #     # else
-    #     #     println("no")
-    #     #     add_edge!(sim, a1id, a3id, t())
-    #     # end
-    #     add_edge!(sim, a3id, a1id, t())
-
-    #     @eval println(sim.$(Symbol(t,"_write")))
-    #     println()
-    # end
 
 
-# for t in statelessEdgeTypes
-#     println(t)
-#     add_edge!(sim, a2id, a3id, t())
-#     # if hasprop(t, "E") && !hasprop(t, "T")
-#     #     add_edge!(sim, a1id, a3id, t())
-#     # add_edge!(sim, a3id, a1id, t())
+sim = construct(model, "Test", nothing, nothing)
 
-#     @eval println(sim.$(Symbol(t,"_write")))
-#     println()
-# end
+(a1id, a2id, a3id) = add_agents!(sim, AVec(1), AVec(2), AVec(3))
 
-# for t in statefulEdgeTypes
-#     println(t)
-#     add_edge!(sim, a2id, a3id, t(2))
-#     add_edge!(sim, a1id, a3id, t(1))
-#     add_edge!(sim, a3id, a1id, t(3))
-#     @eval println(sim.$(Symbol(t,"_write")))
-#     println()
-# end
+# Lets add some edges for each of the different property combinations
+# For each combination we will have
+# 2 -> 3 (with state 1 for stateful edges)
+# 3 -> 1 (with state 3 for stateful edges)
+# and for all combination that supports multiple edges we add also
+# 1 -> 3 (with state 2 for stateful edges)
 
+for t in statelessEdgeTypes
+    add_edge!(sim, a2id, a3id, t())
+    # we can not check the "ET" combination, instead a warning
+    # is given when add_edgetype is called
+    if hasprop(t, "E") && !hasprop(t, "T") && !(hasprop(t, "S") && hasprop(t, "I"))
+        # and check in the case that a second edge can not be added to
+        # the same agent (and that this can be checked),
+        # that this throws an assertion
+        @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
+    elseif !hasprop(t, "E")
+        add_edge!(sim, a1id, a3id, t())
+    end
+    edge = Edge(a3id, t())
+    add_edge!(sim, a1id, edge)
+
+    # println(t)
+    # @eval println($sim.$(Symbol(t,"_write")))
+    # println()
+end
+
+for t in statefulEdgeTypes
+    add_edge!(sim, a2id, a3id, t(1))
+    # we can not check the "ET" combination, instead a warning
+    # is given when add_edgetype is called
+    if hasprop(t, "E") && !hasprop(t, "T") && !(hasprop(t, "S") && hasprop(t, "I"))
+        @test_throws AssertionError add_edge!(sim, a1id, a3id, t(2))
+    elseif !hasprop(t, "E")
+        add_edge!(sim, a1id, a3id, t(2))
+    end
+    edge = Edge(a3id, t(3))
+    add_edge!(sim, a1id, edge)
+
+    # println(t)
+    # @eval println($sim.$(Symbol(t,"_write")))
+    # println()
+end
+
+finish_init!(sim)
+
+sim
+
+# show_random_agent(sim, Val(AVec))
 
 # include("core.jl")
 

@@ -5,7 +5,7 @@ using Printf
 
 # as a convention, we print only "complete" agentid as hex
 function _printid(id, nrformatted = true)
-    if typeof(id) == UInt32 ||  agent_nr(id) == id
+    if typeof(id) == UInt32 ||  agent_nr(AgentID(id)) == id
         if nrformatted
             Printf.@printf "%18i" id
         else
@@ -70,11 +70,20 @@ The optional `stateof` argument controls whether the state of the edge
 
 """
 function show_random_agent(sim, t::Val{T}; kwargs...) where T
-    agent = _getread(sim, t) |>
-        keys |>
-        rand
+    if !sim.initialized
+        println("show_random_agent can not be called before finish_init!.")
+        return
+    end
+    
+    agents = _getread(sim, t) |>
+        keys
 
-    show_agent(sim, agent, t; kwargs...)
+    if length(agents) == 0
+        println("No agent of type $T found.")
+        return
+    end
+
+    show_agent(sim, rand(agents), t; kwargs...)
 end
 
 
@@ -138,36 +147,65 @@ function show_agent(sim,
     # the all the edges for the agent
     printstyled("\nNetwork(s):"; color = :cyan)
     for edgeT in sim.typeinfos.edges_types
+        # output the network name and derive some information from sim.typeinfos
         printstyled("\n    $edgeT"; color = :yellow)
         read_container = getproperty(sim, readfield(Symbol(edgeT)))
         edgetypeprops = sim.typeinfos.edges_attr[Symbol(edgeT)][:props]
-        agenttypeid = sim.typeinfos.nodes_type2id[T]
-        nid = :SingleAgentType in edgetypeprops ? agent_nr(id) :
-            agent_id(agenttypeid, agent_nr(id))
-        if nid in read_container |> keys
-            d = read_container[nid]
+        
+        justcount = :IgnoreFrom in edgetypeprops && :Stateless in edgetypeprops
+        
+        if :SingleEdge in edgetypeprops && :SingleAgentType in edgetypeprops && !justcount
+            printstyled("\n\tIt is not possible to give reliable information " *
+                "about the edges of the agent when the\n\tcorresponding edgetype has the " *
+                ":SingleEdge and :SingleAgentType property combination."; color = :red)
+            continue
+        end
+        # unify the agentid. For vector (:SingleAgent) types, this must be the index,
+        # and for dict types, the AgentID
+        aid = agent_id(sim.typeinfos.nodes_type2id[T], agent_nr(id))
+        nid = :SingleAgentType in edgetypeprops ? agent_nr(id) : aid
+        # check that this agent has some edges
+        if nid in keys(read_container)
+            # for vector types we can have #undef entries. to only something
+            # for the agent when it is assigned to the vector 
+            if !(:SingleAgentType in edgetypeprops && !isassigned(read_container, nid))
+                d = read_container[nid]
 
-            if :SingleEdge in edgetypeprops || length(d) > 0
-                printstyled("\n\tfrom:              "; color = :green)
-                if stateof == :Edge || :IgnoreFrom in edgetypeprops
-                    printstyled("edge.state:"; color = :green)
-                else
-                    printstyled("state of edge.from:"; color = :green)
-                end
-                if :SingleEdge in edgetypeprops
-                    _show_edge(d, edgetypeprops, stateof, edgeT)
-                else
-                    for e in first(d, nedges)
-                        _show_edge(e, edgetypeprops, stateof, edgeT)
+                if justcount
+                    if :SingleEdge in edgetypeprops
+                        printstyled("\n\thas_neighbor:  "; color = :green)
+                        print("$(has_neighbor(sim, aid, Val(edgeT)))")
+                    else
+                        printstyled("\n\tnum_neighbors: "; color = :green)
+                        print("$(num_neighbors(sim, aid, Val(edgeT)))")
                     end
-                    if length(d) > nedges
-                        println("\n\t... ($(length(d)-nedges) not shown)")
+                else
+                    # write the header for this edgetype, 
+                    printstyled("\n\tfrom:              "; color = :green)
+                    if stateof == :Edge || :IgnoreFrom in edgetypeprops
+                        printstyled("edge.state:"; color = :green)
+                    else
+                        printstyled("state of edge.from:"; color = :green)
+                    end
+                    if :SingleEdge in edgetypeprops
+                        _show_edge(sim, d, edgetypeprops, stateof, edgeT)
+                    else
+                        for e in first(d, nedges)
+                            _show_edge(sim, e, edgetypeprops, stateof, edgeT)
+                        end
+                        if length(d) > nedges
+                            println("\n\t... ($(length(d)-nedges) not shown)")
+                        end
                     end
                 end
             end
         end
 
         if :IgnoreFrom in edgetypeprops
+            if !justcount
+                printstyled("\n\tFor edgetypes with the :IgnoreFrom property " *
+                    "the edges to an agent can not be determined."; color = :red)
+            end
             continue
         end
         # collect the outgoing edges and overwrite the from id
@@ -176,7 +214,7 @@ function show_agent(sim,
         for (eid, e) in edges_iterator(read_container)
             edge = _reconstruct_edge(e, edgetypeprops, edgeT)
             if id == edge.from
-                push!(edges_agents, Edge(eid, edge.state))
+                push!(edges_agents, Edge(AgentID(eid), edge.state))
             end   
         end
 
@@ -188,7 +226,7 @@ function show_agent(sim,
                 printstyled("state of edge.to:"; color = :green)
             end
             for ea in first(edges_agents, nedges)
-                _show_edge(ea, [], stateof, edgeT)
+                _show_edge(sim, ea, [], stateof, edgeT)
             end
             if length(edges_agents) > nedges
                 println("\n\t... ($(length(edges_agents)-nedges) not shown)")
