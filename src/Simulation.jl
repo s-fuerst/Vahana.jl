@@ -32,7 +32,7 @@ agents and edges for the initial state, it is necessary to call
 [`finish_init!`](@ref) before applying a transition function for the first
 time.
 
-See also [`ModelTypes!`](@ref), [`param`](@ref),
+See also [`ModelTypes`](@ref), [`param`](@ref),
 [`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
 and [`finish_init!`](@ref)
 """
@@ -40,8 +40,8 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     edgefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[Symbol(T)]))),
-                 :($(edgefield_constructor(T, types.edges_attr[Symbol(T)]))))
+                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[T]))),
+                 :($(edgefield_constructor(T, types.edges_attr[T]))))
         end 
         for T in types.edges_types ] |> Iterators.flatten |> collect
 
@@ -75,6 +75,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     # the true in the second arg makes the struct mutable
     strukt = Expr(:struct, true, :(Simulation{P, G}), fields)
 
+    
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
@@ -92,7 +93,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
 
     # Construct all type specific functions for the edge types
     for T in sim.typeinfos.edges_types
-        construct_edge_functions(Symbol(T), types.edges_attr[Symbol(T)])
+        construct_edge_functions(T, types.edges_attr[T])
     end
 
     # Construct all type specific functions for the agent types
@@ -262,12 +263,11 @@ edges of type T.
 `f` is applied to all of these agents or edges and then `op` is used to
 reduce (aggregate) the values returned by `f`.
 
-aggregate is based on [`Base.mapreduce`](@ref), `f`, `op` and `kwargs` are
+aggregate is based on mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
-
-See also [`Base.mapreduce`](@ref)
 """
+function aggregate end
 #function aggregate(sim, ::Val{T}, f, op; kwargs...) where T end
 
 

@@ -32,11 +32,11 @@ function construct_prettyprinting_functions()
                 printstyled(io, "\nNetworks(s):"; color = :cyan)
             end
             for t in edges_types
-                edgetypeprops = sim.typeinfos.edges_attr[Symbol(t)][:props]
+                edgetypeprops = sim.typeinfos.edges_attr[t][:props]
                 if (:SingleEdge in edgetypeprops &&
                     :SingleAgentType in edgetypeprops) ||
                     (:SingleAgentType in edgetypeprops &&
-                    :size in keys(sim.typeinfos.edges_attr[Symbol(t)]))
+                    :size in keys(sim.typeinfos.edges_attr[t]))
                     print(io, "\n\t Type $t") 
                 else 
                     print(io, "\n\t Type $t \
@@ -114,8 +114,8 @@ function _show_edge(sim, e, edgetypeprops, stateof, edgeT)
         # for the to edges we get an empty edgetype props, as we constructed
         # those edges they don't have the same properties
         # But here we need the original props, so we access them directly
-        if :SingleAgentType in sim.typeinfos.edges_attr[Symbol(edgeT)][:props]
-            agentT = sim.typeinfos.edges_attr[Symbol(edgeT)][:to_agenttype]
+        if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:props]
+            agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             print(" $(agentstate(sim, aid, Val(agentT)))")
         else

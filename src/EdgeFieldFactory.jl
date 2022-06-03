@@ -10,34 +10,34 @@ import Base.zero
 #
 # |                             | A             | B             | C(B)      |
 # |-----------------------------+---------------+---------------+-----------|
-# | Default                     | Dict{AgentID, | Edge{Main.$T} | Vector{B} |
+# | Default                     | Dict{AgentID, | Edge{$T}      | Vector{B} |
 # | SType                       | Vector{       |               | B         |
 # | Stateless & !Ignore         |               | AgentID       |           |
-# | Ignore & !Stateless         |               | Main.$T       |           |
+# | Ignore & !Stateless         |               | $T            |           |
 # | Stateless & Ignore & !SEdge |               |               | Int       |
 # | Stateless & Ignore & SEdge  |               |               | Bool      |
 #
 # The following table show all the 16 type variante for the container that can be
 # constructed following the rules from the table above
 #
-# |                                      | SType | Stateless | SEdge | Ignore |
-# |--------------------------------------+-------+-----------+-------+--------|
-# | Dict{AgentID, Vector{Edge{Main.$T}}} |       |           |       |        |
-# | Dict{AgentID, Edge{Main.$T}}         |       |           | x     |        |
-# | Dict{AgentID, Vector{AgentID}}       |       | x         |       |        |
-# | Dict{AgentID, AgentID}               |       | x         | x     |        |
-# | Vector{Vector{Edge{Main.T}}}         | x     |           |       |        |
-# | Vector{Edge{Main.T}}                 | x     |           | x     |        |
-# | Vector{Vector{AgentID}}              | x     | x         |       |        |
-# | Vector{AgentID}                      | x     | x         | x     |        |
-# | Dict{AgentID, Vector{Main.$T}}       |       |           |       | x      |
-# | Dict{AgentID, Main.$T}               |       |           | x     | x      |
-# | Dict{AgentID, Int64}                 |       | x         |       | x      |
-# | Dict{AgentID, Bool}                  |       | x         | x     | x      |
-# | Vector{Vector{Main.$T}}              | x     |           |       | x      |
-# | Vector{Main.$T}                      | x     |           | x     | x      |
-# | Vector{Int64}                        | x     | x         |       | x      |
-# | Vector{Bool}                         | x     | x         | x     | x      |
+# |                                 | SType | Stateless | SEdge | Ignore |
+# |---------------------------------+-------+-----------+-------+--------|
+# | Dict{AgentID, Vector{Edge{$T}}} |       |           |       |        |
+# | Dict{AgentID, Edge{$T}}         |       |           | x     |        |
+# | Dict{AgentID, Vector{AgentID}}  |       | x         |       |        |
+# | Dict{AgentID, AgentID}          |       | x         | x     |        |
+# | Vector{Vector{Edge{T}}}         | x     |           |       |        |
+# | Vector{Edge{T}}                 | x     |           | x     |        |
+# | Vector{Vector{AgentID}}         | x     | x         |       |        |
+# | Vector{AgentID}                 | x     | x         | x     |        |
+# | Dict{AgentID, Vector{$T}}       |       |           |       | x      |
+# | Dict{AgentID, $T}               |       |           | x     | x      |
+# | Dict{AgentID, Int64}            |       | x         |       | x      |
+# | Dict{AgentID, Bool}             |       | x         | x     | x      |
+# | Vector{Vector{$T}}              | x     |           |       | x      |
+# | Vector{$T}                      | x     |           | x     | x      |
+# | Vector{Int64}                   | x     | x         |       | x      |
+# | Vector{Bool}                    | x     | x         | x     | x      |
 #
 #
 # C(B) alone is the type of the container stored per element. We need
@@ -49,6 +49,7 @@ function construct_types(T, attr::Dict{Symbol, Any})
     singleedge = :SingleEdge in attr[:props]
     singletype = :SingleAgentType in attr[:props]
     stateless = :Stateless in attr[:props]
+
     
     A = if singletype
         "Vector{"
@@ -81,7 +82,6 @@ edgefield_type(T, info) = Meta.parse(construct_types(T, info)[1])
 
 edgefield_constructor(T, info) = Meta.parse(construct_types(T, info)[1] * "()")
 
-
 # We have some functions that are do only something when some edge properties
 # are set and are in this case specialized for the edgetype. Here we define
 # the "fallback" functions for the case that no specialized versions are needed.
@@ -91,7 +91,7 @@ init_field!(_, _) = nothing
 _can_add(_, _, _) = true
 
 
-function construct_edge_functions(T::Symbol, attr)
+function construct_edge_functions(T::DataType, attr)
     ignorefrom = :IgnoreFrom in attr[:props]
     singleedge = :SingleEdge in attr[:props]
     singletype = :SingleAgentType in attr[:props]
@@ -104,7 +104,8 @@ function construct_edge_functions(T::Symbol, attr)
     type_strings = construct_types(T, attr)
     FT = Meta.parse(type_strings[1]) |> eval
     CT = Meta.parse(type_strings[2]) |> eval
-
+    MT = startswith(string(T), "Main") ? T : @eval Main.$(Symbol(T))
+            
     #### Functions that helps to write generic versions of the edge functions
     #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
@@ -119,17 +120,17 @@ function construct_edge_functions(T::Symbol, attr)
     # _valuetostore is used to retrieve the value that should be stored
     # from an edge, or the (from, edgestate) combination
     if  stateless && ignorefrom && singleedge
-        @eval _valuetostore(edge::Edge{Main.$T}) = true
-        @eval _valuetostore(from::AgentID, edgestate::Main.$T) = true
+        @eval _valuetostore(edge::Edge{$MT}) = true
+        @eval _valuetostore(from::AgentID, edgestate::$MT) = true
     elseif ignorefrom
-        @eval _valuetostore(edge::Edge{Main.$T}) = edge.state
-        @eval _valuetostore(::AgentID, edgestate::Main.$T) = edgestate
+        @eval _valuetostore(edge::Edge{$MT}) = edge.state
+        @eval _valuetostore(::AgentID, edgestate::$MT) = edgestate
     elseif stateless
-        @eval _valuetostore(edge::Edge{Main.$T}) = edge.from
-        @eval _valuetostore(from::AgentID, ::Main.$T) = from
+        @eval _valuetostore(edge::Edge{$MT}) = edge.from
+        @eval _valuetostore(from::AgentID, ::$MT) = from
     else
-        @eval _valuetostore(edge::Edge{Main.$T}) = edge
-        @eval _valuetostore(from::AgentID, edgestate::Main.$T) = Edge(from, edgestate)
+        @eval _valuetostore(edge::Edge{$MT}) = edge
+        @eval _valuetostore(from::AgentID, edgestate::$MT) = Edge(from, edgestate)
     end
 
     # We must sometime construct the (per agent) containers, and those
@@ -170,7 +171,7 @@ function construct_edge_functions(T::Symbol, attr)
                     end
                 end
             else 
-                @eval function init_field!(sim, ::Val{Main.$T})
+                @eval function init_field!(sim, ::Val{$MT})
                     field = sim.$(writefield(T))
                     resize!(field, $singletype_size)
                     ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
@@ -186,7 +187,7 @@ function construct_edge_functions(T::Symbol, attr)
                     end
                 end
             else
-                @eval init_field!(sim, ::Val{Main.$T}) =
+                @eval init_field!(sim, ::Val{$MT}) =
                     resize!(sim.$(writefield(T)), $singletype_size)
             end
             
@@ -232,19 +233,19 @@ function construct_edge_functions(T::Symbol, attr)
     #### The exported functions
     #- add_edge!
     if stateless && ignorefrom && !singleedge
-        @eval function add_edge!(sim::Simulation, to::AgentID, ::Edge{Main.$T})
+        @eval function add_edge!(sim::Simulation, to::AgentID, ::Edge{$MT})
             nr = _to2idx(to, $(Val{T}))
             sim.$(writefield(T))[nr] =
                 _get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))) + 1
         end
 
-        @eval function add_edge!(sim::Simulation, ::AgentID, to::AgentID, ::Main.$T)
+        @eval function add_edge!(sim::Simulation, ::AgentID, to::AgentID, ::$MT)
             nr = _to2idx(to, $(Val{T}))
             sim.$(writefield(T))[nr] =
                 _get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))) + 1
         end
     elseif singleedge
-        @eval function add_edge!(sim::Simulation, to::AgentID, edge::Edge{Main.$T})
+        @eval function add_edge!(sim::Simulation, to::AgentID, edge::Edge{$MT})
             @mayassert _can_add(sim.$(writefield(T)), to, $(Val{T})) """
             An edge has already beend added to the agent with the id $to (and the
             edgetype properties containing the :SingleEdge property).
@@ -254,7 +255,7 @@ function construct_edge_functions(T::Symbol, attr)
             sim.$(writefield(T))[nr] = _valuetostore(edge)
         end
 
-        @eval function add_edge!(sim::Simulation, from::AgentID, to::AgentID, edgestate::Main.$T)
+        @eval function add_edge!(sim::Simulation, from::AgentID, to::AgentID, edgestate::$MT)
             @mayassert _can_add(sim.$(writefield(T)), to, $(Val{T})) """
             An edge has already beend added to the agent with the id $to (and the
             edgetype properties containing the :SingleEdge property).
@@ -264,25 +265,25 @@ function construct_edge_functions(T::Symbol, attr)
             sim.$(writefield(T))[nr] = _valuetostore(from, edgestate)
         end
     else
-        @eval function add_edge!(sim::Simulation, to::AgentID, edge::Edge{Main.$T})
+        @eval function add_edge!(sim::Simulation, to::AgentID, edge::Edge{$MT})
             push!(_get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))),
                   _valuetostore(edge))
         end
 
-        @eval function add_edge!(sim::Simulation, from::AgentID, to::AgentID, edgestate::Main.$T)
+        @eval function add_edge!(sim::Simulation, from::AgentID, to::AgentID, edgestate::$MT)
             push!(_get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))),
                   _valuetostore(from, edgestate))
         end
     end
 
     #- prepare_write! 
-    @eval function prepare_write!(sim, t::Val{Main.$T})
+    @eval function prepare_write!(sim, t::Val{$MT})
         sim.$(writefield(T)) = $FT()
         init_field!(sim, t)
     end
 
     #- finish_write!
-    @eval function finish_write!(sim, ::Val{Main.$T})
+    @eval function finish_write!(sim, ::Val{$MT})
         sim.$(readfield(T)) = sim.$(writefield(T))
     end
 
@@ -293,11 +294,11 @@ function construct_edge_functions(T::Symbol, attr)
 
     #- edges_to
     if !stateless && !ignorefrom
-        @eval function edges_to(sim::Simulation, to::AgentID, ::Val{Main.$T})
+        @eval function edges_to(sim::Simulation, to::AgentID, ::Val{$MT})
             _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
         end
     else
-        @eval function edges_to(::Simulation, ::AgentID, t::Val{Main.$T})
+        @eval function edges_to(::Simulation, ::AgentID, t::Val{$MT})
             @assert false """
             edges_to is not defined for the property combination of $t
             """
@@ -307,23 +308,23 @@ function construct_edge_functions(T::Symbol, attr)
     #- neighborids
     if !ignorefrom
         if stateless
-            @eval function neighborids(sim::Simulation, to::AgentID, ::Val{Main.$T})
+            @eval function neighborids(sim::Simulation, to::AgentID, ::Val{$MT})
                 _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
             end
         else
             if singleedge
-                @eval function neighborids(sim::Simulation, to::AgentID, ::Val{Main.$T})
+                @eval function neighborids(sim::Simulation, to::AgentID, ::Val{$MT})
                     _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))).from
                 end
             else
-                @eval function neighborids(sim::Simulation, to::AgentID, ::Val{Main.$T})
+                @eval function neighborids(sim::Simulation, to::AgentID, ::Val{$MT})
                     map(e -> e.from,
                         _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))))
                 end
             end
         end
     else
-        @eval function neighborids(::Simulation, ::AgentID, t::Val{Main.$T})
+        @eval function neighborids(::Simulation, ::AgentID, t::Val{$MT})
             @assert false """
             neighborids is not defined for the property combination of $t
             """
@@ -333,23 +334,23 @@ function construct_edge_functions(T::Symbol, attr)
     #- edgestates
     if !stateless
         if ignorefrom
-            @eval function edgestates(sim::Simulation, to::AgentID, ::Val{Main.$T})
+            @eval function edgestates(sim::Simulation, to::AgentID, ::Val{$MT})
                 _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
             end
         else
             if singleedge
-                @eval function edgestates(sim::Simulation, to::AgentID, ::Val{Main.$T})
+                @eval function edgestates(sim::Simulation, to::AgentID, ::Val{$MT})
                     _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))).state
                 end
             else
-                @eval function edgestates(sim::Simulation, to::AgentID, ::Val{Main.$T})
+                @eval function edgestates(sim::Simulation, to::AgentID, ::Val{$MT})
                     map(e -> e.state,
                         _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))))
                 end
             end
         end
     else
-        @eval function edgestates(::Simulation, ::AgentID, t::Val{Main.$T})
+        @eval function edgestates(::Simulation, ::AgentID, t::Val{$MT})
             @assert false """
             edgestates is not defined for the property combination of $t
             """
@@ -359,16 +360,16 @@ function construct_edge_functions(T::Symbol, attr)
     #- num_neighbors
     if !singleedge
         if ignorefrom && stateless
-            @eval function num_neighbors(sim::Simulation, to::AgentID, ::Val{Main.$T})
+            @eval function num_neighbors(sim::Simulation, to::AgentID, ::Val{$MT})
                 _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T)))
             end
         else
-            @eval function num_neighbors(sim::Simulation, to::AgentID, ::Val{Main.$T})
+            @eval function num_neighbors(sim::Simulation, to::AgentID, ::Val{$MT})
                 size(_get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))),1)
             end
         end
     else
-        @eval function num_neighbors(::Simulation, ::AgentID, t::Val{Main.$T})
+        @eval function num_neighbors(::Simulation, ::AgentID, t::Val{$MT})
             @assert false """
             num_neighbors is not defined for the property combination of $t
             """
@@ -378,19 +379,19 @@ function construct_edge_functions(T::Symbol, attr)
 
     #- has_neighbor
     if ignorefrom && stateless
-        @eval function has_neighbor(sim::Simulation, to::AgentID, ::Val{Main.$T})
+        @eval function has_neighbor(sim::Simulation, to::AgentID, ::Val{$MT})
             _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))) >= 1
         end
     elseif !singleedge
-        @eval function has_neighbor(sim::Simulation, to::AgentID, t::Val{Main.$T})
+        @eval function has_neighbor(sim::Simulation, to::AgentID, t::Val{$MT})
             num_neighbors(sim,to, t) >= 1
         end
     elseif !singletype 
-        @eval function has_neighbor(sim::Simulation, to::AgentID, ::Val{Main.$T})
+        @eval function has_neighbor(sim::Simulation, to::AgentID, ::Val{$MT})
             haskey(sim.$(readfield(T)), to)
         end
     else
-        @eval function has_neighbor(::Simulation, ::AgentID, t::Val{Main.$T})
+        @eval function has_neighbor(::Simulation, ::AgentID, t::Val{$MT})
             @assert false """
             has_neighbor is not defined for the property combination of $t
             """
@@ -399,32 +400,32 @@ function construct_edge_functions(T::Symbol, attr)
 
     #- _vectorized_container
     # if !singleedge
-    #     @eval function _vectorized_container_read(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #     @eval function _vectorized_container_read(sim::Simulation, to::AgentID, ::Val{$MT})
     #         _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))) 
     #     end
-    #     @eval function _vectorized_container_write(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #     @eval function _vectorized_container_write(sim::Simulation, to::AgentID, ::Val{$MT})
     #         _get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))) 
     #     end
     # else
-    #     @eval function _vectorized_container_read(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #     @eval function _vectorized_container_read(sim::Simulation, to::AgentID, ::Val{$MT})
     #         [ _get_agent_container(sim, to, $(Val{T}), sim.$(readfield(T))) ]
     #     end
-    #     @eval function _vectorized_container_write(sim::Simulation, to::AgentID, ::Val{Main.$T})
+    #     @eval function _vectorized_container_write(sim::Simulation, to::AgentID, ::Val{$MT})
     #         [ _get_agent_container(sim, to, $(Val{T}), sim.$(writefield(T))) ]
     #     end
     # end
 
 
     if singletype
-        @eval _removeundef(::Val{Main.$T}) = edges ->
+        @eval _removeundef(::Val{$MT}) = edges ->
             [ edges[i] for i=1:length(edges) if isassigned(edges, i)]
     else
-        @eval _removeundef(::Val{Main.$T}) = edges -> edges
+        @eval _removeundef(::Val{$MT}) = edges -> edges
     end
 
     if !singleedge
         if !singletype
-            @eval function _num_edges(sim::Simulation, t::Val{Main.$T}, write = false)
+            @eval function _num_edges(sim::Simulation, t::Val{$MT}, write = false)
                 field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
                 if length(field) == 0
                     return 0
@@ -432,7 +433,7 @@ function construct_edge_functions(T::Symbol, attr)
                 mapreduce(id -> length(field[id]), +, keys(field))
             end
         else
-            @eval function _num_edges(sim::Simulation, t::Val{Main.$T}, write = false)
+            @eval function _num_edges(sim::Simulation, t::Val{$MT}, write = false)
                 field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
                 if length(field) == 0
                     return 0
@@ -447,7 +448,7 @@ function construct_edge_functions(T::Symbol, attr)
             end
         end 
     else
-        @eval function _num_edges(sim::Simulation, t::Val{Main.$T}, write = false)
+        @eval function _num_edges(sim::Simulation, t::Val{$MT}, write = false)
             field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
             length(_removeundef(t)(field))
         end
@@ -456,12 +457,12 @@ function construct_edge_functions(T::Symbol, attr)
     #- aggregate
     if !stateless
         if ignorefrom
-            @eval _edgestates(::Val{Main.$T}) = edges -> edges
+            @eval _edgestates(::Val{$MT}) = edges -> edges
         else
-            @eval _edgestates(::Val{Main.$T}) = edges -> map(e -> e.state, edges)
+            @eval _edgestates(::Val{$MT}) = edges -> map(e -> e.state, edges)
         end
         if singleedge
-            @eval function aggregate(sim::Simulation, t::Val{Main.$T}, f, op; kwargs...)
+            @eval function aggregate(sim::Simulation, t::Val{$MT}, f, op; kwargs...)
                 estates = sim.$(readfield(T)) |>
                     values |>
                     _removeundef(t) |>
@@ -470,7 +471,7 @@ function construct_edge_functions(T::Symbol, attr)
                 mapreduce(f, op, estates; kwargs...)
             end
         else
-            @eval function aggregate(sim::Simulation, t::Val{Main.$T}, f, op; kwargs...)
+            @eval function aggregate(sim::Simulation, t::Val{$MT}, f, op; kwargs...)
                 estates = sim.$(readfield(T)) |>
                     values |>
                     _removeundef(t) |>
@@ -481,7 +482,7 @@ function construct_edge_functions(T::Symbol, attr)
             end
         end
     else
-        @eval function aggregate(::Simulation, t::Val{Main.$T}, f, op; kwargs...)
+        @eval function aggregate(::Simulation, t::Val{$MT}, f, op; kwargs...)
             @assert false """
             aggregate is not defined for the property combination of $t
             """

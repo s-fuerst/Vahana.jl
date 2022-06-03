@@ -153,7 +153,7 @@ function show_agent(sim,
         # output the network name and derive some information from sim.typeinfos
         printstyled("\n    $edgeT"; color = :yellow)
         read_container = getproperty(sim, readfield(Symbol(edgeT)))
-        edgetypeprops = sim.typeinfos.edges_attr[Symbol(edgeT)][:props]
+        edgetypeprops = sim.typeinfos.edges_attr[edgeT][:props]
         
         justcount = :IgnoreFrom in edgetypeprops && :Stateless in edgetypeprops
         

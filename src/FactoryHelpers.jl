@@ -1,6 +1,7 @@
-writefield(T::Symbol) = Symbol(T, "_write")
 
-readfield(T::Symbol) = Symbol(T, "_read")
+writefield(T) = Symbol(T, "_write")
 
-nextidfield(T::Symbol) = Symbol(T, "_nextid")
+readfield(T) = Symbol(T, "_read")
+
+nextidfield(T) = Symbol(T, "_nextid")
 

@@ -17,44 +17,42 @@
     # 3 -> 1 (with state 3 for stateful edges)
     # and for all combination that supports multiple edges we add also
     # 1 -> 3 (with state 2 for stateful edges)
-    @testset "add_edge!" begin
 
-        for t in statelessEdgeTypes
-            add_edge!(sim, a2id, a3id, t())
-            # we can not check the "ET" combination, instead a warning
-            # is given when add_edgetype is called
-            if hasprop(t, "E") && !hasprop(t, "T") && !(hasprop(t, "S") && hasprop(t, "I"))
-                # and check in the case that a second edge can not be added to
-                # the same agent (and that this can be checked),
-                # that this throws an assertion
-                @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
-            elseif !hasprop(t, "E")
-                add_edge!(sim, a1id, a3id, t())
-            end
-            edge = Edge(a3id, t())
-            add_edge!(sim, a1id, edge)
-
-            # println(t)
-            # @eval println($sim.$(Symbol(t,"_write")))
-            # println()
+    for t in statelessEdgeTypes
+        add_edge!(sim, a2id, a3id, t())
+        # we can not check the "ET" combination, instead a warning
+        # is given when add_edgetype is called
+        if hasprop(nameof(t), "E") && !hasprop(nameof(t), "T") && !(hasprop(nameof(t), "S") && hasprop(nameof(t), "I"))
+            # and check in the case that a second edge can not be added to
+            # the same agent (and that this can be checked),
+            # that this throws an assertion
+            @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
+        elseif !hasprop(nameof(t), "E")
+            add_edge!(sim, a1id, a3id, t())
         end
+        edge = Edge(a3id, t())
+        add_edge!(sim, a1id, edge)
 
-        for t in statefulEdgeTypes
-            add_edge!(sim, a2id, a3id, t(1))
-            # we can not check the "ET" combination, instead a warning
-            # is given when add_edgetype is called
-            if hasprop(t, "E") && !hasprop(t, "T") && !(hasprop(t, "S") && hasprop(t, "I"))
-                @test_throws AssertionError add_edge!(sim, a1id, a3id, t(2))
-            elseif !hasprop(t, "E")
-                add_edge!(sim, a1id, a3id, t(2))
-            end
-            edge = Edge(a3id, t(3))
-            add_edge!(sim, a1id, edge)
+        # println(t)
+        # @eval println($sim.$(Symbol(nameof(t),"_write")))
+        # println()
+    end
 
-            # println(t)
-            # @eval println($sim.$(Symbol(t,"_write")))
-            # println()
+    for t in statefulEdgeTypes
+        add_edge!(sim, a2id, a3id, t(1))
+        # we can not check the "ET" combination, instead a warning
+        # is given when add_edgetype is called
+        if hasprop(nameof(t), "E") && !hasprop(nameof(t), "T") && !(hasprop(nameof(t), "S") && hasprop(nameof(t), "I"))
+            @test_throws AssertionError add_edge!(sim, a1id, a3id, t(2))
+        elseif !hasprop(nameof(t), "E")
+            add_edge!(sim, a1id, a3id, t(2))
         end
+        edge = Edge(a3id, t(3))
+        add_edge!(sim, a1id, edge)
+
+        # println(t)
+        # @eval println($sim.$(Symbol(t,"_write")))
+        # println()
     end
 
     finish_init!(sim)
@@ -166,14 +164,14 @@
             @test_throws AssertionError aggregate(sim, Val(t), a -> a.foo, +)
         end
     end
-        # @testset "neighbor_states" begin
-        #     for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
-        #         e = neighborids(sim, a3id, Val(t))
-        #         @test e[1] == a2id
-        #         @test e[2] == a1id
-        #         e = neighborids(sim, a2id, Val(t))
-        #         @test e == Vector()
-        #     end
-        # end
-        
+    # @testset "neighbor_states" begin
+    #     for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
+    #         e = neighborids(sim, a3id, Val(t))
+    #         @test e[1] == a2id
+    #         @test e[2] == a1id
+    #         e = neighborids(sim, a2id, Val(t))
+    #         @test e == Vector()
+    #     end
+    # end
+    
 end

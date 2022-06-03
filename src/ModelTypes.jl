@@ -1,12 +1,14 @@
 export ModelTypes
 export add_agenttype!, add_edgetype!
 
+"""
 # TODO DOC
+"""
 Base.@kwdef struct ModelTypes
-    edges_attr = Dict{Symbol, Dict{Symbol, Any}}()
+    edges_attr = Dict{DataType, Dict{Symbol, Any}}()
     edges_types = Vector{DataType}()
-    nodes = Dict{Symbol, Symbol}()
-    nodes_attr = Dict{Symbol, Dict{Symbol, Any}}()
+    nodes = Dict{DataType, Symbol}()
+    nodes_attr = Dict{DataType, Dict{Symbol, Any}}()
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, typemax(TypeID))
@@ -39,9 +41,9 @@ function add_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
     types.nodes_type2id[T] = type_number
     types.nodes_id2type[type_number] = T
     
-    types.nodes[Symbol(T)] = C
+    types.nodes[T] = C
     attr = Dict{Symbol,Any}()
-    types.nodes_attr[Symbol(T)] = attr
+    types.nodes_attr[T] = attr
     if size > 0
         attr[:size] = size
     end
@@ -87,7 +89,7 @@ function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
     @assert !(T in types.edges_types) "Each type can be added only once"
     @assert isbitstype(T)
     push!(types.edges_types, T)
-    types.edges_attr[Symbol(T)] = kwargs
+    types.edges_attr[T] = kwargs
     p = Set{Symbol}(props)
     for prop in p
         @assert prop in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleAgentType] """
@@ -119,7 +121,7 @@ function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
     # if fieldcount(T) == 0
     #     push!(p, :Stateless)
     # end
-    types.edges_attr[Symbol(T)][:props] = p
+    types.edges_attr[T][:props] = p
     types
 end
 
