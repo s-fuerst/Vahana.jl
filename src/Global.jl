@@ -4,7 +4,7 @@ export setglobal!, getglobal, pushglobal!
     getglobal(sim::Simulation, name)
 
 Returns the value of the field `name` of the `globals` struct from the
-[`Simulation`](@ref) constructor.
+Simulation.
 
 See also [`construct`](@ref), [`setglobal!`](@ref) and [`pushglobal!`](@ref)
 """
@@ -14,7 +14,7 @@ getglobal(sim, name) = getfield(sim.globals, name)
     setglobal!(sim::Simulation, name, value)
 
 Set the value of the field `name` of the `globals` struct from the
-[`Simulation`](@ref) constructor. 
+Simulation. 
 
 `setglobal!` must not be called within a transition function. 
 

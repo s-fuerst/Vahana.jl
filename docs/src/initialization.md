@@ -3,7 +3,7 @@ CurrentModule = Vahana
 ```
 
 ```@docs
-Simulation(name::String, params, globals)
+construct
 
 add_agenttype!
 add_agent!

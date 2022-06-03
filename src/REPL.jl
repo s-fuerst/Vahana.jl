@@ -41,8 +41,9 @@ Display (some of) the edges of  type T.
 In a parallized simulation, only the edges that are in the partition
 of the graph associated with the function calling process are shown.
 
-"""
 #TODO DOC keywords
+
+"""
 show_network(sim, t::Val{T}; kwargs...) where T = show_type(sim, t; kwargs...)
 
 """
@@ -52,8 +53,10 @@ Display (some of) the agents of the type T.
 
 In a parallized simulation, only the agents that are in the partition
 of the graph associated with the function calling process are shown.
-"""
+
 #TODO DOC keywords
+
+"""
 show_agents(sim, t::Val{T}; kwargs...) where T = show_type(sim, t; kwargs...)
 
 """

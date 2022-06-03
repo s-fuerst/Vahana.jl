@@ -99,10 +99,10 @@ as a transition function parameter. Calling edges_to outside a transition functi
 or with other IDs may result in undefined behavior.
 
 See also [`apply_transition!`](@ref), [`neighborstates`](@ref),
-[`edgestates`](@ref) and [`neighbors`](@ref)
+[`edgestates`](@ref) and [`neighborids`](@ref)
 """
-#function edges_to(sim, to, ::Val) @assert false "Did you forgot the Val() for the type?" end
 function edges_to end
+#function edges_to(sim, to, ::Val) @assert false "Did you forgot the Val() for the type?" end
 
 """
     neighborids(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{AgentID}
@@ -148,7 +148,7 @@ for the agents whose state is actually used in the transition
 function.
 
 See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
-[`neighbors`](@ref)
+[`neighborids`](@ref)
 """
 function neighborstates end
 

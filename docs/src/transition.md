@@ -16,7 +16,7 @@ getglobal
 edges_to
 
 agentstate
-neighbors
+neighborids
 neighborstates
 
 edgestates
