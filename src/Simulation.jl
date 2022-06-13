@@ -4,7 +4,6 @@ export finish_init!
 export apply_transition, apply_transition!
 export param
 export aggregate
-export Simulation
 
 const MAX_TYPES = typemax(TypeID) 
 
@@ -37,6 +36,8 @@ See also [`ModelTypes`](@ref), [`param`](@ref),
 and [`finish_init!`](@ref)
 """
 function construct(types::ModelTypes, name::String, params::P, globals::G) where {P, G}
+    simsymbol = Symbol(name)
+    
     edgefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
@@ -73,7 +74,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
                   nodeids...)
     
     # the true in the second arg makes the struct mutable
-    strukt = Expr(:struct, true, :(Simulation{P, G}), fields)
+    strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)
 
     
     kwdefqn = QuoteNode(Symbol("@kwdef"))
@@ -81,7 +82,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
     # see also https://github.com/JuliaLang/julia/issues/43976
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
 
-    sim = @eval Simulation(name = $name,
+    sim = @eval $simsymbol(name = $name,
                            params = $params,
                            globals = $globals,
                            typeinfos = $types,
@@ -93,7 +94,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
 
     # Construct all type specific functions for the edge types
     for T in sim.typeinfos.edges_types
-        construct_edge_functions(T, types.edges_attr[T])
+        construct_edge_functions(T, types.edges_attr[T], simsymbol)
     end
 
     # Construct all type specific functions for the agent types
@@ -107,7 +108,7 @@ function construct(types::ModelTypes, name::String, params::P, globals::G) where
         nffs[C].aggregate(T, sim.typeinfos) 
     end
 
-    construct_prettyprinting_functions()
+    construct_prettyprinting_functions(simsymbol)
 
     @eval _init_all_types($sim)
 end

@@ -11,7 +11,7 @@ Base.@kwdef struct NodeFieldFactory
     aggregate
 end
 
-AGENTSTATE_MSG = "The id of the agent does not match the given type in agentstate"
+AGENTSTATE_MSG = "The id of the agent does not match the given type"
 
 #################### Dict
 nff_dict = NodeFieldFactory(

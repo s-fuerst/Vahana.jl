@@ -13,8 +13,8 @@ end
 
 ######################################## Simulation
 
-function construct_prettyprinting_functions()
-    @eval function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
+function construct_prettyprinting_functions(simsymbol)
+    @eval function Base.show(io::IO, ::MIME"text/plain", sim::$simsymbol)
         function show_agent_types(io::IO, sim)
             nodes_types = sim.typeinfos.nodes_types
             if length(nodes_types) >= 1
