@@ -24,7 +24,8 @@ makedocs(sitename="Vahana Documentation",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
                  "Between transitions" => "between.md",
-                 "REPL helpers" => "repl.md"
+                 "REPL helpers" => "repl.md",
+                 "Miscellaneous" => "misc.md"
                  # "All" => "index.md"
              ],
              "Change Log" => "changelog.md"

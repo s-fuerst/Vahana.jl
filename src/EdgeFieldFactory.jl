@@ -170,8 +170,8 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                               pointer(field, s+1), 0, (nr-s) * sizeof($CT))
                     end
                 end
-            else 
-                @eval function init_field!(sim, ::Val{$MT})
+            else
+                @eval function init_field!(sim::$simsymbol, ::Val{$MT})
                     field = sim.$(writefield(T))
                     resize!(field, $singletype_size)
                     ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
@@ -187,7 +187,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                     end
                 end
             else
-                @eval init_field!(sim, ::Val{$MT}) =
+                @eval init_field!(sim::$simsymbol, ::Val{$MT}) =
                     resize!(sim.$(writefield(T)), $singletype_size)
             end
             
@@ -208,7 +208,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
 
     #- _get_agent_container
     if singletype
-        @eval function _get_agent_container(sim, to::AgentID, ::Type{$(Val{T})}, field)
+        @eval function _get_agent_container(sim::$simsymbol, to::AgentID, ::Type{$(Val{T})}, field)
             nr = _to2idx(to, $(Val{T}))
 
             @mayassert begin
@@ -225,7 +225,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             field[nr]
         end
     else
-        @eval function _get_agent_container(sim, to::AgentID, ::Type{$(Val{T})}, field)
+        @eval function _get_agent_container(::$simsymbol, to::AgentID, ::Type{$(Val{T})}, field)
             get!(_construct_container_func($CT), field, to)
         end
     end
@@ -277,13 +277,13 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     end
 
     #- prepare_write! 
-    @eval function prepare_write!(sim, t::Val{$MT})
+    @eval function prepare_write!(sim::$simsymbol, t::Val{$MT})
         sim.$(writefield(T)) = $FT()
         init_field!(sim, t)
     end
 
     #- finish_write!
-    @eval function finish_write!(sim, ::Val{$MT})
+    @eval function finish_write!(sim::$simsymbol, ::Val{$MT})
         sim.$(readfield(T)) = sim.$(writefield(T))
     end
 

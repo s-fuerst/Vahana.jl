@@ -26,18 +26,17 @@
         # Check that edges_to for empty sets return the correct type for the empty vector
         @test edges_to(sim, a2id, Val(ESDict)) |> typeof ==  Vector{Edge{ESDict}}
         @test edges_to(sim, a2id, Val(ESLDict1)) |> typeof == Vector{Edge{ESLDict1}}
-        @test neighborids(sim, avids[1], Val(ESLDict2)) |> typeof == Vector{AgentID}
     end
 
     @testset "neighbors & edgestates" begin
-        @test size(neighborids(sim, avids[1], Val(ESLDict2)), 1) == 1
-        @test size(neighborids(sim, avids[10], Val(ESLDict2)), 1) == 1
+        @test length(neighborids(sim, avids[1], Val(ESLDict2))) == 1
+        @test length(neighborids(sim, avids[10], Val(ESLDict2))) == 1
 
         @test_throws AssertionError neighborids(sim, a2id, Val(ESLDict2))
 
         edges = edges_to(sim, a1id, Val(ESLDict1))
-        @test neighborids(edges)[1] == avids[1]
-        @test neighborids(edges)[10] == avids[10]
+        @test (edges)[1].from == avids[1]
+        @test (edges)[10].from == avids[10]
         edges = neighborids(sim, avids[10], Val(ESLDict2))
         @test edges[1] == avfids[10]
     end

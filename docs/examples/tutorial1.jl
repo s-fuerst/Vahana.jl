@@ -12,17 +12,22 @@ At each step, each buyer has a constant fixed budget $B$ for buying the
 commodities. The quantities are choosen using a Cobb-Douglas
 utility function:
 
-\begin{eqnarray}
-\max_{x,y} && u(x, y) = x^\alpha \cdot y^{1 - \alpha} \\
-\textrm{s.t.:} && x + y \cdot p \leq B \nonumber
-\end{eqnarray}
+
+```math
+\begin{aligned}
+\max_{x,y} u(x, y) &= x^\alpha \cdot y^{1 - \alpha} \\
+\textrm{s.t.:} & x + y \cdot p \leq B
+\end{aligned}
+```
 
 The solution of this optimization is:
 
-\begin{eqnarray} 
-x &=& B \cdot \alpha \label{eqn:demand} \\
-y &=& \frac{B \cdot (1 - \alpha)}{p} \nonumber
-\end{eqnarray}
+```math
+\begin{aligned}
+x &= B \cdot \alpha \\
+y &= \frac{B \cdot (1 - \alpha)}{p} 
+\end{aligned}
+```
 
 For illustrative reasons, we neglect production except for the
 assumption that $x$ and $y$ are joint products, so that the seller
@@ -32,10 +37,13 @@ the sellers are facing different buyers with different preferences
 $\alpha$ and a different budget $B$. So they start with a random
 price and adjust that price at each time step:
 
-\begin{eqnarray}
-&&p_t = \frac{d_y}{d_x} \cdot p_{t-1} \label{eqn:price} \\
-\textrm{where }&& d_x = \sum_{b \in \textrm{buyers}}x_b ,\quad d_y = \sum_{b \in \textrm{buyers}} y_b  \nonumber 
-\end{eqnarray}
+
+```math
+\begin{aligned}
+p_t &= \frac{d_y}{d_x} \cdot p_{t-1} \\
+\textrm{where } d_x &= \sum_{b \in \textrm{buyers}}x_b ,\quad d_y = \sum_{b \in \textrm{buyers}} y_b 
+\end{aligned}
+```
 
 It's easy to see that in the single buyer case, this will lead to $p =
 \frac{1 - \alpha}{\alpha}$ after a single step.

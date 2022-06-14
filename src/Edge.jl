@@ -13,10 +13,9 @@ export neighborids
 An edge between to agents with (optionally) additional state. T can be
 also a struct without any field.
 
-To save memory (and reduce cache misses), the AgentID of the agent at
-the head of the edge is not a field of `Edge` itself, since this
-information is already part of the containers in which the edges are
-stored.
+The AgentID of the agent at the head of the edge is not a field of
+`Edge` itself, since this information is already part of the
+containers in which the edges are stored.
 
 See also [`add_edgetype!`](@ref)
 """
@@ -25,25 +24,13 @@ struct Edge{T}
     state::T
 end
 
-#statetype(::Edge{T}) where T = T
-
 """
-    add_edge!(sim::Simulation, to::AgentID, edge::Edge{T}) where {T <: EdgeState}
-
-TODO DOC
+    add_edge!(sim, to::AgentID, edge::Edge{T}) 
 
 Add a single edge to the simulation `sim`. The edges is directed from
 the agent with ID `edge.from` to the agent with ID `to`.
 
-T must have been previously registered in the simulation by calling
-[`add_edgetype!`](@ref).
-
-See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
-"""
-function add_edge! end
-
-"""
-    add_edge!(sim::Simulation, from::AgentID, to::AgentID, state::T) where {T<:EdgeState}
+    add_edge!(sim, from::AgentID, to::AgentID, state::T) 
 
 Add a single edge to the simulation `sim`. The edge is directed
 from the agent with ID `from` to the agent with ID `to` and has the
@@ -52,21 +39,13 @@ state `state`.
 T must have been previously registered in the simulation by calling
 [`add_edgetype!`](@ref).
 
-In the case, that the EdgeState type T does not have any fields, it
-is also possible to just use T as forth parameter instead of T.
-
 See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
-# function add_edge!(sim, from::AgentID, to::AgentID, ::Type{T}) where T
-#     add_edge!(sim, to, Edge{T}(from, T()))
-# end
+function add_edge! end
 
-# function add_edge!(sim, from::AgentID, to::AgentID, state::T) where T
-#     add_edge!(sim, to, Edge{T}(from, state))
-# end
 
 """
-    add_edges!(sim::Simulation, to::AgentID, edges)
+    add_edges!(sim, to::AgentID, edges)
 
 Add multiple `edges` at once to the simulation `sim`, with all edges
 are directed to `to`.
@@ -90,51 +69,73 @@ function add_edges!(sim, to::AgentID, edges::Edge{T}...) where T
 end
 
 """
-    edges_to(sim::Simulation, id::AgentID, edgetype::Val{T}) -> Vector{Edges{T}}
+    edges_to(sim, id::AgentID, ::Val{T}) 
 
-Returns all incoming edges for agent `id` of network `T`.
+If T has the character :SingleEdge
+    Returns the incoming edge for agent `id` of network `T`.
+else
+    Returns all incoming edges for agent `id` of network `T`.
+
+edges_to is not defined if T has the character :IgnoreFrom or :Stateless
 
 Should only be used inside a transition function and only for the ID specified
 as a transition function parameter. Calling edges_to outside a transition function
 or with other IDs may result in undefined behavior.
 
 See also [`apply_transition!`](@ref), [`neighborstates`](@ref),
-[`edgestates`](@ref) and [`neighborids`](@ref)
+[`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
+and [`neighborids`](@ref)
 """
 function edges_to end
-#function edges_to(sim, to, ::Val) @assert false "Did you forgot the Val() for the type?" end
 
 """
-    neighborids(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{AgentID}
+    neighborids(sim, id::AgentID, ::Val{T}) -> Vector{AgentID}
+
+If T has the character :SingleEdge
+    Returns the id of the agent on the incoming side agent `id` of network `T`.
+else
+    Returns all incoming edges for agent `id` of network `T`.
+
 
 Returns all IDs of the agents at the tail of the edges in `v`. 
 
 Used mainly in combination with [`edges_to`](@ref).
-
-See also [`neighborstates`](@ref) 
 """
-neighborids(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
+function neighborsids end
 
-# TODO write tests, update doc, move to factory?
+#function edges_to(sim, to, ::Val) @assert false "Did you forgot the Val() for the type?" end
 
-# function neighborids(sim, to::AgentID, type)
-#     neighborids(edges_to(sim, to, type))
-# end
+# """
+#     neighborids(v::Vector{Edge}) -> Vector{AgentID}
+
+# Returns all IDs of the agents at the tail of the edges in `v`. 
+
+# Used mainly in combination with [`edges_to`](@ref).
+
+# See also [`neighborstates`](@ref) 
+# """
+# neighborids(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
+
+# # TODO write tests, update doc, move to factory?
+
+# # function neighborids(sim, to::AgentID, type)
+# #     neighborids(edges_to(sim, to, type))
+# # end
 
 
-"""
-    edgestates(v::Vector{Edge{T}}) where {T<:EdgeState} -> Vector{EdgeState}
+# """
+#     edgestates(v::Vector{Edge{T}}) -> Vector{T}
 
-Return all states from a vector of edges. 
+# Return all states from a vector of edges. 
 
-Used mainly in combination with [`edges_to`](@ref).
-"""
-edgestates(v::Vector{Edge{T}}) where T = map(e -> e.state, v)
+# Used mainly in combination with [`edges_to`](@ref).
+# """
+# edgestates(v::Vector{Edge{T}}) where T = map(e -> e.state, v)
 
 """
     neighborstates(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Agent}
 
-Returns all incoming neighbors of agent `id` for the network `T`.
+Returns the state of all incoming neighbors of agent `id` for the network `T`.
 
 Should only be used inside a transition function and only for the ID specified
 as a transition function parameter. Calling agents_to outside a transition function
@@ -155,12 +156,20 @@ function neighborstates end
 neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
     map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
 
+"""
+TODO DOC
+"""
 function neighborstates_flexible end
 
-# TODO DOC
 neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
     map(id -> agentstate_flexible(sim, id), neighborids(sim, id, edgetype))  
 
-
-# TODO DOC
+"""
+TODO DOC
+"""
 function num_neighbors end
+
+"""
+TODO DOC
+"""
+function has_neighbor end
