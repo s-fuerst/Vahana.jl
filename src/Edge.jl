@@ -161,8 +161,10 @@ TODO DOC
 """
 function neighborstates_flexible end
 
-neighborstates_flexible(sim, id::AgentID, edgetype::Val) =
-    map(id -> agentstate_flexible(sim, id), neighborids(sim, id, edgetype))  
+function neighborstates_flexible(sim, id::AgentID, edgetype::Val)
+    nids = neighborids(sim, id, edgetype)
+    isnothing(nids) ? nothing : map(id -> agentstate_flexible(sim, id), nids)  
+end
 
 """
 TODO DOC

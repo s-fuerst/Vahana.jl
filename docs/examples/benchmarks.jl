@@ -12,10 +12,13 @@ end
 statelessEdgeTypes = [ "EdgeS", "EdgeSE", "EdgeST", "EdgeSI", "EdgeSET", "EdgeSEI", "EdgeSTI", "EdgeSETI",
                        "EdgeSTF", "EdgeSETF", "EdgeSTFI", "EdgeSETFI" ]
 
-statefulEdgeTypes = [ "edge", "EdgeD", "EdgeE", "EdgeT", "EdgeI", "EdgeET", "EdgeEI", "EdgeTI", "EdgeETI",
+statefulEdgeTypes = [ "edge", "EdgeE", "EdgeT", "EdgeI", "EdgeET", "EdgeEI", "EdgeTI", "EdgeETI",
                       "EdgeTF", "EdgeETF", "EdgeTFI", "EdgeETFI" ]
 
 allEdgeTypes = vcat(statefulEdgeTypes, statelessEdgeTypes)
+
+#allEdgeTypes = [ "EdgeT", "EdgeTF" ]
+
 
 hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
 
@@ -38,7 +41,7 @@ function prepare(name)
     if hasprop(name, "F")
         mt = ModelTypes() |>
             add_agenttype!(AgentState) |>
-            add_edgetype!(EdgeState, props...; to_agenttype=AgentState, size=1000000)
+            add_edgetype!(EdgeState, props...; to_agenttype=AgentState, size=3)
     else
         mt = ModelTypes() |>
             add_agenttype!(AgentState) |>
@@ -77,28 +80,27 @@ function run_benchmark(mt, name)
 
     edge = Edge(a2, EdgeState(2.0))
 
-    for i=1:100
+    for i=1:10
         add_edge!(sim, a1, a3, EdgeState(i))
     end
 
     addedge = @benchmark add_edge!($sim, $a1, $edge)
 
-    # TODO: singleedges should work and return something
-    if !stateless && !ignorefrom && !singleedge
+    finish_init!(sim)
+
+    if !stateless && !ignorefrom 
         edgeto = @benchmark edges_to($sim, $a3, Val(EdgeState))
     else
         edgeto = nothing
     end
 
-    # TODO: singleedges should work and return something
-    if ignorefrom || singleedge
+    if ignorefrom 
         nids = nothing
     else
         nids = @benchmark neighborids($sim, $a3, Val(EdgeState))
     end
 
-    # TODO: singleedges should work and return something
-    if stateless || singleedge
+    if stateless 
         estates = nothing
     else
         estates = @benchmark edgestates($sim, $a3, Val(EdgeState))
@@ -125,6 +127,7 @@ println("| EdgeType | add_edge! | edges_to | has_neighbor | num_neighbors | neig
 for t in allEdgeTypes
     mt = prepare(t)
     run_benchmark(mt, t)
+    GC.gc()
 end
 
 mutable struct Foo

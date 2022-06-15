@@ -81,9 +81,9 @@ end
 
 @testset "Raster_NodeID" begin
     function sum_on_pos(cell::Position, id, sim)
-        if length(edges_to(sim, id, Val(OnPosition))) > 0
-            Position(mapreduce(c -> c.value, +,
-                               neighborstates_flexible(sim, id, Val(OnPosition))))
+        nstates =neighborstates_flexible(sim, id, Val(OnPosition))
+        if !isnothing(nstates)
+            Position(mapreduce(c -> c.value, +, nstates))
         else
             Position(0)
         end

@@ -63,7 +63,7 @@
             @test e[1] == Edge(a2id, t(1))
             @test e[2] == Edge(a1id, t(2))
             e = edges_to(sim, a2id, Val(t))
-            @test e == Vector()
+            @test e === nothing
         end
         for t in [EdgeE, EdgeET, EdgeETs]
             e = edges_to(sim, a3id, Val(t))
@@ -82,7 +82,7 @@
             @test e[1] == a2id
             @test e[2] == a1id
             e = neighborids(sim, a2id, Val(t))
-            @test e == Vector()
+            @test e === nothing
         end
         for t in [EdgeE, EdgeET, EdgeETs, EdgeSE, EdgeSET, EdgeSETs]
             e = neighborids(sim, a3id, Val(t))
@@ -100,7 +100,7 @@
             @test e[1] == t(1)
             @test e[2] == t(2)
             e = edgestates(sim, a2id, Val(t))
-            @test e == Vector()
+            @test e === nothing
         end
         for t in [EdgeE, EdgeET, EdgeETs, EdgeEI, EdgeETI, EdgeETsI]
             e = edgestates(sim, a3id, Val(t))
@@ -138,19 +138,6 @@
         end
     end
 
-
-    @testset "has_neighbor" begin
-        for t in [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
-                EdgeSTs, EdgeSTsI, EdgeSETsI, EdgeD, EdgeE, EdgeT, EdgeI,
-                EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
-            @test has_neighbor(sim, a1id, Val(t)) == true
-            @test has_neighbor(sim, a2id, Val(t)) == false
-            @test has_neighbor(sim, a3id, Val(t)) == true
-        end
-        for t in [ EdgeET, EdgeETs ]
-            @test_throws AssertionError has_neighbor(sim, a1id, Val(t))
-        end
-    end
 
     @testset "aggregate" begin
         for t in [ EdgeD, EdgeT, EdgeI, EdgeTI, EdgeTs, EdgeTsI ]

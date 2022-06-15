@@ -151,19 +151,12 @@ end
 
 function create_sum_state_neighbors(edgetypeval) 
     function sum_state_neighbors(agent, id, sim)
+        nstates = neighborstates_flexible(sim, id, edgetypeval)
         s = 0
-        for n in neighborstates_flexible(sim, id, edgetypeval)
-            s = s + n.foo
-        end
-        typeof(agent)(s)
-    end
-end
-
-function create_sum_state_neighbors_stateless(edgetypeval) 
-    function sum_state_neighbors_stateless(agent, id, sim)
-        s = 0
-        for n in neighborstates_flexible(sim, id, edgetypeval)
-            s = s + n.foo
+        if !isnothing(nstates)
+            for n in nstates
+                s = s + n.foo
+            end
         end
         typeof(agent)(s)
     end

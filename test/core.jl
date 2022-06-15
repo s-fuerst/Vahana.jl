@@ -21,11 +21,8 @@
         @test size(edges_to(sim, a1id, Val(ESDict)), 1) == 4
         @test size(edges_to(sim, a1id, Val(ESLDict1)), 1) == 10
         # Check that we can call edges_to also for an empty set of neighbors
-        @test size(edges_to(sim, a2id, Val(ESDict)), 1) == 0
-        @test size(edges_to(sim, a2id, Val(ESLDict1)), 1) == 0
-        # Check that edges_to for empty sets return the correct type for the empty vector
-        @test edges_to(sim, a2id, Val(ESDict)) |> typeof ==  Vector{Edge{ESDict}}
-        @test edges_to(sim, a2id, Val(ESLDict1)) |> typeof == Vector{Edge{ESLDict1}}
+        @test edges_to(sim, a2id, Val(ESDict)) === nothing
+        @test edges_to(sim, a2id, Val(ESLDict1)) === nothing
     end
 
     @testset "neighbors & edgestates" begin
