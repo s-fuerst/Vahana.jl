@@ -56,9 +56,10 @@ include("Global.jl")
 include("EdgesIterator.jl")
 
 include("PrettyPrinting.jl")
-
 include("REPL.jl")
 
 include("GraphsSupport.jl")
 include("Raster.jl")
+
+include("Helpers.jl")
 end
