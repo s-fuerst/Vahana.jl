@@ -1,5 +1,24 @@
 # Change Log
 
+## v0.5
+#### new features:
+- Huge performance improvement, thanks in part to Agent and Edge
+  properties, see [Performance Tuning](performance.md) for details.
+
+- Added [`num_neighbors`](@ref) and [`has_neighbor`](@ref).
+  
+### breaking changes:
+- Simulation construction, see [`construct`](@ref) for details.
+
+- If a type is a parameter of a function, it is now always specified
+  as a value type.
+
+- [`agentstate`](@ref) and [`neighborstates`](@ref) need the agent
+  type as additional parameter.
+
+- [`neighborids`](@ref) and [`edgestates`](@ref) no longer accept a
+  vector of edges, they now work directly with the AgentID.
+
 ## v0.2
 #### new features:
 - Support for two dimensional, discrete spatial information (raster).
@@ -11,7 +30,7 @@
   cell nodes to a ordinary matrix.
 
 #### breaking changes:
-- function `add_grid!` renamed to [`add_raster!`](@ref).
+- Function `add_grid!` renamed to [`add_raster!`](@ref).
 
 ## v0.1.3
 
@@ -23,6 +42,6 @@
   neighbors in a transition function.
 - For the REPL: [`show_agent`](@ref) and [`show_random_agent`](@ref).
 #### breaking changes:
-- function `states` renamed to [`edgestates`](@ref)
-- function `agentstate_from` is removed:
+- Function `states` renamed to [`edgestates`](@ref)
+- Function `agentstate_from` is removed:
   Instead of `agentstate_from(sim, edge)` write `agentstate(sim, edge.from)`

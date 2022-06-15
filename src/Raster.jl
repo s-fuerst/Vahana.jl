@@ -20,7 +20,28 @@ The agent types of agents created by the `agent_constructor` must be
 already registered via [`add_agenttype!`](@ref) and vis a vis the edge
 type via [`add_edgetype!`](@ref).
 
+TODO DOC name
+
 Returns a vector with the IDs of the created agents.
+
+```@repl
+using Vahana
+struct RasterNode
+    pos::Tuple{Int64, Int64} 
+end
+struct RasterEdge end
+const sim = ModelTypes() |> 
+    add_agenttype!(RasterNode) |>
+    add_edgetype!(RasterEdge) |>
+    construct("Raster Example", nothing, nothing)
+
+add_raster!(sim, 
+            (10, 8),
+            pos -> RasterNode(pos), # or just RasterNode
+            RasterEdge();
+            name = :grid
+            )
+```            
 """
 function add_raster!(sim,
               dims::Tuple{Int64, Int64},

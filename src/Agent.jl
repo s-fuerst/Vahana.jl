@@ -1,5 +1,23 @@
+# The overall AgentID is composed of three parts:
+#
+# - The TypeID by which the AgentType of the agent can be determined.
+#
+# - The ProcessID, which in the MPI implementation is the rank on which
+#   the agent is currently managed.
+#
+# - The AgentNr which says: "This is the nth agent of type TypeID
+#   created on Process ID" (so on different processes there can be
+#   different agents with the same AgentNr)
+#
+# In this implementation these three values are packed into a single
+# UInt64, but since the construction of the AgentID and the
+# determination of the TypeID, ProcessID and AgentNr from the AgentID
+# is always done using the interface defined below, this could also be
+# changed to a tuple, for example (and this was also tested during
+# development, but the implementation found here has a noticeable
+# performance advantage).
+
 export AgentID, AgentNr
-export Agent
 export agent_id
 export TypeID
 export type_nr
@@ -23,17 +41,6 @@ const AgentID = UInt64
 @assert round(log2(typemax(AgentNr))) >= BITS_AGENTNR
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
     BITS_PROCESS + BITS_AGENTNR 
-
-"""
-    abstract type Agent
-
-The different agent types must be concrete subtypes of
-~Agent~. These structs define the state of an
-edge, but not their (internal) IDs.
-
-See also [`add_agenttype!`](@ref) and [`add_agents!`](@ref)
-"""
-abstract type Agent end
 
 const shift_type = BITS_PROCESS + BITS_AGENTNR
 
@@ -67,7 +74,7 @@ end
 
 
 """
-    add_agent!(sim::Simulation, agent::T) -> AgentID
+    add_agent!(sim, agent::T) -> AgentID
 
 Add a single agent of type T to the simulation `sim`.
 
@@ -88,7 +95,7 @@ See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
 function add_agent! end
 
 """
-    add_agents!(sim::Simulation, agents) -> Vector{AgentID}
+    add_agents!(sim, agents) -> Vector{AgentID}
 
 Add multiple agents at once to the simulation `sim`.
 
@@ -119,26 +126,28 @@ function add_agents!(sim, agents...)
 end
 
 """
-    agentstate(sim::Simulation, id::AgentID) -> T<:Agent
+    agentstate(sim, id::AgentID, Val{T}) -> T
 
-Returns the agent with `id`.
+Returns the state of an agent of type T.
+
+In the case where the type T is not determinable when writing the code
+(e.g., since there is no limit to the edges between agents,
+[`edges_to`](@ref) can return agentID of different agent types),
+[`agentstate_flexible`](@ref) must be used instead.
+
+Warning: if agentstate is called with a Val{T} that does not match the
+type of the agent with `id` and the vahana assertions are disabled via
+[`enable_asserts`](@ref), then it is possible that the state of
+another agent will be returned.
 """
 function agentstate end
 
 """
-TODO DOC
+    agentstate_flexible(sim, id::AgentID)
+
+Returns the state of an agent with the `id`, where the type of the
+agent is determined at runtime. If the type is known at compile time,
+using [`agentstate`](@ref) is preferable as it improves performance.
 """
 agentstate_flexible(sim, id::AgentID) =
      sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
-
-# function finish_write_node!(sim, t)
-#     symt = Symbol(t)
-#     c = sim.typeinfos.nodes[symt]
-    
-#     if c == :Dict || c == :Vector
-#         @eval $sim.$(readfield(symt)) = $sim.$(writefield(symt))
-#     end
-# end
-
-# finish_write_node!(sim) = t -> finish_write_node!(sim, t)
-

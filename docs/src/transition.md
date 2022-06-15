@@ -14,11 +14,16 @@ param
 getglobal
 
 edges_to
+num_neighbors
+has_neighbor
 
 agentstate
-neighborids
-neighborstates
+agentstate_flexible
 
+neighborstates
+neighborstates_flexible
+
+neighborids
 edgestates
 
 raster_nodeid
