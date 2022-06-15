@@ -450,6 +450,7 @@ function construct_edge_functions(T::DataType, attr)
     else
         @eval function _num_edges(sim::Simulation, t::Val{$MT}, write = false)
             field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            # TODO: performance improvement with _countundef?
             length(_removeundef(t)(field))
         end
     end
