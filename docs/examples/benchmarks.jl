@@ -56,7 +56,7 @@ function pt(b)
     if b === nothing
         "-"
     else
-        round(mean(b.times), digits=1) |> string
+        round(minimum(b.times), digits=1) |> string
     end
 end
 
@@ -71,22 +71,26 @@ function run_benchmark(mt, name)
     singleedge = hasprop(name, "E")
     singletype = hasprop(name, "T")
     ignorefrom = hasprop(name, "I")
-    fixsize = hasprop(name, "F")
-
 
     add_edge!(sim, a1, a2, EdgeState(0.1))
-    add_edge!(sim, a1, a2, EdgeState(0.2))
-    add_edge!(sim, a1, a2, EdgeState(0.3))
+    add_edge!(sim, a2, a3, EdgeState(0.2))
+    add_edge!(sim, a3, a1, EdgeState(0.3))
 
-    edge = Edge(a2, EdgeState(2.0))
+    sim_agg = deepcopy(sim)
 
-    for i=1:10
+    
+    for i=1:9
         add_edge!(sim, a1, a3, EdgeState(i))
     end
 
-    addedge = @benchmark add_edge!($sim, $a1, $edge)
-
     finish_init!(sim)
+    finish_init!(sim_agg)
+
+    edge = Edge(a2, EdgeState(2.0))
+
+    sim_add = deepcopy(sim)
+    addedge = @benchmark add_edge!($sim_add, $a1, $edge)
+
 
     if !stateless && !ignorefrom 
         edgeto = @benchmark edges_to($sim, $a3, Val(EdgeState))
@@ -107,6 +111,15 @@ function run_benchmark(mt, name)
     end
 
 
+    if stateless 
+        agg = nothing
+    else
+        println(Vahana._num_edges(sim_agg, Val(EdgeState), false))
+
+        agg = @benchmark aggregate($sim_agg, s -> s.v, +, Val(EdgeState))
+    end
+    
+
     if ignorefrom && stateless || !singleedge || !singletype
         hasn = @benchmark has_neighbor($sim, $a3, Val(EdgeState))
     else
@@ -118,12 +131,12 @@ function run_benchmark(mt, name)
     else
         numn = @benchmark num_neighbors($sim, $a3, Val(EdgeState))
     end
-    println("| $(name) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) |")
+    println("| $(name) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) | $(pt(agg)) |")
 end
 
 # aggregate | edgestates | 
 
-println("| EdgeType | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates |")
+println("| EdgeType | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 for t in allEdgeTypes
     mt = prepare(t)
     run_benchmark(mt, t)

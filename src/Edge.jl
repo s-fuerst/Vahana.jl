@@ -36,7 +36,7 @@ Add a single edge to the simulation `sim`. The edge is directed
 from the agent with ID `from` to the agent with ID `to` and has the
 state `state`. 
 
-T must have been previously registered in the simulation by calling
+`T` must have been previously registered in the simulation by calling
 [`add_edgetype!`](@ref).
 
 See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
@@ -53,9 +53,6 @@ are directed to `to`.
 `edges` can be any iterable set of agents, or an arbitrary number of
 edges as arguments. 
 
-T must have been previously registered in the simulation by calling
-[`add_edgetype!`](@ref).
-
 See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edge!`](@ref)
 """
 function add_edges!(sim, to::AgentID, edges::Vector{Edge{T}}) where T
@@ -69,77 +66,82 @@ function add_edges!(sim, to::AgentID, edges::Edge{T}...) where T
 end
 
 """
-    edges_to(sim, id::AgentID, ::Val{T}) 
+    edges_to(sim, id::AgentID, ::Val{E}) 
 
-If T has the character :SingleEdge
-    Returns the incoming edge for agent `id` of network `T`.
+If `E` has the trait :SingleEdge
+    Returns the incoming edge of type `E` for agent `id`.
 else
-    Returns all incoming edges for agent `id` of network `T`.
+    Returns a vector of all incoming edges of type `E` for agent `id`.
 
-edges_to is not defined if T has the character :IgnoreFrom or :Stateless
+In the case that there is no incoming edge for this agent, `edges_to`
+returns `nothing`.
 
-Should only be used inside a transition function and only for the ID specified
-as a transition function parameter. Calling edges_to outside a transition function
-or with other IDs may result in undefined behavior.
+edges_to is not defined if `E` has the trait :IgnoreFrom or :Stateless.
 
-See also [`apply_transition!`](@ref), [`neighborstates`](@ref),
+See also [`apply_transition!`](@ref), [`neighborids`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
-and [`neighborids`](@ref)
+and [`neighborstates`](@ref)
 """
 function edges_to end
 
 """
-    neighborids(sim, id::AgentID, ::Val{T}) -> Vector{AgentID}
+    neighborids(sim, id::AgentID, ::Val{E}) 
 
-If T has the character :SingleEdge
-    Returns the id of the agent on the incoming side agent `id` of network `T`.
+If `E` has the trait :SingleEdge
+    Returns the id of the agent on the incoming side of the edge of
+    type `E` that is pointing to agent `id` .
 else
-    Returns all incoming edges for agent `id` of network `T`.
+    Returns a vector of all ids of agents on the incoming side of
+    edges of type `E` that are pointing to agent `id` .
 
+In the case that there is no incoming edge for agent `id`, `neighborids`
+returns `nothing`.
 
-Returns all IDs of the agents at the tail of the edges in `v`. 
+`neighborids` is not defined if `E` has the trait :IgnoreFrom.
 
-Used mainly in combination with [`edges_to`](@ref).
+See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+[`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
+and [`neighborstates`](@ref)
 """
-function neighborsids end
-
-#function edges_to(sim, to, ::Val) @assert false "Did you forgot the Val() for the type?" end
-
-# """
-#     neighborids(v::Vector{Edge}) -> Vector{AgentID}
-
-# Returns all IDs of the agents at the tail of the edges in `v`. 
-
-# Used mainly in combination with [`edges_to`](@ref).
-
-# See also [`neighborstates`](@ref) 
-# """
-# neighborids(v::Vector{Edge{T}}) where T = map(e -> e.from, v)
-
-# # TODO write tests, update doc, move to factory?
-
-# # function neighborids(sim, to::AgentID, type)
-# #     neighborids(edges_to(sim, to, type))
-# # end
-
-
-# """
-#     edgestates(v::Vector{Edge{T}}) -> Vector{T}
-
-# Return all states from a vector of edges. 
-
-# Used mainly in combination with [`edges_to`](@ref).
-# """
-# edgestates(v::Vector{Edge{T}}) where T = map(e -> e.state, v)
+function neighborids end
 
 """
-    neighborstates(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Agent}
+    edgestates(sim, id::AgentID, ::Val{E}) 
 
-Returns the state of all incoming neighbors of agent `id` for the network `T`.
+If `E` has the trait :SingleEdge
+    Returns the state of edge of type `E` that is pointing to agent `id` .
+else
+    Returns a vector of all states of edges of type `E` that are pointing to agent `id` .
 
-Should only be used inside a transition function and only for the ID specified
-as a transition function parameter. Calling agents_to outside a transition function
-or with other IDs may result in undefined behavior.
+In the case that there is no incoming edge for agent `id`, `edgestates`
+returns `nothing`.
+
+`edgestates` is not defined if `E` has the trait :Stateless.
+
+See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+[`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
+and [`neighborstates`](@ref)
+"""
+function edgestates end
+
+"""
+    neighborstates(sim::Simulation, id::AgentID, ::Val{E}, ::Val{A}) 
+
+If `E` has the trait :SingleEdge
+    Returns the state of the agent with type `A` on the incoming side
+    of the edge of type `E` that is pointing to agent `id` .
+else
+    Returns a vector of all states of agents with type `A` on the
+    incoming side of edges of type `E` that are pointing to agent `id`
+
+In the case that there is no incoming edge for agent `id`,
+`neighborstates` returns `nothing`.
+
+When the agents on the incoming side of the edges can have different
+types, it is maybe impossible to determine the Val{A}. Use
+[`neighborstates_flexible`](@ref) in this case.
+
+`neighborstates` is not defined if T has the trait :IgnoreFrom.
 
 In a parallel run, this function can trigger communication between
 processes. In the case that the state of ALL agents is not needed in
@@ -148,8 +150,9 @@ using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
 for the agents whose state is actually used in the transition
 function.
 
-See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
-[`neighborids`](@ref)
+See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+[`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
+and [`edgestates`](@ref)
 """
 function neighborstates end
 
@@ -157,7 +160,34 @@ neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
     map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
 
 """
-TODO DOC
+    neighborstates_flexible(sim::Simulation, id::AgentID, ::Val{E}) 
+
+If `E` has the trait :SingleEdge
+    Returns the state of the agent on the incoming side
+    of the edge of type `E` that is pointing to agent `id` .
+else
+    Returns a vector of all states of agents on the
+    incoming side of edges of type `E` that are pointing to agent `id`
+
+In the case that there is no incoming edge for agent `id`,
+`neighborstates_flexible` returns `nothing`.
+
+`neighborstates_flexible` is the type instable version of
+[`neighborstates`](@ref) and should be only used in the case that the
+type of agent can not be determined.
+
+`neighborstates_flexible` is not defined if T has the trait :IgnoreFrom.
+
+In a parallel run, this function can trigger communication between
+processes. In the case that the state of ALL agents is not needed in
+the transition function, the performance can be likely increased by
+using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
+for the agents whose state is actually used in the transition
+function.
+
+See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+[`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
+and [`edgestates`](@ref)
 """
 function neighborstates_flexible end
 
@@ -167,11 +197,29 @@ function neighborstates_flexible(sim, id::AgentID, edgetype::Val)
 end
 
 """
-TODO DOC
+    num_neighbors(sim, id::AgentID, ::Val{E}) 
+
+Returns the number of incoming edges of type `E` for agent `id`.
+
+`num_neighbors` is not defined if T has the trait :SingleEdge
+
+See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+[`neighborids`](@ref), [`neighborstates`](@ref), [`has_neighbor`](@ref)
+and [`edgestates`](@ref)
 """
 function num_neighbors end
 
 """
-TODO DOC
+    has_neighbor(sim, id::AgentID, ::Val{E}) 
+
+Returns true if agent `id` has at least one incoming edge of type `E`.
+
+`has_neighbor` is not defined if T has the :SingleEdge and :SingleType
+traits, with the exception that it has also the :IgnoreFrom and
+:Stateless traits.
+
+See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+[`neighborids`](@ref), [`neighborstates`](@ref), [`num_neighbors`](@ref)
+and [`edgestates`](@ref)
 """
 function has_neighbor end

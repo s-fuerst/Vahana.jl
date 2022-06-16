@@ -141,10 +141,10 @@
 
     @testset "aggregate" begin
         for t in [ EdgeD, EdgeT, EdgeI, EdgeTI, EdgeTs, EdgeTsI ]
-            @test aggregate(sim, Val(t), a -> a.foo, +) == 6
+            @test aggregate(sim, a -> a.foo, +, Val(t)) == 6
         end
         for t in [ EdgeE, EdgeET, EdgeEI, EdgeETI, EdgeETs, EdgeETsI ]
-            @test aggregate(sim, Val(t), a -> a.foo, +) == 4
+            @test aggregate(sim, a -> a.foo, +, Val(t)) == 4
         end
         for t in  [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
                  EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]

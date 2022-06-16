@@ -60,7 +60,7 @@ nff_dict = NodeFieldFactory(
     end,
 
     aggregate = (T, _) -> begin
-        @eval function aggregate(sim, ::Val{$T}, f, op; kwargs...)
+        @eval function aggregate(sim, f, op, ::Val{$T}; kwargs...)
             mapreduce(f, op, values(sim.$(readfield(T))); kwargs...)
         end
     end, 
@@ -133,7 +133,7 @@ nff_vec = NodeFieldFactory(
     end,
 
     aggregate = (T, _) -> begin
-        @eval function aggregate(sim, ::Val{$T}, f, op; kwargs...)
+        @eval function aggregate(sim, f, op, ::Val{$T}; kwargs...)
             mapreduce(f, op, sim.$(readfield(T)); kwargs...)
         end
     end, 

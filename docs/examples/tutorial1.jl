@@ -364,7 +364,7 @@ show_agents(sim3, Val(Seller))
 
 # E.g. to calculate the excess demand we write
 
-aggregate(sim2, Val(Bought), b -> b.x - b.y, +)
+aggregate(sim2, b -> b.x - b.y, +, Val(Bought))
 
 # where the second parameter specifies for which agent or edge type the
 # aggregation should be performed, and the anonymous function in the
@@ -376,8 +376,8 @@ aggregate(sim2, Val(Bought), b -> b.x - b.y, +)
 # To calculate the average price we define a helper function
 
 function calc_average_price(sim)
-    m = aggregate(sim, Val(Seller), s -> s.p * s.d_y, +)
-    q = aggregate(sim, Val(Seller), s -> s.d_y, +)
+    m = aggregate(sim, s -> s.p * s.d_y, +, Val(Seller))
+    q = aggregate(sim, s -> s.d_y, +, Val(Seller))
     m / q
 end
 
@@ -387,7 +387,7 @@ calc_average_price(sim3)
 
 for _ in 1:10
     apply_transition!(sim, calc_demand, [ Buyer ], [ KnownSellers], [ Bought ])
-    pushglobal!(sim, :x_minus_y, aggregate(sim, Val(Bought), b -> b.x - b.y, +))
+    pushglobal!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Val(Bought)))
     apply_transition!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
     pushglobal!(sim, :p, calc_average_price(sim))
 end

@@ -192,14 +192,23 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         end
     end
 
-    #- _can_add
+    #- _can_add is used to check for some singleedge cases, if it's allowed
+    # call add_edge! for the agent with id `to`. This should be only done maximal
+    # one time, except for the ignorefrom && stateless case, in which we only
+    # support the has_neighbor function, and as true && true = true, we allow multiple
+    # add_edge calls in this case. For the singletype case we can not
+    # check if add_edge! was already called reliably.
     if singleedge && !singletype && !(ignorefrom && stateless)
         @eval function _can_add(field, to::AgentID, ::Type{$(Val{T})})
             !haskey(field, to)
         end
     end
 
-    #- _get_agent_container
+    #- _get_agent_container / _get_or_create_agent_container unifies
+    # the access to the field, incl. possible needed steps like
+    # resizing the underlying vector. The _get_ version return `nothing`
+    # in the case, that there is no container for this agent, the _get_or_create_
+    # version constructs an empty container and returns this one.
     if singletype
         @eval function _get_agent_container(sim::$simsymbol,
                                      to::AgentID,
@@ -310,9 +319,9 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     end
 
     # Rules for the edge functions:
-    # Stateless => !aggregate, !edges_to, !neighbor_states
-    # SEdge => !num_neighbors
-    # Ignore => !edges_to, !neighbor_ids
+    # stateless => !aggregate, !edges_to, !edgestates
+    # singledge => !num_neighbors
+    # ignorefrom => !edges_to, !neighborids
 
     #- edges_to
     if !stateless && !ignorefrom
@@ -442,6 +451,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #     end
     # end
 
+    #- aggregate incl. helper functions
 
     if singletype
         @eval _removeundef(::Val{$MT}) = edges ->
@@ -481,7 +491,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             length(_removeundef(t)(field))
         end
     end
-    
+
     #- aggregate
     if !stateless
         if ignorefrom
@@ -490,7 +500,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             @eval _edgestates(::Val{$MT}) = edges -> map(e -> e.state, edges)
         end
         if singleedge
-            @eval function aggregate(sim::$simsymbol, t::Val{$MT}, f, op; kwargs...)
+            @eval function aggregate(sim::$simsymbol, f, op, t::Val{$MT} ; kwargs...)
                 estates = sim.$(readfield(T)) |>
                     values |>
                     _removeundef(t) |>
@@ -499,12 +509,12 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                 mapreduce(f, op, estates; kwargs...)
             end
         else
-            @eval function aggregate(sim::$simsymbol, t::Val{$MT}, f, op; kwargs...)
+            @eval function aggregate(sim::$simsymbol, f, op, t::Val{$MT}; kwargs...)
                 estates = sim.$(readfield(T)) |>
                     values |>
                     _removeundef(t) |>
                     Iterators.flatten |>
-                    collect |>
+                    collect  |>
                     _edgestates(t)
                 mapreduce(f, op, estates; kwargs...)
             end
@@ -516,6 +526,51 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             """
         end
     end
+    
+    # if !stateless
+    #     if ignorefrom
+    #         @eval _edgestates(::Val{$MT}) = edges -> edges
+    #     else
+    #         @eval _edgestates(::Val{$MT}) = edges -> map(e -> e.state, edges)
+    #     end
+    #     if singleedge
+    #         @eval function aggregate(sim::$simsymbol, f, op, t::Val{$MT}; kwargs...)
+    #             estates = sim.$(readfield(T)) |>
+    #                 values |>
+    #                 _removeundef(t) |>
+    #                 collect |>
+    #                 _edgestates(t)
+    #             mapreduce(f, op, estates; kwargs...)
+    #         end
+    #     else
+    #         @eval function aggregate(sim::$simsymbol, f, op, t::Val{$MT}; kwargs...)
+    #             estates = sim.$(readfield(T)) |>
+    #                 values |>
+    #                 _removeundef(t) |>
+    #                 Iterators.flatten |>
+    #                 collect |>
+    #                 _edgestates(t)
+    #             mapreduce(f, op, estates; kwargs...)
+
+    #             # estates = $CT()
+    #             # println(sim.$(readfield(T)))
+    #             # for k in keys(sim.$(readfield(T)))
+    #             #     println(k)
+    #             #     for v in (sim.$(readfield(T))[k] |> _removeundef(t))
+    #             #         push!(estates, v)
+    #             #     end
+    #             # end
+    #             # println(estates)
+    #             # mapreduce(f, op, estates |> _edgestates(t); kwargs ...)
+    #         end
+    #     end
+    # else
+    #     @eval function aggregate(::$simsymbol, f, op, t::Val{$MT}; kwargs...)
+    #         @assert false """
+    #         aggregate is not defined for the property combination of $t
+    #         """
+    #     end
+    # end
 end    
 
 

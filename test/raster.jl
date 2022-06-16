@@ -17,11 +17,11 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 25
 
     raster = calc_raster(sim, :grid, c -> c.active, Val(GridA))
     @test raster[1,3] == false
@@ -38,11 +38,16 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 25
+    # @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
+    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
+    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
 
     sim = construct(model, "Test Grid top center", nothing, nothing)
 
@@ -54,11 +59,16 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 25
+    # @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
+    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
+    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
 
     sim = construct(model, "Test Grid top left", nothing, nothing)
 
@@ -70,11 +80,11 @@
 
     finish_init!(sim)
 
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 1
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 1
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 9
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 9
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
-    @test aggregate(sim, Val(GridA), a -> a.active, +) == 25
+    @test aggregate(sim, a -> a.active, +, Val(GridA)) == 25
     
     
 end
