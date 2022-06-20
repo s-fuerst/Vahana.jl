@@ -50,10 +50,10 @@ function transition(c::Cell, id, sim)
 end
 
 const model = ModelTypes() |>    
-    add_agenttype!(Cell) |> 
+    add_agenttype!(Cell, :Vector; size = 40000) |> 
 #    add_agenttype!(Cell) |> 
-    add_edgetype!(Neighbor, :Stateless) |>
-    add_edgetype!(ActiveNeighbor, :Stateless)
+    add_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=40000) |>
+    add_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=40000)
 
 
 function new_sim(params)
@@ -88,5 +88,8 @@ init!(sim)
 
 num_edges(sim, Val(Neighbor))
 # step!(sim)
+
+@benchmark apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+
 
 #@profilehtml for i in 1:20 step!(sim) end

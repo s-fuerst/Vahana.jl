@@ -238,7 +238,6 @@ function show_agent(sim,
     end
 end
 
-function num_edges(sim, ::Val{T}) where {T}
-    read = getproperty(sim, readfield(Symbol(T)))
-    _num_edges(read)
+function num_edges(sim, t::Val{T}) where {T}
+    _num_edges(sim, t)
 end

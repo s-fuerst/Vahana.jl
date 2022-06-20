@@ -52,13 +52,6 @@ function prepare(name)
     mt
 end
 
-function pt(b)
-    if b === nothing
-        "-"
-    else
-        round(minimum(b.times), digits=1) |> string
-    end
-end
 
 function run_benchmark(mt, name)
     sim = construct(mt, name, nothing, nothing)
@@ -71,6 +64,7 @@ function run_benchmark(mt, name)
     singleedge = hasprop(name, "E")
     singletype = hasprop(name, "T")
     ignorefrom = hasprop(name, "I")
+    fixedsize = hasprop(name, "F")
 
     add_edge!(sim, a1, a2, EdgeState(0.1))
     add_edge!(sim, a2, a3, EdgeState(0.2))
@@ -114,8 +108,6 @@ function run_benchmark(mt, name)
     if stateless 
         agg = nothing
     else
-        println(Vahana._num_edges(sim_agg, Val(EdgeState), false))
-
         agg = @benchmark aggregate($sim_agg, s -> s.v, +, Val(EdgeState))
     end
     
@@ -131,12 +123,24 @@ function run_benchmark(mt, name)
     else
         numn = @benchmark num_neighbors($sim, $a3, Val(EdgeState))
     end
-    println("| $(name) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) | $(pt(agg)) |")
+
+    x(f) = f ? "x" : " "
+
+    function pt(b)
+        if b === nothing
+            "-"
+        else
+            (round(minimum(b.times), digits=1) |> string) * "/" * (Int32(round(mean(b.times))) |> string)
+        end
+    end
+
+    
+    println("| $(x(stateless)) | $(x(singleedge)) | $(x(singletype))  | $(x(ignorefrom)) | $(x(fixedsize)) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) | $(pt(agg)) |")
 end
 
 # aggregate | edgestates | 
 
-println("| EdgeType | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
+println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 for t in allEdgeTypes
     mt = prepare(t)
     run_benchmark(mt, t)
