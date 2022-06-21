@@ -1,5 +1,69 @@
+# A for Agent, one type per difference container type
+struct ADict     foo::Int64 end
+struct AVec      foo::Int64 end
+struct AVecFixed foo::Int64 end
+struct ASLDict end
+
+# ES = EdgeState and ESL = EdgeStateless
+struct ESDict  foo::Int64 end
+struct ESLDict1 end
+struct ESLDict2 end
+
+model = ModelTypes() |>
+    add_agenttype!(ADict) |>
+    add_agenttype!(AVec, :Vector) |>
+    add_agenttype!(AVecFixed, :Vector; size = 10) |>
+    add_agenttype!(ASLDict) |>
+    add_edgetype!(ESDict) |>
+    add_edgetype!(ESLDict1) |> 
+    add_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |> # to = AVec 
+    construct_model("Core")
+
+function add_example_network!(sim)
+    # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
+    a1id = add_agent!(sim, ADict(1))
+    a2id, a3id = add_agents!(sim, ADict(2), ADict(3))
+    avids = add_agents!(sim, [ AVec(i) for i in 1:10])
+    avfids = add_agents!(sim, [ AVecFixed(i) for i in 1:10])
+
+    # we construct the following network for ESDict:
+    # a2 & a3 & avids[1] & avfids[10] -> a1
+    add_edge!(sim, a2id, a1id, ESDict(1))
+    add_edge!(sim, a3id, a1id, ESDict(2))
+    add_edge!(sim, avids[1], a1id, ESDict(3))
+    add_edge!(sim, avfids[10], a1id, ESDict(4))
+    # we construct the following network for ESLVec:
+    # avids -> a1
+    add_edges!(sim, a1id, [ Edge(avids[i], ESLDict1()) for i in 1:10 ])
+    # we construct the following network for ESLVecFixed:
+    # avfids[i] -> avids[i]
+    for i in 1:10
+        add_edge!(sim, avfids[i], avids[i], ESLDict2())
+    end
+
+    (a1id, a2id, a3id, avids, avfids)
+end
+
+function create_sum_state_neighbors(edgetypeval) 
+    function sum_state_neighbors(agent, id, sim)
+        nstates = neighborstates_flexible(sim, id, edgetypeval)
+        s = 0
+        if !isnothing(nstates)
+            for n in nstates
+                s = s + n.foo
+            end
+        end
+        typeof(agent)(s)
+    end
+end
+
+function nothing_transition(agent, id, sim)
+    nothing
+end
+
+
 @testset "Core" begin
-    sim = construct(model, "Test", nothing, nothing)
+    sim = new_simulation(model, nothing, nothing)
     
     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
     
@@ -117,4 +181,15 @@
 end
 
 
+@testset "Aggregate" begin
+    sim = new_simulation(model, nothing, nothing; name = "Aggregate")
+
+    (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
+    
+    finish_init!(sim)
+    
+    @test aggregate(sim, a -> a.foo, +, ADict) == 6
+    @test aggregate(sim, a -> a.foo, +, AVec) == sum(1:10)
+    @test aggregate(sim, e -> e.foo, +, ESDict) == 10
+end
 

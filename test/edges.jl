@@ -1,3 +1,74 @@
+# We need a lot of edgetypes to test all the edge property combinations
+# The properties are
+# (S) Stateless
+# (E) SingleEdge
+# (T) SingleAgentType, which can also have a size information (Ts)
+# (I) IgnoreFrom
+# so EdgeET means an Edge(State) with the SingleEdge and SingleAgentType property
+
+struct Agent foo::Int64 end
+
+struct EdgeD foo::Int64 end # D for default (no property is set)
+struct EdgeS end
+struct EdgeE foo::Int64 end
+struct EdgeT foo::Int64 end
+struct EdgeI foo::Int64 end
+struct EdgeSE end
+struct EdgeST end
+struct EdgeSI end
+struct EdgeET foo::Int64 end
+struct EdgeEI foo::Int64 end
+struct EdgeTI foo::Int64 end
+struct EdgeSET end
+struct EdgeSEI end
+struct EdgeSTI end
+struct EdgeETI foo::Int64 end
+struct EdgeSETI end
+
+struct EdgeTs foo::Int64 end
+struct EdgeETs foo::Int64 end
+struct EdgeTsI foo::Int64 end
+struct EdgeETsI foo::Int64 end
+
+struct EdgeSTs end
+struct EdgeSETs end
+struct EdgeSTsI end
+struct EdgeSETsI end
+
+statelessEdgeTypes = [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
+                       EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
+
+statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeETI,
+                      EdgeTs, EdgeETs, EdgeTsI, EdgeETsI ]
+
+model_edges = ModelTypes() |>
+    add_agenttype!(Agent) |>
+    add_edgetype!(EdgeD) |>
+    add_edgetype!(EdgeS, :Stateless) |>
+    add_edgetype!(EdgeE, :SingleEdge) |>
+    add_edgetype!(EdgeT, :SingleAgentType; to_agenttype = Agent) |>
+    add_edgetype!(EdgeI, :IgnoreFrom) |>
+    add_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
+    add_edgetype!(EdgeST, :Stateless, :SingleAgentType; to_agenttype = Agent) |>
+    add_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
+    add_edgetype!(EdgeET, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
+    add_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
+    add_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    add_edgetype!(EdgeSET, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
+    add_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    add_edgetype!(EdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    add_edgetype!(EdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    add_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    add_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeETs, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeETsI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeSETs, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    add_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    construct_model("edges")
+
 # All types (for copy, paste and adjust for the individual tests)
 #
 # [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeETI,
@@ -5,11 +76,13 @@
 #   EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
 #   EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
 
+hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
+
 
 @testset "Edges" begin
-    sim = construct(model, "Test", nothing, nothing)
+    sim = new_simulation(model_edges, nothing, nothing)
     
-    (a1id, a2id, a3id) = add_agents!(sim, AVec(1), AVec(2), AVec(3))
+    (a1id, a2id, a3id) = add_agents!(sim, Agent(1), Agent(2), Agent(3))
 
     # Lets add some edges for each of the different property combinations
     # For each combination we will have

@@ -1,4 +1,5 @@
-export construct
+export construct_model
+export new_simulation
 export finish_init!
 #export typeid
 export apply_transition, apply_transition!
@@ -6,6 +7,86 @@ export param
 export aggregate
 
 const MAX_TYPES = typemax(TypeID) 
+
+function construct_model(types::ModelTypes, name::String) 
+    simsymbol = Symbol(name)
+    
+    edgefields = [
+        map(["_read", "_write"]) do RW
+            Expr(Symbol("="),
+                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[T]))),
+                 :($(edgefield_constructor(T, types.edges_attr[T]))))
+        end 
+        for T in types.edges_types ] |> Iterators.flatten |> collect
+
+    nodefields = [
+        map(["_read", "_write"]) do RW
+            Expr(Symbol("="),
+                 :($(Symbol(T, RW))::$(nffs[C].type(T, types))),
+                 :($(nffs[C].constructor(T, types))))
+        end 
+        for (T,C) in types.nodes ] |> Iterators.flatten |> collect
+
+    nodeids = [
+        Expr(Symbol("="),
+             :($(Symbol(T, "_nextid"))::AgentNr),
+             :(AgentNr(1)))
+        for (T,_) in types.nodes ]
+
+    fields = Expr(:block,
+                  :(modelname::String),
+                  :(name::String),
+                  :(params::P),
+                  :(globals::G),
+                  :(typeinfos::ModelTypes),
+                  :(rasters::Dict{Symbol, Array{AgentID,2}}),
+                  :(nodes_id2read::Vector{Function}),
+                  :(nodes_id2write::Vector{Function}),
+                  :(initialized::Bool),
+                  edgefields...,
+                  nodefields...,
+                  nodeids...)
+    
+    # the true in the second arg makes the struct mutable
+    strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)
+
+    
+    kwdefqn = QuoteNode(Symbol("@kwdef"))
+    # nothing in third argument is for the expected LineNumberNode
+    # see also https://github.com/JuliaLang/julia/issues/43976
+    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
+
+    # sim = @eval $simsymbol(name = $name,
+    #                        params = $params,
+    #                        globals = $globals,
+    #                        typeinfos = $types,
+    #                        rasters = Dict{Symbol, Array{AgentID,2}}(),
+    #                        initialized = false,
+    #                        nodes_id2read = Vector{Function}(undef, MAX_TYPES),
+    #                        nodes_id2write = Vector{Function}(undef, MAX_TYPES)
+    #                        )
+
+    # Construct all type specific functions for the edge types
+    for T in types.edges_types
+        construct_edge_functions(T, types.edges_attr[T], simsymbol)
+    end
+
+    # Construct all type specific functions for the agent types
+    for (T, C) in types.nodes
+        nffs[C].init_field(T, types) 
+        nffs[C].add_agent(T, types)  
+        nffs[C].agentstate(T, types) 
+        nffs[C].prepare_write(T, types) 
+        nffs[C].transition(T, types) 
+        nffs[C].finish_write(T, types) 
+        nffs[C].aggregate(T, types) 
+    end
+
+    construct_prettyprinting_functions(simsymbol)
+
+    Model(types, name)
+end
+
 
 """
     construct(types::ModelTypes, name::String, params, globals)
@@ -35,85 +116,24 @@ See also [`ModelTypes`](@ref), [`param`](@ref),
 [`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
 and [`finish_init!`](@ref)
 """
-function construct(types::ModelTypes, name::String, params::P, globals::G) where {P, G}
-    simsymbol = Symbol(name)
-    
-    edgefields = [
-        map(["_read", "_write"]) do RW
-            Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[T]))),
-                 :($(edgefield_constructor(T, types.edges_attr[T]))))
-        end 
-        for T in types.edges_types ] |> Iterators.flatten |> collect
+# function construct(types::ModelTypes, name::String, params::P, globals::G) where {P, G}
+#     construct_model(types, name) |>
+#         new_simulation(params, globals)
+# end
 
-    nodefields = [
-        map(["_read", "_write"]) do RW
-            Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(nffs[C].type(T, types))),
-                 :($(nffs[C].constructor(T, types))))
-        end 
-        for (T,C) in types.nodes ] |> Iterators.flatten |> collect
+function new_simulation(model::Model, params::P, globals::G; name = model.name) where {P, G}
+    sim = @eval $(Symbol(model.name))(
+        modelname = $(model.name),
+        name = $name,
+        params = $params,
+        globals = $globals,
+        typeinfos = $(model.types),
+        rasters = Dict{Symbol, Array{AgentID,2}}(),
+        initialized = false,
+        nodes_id2read = Vector{Function}(undef, MAX_TYPES),
+        nodes_id2write = Vector{Function}(undef, MAX_TYPES)
+    )
 
-    nodeids = [
-        Expr(Symbol("="),
-             :($(Symbol(T, "_nextid"))::AgentNr),
-             :(AgentNr(1)))
-        for (T,_) in types.nodes ]
-
-    fields = Expr(:block,
-                  :(name::String),
-                  :(params::P),
-                  :(globals::G),
-                  :(typeinfos::ModelTypes),
-                  :(rasters::Dict{Symbol, Array{AgentID,2}}),
-                  :(nodes_id2read::Vector{Function}),
-                  :(nodes_id2write::Vector{Function}),
-                  :(initialized::Bool),
-                  edgefields...,
-                  nodefields...,
-                  nodeids...)
-    
-    # the true in the second arg makes the struct mutable
-    strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)
-
-    
-    kwdefqn = QuoteNode(Symbol("@kwdef"))
-    # nothing in third argument is for the expected LineNumberNode
-    # see also https://github.com/JuliaLang/julia/issues/43976
-    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
-
-    sim = @eval $simsymbol(name = $name,
-                           params = $params,
-                           globals = $globals,
-                           typeinfos = $types,
-                           rasters = Dict{Symbol, Array{AgentID,2}}(),
-                           initialized = false,
-                           nodes_id2read = Vector{Function}(undef, MAX_TYPES),
-                           nodes_id2write = Vector{Function}(undef, MAX_TYPES)
-                           )
-
-    # Construct all type specific functions for the edge types
-    for T in sim.typeinfos.edges_types
-        construct_edge_functions(T, types.edges_attr[T], simsymbol)
-    end
-
-    # Construct all type specific functions for the agent types
-    for (T, C) in sim.typeinfos.nodes
-        nffs[C].init_field(T, sim.typeinfos) 
-        nffs[C].add_agent(T, sim.typeinfos)  
-        nffs[C].agentstate(T, sim.typeinfos) 
-        nffs[C].prepare_write(T, sim.typeinfos) 
-        nffs[C].transition(T, sim.typeinfos) 
-        nffs[C].finish_write(T, sim.typeinfos) 
-        nffs[C].aggregate(T, sim.typeinfos) 
-    end
-
-    construct_prettyprinting_functions(simsymbol)
-
-    @eval _init_all_types($sim)
-end
-
-function _init_all_types(sim)
     for T in sim.typeinfos.edges_types
         init_field!(sim, T)
     end
@@ -129,9 +149,14 @@ function _init_all_types(sim)
     sim
 end
 
-construct(name::String, params::P, globals::G) where {P, G} =
-    types -> construct(types, name, params, globals)
-    
+construct_model(name::String) = types -> construct_model(types, name)
+
+new_simulation(params::P, globals::G; kwargs...) where {P, G} =
+    model -> new_simulation(model, params, globals; kwargs...)
+
+# construct(name::String, params::P, globals::G) where {P, G} =
+#     types -> construct(types, name, params, globals)
+
 
 """
     finish_init!(sim::Simulation)
@@ -227,7 +252,7 @@ function apply_transition!(sim,
     end
 
     foreach(finish_write!(sim), writeable)
-#    foreach(finish_write_edge!(sim), writeable_edges)
+    #    foreach(finish_write_edge!(sim), writeable_edges)
     sim
 end
 

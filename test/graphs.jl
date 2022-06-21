@@ -1,4 +1,17 @@
-import Graphs
+import Graphs.SimpleGraphs
+
+struct GraphA 
+    id::Int64
+    sum::Int64
+end
+
+struct GraphE end
+
+
+model_graph = ModelTypes() |>
+    add_agenttype!(GraphA) |>
+    add_edgetype!(GraphE) |>
+    construct_model("graph")
 
 @testset "Graphs" begin
     # calculate the sum of all ids
@@ -8,12 +21,12 @@ import Graphs
     end
 
 
-    sim = construct(model, "Test Graphs", nothing, nothing)
+    sim = new_simulation(model_graph, nothing, nothing)
 
     nagents = 4
     
     add_graph!(sim,
-               Graphs.SimpleGraphs.complete_graph(nagents),
+               SimpleGraphs.complete_graph(nagents),
                i -> GraphA(i, 0),
                _ -> GraphE()
                )

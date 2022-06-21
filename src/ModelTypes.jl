@@ -1,6 +1,8 @@
 export ModelTypes
 export add_agenttype!, add_edgetype!
 
+    
+
 """
 # TODO DOC
 """
@@ -12,6 +14,11 @@ Base.@kwdef struct ModelTypes
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, typemax(TypeID))
+end
+
+struct Model
+    types::ModelTypes
+    name::String
 end
 
 """

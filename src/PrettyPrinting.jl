@@ -54,7 +54,10 @@ function construct_prettyprinting_functions(simsymbol)
             end
         end
         
-        printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
+        printstyled(io, "Model Name:", sim.modelname; color = :magenta)
+        if sim.modelname != sim.name
+            printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
+        end
         show_struct(io, sim.params, "Parameter")
         show_agent_types(io, sim)
         show_edge_types(io, sim)

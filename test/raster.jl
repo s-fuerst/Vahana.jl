@@ -1,3 +1,28 @@
+struct GridA 
+    pos::Tuple{Int64, Int64}
+    active::Bool
+end
+
+struct GridE end
+
+struct Position 
+    sum::Int64
+end
+
+struct MovingAgent 
+    value::Int64
+end
+
+struct OnPosition  end
+
+raster_model = ModelTypes() |>
+    add_agenttype!(GridA) |>
+    add_edgetype!(GridE) |>
+    add_agenttype!(Position) |>
+    add_agenttype!(MovingAgent) |>
+    add_edgetype!(OnPosition) |>
+    construct_model("Raster_Test")
+
 
 @testset "Raster" begin
     # calculate the sum of all ids
@@ -6,7 +31,7 @@
             mapreduce(a -> a.active, |, neighborstates(sim, id, GridE, GridA)))
     end
 
-    sim = construct(model, "Test Grid right botton", nothing, nothing)
+    sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
                 (10,8),
@@ -28,7 +53,7 @@
     @test raster[1,1] == true
     @test raster[4,4] == false
     
-    sim = construct(model, "Test Grid center", nothing, nothing)
+    sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
                 (7,9),
@@ -49,7 +74,7 @@
     # apply_transition!(sim, diffuse, [GridA], [GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 25
 
-    sim = construct(model, "Test Grid top center", nothing, nothing)
+    sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
                 (17,6),
@@ -70,7 +95,7 @@
     # apply_transition!(sim, diffuse, [GridA], [GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 25
 
-    sim = construct(model, "Test Grid top left", nothing, nothing)
+    sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
                 (6,7),
@@ -105,7 +130,7 @@ end
         MovingAgent(value)
     end
 
-    sim = construct(model, "Raster NodeID", nothing, nothing)
+    sim = new_simulation(raster_model, "Raster NodeID", nothing)
 
     add_raster!(sim,
                 (10,10),
