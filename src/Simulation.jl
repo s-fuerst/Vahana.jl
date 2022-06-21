@@ -115,11 +115,11 @@ end
 
 function _init_all_types(sim)
     for T in sim.typeinfos.edges_types
-        init_field!(sim, Val(T))
+        init_field!(sim, T)
     end
 
     for T in sim.typeinfos.nodes_types
-        init_field!(sim, Val(T))
+        init_field!(sim, T)
         sim.nodes_id2read[sim.typeinfos.nodes_type2id[T]] =
             @eval sim -> sim.$(readfield(Symbol(T)))
         sim.nodes_id2write[sim.typeinfos.nodes_type2id[T]] =
@@ -180,9 +180,9 @@ function maybeadd(_,
     nothing
 end
 
-prepare_write!(sim) = t -> prepare_write!(sim, Val(t))
+prepare_write!(sim) = t -> prepare_write!(sim, t)
 
-finish_write!(sim) = t -> finish_write!(sim, Val(t))
+finish_write!(sim) = t -> finish_write!(sim, t)
 
 
 """
@@ -222,8 +222,8 @@ function apply_transition!(sim,
 
     foreach(prepare_write!(sim), writeable)
 
-    for c in compute
-        transition!(sim, func, Val(c))
+    for C in compute
+        transition!(sim, func, C)
     end
 
     foreach(finish_write!(sim), writeable)
@@ -269,27 +269,3 @@ passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
 """
 function aggregate end
-#function aggregate(sim, ::Val{T}, f, op; kwargs...) where T end
-
-
-# function aggregate(sim, ::Val{T}, f, op;
-#             kwargs...) where T
-#     sim.nodes_id2read[sim.typeinfos.nodes_type2id[T]](sim) |>
-    
-#     agents = sim.agents[sim.agent_typeids[T]] |>
-#         read_container |>
-#         values
-#     mapreduce(f, op, agents; kwargs...)
-# end
-
-# function aggregate(sim, ::Type{T}, f, op;
-#             kwargs...) where T
-#     edges = sim.edges[T] |>
-#         read_container |>
-#         values |>
-#         Iterators.flatten |>
-#         collect |>
-#         edgestates
-#     mapreduce(f, op, edges; kwargs...)
-# end
-

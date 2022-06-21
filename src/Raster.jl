@@ -90,7 +90,7 @@ Returns a matrix with those values.
 
 See also [`add_raster!`](@ref)
 """
-function calc_raster(sim, name::Symbol, f, t::Val{T}) where T
+function calc_raster(sim, name::Symbol, f, t::Type{T}) where T
     map(id -> agentstate(sim, id, t) |> f, sim.rasters[name])
 end
 
@@ -125,7 +125,7 @@ function move_to!(sim,
            name::Symbol,
            id::AgentID,
            pos,
-           ::Val{T}) where T
+           ::Type{T}) where T
     posid = raster_nodeid(sim, name, pos)
     add_edge!(sim, id, posid, T())
     add_edge!(sim, posid, id, T())

@@ -126,7 +126,7 @@ function add_agents!(sim, agents...)
 end
 
 """
-    agentstate(sim, id::AgentID, Val{T}) -> T
+    agentstate(sim, id::AgentID, Type{T}) -> T
 
 Returns the state of an agent of type T.
 
@@ -135,7 +135,7 @@ In the case where the type T is not determinable when writing the code
 [`edges_to`](@ref) can return agentID of different agent types),
 [`agentstate_flexible`](@ref) must be used instead.
 
-Warning: if agentstate is called with a Val{T} that does not match the
+Warning: if agentstate is called with a Type{T} that does not match the
 type of the agent with `id` and the vahana assertions are disabled via
 [`enable_asserts`](@ref), then it is possible that the state of
 another agent will be returned.

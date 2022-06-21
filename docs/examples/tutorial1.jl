@@ -230,7 +230,7 @@ finish_init!(sim)
 # agents and edges. But again, we can only see the partition that is
 # assigned to the process.
 
-show_agents(sim, Val(Buyer))
+show_agents(sim, Buyer)
 
 # # Transition functions
 
@@ -271,8 +271,8 @@ show_agents(sim, Val(Buyer))
 # got as function parameter.
 
 function calc_demand(b::Buyer, id, sim)
-    seller_edge = rand(edges_to(sim, id, Val(KnownSellers)))
-    s = agentstate(sim, seller_edge.from, Val(Seller))
+    seller_edge = rand(edges_to(sim, id, KnownSellers))
+    s = agentstate(sim, seller_edge.from, Seller)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
     add_edge!(sim, id, seller_edge.from, Bought(x, y))
@@ -296,7 +296,7 @@ end
 # price as shown in equation (\ref{eqn:price}).
 
 function calc_price(s::Seller, id, sim)
-    edges = edgestates(sim, id, Val(Bought))
+    edges = edgestates(sim, id, Bought)
     if isnothing(edges) 
         return s
     end
@@ -347,11 +347,11 @@ sim3 = apply_transition(sim2, calc_price, [ Seller ], [ Bought ], [ Bought ])
 # But here we can now simply compare the simulation states before and
 # after calling the transition functions:
 
-show_agents(sim, Val(Seller))
+show_agents(sim, Seller)
 
 # and
 
-show_agents(sim3, Val(Seller))
+show_agents(sim3, Seller)
 
 # # Globals
 
@@ -364,7 +364,7 @@ show_agents(sim3, Val(Seller))
 
 # E.g. to calculate the excess demand we write
 
-aggregate(sim2, b -> b.x - b.y, +, Val(Bought))
+aggregate(sim2, b -> b.x - b.y, +, Bought)
 
 # where the second parameter specifies for which agent or edge type the
 # aggregation should be performed, and the anonymous function in the
@@ -376,8 +376,8 @@ aggregate(sim2, b -> b.x - b.y, +, Val(Bought))
 # To calculate the average price we define a helper function
 
 function calc_average_price(sim)
-    m = aggregate(sim, s -> s.p * s.d_y, +, Val(Seller))
-    q = aggregate(sim, s -> s.d_y, +, Val(Seller))
+    m = aggregate(sim, s -> s.p * s.d_y, +, Seller)
+    q = aggregate(sim, s -> s.d_y, +, Seller)
     m / q
 end
 
@@ -387,7 +387,7 @@ calc_average_price(sim3)
 
 for _ in 1:10
     apply_transition!(sim, calc_demand, [ Buyer ], [ KnownSellers], [ Bought ])
-    pushglobal!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Val(Bought)))
+    pushglobal!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Bought))
     apply_transition!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
     pushglobal!(sim, :p, calc_average_price(sim))
 end

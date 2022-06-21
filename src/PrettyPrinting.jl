@@ -1,5 +1,5 @@
-_getread(sim, ::Val{T}) where {T} = getproperty(sim, readfield(Symbol(T)))
-_getwrite(sim, ::Val{T}) where {T} = getproperty(sim, writefield(Symbol(T)))
+_getread(sim, ::Type{T}) where T = getproperty(sim, readfield(Symbol(T)))
+_getwrite(sim, ::Type{T}) where T = getproperty(sim, writefield(Symbol(T)))
 
 ######################################## <: EdgeState
 
@@ -22,7 +22,7 @@ function construct_prettyprinting_functions(simsymbol)
             end
             for t in nodes_types
                 print(io, "\n\t Type $t \
-                           with $(_show_length(sim, Val(t))) Agent(s)")
+                           with $(_show_length(sim, t)) Agent(s)")
             end
         end
 
@@ -40,7 +40,7 @@ function construct_prettyprinting_functions(simsymbol)
                     print(io, "\n\t Type $t") 
                 else 
                     print(io, "\n\t Type $t \
-                               with $(_show_num_edges(sim, Val(t))) Edges(s) for $(_show_length(sim, Val(t))) Agent(s)")
+                               with $(_show_num_edges(sim, t)) Edges(s) for $(_show_length(sim, t)) Agent(s)")
                 end
             end
         end
@@ -117,7 +117,7 @@ function _show_edge(sim, e, edgetypeprops, stateof, edgeT)
         if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:props]
             agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
-            print(" $(agentstate(sim, aid, Val(agentT)))")
+            print(" $(agentstate(sim, aid, agentT))")
         else
             print(" $(agentstate_flexible(sim, e.from)))")
         end
@@ -127,7 +127,7 @@ end
 ######################################## Buffered Collections
 
 
-function _show_length(sim, ::Val{T}) where {T} 
+function _show_length(sim, ::Type{T}) where {T} 
     read = getproperty(sim, readfield(Symbol(T)))
     write = getproperty(sim, writefield(Symbol(T)))
     if !sim.initialized 
@@ -137,7 +137,7 @@ function _show_length(sim, ::Val{T}) where {T}
     end
 end
 
-function _show_num_edges(sim, t::Val{T}) where {T}
+function _show_num_edges(sim, t::Type{T}) where {T}
     if !sim.initialized 
         "$(_num_edges(sim, t))/$(_num_edges(sim, t, true)) (R/W)"
     else

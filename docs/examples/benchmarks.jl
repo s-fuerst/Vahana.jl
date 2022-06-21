@@ -87,7 +87,7 @@ function run_benchmark(mt, name)
 
 
     if !stateless && !ignorefrom 
-        edgeto = @benchmark edges_to($sim, $a3, Val(EdgeState))
+        edgeto = @benchmark edges_to($sim, $a3, EdgeState)
     else
         edgeto = nothing
     end
@@ -95,25 +95,25 @@ function run_benchmark(mt, name)
     if ignorefrom 
         nids = nothing
     else
-        nids = @benchmark neighborids($sim, $a3, Val(EdgeState))
+        nids = @benchmark neighborids($sim, $a3, EdgeState)
     end
 
     if stateless 
         estates = nothing
     else
-        estates = @benchmark edgestates($sim, $a3, Val(EdgeState))
+        estates = @benchmark edgestates($sim, $a3, EdgeState)
     end
 
 
     if stateless 
         agg = nothing
     else
-        agg = @benchmark aggregate($sim_agg, s -> s.v, +, Val(EdgeState))
+        agg = @benchmark aggregate($sim_agg, s -> s.v, +, EdgeState)
     end
     
 
     if ignorefrom && stateless || !singleedge || !singletype
-        hasn = @benchmark has_neighbor($sim, $a3, Val(EdgeState))
+        hasn = @benchmark has_neighbor($sim, $a3, EdgeState)
     else
         hasn = nothing
     end
@@ -121,7 +121,7 @@ function run_benchmark(mt, name)
     if singleedge
         numn = nothing
     else
-        numn = @benchmark num_neighbors($sim, $a3, Val(EdgeState))
+        numn = @benchmark num_neighbors($sim, $a3, EdgeState)
     end
 
     x(f) = f ? "x" : " "

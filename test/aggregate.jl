@@ -5,7 +5,7 @@
     
     finish_init!(sim)
     
-    @test aggregate(sim, a -> a.foo, +, Val(ADict)) == 6
-    @test aggregate(sim, a -> a.foo, +, Val(AVec)) == sum(1:10)
-    @test aggregate(sim, e -> e.foo, +, Val(ESDict)) == 10
+    @test aggregate(sim, a -> a.foo, +, ADict) == 6
+    @test aggregate(sim, a -> a.foo, +, AVec) == sum(1:10)
+    @test aggregate(sim, e -> e.foo, +, ESDict) == 10
 end

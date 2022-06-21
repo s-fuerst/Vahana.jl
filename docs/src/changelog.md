@@ -1,6 +1,6 @@
 # Change Log
 
-## v0.5
+## v0.4
 #### new features:
 - Huge performance improvement, thanks in part to Agent and Edge
   properties, see [Performance Tuning](performance.md) for details.
@@ -10,14 +10,15 @@
 ### breaking changes:
 - Simulation construction, see [`construct`](@ref) for details.
 
-- If a type is a parameter of a function, it is now always specified
-  as a value type.
-
 - [`agentstate`](@ref) and [`neighborstates`](@ref) need the agent
   type as additional parameter.
 
 - [`neighborids`](@ref) and [`edgestates`](@ref) no longer accept a
   vector of edges, they now work directly with the AgentID.
+
+- The argument order of [`aggregate`](@ref) changed, the agent or edge
+  type is now the last argument, as this is also the convention for
+  all other Vahana functions.
 
 ## v0.2
 #### new features:

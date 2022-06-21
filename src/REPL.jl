@@ -17,7 +17,7 @@ function _printid(id, nrformatted = true)
 end    
 
 
-function show_type(sim, t::Val{T}; write = false, max = 5) where T
+function show_type(sim, t::Type{T}; write = false, max = 5) where T
     readfield = _getread(sim, t)
     if length(readfield) > 0
         printstyled("Read:\n"; color = :cyan)
@@ -44,7 +44,7 @@ of the graph associated with the function calling process are shown.
 #TODO DOC keywords
 
 """
-show_network(sim, t::Val{T}; kwargs...) where T = show_type(sim, t; kwargs...)
+show_network(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
 
 """
     show_agents(sim, ::Type{T}) where {T <: Agent}
@@ -57,7 +57,7 @@ of the graph associated with the function calling process are shown.
 #TODO DOC keywords
 
 """
-show_agents(sim, t::Val{T}; kwargs...) where T = show_type(sim, t; kwargs...)
+show_agents(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
 
 """
     show_random_agent(sim, ::Type{T}; kwargs...) 
@@ -72,7 +72,7 @@ The optional `stateof` argument controls whether the state of the edge
 :Edge) is printed.
 
 """
-function show_random_agent(sim, t::Val{T}; kwargs...) where T
+function show_random_agent(sim, t::Type{T}; kwargs...) where T
     if !sim.initialized
         println("show_random_agent can not be called before finish_init!.")
         return
@@ -102,7 +102,7 @@ The optional `stateof` argument controls whether the state of the edge
 (the default) or the state of the adjacent agent (for any value except
 :Edge) is printed.
 """
-# function show_agent(sim, nth, t::Val{T}; kwargs...) where T
+# function show_agent(sim, nth, t::Type{T}; kwargs...) where T
 #     show_agent(sim,
 #                agent_id(sim.typeinfos.nodes_type2id[T], UInt32(nth)),
 #                t;
@@ -127,7 +127,7 @@ The optional `stateof` argument controls whether the state of the edge
 """
 function show_agent(sim,
              id,
-             t::Val{T};
+             t::Type{T};
              nedges=5,
              stateof=:Edge) where T
     # id can be always the local nr, so we first ensure that id
@@ -177,10 +177,10 @@ function show_agent(sim,
                 if justcount
                     if :SingleEdge in edgetypeprops
                         printstyled("\n\thas_neighbor:  "; color = :green)
-                        print("$(has_neighbor(sim, aid, Val(edgeT)))")
+                        print("$(has_neighbor(sim, aid, edgeT))")
                     else
                         printstyled("\n\tnum_neighbors: "; color = :green)
-                        print("$(num_neighbors(sim, aid, Val(edgeT)))")
+                        print("$(num_neighbors(sim, aid, edgeT))")
                     end
                 else
                     # write the header for this edgetype, 
@@ -238,6 +238,6 @@ function show_agent(sim,
     end
 end
 
-function num_edges(sim, t::Val{T}) where {T}
+function num_edges(sim, t::Type{T}) where {T}
     _num_edges(sim, t)
 end

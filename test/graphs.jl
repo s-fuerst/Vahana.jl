@@ -4,7 +4,7 @@ import Graphs
     # calculate the sum of all ids
     function sumids(a, id, sim)
         GraphA(a.id,
-               mapreduce(a -> a.id, +, neighborstates_flexible(sim, id, Val(GraphE))))
+               mapreduce(a -> a.id, +, neighborstates_flexible(sim, id, GraphE)))
     end
 
 
@@ -25,6 +25,6 @@ import Graphs
     # we have a complete graph, and all agents sum the
     # ids of the neighbors (but ignoring the own)
     # so in overall we have the nagents-1 times the sum of all ids
-    @test aggregate(sim, a -> a.sum, +, Val(GraphA)) ==
+    @test aggregate(sim, a -> a.sum, +, GraphA) ==
         sum(1:nagents) * (nagents - 1)
 end

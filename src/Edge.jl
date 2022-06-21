@@ -66,7 +66,7 @@ function add_edges!(sim, to::AgentID, edges::Edge{T}...) where T
 end
 
 """
-    edges_to(sim, id::AgentID, ::Val{E}) 
+    edges_to(sim, id::AgentID, ::Type{E}) 
 
 If `E` has the trait :SingleEdge
     Returns the incoming edge of type `E` for agent `id`.
@@ -85,7 +85,7 @@ and [`neighborstates`](@ref)
 function edges_to end
 
 """
-    neighborids(sim, id::AgentID, ::Val{E}) 
+    neighborids(sim, id::AgentID, ::Type{E}) 
 
 If `E` has the trait :SingleEdge
     Returns the id of the agent on the incoming side of the edge of
@@ -106,7 +106,7 @@ and [`neighborstates`](@ref)
 function neighborids end
 
 """
-    edgestates(sim, id::AgentID, ::Val{E}) 
+    edgestates(sim, id::AgentID, ::Type{E}) 
 
 If `E` has the trait :SingleEdge
     Returns the state of edge of type `E` that is pointing to agent `id` .
@@ -125,7 +125,7 @@ and [`neighborstates`](@ref)
 function edgestates end
 
 """
-    neighborstates(sim::Simulation, id::AgentID, ::Val{E}, ::Val{A}) 
+    neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
 
 If `E` has the trait :SingleEdge
     Returns the state of the agent with type `A` on the incoming side
@@ -138,7 +138,7 @@ In the case that there is no incoming edge for agent `id`,
 `neighborstates` returns `nothing`.
 
 When the agents on the incoming side of the edges can have different
-types, it is maybe impossible to determine the Val{A}. Use
+types, it is maybe impossible to determine the Type{A}. Use
 [`neighborstates_flexible`](@ref) in this case.
 
 `neighborstates` is not defined if T has the trait :IgnoreFrom.
@@ -156,11 +156,11 @@ and [`edgestates`](@ref)
 """
 function neighborstates end
 
-neighborstates(sim, id::AgentID, edgetype::Val, agenttype::Val) =
+neighborstates(sim, id::AgentID, edgetype::Type, agenttype::Type) =
     map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
 
 """
-    neighborstates_flexible(sim::Simulation, id::AgentID, ::Val{E}) 
+    neighborstates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 
 
 If `E` has the trait :SingleEdge
     Returns the state of the agent on the incoming side
@@ -191,13 +191,13 @@ and [`edgestates`](@ref)
 """
 function neighborstates_flexible end
 
-function neighborstates_flexible(sim, id::AgentID, edgetype::Val)
+function neighborstates_flexible(sim, id::AgentID, edgetype::Type)
     nids = neighborids(sim, id, edgetype)
     isnothing(nids) ? nothing : map(id -> agentstate_flexible(sim, id), nids)  
 end
 
 """
-    num_neighbors(sim, id::AgentID, ::Val{E}) 
+    num_neighbors(sim, id::AgentID, ::Type{E}) 
 
 Returns the number of incoming edges of type `E` for agent `id`.
 
@@ -210,7 +210,7 @@ and [`edgestates`](@ref)
 function num_neighbors end
 
 """
-    has_neighbor(sim, id::AgentID, ::Val{E}) 
+    has_neighbor(sim, id::AgentID, ::Type{E}) 
 
 Returns true if agent `id` has at least one incoming edge of type `E`.
 

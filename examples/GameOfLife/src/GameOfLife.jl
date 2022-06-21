@@ -41,7 +41,7 @@ function transition(c::Cell, id, sim)
  end
 
 function countactive!(sim)
-    pushglobal!(sim, :numactive, aggregate(sim, Cell, c -> c.active, +))
+    pushglobal!(sim, :numactive, aggregate(sim, c -> c.active, +, Cell))
 end
 
 function addgrid!(sim)
@@ -49,18 +49,25 @@ function addgrid!(sim)
     spm4c(c::Cell) = sparse([c.pos[1]], [c.pos[2]],
                             [c.active],
                             dims[1], dims[2])
-    pushglobal!(sim, :grid, aggregate(sim, Cell, spm4c, +))
+    pushglobal!(sim, :grid, aggregate(sim, spm4c, +, Cell))
 end 
 
-function init(params::Params)
-    sim = Simulation("Game of Life", params, Globals(Vector(), Vector()))
-    add_agenttype!(sim, Cell)
-    add_edgetype!(sim, Neighbor)
+ModelTypes() |>
+    add_agenttype!(Cell) |>
+    add_edgetype!(Neighbor) |>
+    construct("Game of Life", nothing, nothing)
 
-    add_grid!(sim, 
-              param(sim, :dims),
-              pos -> rand() < 0.2 ? Cell(true, pos) : Cell(false, pos),
-              Neighbor())
+
+function init(params::Params)
+    sim = ModelTypes() |>
+        add_agenttype!(Cell) |>
+        add_edgetype!(Neighbor) |>
+        construct("Game of Life", params, Globals(Vector(), Vector()))
+
+    add_raster!(sim, 
+                param(sim, :dims),
+                pos -> rand() < 0.2 ? Cell(true, pos) : Cell(false, pos),
+                Neighbor())
 
     finish_init!(sim)
 
