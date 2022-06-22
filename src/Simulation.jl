@@ -54,6 +54,8 @@ function construct_model(types::ModelTypes, name::String)
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
+    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> dump
+
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
 
     # sim = @eval $simsymbol(name = $name,
@@ -73,13 +75,13 @@ function construct_model(types::ModelTypes, name::String)
 
     # Construct all type specific functions for the agent types
     for (T, C) in types.nodes
-        nffs[C].init_field(T, types) 
-        nffs[C].add_agent(T, types)  
-        nffs[C].agentstate(T, types) 
-        nffs[C].prepare_write(T, types) 
-        nffs[C].transition(T, types) 
-        nffs[C].finish_write(T, types) 
-        nffs[C].aggregate(T, types) 
+        nffs[C].init_field(T, types, simsymbol) 
+        nffs[C].add_agent(T, types, simsymbol)  
+        nffs[C].agentstate(T, types, simsymbol) 
+        nffs[C].prepare_write(T, types, simsymbol) 
+        nffs[C].transition(T, types, simsymbol) 
+        nffs[C].finish_write(T, types, simsymbol) 
+        nffs[C].aggregate(T, types, simsymbol) 
     end
 
     construct_prettyprinting_functions(simsymbol)
@@ -242,8 +244,6 @@ function apply_transition!(sim,
                     networks::Vector,
                     rebuild::Vector)
     writeable = [ compute; rebuild ]
-    # writeable_nodes = intersect(writeable, keys(sim.typeinfos.nodes_type2id))
-    # writeable_edges = intersect(writeable, sim.typeinfos.edges_types)
 
     foreach(prepare_write!(sim), writeable)
 
@@ -252,7 +252,7 @@ function apply_transition!(sim,
     end
 
     foreach(finish_write!(sim), writeable)
-    #    foreach(finish_write_edge!(sim), writeable_edges)
+
     sim
 end
 

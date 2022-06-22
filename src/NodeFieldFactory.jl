@@ -2,10 +2,10 @@ Base.@kwdef struct NodeFieldFactory
     type # Function Symbol -> Expr
     constructor # Function Symbol -> Expr
     # Functions:
-    init_field = (T, _) -> @eval init_field!(_, ::Type{$T}) = nothing
+    init_field = (T, _, simsymbol) -> @eval init_field!(sim::$simsymbol, ::Type{$T}) = nothing
     add_agent
     agentstate
-    prepare_write = (T, _) -> @eval prepare_write!(_, ::Type{$T}) = nothing
+    prepare_write = (T, _, simsymbol) -> @eval prepare_write!(sim::$simsymbol, ::Type{$T}) = nothing
     transition
     finish_write
     aggregate
@@ -18,9 +18,9 @@ nff_dict = NodeFieldFactory(
     type = (T, _) -> :(Dict{AgentNr, $T}),
     constructor = (T, _) -> :(Dict{AgentNr, $T}()),
 
-    add_agent = (T, info) -> begin
+    add_agent = (T, info, simsymbol) -> begin
         @eval typeid = $info.nodes_type2id[$T]
-        @eval function add_agent!(sim, agent::$T)
+        @eval function add_agent!(sim::$simsymbol, agent::$T)
             nextid = sim.$(nextidfield(T))
             sim.$(nextidfield(T)) = nextid + 1
             sim.$(writefield(T))[nextid] = agent
@@ -28,22 +28,22 @@ nff_dict = NodeFieldFactory(
         end 
     end,
 
-    agentstate = (T, _) -> begin
-        @eval function agentstate(sim, id::AgentID, ::Type{$T})
+    agentstate = (T, _, simsymbol) -> begin
+        @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
             @mayassert type_nr(id) == sim.typeinfos.nodes_type2id[$T] AGENTSTATE_MSG
             sim.$(readfield(T))[agent_nr(id)]
         end
     end,
 
-    prepare_write = (T, _) -> begin
-        @eval function prepare_write!(sim, ::Type{$T})
+    prepare_write = (T, _, simsymbol) -> begin
+        @eval function prepare_write!(sim::$simsymbol, ::Type{$T})
             sim.$(writefield(T)) = Dict{AgentNr, $T}()
         end
     end,
     
-    transition = (T, info) -> begin
+    transition = (T, info, simsymbol) -> begin
         @eval typeid = $info.nodes_type2id[$T]
-        @eval function transition!(sim, func, ::Type{$T})
+        @eval function transition!(sim::$simsymbol, func, ::Type{$T})
             read = sim.nodes_id2read[$typeid](sim)
             write = sim.nodes_id2write[$typeid](sim)
             for (agentnr, state) in read
@@ -53,14 +53,14 @@ nff_dict = NodeFieldFactory(
         end
     end,
 
-    finish_write = (T, _) -> begin
-        @eval function finish_write!(sim, ::Type{$T})
+    finish_write = (T, _, simsymbol) -> begin
+        @eval function finish_write!(sim::$simsymbol, ::Type{$T})
             sim.$(readfield(T)) = sim.$(writefield(T))
         end
     end,
 
-    aggregate = (T, _) -> begin
-        @eval function aggregate(sim, f, op, ::Type{$T}; kwargs...)
+    aggregate = (T, _, simsymbol) -> begin
+        @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
             mapreduce(f, op, values(sim.$(readfield(T))); kwargs...)
         end
     end, 
@@ -71,10 +71,10 @@ nff_vec = NodeFieldFactory(
     type = (T, _) -> :(Vector{$T}),
     constructor = (T, _) -> :(Vector{$T}()),
 
-    init_field = (T, info) -> begin
+    init_field = (T, info, simsymbol) -> begin
         if haskey(info.nodes_attr[T], :size)
             s = info.nodes_attr[T][:size]
-            @eval function init_field!(sim, ::Type{$T})
+            @eval function init_field!(sim::$simsymbol, ::Type{$T})
                 resize!(sim.$(writefield(T)), $s)
             end
         else
@@ -82,10 +82,10 @@ nff_vec = NodeFieldFactory(
         end
     end,
     
-    add_agent = (T, info) -> begin
+    add_agent = (T, info, simsymbol) -> begin
         if haskey(info.nodes_attr[T], :size)
             @eval typeid = $info.nodes_type2id[$T]
-            @eval function add_agent!(sim, agent::$T)
+            @eval function add_agent!(sim::$simsymbol, agent::$T)
                 agentid = sim.$(nextidfield(T))
                 sim.$(nextidfield(T)) = agentid + 1
                 @inbounds sim.$(writefield(T))[agentid] = agent
@@ -93,7 +93,7 @@ nff_vec = NodeFieldFactory(
             end
         else
             @eval typeid = $info.nodes_type2id[$T]
-            @eval function add_agent!(sim, agent::$T)
+            @eval function add_agent!(sim::$simsymbol, agent::$T)
                 agentid = sim.$(nextidfield(T))
                 sim.$(nextidfield(T)) = agentid + 1
                 if agentid > size(sim.$(writefield(T)), 1)
@@ -105,16 +105,16 @@ nff_vec = NodeFieldFactory(
         end
     end,
 
-    agentstate = (T, _) -> begin
-        @eval function agentstate(sim, id::AgentID, ::Type{$T})
+    agentstate = (T, _, simsymbol) -> begin
+        @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
             @mayassert type_nr(id) == sim.typeinfos.nodes_type2id[$T] AGENTSTATE_MSG 
             @inbounds sim.$(readfield(T))[agent_nr(id)]
         end
     end,
 
-    transition = (T, info) -> begin
+    transition = (T, info, simsymbol) -> begin
         @eval typeid = $info.nodes_type2id[$T]
-        @eval function transition!(sim, func, ::Type{$T})
+        @eval function transition!(sim::$simsymbol, func, ::Type{$T})
             read = sim.nodes_id2read[$typeid](sim)
             write = sim.nodes_id2write[$typeid](sim)
             for (agentnr, state) in enumerate(read)
@@ -126,14 +126,14 @@ nff_vec = NodeFieldFactory(
         end
     end,
 
-    finish_write = (T, _) -> begin
-        @eval function finish_write!(sim, ::Type{$T})
+    finish_write = (T, _, simsymbol) -> begin
+        @eval function finish_write!(sim::$simsymbol, ::Type{$T})
             sim.$(readfield(T)) = deepcopy(sim.$(writefield(T)))
         end
     end,
 
-    aggregate = (T, _) -> begin
-        @eval function aggregate(sim, f, op, ::Type{$T}; kwargs...)
+    aggregate = (T, _, simsymbol) -> begin
+        @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
             mapreduce(f, op, sim.$(readfield(T)); kwargs...)
         end
     end, 
