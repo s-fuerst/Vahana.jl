@@ -109,7 +109,9 @@ function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
             :SingleAgentType    
         """
     end
-    if :SingleEdge in p && :SingleAgentType in p && show_single_edge_and_type_warning
+    if show_single_edge_and_type_warning && :SingleEdge in p &&
+        :SingleAgentType in p && !(:IgnoreFrom in p && :Stateless in p) 
+        
         show_single_edge_and_type_warning = false
         printstyled("""
 

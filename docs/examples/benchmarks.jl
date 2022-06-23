@@ -47,14 +47,12 @@ function prepare(name)
             add_agenttype!(AgentState) |>
             add_edgetype!(EdgeState, props...; to_agenttype=AgentState)
     end    
-    construct(mt, name, nothing, nothing)
-
-    mt
+    construct_model(mt, name)
 end
 
 
 function run_benchmark(mt, name)
-    sim = construct(mt, name, nothing, nothing)
+    sim = new_simulation(mt, nothing, nothing)
 
     a1 = add_agent!(sim, AgentState())
     a2 = add_agent!(sim, AgentState())

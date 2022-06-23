@@ -54,8 +54,6 @@ function construct_model(types::ModelTypes, name::String)
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
-    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> dump
-
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
 
     # sim = @eval $simsymbol(name = $name,

@@ -112,9 +112,9 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     # case that the container for the Edges is a Vector (which is the
     # case when the :SingleEdge property is set.
     if singletype
-        @eval _to2idx(to::AgentID, ::Type{$(Type{T})}) = agent_nr(to)
+        @eval _to2idx(to::AgentID, ::Type{$T}) = agent_nr(to)
     else
-        @eval _to2idx(to::AgentID, ::Type{$(Type{T})}) = to
+        @eval _to2idx(to::AgentID, ::Type{$T}) = to
     end
 
     # _valuetostore is used to retrieve the value that should be stored
@@ -159,8 +159,8 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         if isbitstype(CT)
             # for bitstype we must initialize the new memory
             if singletype_size == 0
-                @eval function _check_size!(field, nr::AgentNr, ::Type{$(Type{T})})
-                    s = size(field, 1)
+                @eval function _check_size!(field, nr::AgentNr, ::Type{$T})
+                    s = length(field)
                     if (s < nr)
                         resize!(field, nr)
                         ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
@@ -174,12 +174,12 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                     ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
                           pointer(field), 0, $singletype_size * sizeof($CT))
                 end
-                @eval function _check_size!(_, ::AgentNr, ::Type{$(Type{T})})
+                @eval function _check_size!(_, ::AgentNr, ::Type{$T})
                 end
             end            
         else
             if singletype_size == 0
-                @eval function _check_size!(field, nr::AgentNr, ::Type{$(Type{T})})
+                @eval function _check_size!(field, nr::AgentNr, ::Type{$T})
                     s = size(field, 1)
                     if (s < nr)
                         resize!(field, nr)
@@ -199,7 +199,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     # add_edge calls in this case. For the singletype case we can not
     # check if add_edge! was already called reliably.
     if singleedge && !singletype && !(ignorefrom && stateless)
-        @eval function _can_add(field, to::AgentID, ::Type{$(Type{T})})
+        @eval function _can_add(field, to::AgentID, ::Type{$T})
             !haskey(field, to)
         end
     end
@@ -212,9 +212,9 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     if singletype
         @eval function _get_agent_container(sim::$simsymbol,
                                      to::AgentID,
-                                     ::Type{$(Type{T})},
+                                     ::Type{$T},
                                      field)
-            nr = _to2idx(to, $(Type{T}))
+            nr = _to2idx(to, $T)
 
             @mayassert begin
                 at = $(attr[:to_agenttype])
@@ -225,14 +225,14 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
-            _check_size!(field, nr, $(Type{T}))
+            _check_size!(field, nr, $T)
             isassigned(field, Int64(nr)) ? field[nr] : nothing
         end
         @eval function _get_or_create_agent_container(sim::$simsymbol,
                                                to::AgentID,
-                                               ::Type{$(Type{T})},
+                                               ::Type{$T},
                                                field)
-            nr = _to2idx(to, $(Type{T}))
+            nr = _to2idx(to, $T)
 
             @mayassert begin
                 at = $(attr[:to_agenttype])
@@ -243,7 +243,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
-            _check_size!(field, nr, $(Type{T}))
+            _check_size!(field, nr, $T)
             if !isassigned(field, Int64(nr))
                 field[nr] = zero($CT)
             end
@@ -252,11 +252,11 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function _get_or_create_agent_container(::$simsymbol,
                                                to::AgentID,
-                                               ::Type{$(Type{T})},
+                                               ::Type{$T},
                                                field)
             get!(_construct_container_func($CT), field, to)
         end
-        @eval function _get_agent_container(::$simsymbol, to::AgentID, ::Type{$(Type{T})}, field)
+        @eval function _get_agent_container(::$simsymbol, to::AgentID, ::Type{$T}, field)
             get(field, to, nothing)
         end
     end
@@ -265,44 +265,44 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #- add_edge!
     if stateless && ignorefrom && !singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, ::Edge{$MT})
-            nr = _to2idx(to, $(Type{T}))
+            nr = _to2idx(to, $T)
             sim.$(writefield(T))[nr] =
-                _get_or_create_agent_container(sim, to, $(Type{T}), sim.$(writefield(T))) + 1
+                _get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))) + 1
         end
 
         @eval function add_edge!(sim::$simsymbol, ::AgentID, to::AgentID, ::$MT)
-            nr = _to2idx(to, $(Type{T}))
+            nr = _to2idx(to, $T)
             sim.$(writefield(T))[nr] =
-                _get_or_create_agent_container(sim, to, $(Type{T}), sim.$(writefield(T))) + 1
+                _get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))) + 1
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            @mayassert _can_add(sim.$(writefield(T)), to, $(Type{T})) """
-            An edge has already beend added to the agent with the id $to (and the
+            @mayassert _can_add(sim.$(writefield(T)), to, $T) """
+            An edge has already been added to the agent with the id $to (and the
             edgetype properties containing the :SingleEdge property).
             """
-            nr = _to2idx(to, $(Type{T}))
-            _check_size!(sim.$(writefield(T)), nr, $(Type{T}))
+            nr = _to2idx(to, $T)
+            _check_size!(sim.$(writefield(T)), nr, $T)
             sim.$(writefield(T))[nr] = _valuetostore(edge)
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
-            @mayassert _can_add(sim.$(writefield(T)), to, $(Type{T})) """
-            An edge has already beend added to the agent with the id $to (and the
+            @mayassert _can_add(sim.$(writefield(T)), to, $T) """
+            An edge has already been added to the agent with the id $to (and the
             edgetype properties containing the :SingleEdge property).
             """
-            nr = _to2idx(to, $(Type{T}))
-            _check_size!(sim.$(writefield(T)), nr, $(Type{T}))
+            nr = _to2idx(to, $T)
+            _check_size!(sim.$(writefield(T)), nr, $T)
             sim.$(writefield(T))[nr] = _valuetostore(from, edgestate)
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            push!(_get_or_create_agent_container(sim, to, $(Type{T}), sim.$(writefield(T))),
+            push!(_get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))),
                   _valuetostore(edge))
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
-            push!(_get_or_create_agent_container(sim, to, $(Type{T}), sim.$(writefield(T))),
+            push!(_get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))),
                   _valuetostore(from, edgestate))
         end
     end
@@ -326,7 +326,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #- edges_to
     if !stateless && !ignorefrom
         @eval function edges_to(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+            _get_agent_container(sim, to, $T, sim.$(readfield(T)))
         end
     else
         @eval function edges_to(::$simsymbol, ::AgentID, t::Type{$MT})
@@ -340,17 +340,17 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     if !ignorefrom
         if stateless
             @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+                _get_agent_container(sim, to, $T, sim.$(readfield(T)))
             end
         else
             if singleedge
                 @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
                     isnothing(ac) ? nothing : ac.from
                 end
             else
                 @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
                     isnothing(ac) ? nothing : map(e -> e.from, ac)
                 end
             end
@@ -367,17 +367,17 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     if !stateless
         if ignorefrom
             @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+                _get_agent_container(sim, to, $T, sim.$(readfield(T)))
             end
         else
             if singleedge
                 @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T))) 
+                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T))) 
                     isnothing(ac) ? nothing : ac.state
                 end
             else
                 @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T))) 
+                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T))) 
                     isnothing(ac) ? nothing : map(e -> e.state, ac)
                 end
             end
@@ -394,12 +394,12 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     if !singleedge
         if ignorefrom && stateless
             @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                n = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+                n = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
                 isnothing(n) ? 0 : n
             end
         else
             @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                ac = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+                ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
                 isnothing(ac) ? 0 : length(ac)
             end
         end
@@ -415,7 +415,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #- has_neighbor
     if ignorefrom && stateless
         @eval function has_neighbor(sim::$simsymbol, to::AgentID, t::Type{$MT})
-            ac = _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T)))
+            ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
             isnothing(ac) || ac == 0 ? false : true
         end
     elseif !singleedge 
@@ -437,17 +437,17 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #- _vectorized_container
     # if !singleedge
     #     @eval function _vectorized_container_read(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T))) 
+    #         _get_agent_container(sim, to, $T, sim.$(readfield(T))) 
     #     end
     #     @eval function _vectorized_container_write(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         _get_agent_container(sim, to, $(Type{T}), sim.$(writefield(T))) 
+    #         _get_agent_container(sim, to, $T, sim.$(writefield(T))) 
     #     end
     # else
     #     @eval function _vectorized_container_read(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         [ _get_agent_container(sim, to, $(Type{T}), sim.$(readfield(T))) ]
+    #         [ _get_agent_container(sim, to, $T, sim.$(readfield(T))) ]
     #     end
     #     @eval function _vectorized_container_write(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         [ _get_agent_container(sim, to, $(Type{T}), sim.$(writefield(T))) ]
+    #         [ _get_agent_container(sim, to, $T, sim.$(writefield(T))) ]
     #     end
     # end
 
