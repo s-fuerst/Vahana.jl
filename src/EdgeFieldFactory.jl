@@ -291,9 +291,10 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             An edge has already been added to the agent with the id $to (and the
             edgetype properties containing the :SingleEdge property).
             """
+            field = sim.$(writefield(T))
             nr = _to2idx(to, $T)
-            _check_size!(sim.$(writefield(T)), nr, $T)
-            sim.$(writefield(T))[nr] = _valuetostore(from, edgestate)
+            _check_size!(field, nr, $T)
+            @inbounds field[nr] = _valuetostore(from, edgestate)
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
