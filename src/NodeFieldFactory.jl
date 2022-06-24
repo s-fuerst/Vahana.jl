@@ -117,11 +117,11 @@ nff_vec = NodeFieldFactory(
         @eval function transition!(sim::$simsymbol, func, ::Type{$T})
             read = sim.nodes_id2read[$typeid](sim)
             write = sim.nodes_id2write[$typeid](sim)
-            for (agentnr, state) in enumerate(read)
-                # convert to the correct type as enumerate uses Int64
-                agentnr = AgentNr(agentnr) 
-                agentid = agent_id($typeid, agentnr)
-                maybeadd(write, agentnr, func(state, agentid, sim))
+            # an own counter (with the correct type) is faster then enumerate 
+            idx = AgentNr(0)
+            for state in read
+                idx += AgentNr(1)
+                maybeadd(write, idx, func(state, agent_id($typeid, idx), sim))
             end 
         end
     end,
