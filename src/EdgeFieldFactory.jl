@@ -226,7 +226,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             """
 
             _check_size!(field, nr, $T)
-            isassigned(field, Int64(nr)) ? @inbounds field[nr] : nothing
+            @inbounds isassigned(field, Int64(nr)) ? field[nr] : nothing
         end
         @eval function _get_or_create_agent_container(sim::$simsymbol,
                                                to::AgentID,
@@ -267,13 +267,13 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         @eval function add_edge!(sim::$simsymbol, to::AgentID, ::Edge{$MT})
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))
-            field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
+            @inbounds field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
         end
 
         @eval function add_edge!(sim::$simsymbol, ::AgentID, to::AgentID, ::$MT)
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))
-            field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
+            @inbounds field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
@@ -284,7 +284,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))
             _check_size!(field, nr, $T)
-            field[nr] = _valuetostore(edge)
+            @inbounds field[nr] = _valuetostore(edge)
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
@@ -456,8 +456,8 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #- aggregate incl. helper functions
 
     if singletype
-        @eval _removeundef(::Type{$MT}) = edges ->
-            [ edges[i] for i=1:length(edges) if isassigned(edges, i)]
+        @eval _removeundef(::Type{$MT}) = edges -> 
+            [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
     else
         @eval _removeundef(::Type{$MT}) = edges -> edges
     end
