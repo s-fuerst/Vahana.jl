@@ -53,12 +53,9 @@ const model = ModelTypes() |>
     add_agenttype!(Cell, :Vector; size = 40000) |> 
 #    add_agenttype!(Cell) |> 
     add_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=40000) |>
-    add_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=40000)
+    add_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=40000) |>
+    construct_model("GameOfLife")
 
-
-function new_sim(params)
-    construct(model, "Game of Life", params, Cell(true))
-end
 
 function init!(sim)
     add_raster!(sim, 
@@ -78,15 +75,16 @@ end
 function step!(sim)
     apply_transition!(sim, transition,
                       [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
-    calc_raster(sim, :raster, c -> c.active, Cell)
+#    calc_raster(sim, :raster, c -> c.active, Cell)
 end
 
-sim = new_sim(Params(rules = SA[2,3,3,3],
-                     dims = (200,200)))
+const sim = new_simulation(model,
+                           Params(rules = SA[2,3,3,3],
+                                  dims = (200,200)),
+                           nothing)
 
 init!(sim)
 
-num_edges(sim, Neighbor)
 # step!(sim)
 
 @benchmark apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])

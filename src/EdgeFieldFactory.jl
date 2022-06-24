@@ -1,10 +1,10 @@
 import Base.zero
 
 # In the following comment:
-# SType stands for the :SingleAgentType property
-# SEdge stands for the :SingleEdge property
+# SType stands for the :SingleAgentType trait
+# SEdge stands for the :SingleEdge trait
 # and
-# Ignore stands for the :IgnoreFrom property
+# Ignore stands for the :IgnoreFrom trait
 #
 # The overall form of the type for the edgefield is the string: A*C(B)}, where
 #
@@ -110,7 +110,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
     # case that the container for the Edges is a Vector (which is the
-    # case when the :SingleEdge property is set.
+    # case when the :SingleEdge trait is set.
     if singletype
         @eval _to2idx(to::AgentID, ::Type{$T}) = agent_nr(to)
     else
@@ -134,7 +134,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     end
 
     # We must sometime construct the (per agent) containers, and those
-    # can be also a primitivetype when the SingleEdge property is
+    # can be also a primitivetype when the SingleEdge trait is
     # set. To have a uniform construction schema, we define zero
     # methods also for the other cases, and call the constructor in this
     # case.
@@ -221,7 +221,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-            The :SingleAgentType property is set, and the agent type is specified as $(at).
+            The :SingleAgentType trait is set, and the agent type is specified as $(at).
             But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
@@ -239,7 +239,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-            The :SingleAgentType property is set, and the agent type is specified as $(at).
+            The :SingleAgentType trait is set, and the agent type is specified as $(at).
             But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
@@ -266,33 +266,34 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     if stateless && ignorefrom && !singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, ::Edge{$MT})
             nr = _to2idx(to, $T)
-            sim.$(writefield(T))[nr] =
-                _get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))) + 1
+            field = sim.$(writefield(T))
+            field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
         end
 
         @eval function add_edge!(sim::$simsymbol, ::AgentID, to::AgentID, ::$MT)
             nr = _to2idx(to, $T)
-            sim.$(writefield(T))[nr] =
-                _get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))) + 1
+            field = sim.$(writefield(T))
+            field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
             @mayassert _can_add(sim.$(writefield(T)), to, $T) """
             An edge has already been added to the agent with the id $to (and the
-            edgetype properties containing the :SingleEdge property).
+            edgetype properties containing the :SingleEdge trait).
             """
             nr = _to2idx(to, $T)
-            _check_size!(sim.$(writefield(T)), nr, $T)
-            sim.$(writefield(T))[nr] = _valuetostore(edge)
+            field = sim.$(writefield(T))
+            _check_size!(field, nr, $T)
+            field[nr] = _valuetostore(edge)
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
             @mayassert _can_add(sim.$(writefield(T)), to, $T) """
             An edge has already been added to the agent with the id $to (and the
-            edgetype properties containing the :SingleEdge property).
+            edgetype properties containing the :SingleEdge trait).
             """
-            field = sim.$(writefield(T))
             nr = _to2idx(to, $T)
+            field = sim.$(writefield(T))
             _check_size!(field, nr, $T)
             @inbounds field[nr] = _valuetostore(from, edgestate)
         end
@@ -332,7 +333,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function edges_to(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            edges_to is not defined for the property combination of $t
+            edges_to is not defined for the trait combination of $t
             """
         end
     end
@@ -359,7 +360,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function neighborids(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            neighborids is not defined for the property combination of $t
+            neighborids is not defined for the trait combination of $t
             """
         end
     end
@@ -386,7 +387,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function edgestates(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            edgestates is not defined for the property combination of $t
+            edgestates is not defined for the trait combination of $t
             """
         end
     end
@@ -407,7 +408,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function num_neighbors(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            num_neighbors is not defined for the property combination of $t
+            num_neighbors is not defined for the trait combination of $t
             """
         end
     end
@@ -415,7 +416,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
 
     #- has_neighbor
     if ignorefrom && stateless
-        @eval function has_neighbor(sim::$simsymbol, to::AgentID, t::Type{$MT})
+        @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
             ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
             isnothing(ac) || ac == 0 ? false : true
         end
@@ -430,7 +431,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function has_neighbor(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            has_neighbor is not defined for the property combination of $t
+            has_neighbor is not defined for the trait combination of $t
             """
         end
     end
@@ -523,55 +524,11 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     else
         @eval function aggregate(::$simsymbol, t::Type{$MT}, f, op; kwargs...)
             @assert false """
-            aggregate is not defined for the property combination of $t
+            aggregate is not defined for the trait combination of $t
             """
         end
     end
-    
-    # if !stateless
-    #     if ignorefrom
-    #         @eval _edgestates(::Type{$MT}) = edges -> edges
-    #     else
-    #         @eval _edgestates(::Type{$MT}) = edges -> map(e -> e.state, edges)
-    #     end
-    #     if singleedge
-    #         @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
-    #             estates = sim.$(readfield(T)) |>
-    #                 values |>
-    #                 _removeundef(t) |>
-    #                 collect |>
-    #                 _edgestates(t)
-    #             mapreduce(f, op, estates; kwargs...)
-    #         end
-    #     else
-    #         @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
-    #             estates = sim.$(readfield(T)) |>
-    #                 values |>
-    #                 _removeundef(t) |>
-    #                 Iterators.flatten |>
-    #                 collect |>
-    #                 _edgestates(t)
-    #             mapreduce(f, op, estates; kwargs...)
-
-    #             # estates = $CT()
-    #             # println(sim.$(readfield(T)))
-    #             # for k in keys(sim.$(readfield(T)))
-    #             #     println(k)
-    #             #     for v in (sim.$(readfield(T))[k] |> _removeundef(t))
-    #             #         push!(estates, v)
-    #             #     end
-    #             # end
-    #             # println(estates)
-    #             # mapreduce(f, op, estates |> _edgestates(t); kwargs ...)
-    #         end
-    #     end
-    # else
-    #     @eval function aggregate(::$simsymbol, f, op, t::Type{$MT}; kwargs...)
-    #         @assert false """
-    #         aggregate is not defined for the property combination of $t
-    #         """
-    #     end
-    # end
-end    
+ end   
+     
 
 
