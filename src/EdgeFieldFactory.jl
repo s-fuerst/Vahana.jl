@@ -226,7 +226,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             """
 
             _check_size!(field, nr, $T)
-            isassigned(field, Int64(nr)) ? field[nr] : nothing
+            isassigned(field, Int64(nr)) ? @inbounds field[nr] : nothing
         end
         @eval function _get_or_create_agent_container(sim::$simsymbol,
                                                to::AgentID,
@@ -247,7 +247,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             if !isassigned(field, Int64(nr))
                 field[nr] = zero($CT)
             end
-            field[nr]
+            @inbounds field[nr]
         end
     else
         @eval function _get_or_create_agent_container(::$simsymbol,

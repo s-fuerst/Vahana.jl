@@ -13,7 +13,7 @@ Base.@kwdef struct ModelTypes
     nodes_attr = Dict{DataType, Dict{Symbol, Any}}()
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
-    nodes_id2type::Vector{DataType} = Vector{DataType}(undef, typemax(TypeID))
+    nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
 end
 
 struct Model
@@ -42,7 +42,7 @@ function add_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
     @assert !(Symbol(T) in keys(types.nodes)) "Each type can be added only once"
     @assert isbitstype(T)
     type_number = length(types.nodes_type2id) + 1
-    @assert type_number < typemax(TypeID) "Can not add new type, 
+    @assert type_number < MAX_TYPES "Can not add new type, 
                                 maximal number of types already registered"
     push!(types.nodes_types, T)
     types.nodes_type2id[T] = type_number
