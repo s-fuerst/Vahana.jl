@@ -6,8 +6,6 @@ export apply_transition, apply_transition!
 export param
 export aggregate
 
-const MAX_TYPES = typemax(TypeID) 
-
 function construct_model(types::ModelTypes, name::String) 
     simsymbol = Symbol(name)
     
@@ -195,7 +193,7 @@ function maybeadd(coll,
            agent) 
     # the coll[id] writes into another container then
     # we use for the iteration
-    coll[id] = agent
+    @inbounds coll[id] = agent
     nothing
 end
 

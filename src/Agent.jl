@@ -14,8 +14,8 @@
 # determination of the TypeID, ProcessID and AgentNr from the AgentID
 # is always done using the interface defined below, this could also be
 # changed to a tuple, for example (and this was also tested during
-# development, but the implementation found here has a noticeable
-# performance advantage).
+# development, but the implementation found here had most time a noticeable
+# performance advantage and a better memory usage).
 
 export AgentID, AgentNr
 export agent_id
@@ -27,6 +27,7 @@ export agentstate, agentstate_flexible
 
 const TypeID = UInt8
 const BITS_TYPE = 8
+const MAX_TYPES = typemax(TypeID) 
 
 const ProcessID = UInt32
 const BITS_PROCESS = 24
