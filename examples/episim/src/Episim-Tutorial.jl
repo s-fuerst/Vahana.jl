@@ -297,13 +297,13 @@ function runsimulation(sim)
 end
 
 const sim = ModelTypes() |>
-        add_agenttype!(Person) |>
-        add_agenttype!(Location) |>
-        add_edgetype!(MovementEvent) |>
-        add_edgetype!(Contact) |>
-        add_edgetype!(EndOfDay) |>
-        add_edgetype!(Infection) |>
-        add_edgetype!(Inform) |>
+        register_agenttype!(Person) |>
+        register_agenttype!(Location) |>
+        register_edgetype!(MovementEvent) |>
+        register_edgetype!(Contact) |>
+        register_edgetype!(EndOfDay) |>
+        register_edgetype!(Infection) |>
+        register_edgetype!(Inform) |>
         construct("Episim-Nutshell",
                   Params(θ=-0.001, tracing=0.25),
                   Globals(reports = Vector(),

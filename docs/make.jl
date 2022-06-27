@@ -1,12 +1,13 @@
 using Documenter, Vahana
 
-# module __atexample__named__tutorial1
-# struct Buyer end
-# struct Seller end
-# struct KnownSellers end
-# struct Bought end
-# end
+# this is a really dirty workaround, but for whatever reason the
+# sandboxing mechanism of Documenter clashes with the way Vahana
+# constructs the model.
 
+# But we do not need the sandboxing, as we can have different models
+# in a single julia session.
+import Documenter.Utilities.get_sandbox_module!
+get_sandbox_module!(_, _, _) = Main
 
 import Literate
 

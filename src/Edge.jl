@@ -4,6 +4,12 @@ export num_neighbors, has_neighbor
 export neighborstates, neighborstates_flexible
 export neighborids
 
+# For many function declared in this file, the concrete impementation depends
+# the the traits of the edge type and the function itself is build via
+# the construct_edge_functions function. The noop implementations here
+# are only used for the documentation, that they come with parameters
+# improves the experience with tools like LSP.
+
 """
     struct Edge{T} 
         from::AgentID
@@ -17,7 +23,7 @@ The AgentID of the agent at the head of the edge is not a field of
 `Edge` itself, since this information is already part of the
 containers in which the edges are stored.
 
-See also [`add_edgetype!`](@ref)
+See also [`register_edgetype!`](@ref)
 """
 struct Edge{T} 
     from::AgentID
@@ -37,11 +43,11 @@ from the agent with ID `from` to the agent with ID `to` and has the
 state `state`. 
 
 `T` must have been previously registered in the simulation by calling
-[`add_edgetype!`](@ref).
+[`register_edgetype!`](@ref).
 
-See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
+See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
-function add_edge! end
+function add_edge!(::__SIMULATION__, to::AgentID, edge::Edge)  end
 
 
 """
@@ -53,7 +59,7 @@ are directed to `to`.
 `edges` can be any iterable set of agents, or an arbitrary number of
 edges as arguments. 
 
-See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edge!`](@ref)
+See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edge!`](@ref)
 """
 function add_edges!(sim, to::AgentID, edges::Vector{Edge{T}}) where T
     [ add_edge!(sim, to, e) for e in edges ]
@@ -82,7 +88,7 @@ See also [`apply_transition!`](@ref), [`neighborids`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
-function edges_to end
+function edges_to(::__SIMULATION__, id::AgentID, edgetype::Type) end
 
 """
     neighborids(sim, id::AgentID, ::Type{E}) 
@@ -103,7 +109,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
-function neighborids end
+function neighborids(::__SIMULATION__, id::AgentID, edgetype::Type) end
 
 """
     edgestates(sim, id::AgentID, ::Type{E}) 
@@ -122,7 +128,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
-function edgestates end
+function edgestates(::__SIMULATION__, id::AgentID, edgetype::Type) end
 
 """
     neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
@@ -154,7 +160,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
-function neighborstates end
+function neighborstates(::__SIMULATION__, id::AgentID, edgetype::Type, agenttype::Type) end
 
 neighborstates(sim, id::AgentID, edgetype::Type, agenttype::Type) =
     map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
@@ -189,7 +195,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
-function neighborstates_flexible end
+function neighborstates_flexible(::__SIMULATION__, id::AgentID, edgetype::Type) end
 
 function neighborstates_flexible(sim, id::AgentID, edgetype::Type)
     nids = neighborids(sim, id, edgetype)
@@ -207,7 +213,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`neighborstates`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
-function num_neighbors end
+function num_neighbors(::__SIMULATION__, id::AgentID, edgetype::Type) end
 
 """
     has_neighbor(sim, id::AgentID, ::Type{E}) 
@@ -222,4 +228,4 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`neighborstates`](@ref), [`num_neighbors`](@ref)
 and [`edgestates`](@ref)
 """
-function has_neighbor end
+function has_neighbor(::__SIMULATION__, id::AgentID, edgetype::Type) end

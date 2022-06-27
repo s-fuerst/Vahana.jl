@@ -1,5 +1,5 @@
 export ModelTypes
-export add_agenttype!, add_edgetype!
+export register_agenttype!, register_edgetype!
 
     
 
@@ -22,7 +22,7 @@ struct Model
 end
 
 """
-    add_agenttype!(types, ::Type{T}, ::Type{C}; size) where { T, C }
+    register_agenttype!(types, ::Type{T}, ::Type{C}; size) where { T, C }
 
 TODO DOC
 
@@ -37,7 +37,7 @@ Can only be called before [`finish_init!`](@ref)
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
-function add_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
+function register_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
                  size::Int64 = 0) where T
     @assert !(Symbol(T) in keys(types.nodes)) "Each type can be added only once"
     @assert isbitstype(T)
@@ -57,16 +57,16 @@ function add_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
     types
 end
 
-add_agenttype!(t::Type{T}) where T = types -> add_agenttype!(types, t) 
+register_agenttype!(t::Type{T}) where T = types -> register_agenttype!(types, t) 
 
-add_agenttype!(t::Type{T}, c::Symbol; kwargs...) where T where C =
-    types -> add_agenttype!(types, t, c; kwargs...) 
+register_agenttype!(t::Type{T}, c::Symbol; kwargs...) where T where C =
+    types -> register_agenttype!(types, t, c; kwargs...) 
 
 
 show_single_edge_and_type_warning = true
 
 """
-    add_edgetype!(sim, ::Type{T}) where {T <: EdgeState}
+    register_edgetype!(sim, ::Type{T}) where {T <: EdgeState}
 
 TODO DOC
 
@@ -90,7 +90,7 @@ agent_type (optional?)
 
 See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
 """
-function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
+function register_edgetype!(types::ModelTypes, ::Type{T}, props...;
                 kwargs...)  where T
     global show_single_edge_and_type_warning
     @assert !(T in types.edges_types) "Each type can be added only once"
@@ -135,8 +135,8 @@ function add_edgetype!(types::ModelTypes, ::Type{T}, props...;
 end
 
 
-#add_edgetype!(t::Type{T}) where T = types -> add_edgetype!(types, t) 
+#register_edgetype!(t::Type{T}) where T = types -> register_edgetype!(types, t) 
 
-add_edgetype!(t::Type{T}, props...; kwargs...) where T =
-    types -> add_edgetype!(types, t, props...; kwargs...) 
+register_edgetype!(t::Type{T}, props...; kwargs...) where T =
+    types -> register_edgetype!(types, t, props...; kwargs...) 
 

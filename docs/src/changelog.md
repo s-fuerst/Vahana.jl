@@ -8,7 +8,7 @@
 - Added [`num_neighbors`](@ref) and [`has_neighbor`](@ref).
   
 ### breaking changes:
-- Simulation construction, see [`construct`](@ref) for details.
+- Simulation construction, see [`construct_model`](@ref) for details.
 
 - [`agentstate`](@ref) and [`neighborstates`](@ref) need the agent
   type as additional parameter.
@@ -19,6 +19,9 @@
 - The argument order of [`aggregate`](@ref) changed, the agent or edge
   type is now the last argument, as this is also the convention for
   all other Vahana functions.
+  
+- `add_agenttype!` and `add_edgetype!` renamed to [`register_agenttype!`](@ref)
+  and [`register_edgetype!`](@ref).
 
 ## v0.2
 #### new features:

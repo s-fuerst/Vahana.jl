@@ -17,8 +17,8 @@ For each edge the `edge_constructor` function is called, without any
 argument.
 
 The agent types of agents created by the `agent_constructor` must be
-already registered via [`add_agenttype!`](@ref) and vis a vis the edge
-type via [`add_edgetype!`](@ref).
+already registered via [`register_agenttype!`](@ref) and vis a vis the edge
+type via [`register_edgetype!`](@ref).
 
 TODO DOC name
 
@@ -31,8 +31,8 @@ struct RasterNode
 end
 struct RasterEdge end
 const sim = ModelTypes() |> 
-    add_agenttype!(RasterNode) |>
-    add_edgetype!(RasterEdge) |>
+    register_agenttype!(RasterNode) |>
+    register_edgetype!(RasterEdge) |>
     construct("Raster Example", nothing, nothing)
 
 add_raster!(sim, 

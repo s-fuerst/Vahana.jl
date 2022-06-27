@@ -80,7 +80,7 @@ end
 Add a single agent of type T to the simulation `sim`.
 
 T must have been previously registered in the simulation by calling
-[`add_agenttype!`](@ref).
+[`register_agenttype!`](@ref).
 
 `add_agent!` returns a new AgentID, which can be used to create edges
 from or to this agent before [`finish_init!`](@ref) is called (in the
@@ -89,11 +89,11 @@ the transition funcion is finished (in the case that add_agent! is
 called in an [`apply_transition!`](@ref) callback). Do not use the ID
 for other purposes, they are not guaranteed to be stable.
 
-See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
+See also [`add_agents!`](@ref), [`register_agenttype!`](@ref),
 [`add_edge!`](@ref) and [`add_edges!`](@ref)
 
 """
-function add_agent! end
+function add_agent!(::__SIMULATION__, agent) end
 
 """
     add_agents!(sim, agents) -> Vector{AgentID}
@@ -104,7 +104,7 @@ Add multiple agents at once to the simulation `sim`.
 agents as arguments. 
 
 The types of the agents must have been previously registered in the
-simulation by calling [`add_agenttype!`](@ref).
+simulation by calling [`register_agenttype!`](@ref).
 
 
 `add_agents!` returns a vector of AgentIDs, which can be used to
@@ -114,7 +114,7 @@ phase), or before the transition funcion is finished (in the case that
 add_agents!  is called in an [`apply_transition!`](@ref) callback). Do
 not use the ID for other purposes, they are not guaranteed to be stable.
 
-See also [`add_agent!`](@ref), [`add_agenttype!`](@ref),
+See also [`add_agent!`](@ref), [`register_agenttype!`](@ref),
 [`add_edge!`](@ref) and [`add_edges!`](@ref)
 
 """
@@ -141,7 +141,7 @@ type of the agent with `id` and the vahana assertions are disabled via
 [`enable_asserts`](@ref), then it is possible that the state of
 another agent will be returned.
 """
-function agentstate end
+function agentstate(::__SIMULATION__, ::AgentID, ::Type{T}) where T end
 
 """
     agentstate_flexible(sim, id::AgentID)

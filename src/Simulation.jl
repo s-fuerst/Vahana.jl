@@ -6,6 +6,9 @@ export apply_transition, apply_transition!
 export param
 export aggregate
 
+"""
+TODO DOC
+"""
 function construct_model(types::ModelTypes, name::String) 
     simsymbol = Symbol(name)
     
@@ -87,7 +90,8 @@ end
 
 
 """
-    construct(types::ModelTypes, name::String, params, globals)
+    TODO DOC
+    new_simulation(model, params, globals; name)
 
 Create a new simulation object, which stores the complete state of a simulation. 
 
@@ -114,11 +118,6 @@ See also [`ModelTypes`](@ref), [`param`](@ref),
 [`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
 and [`finish_init!`](@ref)
 """
-# function construct(types::ModelTypes, name::String, params::P, globals::G) where {P, G}
-#     construct_model(types, name) |>
-#         new_simulation(params, globals)
-# end
-
 function new_simulation(model::Model, params::P, globals::G; name = model.name) where {P, G}
     sim = @eval $(Symbol(model.name))(
         modelname = $(model.name),
@@ -164,7 +163,7 @@ Finish the initialization phase of the simulation.
 Must be called before applying a transition function. All types of agents and
 edges must be registered before `finish_init!` is called.
 
-See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref) and
+See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
 """
 function finish_init!(sim)
@@ -184,7 +183,7 @@ end
 Returns the value of the field `name` of the `params` struct from the
 Simulation constructor.
 
-See also [`construct`](@ref)
+See also [`construct_model`](@ref)
 """
 param(sim, name) = getfield(sim.params, name)
 

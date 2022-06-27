@@ -10,13 +10,13 @@ struct ESLDict1 end
 struct ESLDict2 end
 
 model = ModelTypes() |>
-    add_agenttype!(ADict) |>
-    add_agenttype!(AVec, :Vector) |>
-    add_agenttype!(AVecFixed, :Vector; size = 10) |>
-    add_agenttype!(ASLDict) |>
-    add_edgetype!(ESDict) |>
-    add_edgetype!(ESLDict1) |> 
-    add_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |> # to = AVec 
+    register_agenttype!(ADict) |>
+    register_agenttype!(AVec, :Vector) |>
+    register_agenttype!(AVecFixed, :Vector; size = 10) |>
+    register_agenttype!(ASLDict) |>
+    register_edgetype!(ESDict) |>
+    register_edgetype!(ESLDict1) |> 
+    register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |> # to = AVec 
     construct_model("Core")
 
 function add_example_network!(sim)

@@ -23,7 +23,7 @@ some hints about the properties of the agents or edges to improve
 runtime performance and/or reduce memory requirements. For example, if
 the number of agents in a simulation is fixed, the `:Vector` property
 (TODO: this will be renamed in a later version) can be set in the
-[`add_agenttype!`](@ref) call. In this case, Vahana internally uses a
+[`register_agenttype!`](@ref) call. In this case, Vahana internally uses a
 `Vector` to store the agents instead of a `Dict`.
 
 TODO Gute Idee ohne properties anzufangen, und dann properties

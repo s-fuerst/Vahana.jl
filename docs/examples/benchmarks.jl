@@ -40,12 +40,12 @@ function prepare(name)
 
     if hasprop(name, "F")
         mt = ModelTypes() |>
-            add_agenttype!(AgentState) |>
-            add_edgetype!(EdgeState, props...; to_agenttype=AgentState, size=3)
+            register_agenttype!(AgentState) |>
+            register_edgetype!(EdgeState, props...; to_agenttype=AgentState, size=3)
     else
         mt = ModelTypes() |>
-            add_agenttype!(AgentState) |>
-            add_edgetype!(EdgeState, props...; to_agenttype=AgentState)
+            register_agenttype!(AgentState) |>
+            register_edgetype!(EdgeState, props...; to_agenttype=AgentState)
     end    
     construct_model(mt, name)
 end

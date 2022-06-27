@@ -2,20 +2,21 @@ module Vahana
 
 export enable_asserts
 
-asserting() = true #making this a function results in code being invalidated and recompiled when this gets changed
+# This is a dummy struct to define the stubs of functions like add_agent
+# with a type for the simulation. The real type of the simulation is
+# constructed in construct_model (simulations are an instance of a model).
+# Adding the dummy type to the struct has the advantage, that e.g. LSP will
+# not omit a warning about a possible false call of the function without catching
+# calls to the function with a wrong type for the simulation parameter.
 
-macro mayassert(test)
-  esc(:(if $(@__MODULE__).asserting()
-    @assert($test)
-   end))
-end
-
-macro mayassert(test, msgs)
-  esc(:(if $(@__MODULE__).asserting()
-    @assert($test, $msgs)
-   end))
-end
-
+"""
+    __SIMULATION__ is a documentation placeholder for type of the
+simulation that is returned from the [`new_simulation`](@ref)
+call. The concrete type depends on the [`ModelTypes`](@ref) of the
+[`construct_model`](@ref) call, the concrete type name is the name of
+the model.
+"""
+struct __SIMULATION__ end
 
 """
     enable_asserts(enable::Bool)
@@ -40,6 +41,23 @@ function enable_asserts(enable::Bool)
     end
 end
 
+# making this a function results in code being invalidated and recompiled when
+# this gets changed
+asserting() = true 
+
+macro mayassert(test)
+  esc(:(if $(@__MODULE__).asserting()
+    @assert($test)
+   end))
+end
+
+macro mayassert(test, msgs)
+  esc(:(if $(@__MODULE__).asserting()
+    @assert($test, $msgs)
+   end))
+end
+
+######################################## include all other files
 
 include("Agent.jl")
 include("Edge.jl")

@@ -41,10 +41,10 @@ import Base.+
 
 
 function init_simulation(sim)
-    add_agenttype!(sim, Buyer)
-    add_agenttype!(sim, Seller)
-    add_edgetype!(sim, KnownSellers)
-    add_edgetype!(sim, Bought)
+    register_agenttype!(sim, Buyer)
+    register_agenttype!(sim, Seller)
+    register_edgetype!(sim, KnownSellers)
+    register_edgetype!(sim, Bought)
 
     buyerids = add_agents!(sim, [ Buyer() for _ in 1:param(sim, :numBuyer)])
 

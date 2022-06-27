@@ -1,10 +1,14 @@
 #=
+# Tutorial
+
+TODO: Goal of Tutorial
+
 # Model Background
 
 We have a simple but volatile market with $n$ buyers, $m$ sellers, and
 two goods called $x$ and $y$. Each seller sells both commodities,
 buyers buy both commodities from a single seller, but at each step the
-buyer randomly selects the seller from a fixed subset of all
+buyer randomly selects a seller from a fixed subset of all
 sellers. We are only interested in relative prices, so the price for
 good $x$ is set to 1, the price for good $y$ is $p$.
 
@@ -153,27 +157,30 @@ end
 
 # We now have all the elements needed to construct an uninitialized
 # simulation. Therefore we combine first all the Agent- and Edgetypes
-# into a `ModelTypes` collection, via the `add_agenttype!` and
-# `add_edgetype!` functions.
+# into a `ModelTypes` collection, via the `register_agenttype!` and
+# `register_edgetype!` functions, and then call `contruct_model` on this
+# collection. 
 
-const modeltypes = ModelTypes() |>
-    add_agenttype!(Buyer) |>
-    add_agenttype!(Seller) |>
-    add_edgetype!(KnownSellers) |>
-    add_edgetype!(Bought); 
+const model = ModelTypes() |>
+    register_agenttype!(Buyer) |>
+    register_agenttype!(Seller) |>
+    register_edgetype!(KnownSellers) |>
+    register_edgetype!(Bought) |>
+    construct_model("Excess Demand")
 
-# The Simulation construction itself is done by the `construct`
-# function, which needs beside the collection of model types also the
-# name of the simulation, the parameters struct and the globals struct, whereby
-# the parameters and globals can be also `nothing`.
+# `construct_model` returns a blueprint for our simulation. Simulations
+# itself can be seen as instances of models, where each simulation has
+# it's individual state and set of parameters.  The Simulation is
+# instanciated by the `new_simulation` function, which needs beside
+# the model also the parameters struct and the globals struct, whereby
+# the parameters and globals can be also `nothing`. 
 
-const sim = construct(modeltypes,
-                      "Excess Demand",
-                      Params(numBuyer = 50,
-                             numSeller = 5,
-                             knownSellers = 2),
-                      Globals(Vector(),
-                              Vector()))
+const sim = new_simulation(model,
+                           Params(numBuyer = 50,
+                                  numSeller = 5,
+                                  knownSellers = 2),
+                           Globals(Vector(),
+                                   Vector()))
 
 # Now we can also populate our simulation with the agents and the
 # `KnownSeller` network (the `Bought` network is a result of the

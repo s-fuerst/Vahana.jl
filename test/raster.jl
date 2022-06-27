@@ -16,11 +16,11 @@ end
 struct OnPosition  end
 
 raster_model = ModelTypes() |>
-    add_agenttype!(GridA) |>
-    add_edgetype!(GridE) |>
-    add_agenttype!(Position) |>
-    add_agenttype!(MovingAgent) |>
-    add_edgetype!(OnPosition) |>
+    register_agenttype!(GridA) |>
+    register_edgetype!(GridE) |>
+    register_agenttype!(Position) |>
+    register_agenttype!(MovingAgent) |>
+    register_edgetype!(OnPosition) |>
     construct_model("Raster_Test")
 
 

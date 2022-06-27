@@ -42,31 +42,31 @@ statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeET
                       EdgeTs, EdgeETs, EdgeTsI, EdgeETsI ]
 
 model_edges = ModelTypes() |>
-    add_agenttype!(Agent) |>
-    add_edgetype!(EdgeD) |>
-    add_edgetype!(EdgeS, :Stateless) |>
-    add_edgetype!(EdgeE, :SingleEdge) |>
-    add_edgetype!(EdgeT, :SingleAgentType; to_agenttype = Agent) |>
-    add_edgetype!(EdgeI, :IgnoreFrom) |>
-    add_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
-    add_edgetype!(EdgeST, :Stateless, :SingleAgentType; to_agenttype = Agent) |>
-    add_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
-    add_edgetype!(EdgeET, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
-    add_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
-    add_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    add_edgetype!(EdgeSET, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
-    add_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
-    add_edgetype!(EdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    add_edgetype!(EdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    add_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    add_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeETs, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeETsI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeSETs, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    add_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    register_agenttype!(Agent) |>
+    register_edgetype!(EdgeD) |>
+    register_edgetype!(EdgeS, :Stateless) |>
+    register_edgetype!(EdgeE, :SingleEdge) |>
+    register_edgetype!(EdgeT, :SingleAgentType; to_agenttype = Agent) |>
+    register_edgetype!(EdgeI, :IgnoreFrom) |>
+    register_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
+    register_edgetype!(EdgeST, :Stateless, :SingleAgentType; to_agenttype = Agent) |>
+    register_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
+    register_edgetype!(EdgeET, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
+    register_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
+    register_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    register_edgetype!(EdgeSET, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
+    register_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    register_edgetype!(EdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    register_edgetype!(EdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    register_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
+    register_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeETs, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeETsI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeSETs, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
     construct_model("edges")
 
 # All types (for copy, paste and adjust for the individual tests)
@@ -94,7 +94,7 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
     for t in statelessEdgeTypes
         add_edge!(sim, a2id, a3id, t())
         # we can not check the "ET" combination, instead a warning
-        # is given when add_edgetype is called
+        # is given when register_edgetype is called
         if hasprop(nameof(t), "E") && !hasprop(nameof(t), "T") && !(hasprop(nameof(t), "S") && hasprop(nameof(t), "I"))
             # and check in the case that a second edge can not be added to
             # the same agent (and that this can be checked),
@@ -114,7 +114,7 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
     for t in statefulEdgeTypes
         add_edge!(sim, a2id, a3id, t(1))
         # we can not check the "ET" combination, instead a warning
-        # is given when add_edgetype is called
+        # is given when register_edgetype is called
         if hasprop(nameof(t), "E") && !hasprop(nameof(t), "T") && !(hasprop(nameof(t), "S") && hasprop(nameof(t), "I"))
             @test_throws AssertionError add_edge!(sim, a1id, a3id, t(2))
         elseif !hasprop(nameof(t), "E")

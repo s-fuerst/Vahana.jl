@@ -15,8 +15,8 @@ the Graphs.vertix as argument. For each edge of `graph` the
 `edge_constructor` function is called, with the Graphs.edge as argument.
 
 The agent types of agents created by the `agent_constructor` must be
-already registered via [`add_agenttype!`](@ref) and vis a vis the edge
-type via [`add_edgetype!`](@ref).
+already registered via [`register_agenttype!`](@ref) and vis a vis the edge
+type via [`register_edgetype!`](@ref).
 
 Returns a vector with the IDs of the created agents.
 """

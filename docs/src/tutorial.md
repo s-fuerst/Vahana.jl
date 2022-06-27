@@ -166,10 +166,10 @@ simulation, second the parameters struct and third the globals struct.
 
 Then we must register all of our types. 
 
-    add_agenttype!(sim, Buyer)
-    add_agenttype!(sim, Seller)
-    add_edgetype!(sim, KnownSellers)
-    add_edgetype!(sim, Bought)
+    register_agenttype!(sim, Buyer)
+    register_agenttype!(sim, Seller)
+    register_edgetype!(sim, KnownSellers)
+    register_edgetype!(sim, Bought)
 
 Now we can also populate our simulation with the agents and the
 `KnownSeller` network (the `Bought` network is a result of the

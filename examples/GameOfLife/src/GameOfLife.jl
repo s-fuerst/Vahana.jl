@@ -53,15 +53,15 @@ function addgrid!(sim)
 end 
 
 ModelTypes() |>
-    add_agenttype!(Cell) |>
-    add_edgetype!(Neighbor) |>
+    register_agenttype!(Cell) |>
+    register_edgetype!(Neighbor) |>
     construct("Game of Life", nothing, nothing)
 
 
 function init(params::Params)
     sim = ModelTypes() |>
-        add_agenttype!(Cell) |>
-        add_edgetype!(Neighbor) |>
+        register_agenttype!(Cell) |>
+        register_edgetype!(Neighbor) |>
         construct("Game of Life", params, Globals(Vector(), Vector()))
 
     add_raster!(sim, 
