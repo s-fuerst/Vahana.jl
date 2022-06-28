@@ -19,14 +19,13 @@ makedocs(sitename="Vahana Documentation",
          format = Documenter.HTML(prettyurls = false),
          pages = [
              "Tutorial1" => "tutorial1.md",
-             "Performance Improvments" => "performance.md",
+             "Performance Improvements" => "performance.md",
              "API" => [
                  "Types" => "types.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
                  "Between transitions" => "between.md",
-                 "REPL helpers" => "repl.md",
-                 "Miscellaneous" => "misc.md"
+                 "REPL helpers" => "repl.md"
                  # "All" => "index.md"
              ],
              "Change Log" => "changelog.md"

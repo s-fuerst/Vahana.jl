@@ -1,6 +1,6 @@
 module Vahana
 
-export enable_asserts
+export enable_asserts, suppress_warnings
 
 # This is a dummy struct to define the stubs of functions like add_agent
 # with a type for the simulation. The real type of the simulation is
@@ -56,6 +56,41 @@ macro mayassert(test, msgs)
     @assert($test, $msgs)
    end))
 end
+
+####################
+
+Base.@kwdef mutable struct VahanaConfig
+    quiet = false
+    detect_stateless = false
+end
+
+const config = VahanaConfig()
+
+"""
+    suppress_warnings(suppress::Bool)
+
+In some cases Vahana print some hints or warnings to the stdout. This
+can be suppressed by calling the `suppress_warnings(true)` function after
+importing Vahana.
+"""
+suppress_warnings = (suppress::Bool) -> config.quiet = suppress
+
+####################
+
+detect_stateless = false
+
+"""
+    detect_stateless_trait(detect::Bool)
+
+Per default, Vahana expects that the :Stateless trait is set manually.
+
+This design decision was made so as not to confuse users, since then,
+for example, the [`edges_to`](@ref) is not available.
+
+This behaviour can be customized by calling `detect_stateless_trait` before
+calling [`register_edgetype!`](@ref).
+"""
+detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 
 ######################################## include all other files
 

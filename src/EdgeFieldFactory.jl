@@ -45,10 +45,10 @@ import Base.zero
 # case that the agent/node doesn't had any incoming edge before. So we
 # return also C(B) from the construct_types function.
 function construct_types(T, attr::Dict{Symbol, Any})
-    ignorefrom = :IgnoreFrom in attr[:props]
-    singleedge = :SingleEdge in attr[:props]
-    singletype = :SingleAgentType in attr[:props]
-    stateless = :Stateless in attr[:props]
+    ignorefrom = :IgnoreFrom in attr[:traits]
+    singleedge = :SingleEdge in attr[:traits]
+    singletype = :SingleAgentType in attr[:traits]
+    stateless = :Stateless in attr[:traits]
 
     
     A = if singletype
@@ -82,7 +82,7 @@ edgefield_type(T, info) = Meta.parse(construct_types(T, info)[1])
 
 edgefield_constructor(T, info) = Meta.parse(construct_types(T, info)[1] * "()")
 
-# We have some functions that are do only something when some edge properties
+# We have some functions that are do only something when some edge traits
 # are set and are in this case specialized for the edgetype. Here we define
 # the "fallback" functions for the case that no specialized versions are needed.
 _check_size!(_, _, _) = nothing
@@ -91,10 +91,10 @@ _can_add(_, _, _) = true
 
 
 function construct_edge_functions(T::DataType, attr, simsymbol)
-    ignorefrom = :IgnoreFrom in attr[:props]
-    singleedge = :SingleEdge in attr[:props]
-    singletype = :SingleAgentType in attr[:props]
-    stateless = :Stateless in attr[:props]
+    ignorefrom = :IgnoreFrom in attr[:traits]
+    singleedge = :SingleEdge in attr[:traits]
+    singletype = :SingleAgentType in attr[:traits]
+    stateless = :Stateless in attr[:traits]
 
     singletype_size = get(attr, :size, 0)
 
@@ -279,7 +279,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
             @mayassert _can_add(sim.$(writefield(T)), to, $T) """
             An edge has already been added to the agent with the id $to (and the
-            edgetype properties containing the :SingleEdge trait).
+            edgetype traits containing the :SingleEdge trait).
             """
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))
@@ -290,7 +290,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
             @mayassert _can_add(sim.$(writefield(T)), to, $T) """
             An edge has already been added to the agent with the id $to (and the
-            edgetype properties containing the :SingleEdge trait).
+            edgetype traits containing the :SingleEdge trait).
             """
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))

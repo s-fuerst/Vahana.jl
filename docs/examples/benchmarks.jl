@@ -20,32 +20,32 @@ allEdgeTypes = vcat(statefulEdgeTypes, statelessEdgeTypes)
 #allEdgeTypes = [ "EdgeT", "EdgeTF" ]
 
 
-hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
+hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
 
 function prepare(name)
-    props = []
+    traits = []
     
-    if hasprop(name, "S")
-        props = vcat(props, :Stateless)
+    if hastrait(name, "S")
+        traits = vcat(traits, :Stateless)
     end
-    if hasprop(name, "E")
-        props = vcat(props, :SingleEdge)
+    if hastrait(name, "E")
+        traits = vcat(traits, :SingleEdge)
     end
-    if hasprop(name, "T")
-        props = vcat(props, :SingleAgentType)
+    if hastrait(name, "T")
+        traits = vcat(traits, :SingleAgentType)
     end
-    if hasprop(name, "I")
-        props = vcat(props, :IgnoreFrom)
+    if hastrait(name, "I")
+        traits = vcat(traits, :IgnoreFrom)
     end
 
-    if hasprop(name, "F")
+    if hastrait(name, "F")
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgetype!(EdgeState, props...; to_agenttype=AgentState, size=3)
+            register_edgetype!(EdgeState, traits...; to_agenttype=AgentState, size=3)
     else
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgetype!(EdgeState, props...; to_agenttype=AgentState)
+            register_edgetype!(EdgeState, traits...; to_agenttype=AgentState)
     end    
     construct_model(mt, name)
 end
@@ -58,11 +58,11 @@ function run_benchmark(mt, name)
     a2 = add_agent!(sim, AgentState())
     a3 = add_agent!(sim, AgentState())
 
-    stateless = hasprop(name, "S")
-    singleedge = hasprop(name, "E")
-    singletype = hasprop(name, "T")
-    ignorefrom = hasprop(name, "I")
-    fixedsize = hasprop(name, "F")
+    stateless = hastrait(name, "S")
+    singleedge = hastrait(name, "E")
+    singletype = hastrait(name, "T")
+    ignorefrom = hastrait(name, "I")
+    fixedsize = hastrait(name, "F")
 
     add_edge!(sim, a1, a2, EdgeState(0.1))
     add_edge!(sim, a2, a3, EdgeState(0.2))

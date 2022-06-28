@@ -1,14 +1,14 @@
-# We need a lot of edgetypes to test all the edge property combinations
-# The properties are
+# We need a lot of edgetypes to test all the edge trait combinations
+# The traits are
 # (S) Stateless
 # (E) SingleEdge
 # (T) SingleAgentType, which can also have a size information (Ts)
 # (I) IgnoreFrom
-# so EdgeET means an Edge(State) with the SingleEdge and SingleAgentType property
+# so EdgeET means an Edge(State) with the SingleEdge and SingleAgentType traits
 
 struct Agent foo::Int64 end
 
-struct EdgeD foo::Int64 end # D for default (no property is set)
+struct EdgeD foo::Int64 end # D for default (no trait is set)
 struct EdgeS end
 struct EdgeE foo::Int64 end
 struct EdgeT foo::Int64 end
@@ -76,7 +76,7 @@ model_edges = ModelTypes() |>
 #   EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
 #   EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
 
-hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
+hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
 
 
 @testset "Edges" begin
@@ -84,7 +84,7 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
     
     (a1id, a2id, a3id) = add_agents!(sim, Agent(1), Agent(2), Agent(3))
 
-    # Lets add some edges for each of the different property combinations
+    # Lets add some edges for each of the different trait combinations
     # For each combination we will have
     # 2 -> 3 (with state 1 for stateful edges)
     # 3 -> 1 (with state 3 for stateful edges)
@@ -95,12 +95,12 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
         add_edge!(sim, a2id, a3id, t())
         # we can not check the "ET" combination, instead a warning
         # is given when register_edgetype is called
-        if hasprop(nameof(t), "E") && !hasprop(nameof(t), "T") && !(hasprop(nameof(t), "S") && hasprop(nameof(t), "I"))
+        if hastrait(nameof(t), "E") && !hastrait(nameof(t), "T") && !(hastrait(nameof(t), "S") && hastrait(nameof(t), "I"))
             # and check in the case that a second edge can not be added to
             # the same agent (and that this can be checked),
             # that this throws an assertion
             @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
-        elseif !hasprop(nameof(t), "E")
+        elseif !hastrait(nameof(t), "E")
             add_edge!(sim, a1id, a3id, t())
         end
         edge = Edge(a3id, t())
@@ -115,9 +115,9 @@ hasprop(type, prop::String) = occursin(prop, SubString(String(Symbol(type)), 5))
         add_edge!(sim, a2id, a3id, t(1))
         # we can not check the "ET" combination, instead a warning
         # is given when register_edgetype is called
-        if hasprop(nameof(t), "E") && !hasprop(nameof(t), "T") && !(hasprop(nameof(t), "S") && hasprop(nameof(t), "I"))
+        if hastrait(nameof(t), "E") && !hastrait(nameof(t), "T") && !(hastrait(nameof(t), "S") && hastrait(nameof(t), "I"))
             @test_throws AssertionError add_edge!(sim, a1id, a3id, t(2))
-        elseif !hasprop(nameof(t), "E")
+        elseif !hastrait(nameof(t), "E")
             add_edge!(sim, a1id, a3id, t(2))
         end
         edge = Edge(a3id, t(3))

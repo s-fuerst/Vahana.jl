@@ -153,29 +153,29 @@ function show_agent(sim,
         # output the network name and derive some information from sim.typeinfos
         printstyled("\n    $edgeT"; color = :yellow)
         read_container = getproperty(sim, readfield(Symbol(edgeT)))
-        edgetypeprops = sim.typeinfos.edges_attr[edgeT][:props]
+        edgetypetraits = sim.typeinfos.edges_attr[edgeT][:traits]
         
-        justcount = :IgnoreFrom in edgetypeprops && :Stateless in edgetypeprops
+        justcount = :IgnoreFrom in edgetypetraits && :Stateless in edgetypetraits
         
-        if :SingleEdge in edgetypeprops && :SingleAgentType in edgetypeprops && !justcount
+        if :SingleEdge in edgetypetraits && :SingleAgentType in edgetypetraits && !justcount
             printstyled("\n\tIt is not possible to give reliable information " *
                 "about the edges of the agent when the\n\tcorresponding edgetype has the " *
-                ":SingleEdge and :SingleAgentType property combination."; color = :red)
+                ":SingleEdge and :SingleAgentType trait combination."; color = :red)
             continue
         end
         # unify the agentid. For vector (:SingleAgent) types, this must be the index,
         # and for dict types, the AgentID
         aid = agent_id(sim.typeinfos.nodes_type2id[T], agent_nr(id))
-        nid = :SingleAgentType in edgetypeprops ? agent_nr(id) : aid
+        nid = :SingleAgentType in edgetypetraits ? agent_nr(id) : aid
         # check that this agent has some edges
         if nid in keys(read_container)
             # for vector types we can have #undef entries. to only something
             # for the agent when it is assigned to the vector 
-            if !(:SingleAgentType in edgetypeprops && !isassigned(read_container, nid))
+            if !(:SingleAgentType in edgetypetraits && !isassigned(read_container, nid))
                 d = read_container[nid]
 
                 if justcount
-                    if :SingleEdge in edgetypeprops
+                    if :SingleEdge in edgetypetraits
                         printstyled("\n\thas_neighbor:  "; color = :green)
                         print("$(has_neighbor(sim, aid, edgeT))")
                     else
@@ -185,16 +185,16 @@ function show_agent(sim,
                 else
                     # write the header for this edgetype, 
                     printstyled("\n\tfrom:              "; color = :green)
-                    if stateof == :Edge || :IgnoreFrom in edgetypeprops
+                    if stateof == :Edge || :IgnoreFrom in edgetypetraits
                         printstyled("edge.state:"; color = :green)
                     else
                         printstyled("state of edge.from:"; color = :green)
                     end
-                    if :SingleEdge in edgetypeprops
-                        _show_edge(sim, d, edgetypeprops, stateof, edgeT)
+                    if :SingleEdge in edgetypetraits
+                        _show_edge(sim, d, edgetypetraits, stateof, edgeT)
                     else
                         for e in first(d, nedges)
-                            _show_edge(sim, e, edgetypeprops, stateof, edgeT)
+                            _show_edge(sim, e, edgetypetraits, stateof, edgeT)
                         end
                         if length(d) > nedges
                             println("\n\t... ($(length(d)-nedges) not shown)")
@@ -204,9 +204,9 @@ function show_agent(sim,
             end
         end
 
-        if :IgnoreFrom in edgetypeprops
+        if :IgnoreFrom in edgetypetraits
             if !justcount
-                printstyled("\n\tFor edgetypes with the :IgnoreFrom property " *
+                printstyled("\n\tFor edgetypes with the :IgnoreFrom trait " *
                     "the edges to an agent can not be determined."; color = :red)
             end
             continue
@@ -215,7 +215,7 @@ function show_agent(sim,
         # with the to id
         edges_agents = Vector{Edge}()
         for (eid, e) in edges_iterator(read_container)
-            edge = _reconstruct_edge(e, edgetypeprops, edgeT)
+            edge = _reconstruct_edge(e, edgetypetraits, edgeT)
             if id == edge.from
                 push!(edges_agents, Edge(AgentID(eid), edge.state))
             end   

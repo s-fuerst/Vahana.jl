@@ -32,10 +32,10 @@ function construct_prettyprinting_functions(simsymbol)
                 printstyled(io, "\nNetworks(s):"; color = :cyan)
             end
             for t in edges_types
-                edgetypeprops = sim.typeinfos.edges_attr[t][:props]
-                if (:SingleEdge in edgetypeprops &&
-                    :SingleAgentType in edgetypeprops) ||
-                    (:SingleAgentType in edgetypeprops &&
+                edgetypetraits = sim.typeinfos.edges_attr[t][:traits]
+                if (:SingleEdge in edgetypetraits &&
+                    :SingleAgentType in edgetypetraits) ||
+                    (:SingleAgentType in edgetypetraits &&
                     :size in keys(sim.typeinfos.edges_attr[t]))
                     print(io, "\n\t Type $t") 
                 else 
@@ -86,38 +86,38 @@ function _show_collection(iter, max)
 end
 
 # In the :IgnoreFrom case we set edge.from to 0.
-function _reconstruct_edge(e, edgetypeprops, edgeT)
-    if :Stateless in edgetypeprops
-        if :IgnoreFrom in edgetypeprops
+function _reconstruct_edge(e, edgetypetraits, edgeT)
+    if :Stateless in edgetypetraits
+        if :IgnoreFrom in edgetypetraits
             Edge(AgentID(0), edgeT())
         else
             Edge(e, edgeT())
         end
-    elseif :IgnoreFrom in edgetypeprops
+    elseif :IgnoreFrom in edgetypetraits
         Edge(AgentID(0), e)
     else
         e
     end
 end        
 
-function _show_edge(sim, e, edgetypeprops, stateof, edgeT)
-    e = _reconstruct_edge(e, edgetypeprops, edgeT)
-    if !(:IgnoreFrom in edgetypeprops) && e.from == 0
+function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
+    e = _reconstruct_edge(e, edgetypetraits, edgeT)
+    if !(:IgnoreFrom in edgetypetraits) && e.from == 0
         return
     end
     print("\n\t")
-    if :IgnoreFrom in edgetypeprops
+    if :IgnoreFrom in edgetypetraits
         print("unknown           ")
     else
         _printid(e.from)
     end
-    if stateof == :Edge || :IgnoreFrom in edgetypeprops
+    if stateof == :Edge || :IgnoreFrom in edgetypetraits
         print(" $(e.state)")
     else
-        # for the to edges we get an empty edgetype props, as we constructed
-        # those edges they don't have the same properties
-        # But here we need the original props, so we access them directly
-        if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:props]
+        # for the to edges we get an empty edgetype traits, as we constructed
+        # those edges they don't have the same traits
+        # But here we need the original traits, so we access them directly
+        if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:traits]
             agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             print(" $(agentstate(sim, aid, agentT))")

@@ -3,7 +3,7 @@
 ## v0.4
 #### new features:
 - Huge performance improvement, thanks in part to Agent and Edge
-  properties, see [Performance Tuning](performance.md) for details.
+  traits, see [Performance Tuning](performance.md) for details.
 
 - Added [`num_neighbors`](@ref) and [`has_neighbor`](@ref).
   

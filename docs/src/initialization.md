@@ -25,3 +25,12 @@ move_to!
 
 finish_init!
 ```
+
+Misc Config:
+
+```@docs
+enable_asserts
+suppress_warnings
+detect_stateless_trait
+```
+

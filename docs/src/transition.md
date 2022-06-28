@@ -32,10 +32,6 @@ raster_nodeid
 ```
 
 
-
-
 ```@docs
-checked_foreach
-checked_map
-checked_filter
+checked
 ```

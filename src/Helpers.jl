@@ -1,44 +1,41 @@
-export checked_foreach, checked_map, checked_filter
+export checked
 
 """
-    checked_foreach(f, itr)
+    checked(f, g, itr; kwargs...)
 
-Calls foreach(f, itr) but only when itr != nothing.
+Calls g(f, itr; kwargs...), but only if itr != nothing.
+
+As all the Vahana functions that access the edges of a specific agent
+can return nothing in the case, that there exist no incoming edge for this agent,
+it's often necessery to check this case. 
 
 Example:
-    ```checked_foreach(neighborids(sim, id, Contact)) do nid
-        add_edge!(sim, id, nid, Inform())
-    end```
+
+Instead of writing 
+
+```
+nids = neighborids(sim, id, Contact)
+if nids != nothing
+    foreach(nids) do nid
+      add_edge!(sim, id, nid, Inform()
+    end
+end
+```
+
+you can use the checked function to write
+
+```
+checked(foreach, neighborids(sim, id, Contact)) do nid
+    add_edge!(sim, id, nid, Inform())
+end
+```
 """
-function checked_foreach(f, itr)
+function checked(f, g, itr; kwargs...)
     if !isnothing(itr)
-        foreach(f, itr)
-    else
-        nothing
+        g(f, itr; kwargs...)
     end
 end
 
-"""
-TODO DOC
-"""
-function checked_map(f, itr)
-    if !isnothing(itr)
-        map(f, itr)
-    else
-        nothing
-    end
-end
-
-"""
-TODO DOC
-"""
-function checked_filter(f, itr)
-    if !isnothing(itr)
-        filter(f, itr)
-    else
-        nothing
-    end
-end
 
 ######################################## internal
 
