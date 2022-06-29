@@ -7,7 +7,16 @@ export param
 export aggregate
 
 """
-TODO DOC
+    construct_model(types::ModelTypes, name::String)
+
+Adds a structure and methods corresponding to the type information of
+`types` to the Julia session. The new structure is named `name`, and
+all methods are specific to this structure using Julia's multiple
+dispatch concept, so it is possible to add different models to the
+same Julia session (as long as `name` is different).
+
+Returns a [`Model`](@ref) that can be used in [`new_simulation`](@ref) to create 
+a concrete simulation.
 """
 function construct_model(types::ModelTypes, name::String) 
     simsymbol = Symbol(name)
@@ -57,16 +66,6 @@ function construct_model(types::ModelTypes, name::String)
     # see also https://github.com/JuliaLang/julia/issues/43976
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
 
-    # sim = @eval $simsymbol(name = $name,
-    #                        params = $params,
-    #                        globals = $globals,
-    #                        typeinfos = $types,
-    #                        rasters = Dict{Symbol, Array{AgentID,2}}(),
-    #                        initialized = false,
-    #                        nodes_id2read = Vector{Function}(undef, MAX_TYPES),
-    #                        nodes_id2write = Vector{Function}(undef, MAX_TYPES)
-    #                        )
-
     # Construct all type specific functions for the edge types
     for T in types.edges_types
         construct_edge_functions(T, types.edges_attr[T], simsymbol)
@@ -90,16 +89,12 @@ end
 
 
 """
-    TODO DOC
-    new_simulation(model, params, globals; name)
+    new_simulation(model::Model, params, globals; name)
 
-Create a new simulation object, which stores the complete state of a simulation. 
+Creates and return a new simulation object, which stores the complete state 
+of a simulation. 
 
-`types` TODO DOC
-
-`name` is used as meta-information about the simulation and has no
-effect on the dynamics, since `name` is not accessible in the
-transition functions. 
+`model` is an `Model` instance created by [`construct_model`](@ref).
 
 `params` must be a struct (or `nothing`) that contains all parameters of a
 simulation. Parameter values are constant in a simulation run and can be
@@ -109,12 +104,17 @@ retrieved via the [`param`](@ref) function.
 accessible for all agents via the [`getglobal`](@ref) function. The values can
 be changed by calling [`setglobal!`](@ref) or [`pushglobal!`](@ref). 
 
+The optional keyword argument `name` is used as meta-information about
+the simulation and has no effect on the dynamics, since `name` is not
+accessible in the transition functions. If `name` is not given, the
+name of the model is used instead.
+
 The simulation starts in an uninitialized state. After adding the
 agents and edges for the initial state, it is necessary to call
 [`finish_init!`](@ref) before applying a transition function for the first
 time.
 
-See also [`ModelTypes`](@ref), [`param`](@ref),
+See also [`construct_model`](@ref), [`param`](@ref),
 [`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
 and [`finish_init!`](@ref)
 """

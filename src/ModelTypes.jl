@@ -4,7 +4,18 @@ export register_agenttype!, register_edgetype!
     
 
 """
-# TODO DOC
+    ModelTypes
+
+This struct stores all (internal) information about the agent and edge
+types of the model and is therefore the starting point of the model
+definition. 
+
+Call the ModelType constructor without parameters, and then use the
+created object as the first parameter in [`register_agenttype!`](@ref)
+and [`register_edgetype!`](@ref), whereby the |> operator can be used to
+concatenate these registrations.
+
+See also [`construct_model`](@ref),
 """
 Base.@kwdef struct ModelTypes
     edges_attr = Dict{DataType, Dict{Symbol, Any}}()
@@ -16,15 +27,21 @@ Base.@kwdef struct ModelTypes
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
 end
 
+"""
+    Model
+
+A Model instance is created by [`construct_model`](@ref) and can then be
+used to create one or multiple simulations via [`new_simulation`](@ref).
+"""
 struct Model
     types::ModelTypes
     name::String
 end
 
 """
-    register_agenttype!(types, ::Type{T}, C::Symbol = :Dict; size) where T
+    register_agenttype!(types::ModelTypes, ::Type, C::Symbol = :Dict; size) 
 
-Register an additional agent type to `sim`. 
+Register an additional agent type to `types`. 
 
 An agent type is an struct that define the state for agents of type `T`.
 These structs must be a subtype of `Agent`, and also bits
@@ -41,8 +58,6 @@ and other bits types.
     argument. This will change in the upcoming MPI-Version, so it's better
     to ignore this for now.
 
-
-Can only be called before [`finish_init!`](@ref)
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
@@ -75,30 +90,33 @@ register_agenttype!(t::Type{T}, c::Symbol; kwargs...) where T =
 show_single_edge_and_type_warning = true
 
 """
-    register_edgetype!(sim, ::Type{T}) where {T <: EdgeState}
+    register_edgetype!(types::ModelTypes, ::Type, traits..., kwargs...)  
 
-TODO DOC
-
-Register an additional edge type to `sim`. 
+Register an additional edge type to `types`. 
 
 An edge type is an struct that define the state for edges of type `T`.
 These structs must be a subtype of `EdgeState`, and also bits
 types, meaning the type is immutable and contains only primitive types
 and other bits types.
 
-Can only be called before [`finish_init!`](@ref)
+The internal data structures used to store the graph in memory can be modified by 
+the traits parameters:
 
-Traits:
-Stateless
-SingleAgentType
-SingleEdge
-IgnoreFrom
+- `:IgnoreFrom`: The ID of the source node is not stored. 
+- `:Stateless`: Store only the ID of the source node. 
+- `:SingleAgentType`: All target nodes have the same type.
+- `:SingleEdge`: Each agent can be the target node for max. one edge.
+- `:NumEdgesOnly`: Combines `:IgnoreFrom` and `:Stateless`
+- `:HasEdgeOnly`: Combines `:IgnoreFrom`, `:Stateless` and `:SingleEdge`
 
-kwargs (for SingleTAgentype):
-num_agents (optional)
-agent_type (optional?)
+When `:SingleAgentType` is set it is necessary to add to the
+`to_agenttype` keyword argument. The value of this argument must be
+the type of the target nodes. In the case that it's known how many
+agents of this type exists, this can be also given via the optional
+keyword `size`.
 
-See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
+See also [Edge Traits](./performance.md#Edge-Traits), [`add_edge!`](@ref) and 
+[`add_edges!`](@ref) 
 """
 function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
                 kwargs...)  where T
@@ -107,8 +125,8 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
     @assert isbitstype(T)
     push!(types.edges_types, T)
     types.edges_attr[T] = kwargs
-    p = Set{Symbol}(traits)
-    for trait in p
+    traits = Set{Symbol}(traits)
+    for trait in traits
         @assert trait in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleAgentType,
                          :NumEdgesOnly, :HasEdgeOnly] """
 
@@ -124,24 +142,24 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
         """
     end
     if :NumEdgesOnly in traits
-        push!(traits, [:Stateless, :IgnoreFrom])
+        union!(traits, Set([:Stateless, :IgnoreFrom]))
     end
     if :HasEdgeOnly in traits
-        push!(traits, [:Stateless, :IgnoreFrom, :SingleEdge])
+        union!(traits, Set([:Stateless, :IgnoreFrom, :SingleEdge]))
     end
-    if show_single_edge_and_type_warning && :SingleEdge in p && !config.quiet
-        :SingleAgentType in p && !(:IgnoreFrom in p && :Stateless in p) 
+    if show_single_edge_and_type_warning && :SingleEdge in traits && !config.quiet
+        :SingleAgentType in traits && !(:IgnoreFrom in traits && :Stateless in traits) 
         
         show_single_edge_and_type_warning = false
         printstyled("""
 
-        Using the :SingleEdge and :SingleAgentType traits at the same time 
-        is risky. Please read the documentation (TODO add link) and make
-        sure that you understand the possible pitfalls. 
+        Using the :SingleEdge and :SingleAgentType traits at the same time is
+        risky. Please read the Danger box in the Performance Tuning page of the
+        Vahana documentation and make sure that you understand the possible pitfalls. 
 
         """; color = :red)
     end
-    if :SingleAgentType in p
+    if :SingleAgentType in traits
         @assert haskey(kwargs, :to_agenttype) """
 
         For type $T the :SingleAgentType property is set, but in this
@@ -152,7 +170,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
     end
     if fieldcount(T) == 0 && !(:Stateless in traits)
         if config.detect_stateless
-            push!(traits, :Stateless)
+            union!(traits, Set([:Stateless]))
         elseif !config.quiet
         printstyled("""
 
@@ -165,7 +183,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
         """; color = :red)
         end
     end
-    types.edges_attr[T][:traits] = p
+    types.edges_attr[T][:traits] = traits
     types
 end
 

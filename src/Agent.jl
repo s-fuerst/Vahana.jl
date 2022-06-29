@@ -93,7 +93,7 @@ See also [`add_agents!`](@ref), [`register_agenttype!`](@ref),
 [`add_edge!`](@ref) and [`add_edges!`](@ref)
 
 """
-function add_agent!(::__SIMULATION__, agent) end
+function add_agent!(::__MODEL__, agent) end
 
 """
     add_agents!(sim, agents) -> Vector{AgentID}
@@ -141,7 +141,7 @@ type of the agent with `id` and the vahana assertions are disabled via
 [`enable_asserts`](@ref), then it is possible that the state of
 another agent will be returned.
 """
-function agentstate(::__SIMULATION__, ::AgentID, ::Type{T}) where T end
+function agentstate(::__MODEL__, ::AgentID, ::Type{T}) where T end
 
 """
     agentstate_flexible(sim, id::AgentID)

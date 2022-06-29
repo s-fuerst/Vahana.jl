@@ -11,6 +11,8 @@ get_sandbox_module!(_, _, _) = Main
 
 import Literate
 
+cd(@__DIR__)
+
 Literate.markdown(joinpath(@__DIR__, "examples", "tutorial1.jl"), "src"; execute = false)
 
 #Literate.markdown(joinpath(@__DIR__, "examples", "tutorial2.jl"), "src"; execute = false)
@@ -19,13 +21,15 @@ makedocs(sitename="Vahana Documentation",
          format = Documenter.HTML(prettyurls = false),
          pages = [
              "Tutorial1" => "tutorial1.md",
-             "Performance Improvements" => "performance.md",
+             "Performance Tuning" => "performance.md",
              "API" => [
-                 "Types" => "types.md",
+#                 "Types" => "types.md",
+                 "Model Definition" => "definition.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
                  "Between transitions" => "between.md",
-                 "REPL helpers" => "repl.md"
+                 "REPL helpers" => "repl.md",
+                 "Configuration" => "config.md"
                  # "All" => "index.md"
              ],
              "Change Log" => "changelog.md"

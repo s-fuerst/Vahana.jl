@@ -1,6 +1,6 @@
 module Vahana
 
-export enable_asserts, suppress_warnings
+export enable_asserts, suppress_warnings, detect_stateless_trait
 
 # This is a dummy struct to define the stubs of functions like add_agent
 # with a type for the simulation. The real type of the simulation is
@@ -10,13 +10,13 @@ export enable_asserts, suppress_warnings
 # calls to the function with a wrong type for the simulation parameter.
 
 """
-    __SIMULATION__ is a documentation placeholder for type of the
+    __MODEL__ is a documentation placeholder for type of the
 simulation that is returned from the [`new_simulation`](@ref)
 call. The concrete type depends on the [`ModelTypes`](@ref) of the
 [`construct_model`](@ref) call, the concrete type name is the name of
 the model.
 """
-struct __SIMULATION__ end
+struct __MODEL__ end
 
 """
     enable_asserts(enable::Bool)

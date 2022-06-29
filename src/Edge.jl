@@ -47,7 +47,7 @@ state `state`.
 
 See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
-function add_edge!(::__SIMULATION__, to::AgentID, edge::Edge)  end
+function add_edge!(::__MODEL__, to::AgentID, edge::Edge)  end
 
 
 """
@@ -88,7 +88,7 @@ See also [`apply_transition!`](@ref), [`neighborids`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
-function edges_to(::__SIMULATION__, id::AgentID, edgetype::Type) end
+function edges_to(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
     neighborids(sim, id::AgentID, ::Type{E}) 
@@ -109,7 +109,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
-function neighborids(::__SIMULATION__, id::AgentID, edgetype::Type) end
+function neighborids(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
     edgestates(sim, id::AgentID, ::Type{E}) 
@@ -128,7 +128,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
-function edgestates(::__SIMULATION__, id::AgentID, edgetype::Type) end
+function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
     neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
@@ -160,7 +160,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
-function neighborstates(::__SIMULATION__, id::AgentID, edgetype::Type, agenttype::Type) end
+function neighborstates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Type) end
 
 neighborstates(sim, id::AgentID, edgetype::Type, agenttype::Type) =
     map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
@@ -195,7 +195,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
-function neighborstates_flexible(::__SIMULATION__, id::AgentID, edgetype::Type) end
+function neighborstates_flexible(::__MODEL__, id::AgentID, edgetype::Type) end
 
 function neighborstates_flexible(sim, id::AgentID, edgetype::Type)
     nids = neighborids(sim, id, edgetype)
@@ -213,7 +213,7 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`neighborstates`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
-function num_neighbors(::__SIMULATION__, id::AgentID, edgetype::Type) end
+function num_neighbors(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
     has_neighbor(sim, id::AgentID, ::Type{E}) 
@@ -228,4 +228,4 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`neighborstates`](@ref), [`num_neighbors`](@ref)
 and [`edgestates`](@ref)
 """
-function has_neighbor(::__SIMULATION__, id::AgentID, edgetype::Type) end
+function has_neighbor(::__MODEL__, id::AgentID, edgetype::Type) end
