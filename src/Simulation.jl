@@ -49,7 +49,7 @@ function construct_model(types::ModelTypes, name::String)
                   :(params::P),
                   :(globals::G),
                   :(typeinfos::ModelTypes),
-                  :(rasters::Dict{Symbol, Array{AgentID,2}}),
+                  :(rasters::Dict{Symbol, Array}),
                   :(nodes_id2read::Vector{Function}),
                   :(nodes_id2write::Vector{Function}),
                   :(initialized::Bool),
@@ -125,7 +125,7 @@ function new_simulation(model::Model, params::P, globals::G; name = model.name) 
         params = $params,
         globals = $globals,
         typeinfos = $(model.types),
-        rasters = Dict{Symbol, Array{AgentID,2}}(),
+        rasters = Dict{Symbol, Array}(),
         initialized = false,
         nodes_id2read = Vector{Function}(undef, MAX_TYPES),
         nodes_id2write = Vector{Function}(undef, MAX_TYPES)

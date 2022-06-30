@@ -6,7 +6,7 @@ export neighborids
 
 # For many function declared in this file, the concrete impementation depends
 # the the traits of the edge type and the function itself is build via
-# the construct_edge_functions function. The noop implementations here
+# the construct_edge_functions function. The declaration here
 # are only used for the documentation, that they come with parameters
 # improves the experience with tools like LSP.
 
@@ -49,6 +49,7 @@ See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
 function add_edge!(::__MODEL__, to::AgentID, edge::Edge)  end
 
+function add_edge!(::__MODEL__, from::AgentID, to::AgentID, state::T) where T  end
 
 """
     add_edges!(sim, to::AgentID, edges)

@@ -20,7 +20,8 @@ Literate.markdown(joinpath(@__DIR__, "examples", "tutorial1.jl"), "src"; execute
 makedocs(sitename="Vahana Documentation",
          format = Documenter.HTML(prettyurls = false),
          pages = [
-             "Tutorial1" => "tutorial1.md",
+             "Introduction" => "index.md",
+             "Tutorial" => "tutorial1.md",
              "Performance Tuning" => "performance.md",
              "API" => [
 #                 "Types" => "types.md",

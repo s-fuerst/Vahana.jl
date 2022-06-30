@@ -17,7 +17,7 @@ AGENTSTATE_MSG = "The id of the agent does not match the given type"
 nff_dict = NodeFieldFactory(
     type = (T, _) -> :(Dict{AgentNr, $T}),
     constructor = (T, _) -> :(Dict{AgentNr, $T}()),
-
+    
     add_agent = (T, info, simsymbol) -> begin
         @eval typeid = $info.nodes_type2id[$T]
         @eval function add_agent!(sim::$simsymbol, agent::$T)

@@ -43,43 +43,87 @@ add_raster!(sim,
             )
 ```            
 """
+# function add_raster!(sim,
+#               dims::Tuple{Int64, Int64},
+#               agent_constructor,
+#               edge_constructor;
+#               name = nothing)
+#     function calcidx_torus(point::Tuple, diff::Tuple, dims::Tuple)
+#         ((point[1] + diff[1] + dims[1]) % dims[1]) * dims[2] +
+#             ((point[2] + diff[2] + dims[2]) % dims[2]) + 1
+#     end
+
+#     numcells = dims[1] * dims[2]
+#     coord = map(i -> (divrem(i-1, dims[2])), 1:numcells)
+#     ids = add_agents!(sim, [ agent_constructor(p .+ (1,1)) for p in coord ])
+
+#     ec = edge_constructor
+#     for i in 1:numcells
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (-1,-1), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (-1, 0), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (-1,+1), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], ( 0,-1), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], ( 0,+1), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (+1,-1), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (+1, 0), dims)], ec)
+#         add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (+1,+1), dims)], ec)
+#     end
+
+#     if name !== nothing
+#         onebased = map(c -> c .+ (1,1), coord)
+#         grid = Array{AgentID, 2}(undef, dims)
+#         for i in 1:numcells
+#             grid[onebased[i][1], onebased[i][2]] = ids[i]
+#         end
+#         sim.rasters[name] = grid
+#     end
+# end
+
+
+# New features:
+# neighborhood, moore, periodic
+# n-dimensional
+
+
 function add_raster!(sim,
-              dims::Tuple{Int64, Int64},
+              dims::NTuple{N, Int64},
               agent_constructor,
-              edge_constructor;
-              name = nothing)
-    function calcidx_torus(point::Tuple, diff::Tuple, dims::Tuple)
-        ((point[1] + diff[1] + dims[1]) % dims[1]) * dims[2] +
-            ((point[2] + diff[2] + dims[2]) % dims[2]) + 1
+              name = nothing) where N
+
+    positions = Iterators.product([ 1:i for i in dims]...) |> collect
+    nodeids = add_agents!(sim, [ agent_constructor(pos) for pos in positions ]) 
+
+    grid = Array{AgentID, N}(undef, dims)
+    for (id, pos) in zip(nodeids, positions)
+        grid[pos...] = id
     end
 
-    numcells = dims[1] * dims[2]
-    coord = map(i -> (divrem(i-1, dims[2])), 1:numcells)
-    ids = add_agents!(sim, [ agent_constructor(p .+ (1,1)) for p in coord ])
-
-    ec = edge_constructor
-    for i in 1:numcells
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (-1,-1), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (-1, 0), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (-1,+1), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], ( 0,-1), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], ( 0,+1), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (+1,-1), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (+1, 0), dims)], ec)
-        add_edge!(sim, ids[i], ids[calcidx_torus(coord[i], (+1,+1), dims)], ec)
-    end
-
-    if name !== nothing
-        onebased = map(c -> c .+ (1,1), coord)
-        grid = Array{AgentID, 2}(undef, dims)
-        for i in 1:numcells
-            grid[onebased[i][1], onebased[i][2]] = ids[i]
-        end
+    if ! isnothing(name)
         sim.rasters[name] = grid
     end
 end
 
+function connect_raster_neighbors!(sim,
+                            name::Symbol,
+                            edge_constructor,
+                            distance::Int)
 
+    grid = sim.raster[name]
+    
+    all = Iterators.product([ (-distance):distance for _ in grid[1] ]...) |> collect
+    self = Iterators.product([ 0 for _ in grid[1] ]...) |> first
+    shift = [ CartesianIndex(s) for s in all if s !== self ]
+
+    for s in shift 
+        for ci in keys(grid)
+            to = ci + s
+            HANDLE cycles
+            add_edge!(sim, grid[ci], grid[ci + s], edge_constructor)
+            add_edge!(sim, grid[ci + s], grid[ci], edge_constructor)
+        end
+    end
+end
+    
 """
     calc_raster(sim, name::Symbol, f)
 
@@ -125,13 +169,14 @@ function move_to!(sim,
            name::Symbol,
            id::AgentID,
            pos,
-           ::Type{T}) where T
+           edge_from_raster,
+           edge_to_raster) 
     posid = raster_nodeid(sim, name, pos)
-    add_edge!(sim, id, posid, T())
-    add_edge!(sim, posid, id, T())
+    if ! isnothing(edge_from_raster)
+        add_edge!(sim, posid, id, edge_from_raster)
+    end
+    if ! isnothing(edge_to_raster)
+        add_edge!(sim, id, posid, edge_to_raster)
+    end
 end
 
-# add_edge for grid position?
-
-#Texte Sarah lesen?
-    

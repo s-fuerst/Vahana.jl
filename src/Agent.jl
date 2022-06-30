@@ -75,11 +75,11 @@ end
 
 
 """
-    add_agent!(sim, agent::T) -> AgentID
+    add_agent!(sim, agent::T)::AgentID
 
 Add a single agent of type T to the simulation `sim`.
 
-T must have been previously registered in the simulation by calling
+T must have been previously registered by calling
 [`register_agenttype!`](@ref).
 
 `add_agent!` returns a new AgentID, which can be used to create edges
@@ -89,11 +89,11 @@ the transition funcion is finished (in the case that add_agent! is
 called in an [`apply_transition!`](@ref) callback). Do not use the ID
 for other purposes, they are not guaranteed to be stable.
 
-See also [`add_agents!`](@ref), [`register_agenttype!`](@ref),
-[`add_edge!`](@ref) and [`add_edges!`](@ref)
+See also [`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
 
 """
 function add_agent!(::__MODEL__, agent) end
+
 
 """
     add_agents!(sim, agents) -> Vector{AgentID}
@@ -103,8 +103,8 @@ Add multiple agents at once to the simulation `sim`.
 `agents` can be any iterable set of agents, or an arbitrary number of
 agents as arguments. 
 
-The types of the agents must have been previously registered in the
-simulation by calling [`register_agenttype!`](@ref).
+The types of the agents must have been previously registered by
+calling [`register_agenttype!`](@ref).
 
 
 `add_agents!` returns a vector of AgentIDs, which can be used to

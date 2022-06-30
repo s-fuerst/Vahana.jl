@@ -3,6 +3,10 @@ using BenchmarkTools
 
 enable_asserts(false)
 
+suppress_warnings(true)
+
+detect_stateless_trait(true)
+
 struct AgentState end
 
 struct EdgeState
@@ -136,33 +140,48 @@ function run_benchmark(mt, name)
     println("| $(x(stateless)) | $(x(singleedge)) | $(x(singletype))  | $(x(ignorefrom)) | $(x(fixedsize)) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) | $(pt(agg)) |")
 end
 
-# aggregate | edgestates | 
+######################################## create edge table
 
-println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
-for t in allEdgeTypes
-    mt = prepare(t)
-    run_benchmark(mt, t)
-    GC.gc()
-end
+# println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 
-mutable struct Foo
-    b::Bool
-end
+# for t in allEdgeTypes
+#     mt = prepare(t)
+#     run_benchmark(mt, t)
+#     GC.gc()
+# end
+    
+######################################## raster move_to!
 
-const foo = Foo(false)
+struct GridNode end
 
-function agent_nr(id::UInt64)
-    id & (2 ^ 32 - 1)
-end
+struct GridEdge end
+
+struct MovingAgent end
+
+struct OnPosition  end
+
+struct AgentsOnPoint end
 
 
-cb = @benchmark agent_nr($rand(UInt64))
+const sim = ModelTypes() |>
+    register_agenttype!(GridNode) |>
+    register_agenttype!(MovingAgent) |>
+    register_edgetype!(GridEdge) |>
+    register_edgetype!(OnPosition, :SingleEdge, :SingleAgentType; to_agenttype = GridNode) |>
+    register_edgetype!(AgentsOnPoint, :SingleAgentType; to_agenttype = MovingAgent) |>
+    construct_model("Raster_Test") |>
+    new_simulation(nothing, nothing)
 
-println(round(mean(cb.times), digits=1))
+add_raster!(sim,
+            (20, 12),
+            _ -> GridNode(),
+            GridEdge();
+            name = :grid)
 
-# prepare("Test2")
+id = add_agent!(sim, MovingAgent())
 
-# b = run_benchmark("Test2")
+@benchmark move_to!(sim, :grid, id, (4, 3), nothing, nothing)
 
-# println(mean(b))
+# @benchmark add_agent!(sim, MovingAgent())
 
+sim.rasters[:grid][1,3]
