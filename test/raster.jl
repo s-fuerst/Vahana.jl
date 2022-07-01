@@ -34,11 +34,13 @@ raster_model = ModelTypes() |>
     sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
+                :grid,
                 (10,8),
-                p -> (p[1] == 10 && p[2] == 8) ? GridA(p, true) : GridA(p, false),
-                GridE();
-                name = :grid
-                )
+                p -> (p[1] == 10 && p[2] == 8) ? GridA(p, true) : GridA(p, false))
+
+    connect_raster_neighbors!(sim,
+                              :grid,
+                              _ -> GridE())
 
     finish_init!(sim)
 

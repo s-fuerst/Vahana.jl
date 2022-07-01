@@ -6,12 +6,11 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
+# include("core.jl")
 
-include("core.jl")
+# include("edges.jl")
 
-include("edges.jl")
-
-include("globals.jl")
+# include("globals.jl")
 
 include("raster.jl")
 
