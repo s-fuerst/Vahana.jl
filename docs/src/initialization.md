@@ -41,17 +41,33 @@ it is advisable to import only the SimpleGraphs module from Graphs.jl.
 add_graph!
 ```
 
-## Grids
+## Raster 
 
 Spatial information can be added to the simulation in the form of one
-or more two-dimensional rasters/grids. 
+or more n-dimensional rasters. 
 
 ```@docs
 add_raster!
+```
+
+Such a raster is only a collection of nodes in the graph incl. an
+Vahana internal mapping from the cartesian coordinates to the cell
+IDs. Beside this mapping, cells are also just agents. 
+
+The ID and the state of the cells can not be accessed directly,
+instead it's necessary to create edges between the cells, or between
+the cells and agents of other types. 
+
+```@docs
+connect_raster_neighbors!
 move_to!
 ```
 
 ## Finish initialization
+
+After all the initial state has been built using the functions
+described above, `finish_init!` must be called before the first call
+of [`apply_transition!`](@ref)
 
 ```@docs
 finish_init!

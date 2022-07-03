@@ -43,8 +43,6 @@ neighborstates_flexible
 
 neighborids
 edgestates
-
-raster_nodeid
 ```
 
 Already described...

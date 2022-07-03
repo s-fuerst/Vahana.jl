@@ -160,8 +160,7 @@ new_simulation(params::P, globals::G; kwargs...) where {P, G} =
 
 Finish the initialization phase of the simulation. 
 
-Must be called before applying a transition function. All types of agents and
-edges must be registered before `finish_init!` is called.
+Must be called before applying a transition function. 
 
 See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
