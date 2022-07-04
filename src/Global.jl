@@ -3,22 +3,20 @@ export setglobal!, getglobal, pushglobal!
 """
     getglobal(sim::Simulation, name)
 
-Returns the value of the field `name` of the `globals` struct from the
-Simulation.
+Returns the value of the field `name` of the `globals` struct for simulation `sim`.
 
-See also [`construct_model`](@ref), [`setglobal!`](@ref) and [`pushglobal!`](@ref)
+See also [`new_simulation`](@ref), [`setglobal!`](@ref) and [`pushglobal!`](@ref)
 """
 getglobal(sim, name) = getfield(sim.globals, name)
 
 """
     setglobal!(sim::Simulation, name, value)
 
-Set the value of the field `name` of the `globals` struct from the
-Simulation. 
+Set the value of the field `name` of the `globals` struct for simulation `sim`.
 
 `setglobal!` must not be called within a transition function. 
 
-See also [`construct_model`](@ref), [`aggregate`](@ref), [`pushglobal!`](@ref) and
+See also [`new_simulation`](@ref), [`aggregate`](@ref), [`pushglobal!`](@ref) and
 [`getglobal`](@ref)
 """
 setglobal!(sim, name, value) = setfield!(sim.globals, name, value)

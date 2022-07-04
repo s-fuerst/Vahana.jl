@@ -1,7 +1,6 @@
 export construct_model
 export new_simulation
 export finish_init!
-#export typeid
 export apply_transition, apply_transition!
 export param
 export aggregate
@@ -146,6 +145,7 @@ function new_simulation(model::Model, params::P, globals::G; name = model.name) 
     sim
 end
 
+# pipeable versions 
 construct_model(name::String) = types -> construct_model(types, name)
 
 new_simulation(params::P, globals::G; kwargs...) where {P, G} =
@@ -221,8 +221,9 @@ from the simulation, otherwise the agent with id `id` will have
 with a type that is listed in `compute`, so a method for each of this types
 must be implemented.
 
-`network` is a vector of Edge types. Inside of `func`
-[`edges_to`](@ref) can be only called for types in `network`.
+`network` is a vector of Edge types. Inside of `func` all the
+functions like [`edges_to`](@ref) that access information about edges
+can be only called when the edge type is in the `network` vector.
 
 `rebuild` is a vector of Agent and/or Edge types. All the instances of
 agents or edges with a type in `rebuild` will be removed and must be
@@ -233,7 +234,7 @@ can be only called for types in `network` or `compute`.
 See also [`apply_transition`](@ref)
 """
 function apply_transition!(sim,
-                    func,
+                    func::Function,
                     compute::Vector,
                     networks::Vector,
                     rebuild::Vector)
@@ -249,6 +250,15 @@ function apply_transition!(sim,
 
     sim
 end
+
+function apply_transition!(func::Function,
+                    sim,
+                    compute::Vector,
+                    networks::Vector,
+                    rebuild::Vector)
+    apply_transition!(sim, func, compute, networks, rebuild)
+end
+
 
 """
     apply_transition(sim, func, compute, networks, rebuild) -> Simulation
@@ -287,4 +297,4 @@ aggregate is based on mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
 """
-function aggregate end
+function aggregate(::__MODEL__, ::Type, f, op; kwargs...) end

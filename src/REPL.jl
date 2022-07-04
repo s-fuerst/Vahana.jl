@@ -34,15 +34,17 @@ function show_type(sim, t::Type{T}; write = false, max = 5) where T
 end
 
 """
-    show_network(sim, ::Type{T}) where {T <: Agent}
+    show_network(sim, ::Type{T}; write = false, max = 5) 
 
-Display (some of) the edges of  type T.
+Display (some of) the edges of type T.
 
 In a parallized simulation, only the edges that are in the partition
 of the graph associated with the function calling process are shown.
 
-#TODO DOC keywords
+When the keyword `write` is set to true, also the edges that are added in
+the initialization phase or current transition function are shown.
 
+The keyword `max` determine the maximal number of shown edges.
 """
 show_network(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
 
@@ -54,7 +56,10 @@ Display (some of) the agents of the type T.
 In a parallized simulation, only the agents that are in the partition
 of the graph associated with the function calling process are shown.
 
-#TODO DOC keywords
+When the keyword `write` is set to true, also the agents that are added in
+the initialization phase or current transition function are shown.
+
+The keyword `max` determine the maximal number of shown agents.
 
 """
 show_agents(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
@@ -69,7 +74,7 @@ shown per network (per direction).
 
 The optional `stateof` argument controls whether the state of the edge
 (the default) or the state of the adjacent agent (for any value except
-:Edge) is printed.
+:Edge) is displayed.
 
 """
 function show_random_agent(sim, t::Type{T}; kwargs...) where T
@@ -89,41 +94,19 @@ function show_random_agent(sim, t::Type{T}; kwargs...) where T
     show_agent(sim, rand(agents), t; kwargs...)
 end
 
-
 """
-    show_agent(sim, nth, ::Type{T}; kwargs...) 
+    show_agent(sim, id, Type{T}; nedges=5, stateof=:Edge) 
 
-Display detailed information about the `nth` created agent of type `T`.
+Display detailed information about the agent with ID `id`, or in the
+case that id is a value < 2^32, the information of the nth agent
+of type T created.
 
 The optional arg `nedges` controls the maximal number of edges that are
 shown per network (per direction).
 
 The optional `stateof` argument controls whether the state of the edge
 (the default) or the state of the adjacent agent (for any value except
-:Edge) is printed.
-"""
-# function show_agent(sim, nth, t::Type{T}; kwargs...) where T
-#     show_agent(sim,
-#                agent_id(sim.typeinfos.nodes_type2id[T], UInt32(nth)),
-#                t;
-#                kwargs...
-#                    )
-# end
-
-
-
-
-"""
-    show_agent(sim, id::AgentID; nedges=5, stateof=:Edge) 
-
-Display detailed information about the agent with ID `id`.
-
-The optional arg `nedges` controls the maximal number of edges that are
-shown per network (per direction).
-
-The optional `stateof` argument controls whether the state of the edge
-(the default) or the state of the adjacent agent (for any value except
-:Edge) is printed.
+:Edge) is displayed.
 """
 function show_agent(sim,
              id,

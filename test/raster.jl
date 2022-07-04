@@ -56,7 +56,7 @@ raster_model = ModelTypes() |>
     apply_transition!(sim, diffuse, [GridA], [GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 25
 
-    raster = calc_raster(sim, :grid, c -> c.active, GridA)
+    raster = calc_rasterstate(sim, :grid, c -> c.active, GridA)
     @test raster[1,3] == false
     @test raster[1,1] == true
     @test raster[4,4] == false
@@ -306,7 +306,7 @@ end
     finish_init!(sim)
 
     apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
-    raster = calc_raster_flexible(sim, :raster, c -> c.sum)
+    raster = calc_rasterstate_flexible(sim, :raster, c -> c.sum)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
@@ -318,7 +318,7 @@ end
                       [ OnPosition ],
                       [ OnPosition ])
     apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
-    raster = calc_raster_flexible(sim, :raster, c -> c.sum)
+    raster = calc_rasterstate_flexible(sim, :raster, c -> c.sum)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 0

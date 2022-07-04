@@ -75,17 +75,14 @@ end
 """
     edges_to(sim, id::AgentID, ::Type{E}) 
 
-If `E` has the trait :SingleEdge
-    Returns the incoming edge of type `E` for agent `id`.
-else
-    Returns a vector of all incoming edges of type `E` for agent `id`.
+Returns the edge of type `E` with agent `id` as target if `E` has
+the trait :SingleEdge, or a vector of these edges otherwise.
 
-In the case that there is no incoming edge for this agent, `edges_to`
-returns `nothing`.
+If there is no edge with agent `id` as target, `edges_to` returns `nothing`.
 
 edges_to is not defined if `E` has the trait :IgnoreFrom or :Stateless.
 
-See also [`apply_transition!`](@ref), [`neighborids`](@ref),
+See also [`apply_transition!`](@ref), [`checked`](@ref), [`neighborids`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
@@ -94,19 +91,15 @@ function edges_to(::__MODEL__, id::AgentID, edgetype::Type) end
 """
     neighborids(sim, id::AgentID, ::Type{E}) 
 
-If `E` has the trait :SingleEdge
-    Returns the id of the agent on the incoming side of the edge of
-    type `E` that is pointing to agent `id` .
-else
-    Returns a vector of all ids of agents on the incoming side of
-    edges of type `E` that are pointing to agent `id` .
+Returns the ID of the agent on the source side of the edge of type `E`
+with agent `id` as target if `E` has the property :SingleEdge, or otherwise
+a vector of the IDs of the agents on the source side of those edges.
 
-In the case that there is no incoming edge for agent `id`, `neighborids`
-returns `nothing`.
+If there is no edge with agent `id` as target, `neighborids` returns `nothing`.
 
 `neighborids` is not defined if `E` has the trait :IgnoreFrom.
 
-See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+See also [`apply_transition!`](@ref), [`checked`](@ref), [`edges_to`](@ref),
 [`edgestates`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
@@ -115,17 +108,14 @@ function neighborids(::__MODEL__, id::AgentID, edgetype::Type) end
 """
     edgestates(sim, id::AgentID, ::Type{E}) 
 
-If `E` has the trait :SingleEdge
-    Returns the state of edge of type `E` that is pointing to agent `id` .
-else
-    Returns a vector of all states of edges of type `E` that are pointing to agent `id` .
+Returns the state of the edge of type `E` with agent `id` as target if `E` has
+property :SingleEdge, or a vector of these states otherwise.
 
-In the case that there is no incoming edge for agent `id`, `edgestates`
-returns `nothing`.
+If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 
 `edgestates` is not defined if `E` has the trait :Stateless.
 
-See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+See also [`apply_transition!`](@ref), [`checked`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`neighborstates`](@ref)
 """
@@ -134,19 +124,16 @@ function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
 """
     neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
 
-If `E` has the trait :SingleEdge
-    Returns the state of the agent with type `A` on the incoming side
-    of the edge of type `E` that is pointing to agent `id` .
-else
-    Returns a vector of all states of agents with type `A` on the
-    incoming side of edges of type `E` that are pointing to agent `id`
+Returns the state of the agent with type `A` on the source side of the
+edge of type `E` with agent `id` as target if `E` has the trait
+:SingleEdge, or a vector of these agent states otherwise.
 
-In the case that there is no incoming edge for agent `id`,
-`neighborstates` returns `nothing`.
+If there is no edge with agent `id` as target, `neighborstates`
+returns `nothing`.
 
-When the agents on the incoming side of the edges can have different
-types, it is maybe impossible to determine the Type{A}. Use
-[`neighborstates_flexible`](@ref) in this case.
+When the agents on the source side of the edges can have different
+types, and it is impossible to determine the Type{A} you can use
+[`neighborstates_flexible`](@ref) instead.
 
 `neighborstates` is not defined if T has the trait :IgnoreFrom.
 
@@ -157,7 +144,7 @@ using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
 for the agents whose state is actually used in the transition
 function.
 
-See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+See also [`apply_transition!`](@ref), [`checked`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
@@ -169,15 +156,12 @@ neighborstates(sim, id::AgentID, edgetype::Type, agenttype::Type) =
 """
     neighborstates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 
 
-If `E` has the trait :SingleEdge
-    Returns the state of the agent on the incoming side
-    of the edge of type `E` that is pointing to agent `id` .
-else
-    Returns a vector of all states of agents on the
-    incoming side of edges of type `E` that are pointing to agent `id`
+Returns the state of the agent on the source side of the
+edge of type `E` with agent `id` as target if `E` has the trait
+:SingleEdge, or a vector of these agent states otherwise.
 
-In the case that there is no incoming edge for agent `id`,
-`neighborstates_flexible` returns `nothing`.
+If there is no edge with agent `id` as target, `neighborstates_flexible`
+returns `nothing`.
 
 `neighborstates_flexible` is the type instable version of
 [`neighborstates`](@ref) and should be only used in the case that the
@@ -192,7 +176,7 @@ using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
 for the agents whose state is actually used in the transition
 function.
 
-See also [`apply_transition!`](@ref), [`edges_to`](@ref),
+See also [`apply_transition!`](@ref), [`checked`](@ref), [`edges_to`](@ref),
 [`neighborids`](@ref), [`num_neighbors`](@ref), [`has_neighbor`](@ref)
 and [`edgestates`](@ref)
 """
@@ -206,7 +190,7 @@ end
 """
     num_neighbors(sim, id::AgentID, ::Type{E}) 
 
-Returns the number of incoming edges of type `E` for agent `id`.
+Returns the number of edges of type `E` with agent `id` as target.
 
 `num_neighbors` is not defined if T has the trait :SingleEdge
 
@@ -219,7 +203,8 @@ function num_neighbors(::__MODEL__, id::AgentID, edgetype::Type) end
 """
     has_neighbor(sim, id::AgentID, ::Type{E}) 
 
-Returns true if agent `id` has at least one incoming edge of type `E`.
+Returns true if there is at least one edge of type `E` with agent `id` as
+target.
 
 `has_neighbor` is not defined if T has the :SingleEdge and :SingleType
 traits, with the exception that it has also the :IgnoreFrom and

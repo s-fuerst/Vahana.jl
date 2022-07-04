@@ -52,7 +52,10 @@ add_raster!
 
 Such a raster is only a collection of nodes in the graph incl. an
 Vahana internal mapping from the cartesian coordinates to the cell
-IDs. Beside this mapping, cells are also just agents. 
+IDs. Beside this mapping, cells are also just agents, but there are
+some Vahana functions like [`calc_raster`](@ref) that utilize the
+internal cartesian coordinates to create a n-dimensional
+representation of the state space.
 
 The ID and the state of the cells can not be accessed directly,
 instead it's necessary to create edges between the cells, or between

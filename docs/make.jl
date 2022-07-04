@@ -18,17 +18,17 @@ Literate.markdown(joinpath(@__DIR__, "examples", "tutorial1.jl"), "src"; execute
 #Literate.markdown(joinpath(@__DIR__, "examples", "tutorial2.jl"), "src"; execute = false)
 
 makedocs(sitename="Vahana Documentation",
+#         format = Documenter.LaTeX(),
          format = Documenter.HTML(prettyurls = false),
          pages = [
              "Introduction" => "index.md",
              "Tutorial" => "tutorial1.md",
              "Performance Tuning" => "performance.md",
              "API" => [
-#                 "Types" => "types.md",
                  "Model Definition" => "definition.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
-                 "Between transitions" => "between.md",
+                 "Global Layer" => "between.md",
                  "REPL helpers" => "repl.md",
                  "Configuration" => "config.md"
                  # "All" => "index.md"

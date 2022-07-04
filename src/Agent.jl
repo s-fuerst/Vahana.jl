@@ -96,7 +96,7 @@ function add_agent!(::__MODEL__, agent) end
 
 
 """
-    add_agents!(sim, agents) -> Vector{AgentID}
+    add_agents!(sim, agents)::Vector{AgentID}
 
 Add multiple agents at once to the simulation `sim`.
 
@@ -127,7 +127,7 @@ function add_agents!(sim, agents...)
 end
 
 """
-    agentstate(sim, id::AgentID, Type{T}) -> T
+    agentstate(sim, id::AgentID, Type{T})::T
 
 Returns the state of an agent of type T.
 
@@ -136,10 +136,14 @@ In the case where the type T is not determinable when writing the code
 [`edges_to`](@ref) can return agentID of different agent types),
 [`agentstate_flexible`](@ref) must be used instead.
 
-Warning: if agentstate is called with a Type{T} that does not match the
-type of the agent with `id` and the vahana assertions are disabled via
-[`enable_asserts`](@ref), then it is possible that the state of
-another agent will be returned.
+!!! warning 
+
+    if agentstate is called with a Type{T} that does not match the
+    type of the agent with `id` and the vahana assertions are disabled via
+    [`enable_asserts`](@ref), then it is possible that the state of
+    an incorrect agent will be returned. When the assertions are active,
+    there is a runtime check that the agent with the ID `id` has indeed
+    the type T.
 """
 function agentstate(::__MODEL__, ::AgentID, ::Type{T}) where T end
 

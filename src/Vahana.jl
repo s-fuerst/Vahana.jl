@@ -10,7 +10,7 @@ export enable_asserts, suppress_warnings, detect_stateless_trait
 # calls to the function with a wrong type for the simulation parameter.
 
 """
-    __MODEL__ is a documentation placeholder for type of the
+    __MODEL__ is a documentation placeholder for the type of the
 simulation that is returned from the [`new_simulation`](@ref)
 call. The concrete type depends on the [`ModelTypes`](@ref) of the
 [`construct_model`](@ref) call, the concrete type name is the name of

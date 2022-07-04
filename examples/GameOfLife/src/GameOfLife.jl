@@ -45,29 +45,29 @@ function countactive!(sim)
 end
 
 function addgrid!(sim)
-    dims = param(sim, :dims)
-    spm4c(c::Cell) = sparse([c.pos[1]], [c.pos[2]],
-                            [c.active],
-                            dims[1], dims[2])
-    pushglobal!(sim, :grid, aggregate(sim, spm4c, +, Cell))
+#    r = calc_rasterstate(sim, :raster, c -> c.active, Cell)
+    r = calc_raster(sim, :raster) do id
+        agentstate(sim, id, Cell).active
+    end
+    
+    pushglobal!(sim, :grid, sparse(r))
 end 
 
-ModelTypes() |>
+model = ModelTypes() |>
     register_agenttype!(Cell) |>
     register_edgetype!(Neighbor) |>
-    construct("Game of Life", nothing, nothing)
+    construct_model("Game of Life")
 
 
 function init(params::Params)
-    sim = ModelTypes() |>
-        register_agenttype!(Cell) |>
-        register_edgetype!(Neighbor) |>
-        construct("Game of Life", params, Globals(Vector(), Vector()))
+    sim = new_simulation(model, params, Globals(Vector(), Vector()))
 
-    add_raster!(sim, 
+    add_raster!(sim,
+                :raster,
                 param(sim, :dims),
-                pos -> rand() < 0.2 ? Cell(true, pos) : Cell(false, pos),
-                Neighbor())
+                pos -> rand() < 0.2 ? Cell(true, pos) : Cell(false, pos))
+
+    connect_raster_neighbors!(sim, :raster, (_,_) -> Neighbor())
 
     finish_init!(sim)
 

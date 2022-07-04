@@ -4,7 +4,9 @@ using DelimitedFiles
 
 import Base.+
 
-    include("FakeRandomGen.jl")
+include("FakeRandomGen.jl")
+
+detect_stateless_trait(true)
 
 @enum EventType Arrival=1 Depature=0
 
@@ -108,28 +110,28 @@ function handle_leave(persons, edge, sim, lid)
     day = getglobal(sim, :day)
     minute::Int64 = floor(day * 24 * 60 + edge.state.time)
 
-    p = agentstate(sim, edge.from, Val(Person))
+    p = agentstate(sim, edge.from, Person)
 
     if p.health == S
         Σ = 0
         for (oid, otime) in persons
-            o = agentstate(sim, oid, Val(Person))
+            o = agentstate(sim, oid, Person)
             if o.health == I && not_in_quarantine(o) 
                 Σ += min(minute - ptime, minute - otime)
             end
         end
         prob = 1.0 - exp(param(sim, :θ) * Σ)
         if rand() < prob
-            add_edge!(sim, lid, pid, Infection)
+            add_edge!(sim, lid, pid, Infection())
         end
     elseif p.health == I && not_in_quarantine(p)
         for (oid, otime) in persons
-            o = agentstate(sim, oid, Val(Person))
+            o = agentstate(sim, oid, Person)
             if o.health == S 
                 time = floor(min(minute - ptime, minute - otime))
                 prob = 1.0 - exp(param(sim, :θ) * time)
                 if rand() < prob
-                    add_edge!(sim, lid, oid, Infection)
+                    add_edge!(sim, lid, oid, Infection())
                 end
             end
         end
@@ -138,7 +140,7 @@ function handle_leave(persons, edge, sim, lid)
     # For simplicity I ignore optimization checks like health != R
     if not_in_quarantine(p) 
         for oid in keys(persons)
-            o = agentstate(sim, oid, Val(Person))
+            o = agentstate(sim, oid, Person)
             if pid != oid &&
                 not_in_quarantine(o) &&
                 rand() < param(sim, :tracing)
@@ -152,9 +154,9 @@ end
 
 function contact_model(p::Person, id::AgentID, sim)
     day = getglobal(sim, :day)
-    for c in edges_to(sim, id, Val(Contact))
-        if c.state.day > day - 2
-            add_edge!(sim, id, c)
+    checked(foreach, edges_to(sim, id, Contact)) do edge
+        if edge.state.day > day - 2
+            add_edge!(sim, id, edge)
         end
     end
     p
@@ -164,11 +166,11 @@ function contact_model(l::Location, id::AgentID, sim)
     # persons at location, entered at which time
     persons = Dict{AgentID, Int64}()
 
-    for edge in edges_to(sim, id, Val(EndOfDay))
+    checked(foreach, edges_to(sim, id, EndOfDay)) do edge
         persons[edge.from] = edge.state.time
     end
 
-    event_edges = edges_to(sim, id, Val(MovementEvent))
+    event_edges = edges_to(sim, id, MovementEvent)
     for edge in event_edges
         event = edge.state
         if event.type == Arrival
@@ -195,7 +197,7 @@ end
 
 function disease_progression(p::Person, id, sim)
     ## was check_infection
-    if length(edges_to(sim, id, Val(Infection))) > 0
+    if has_neighbor(sim, id, Infection)
         return change_health(p, E, sim)
     end
 
@@ -205,8 +207,8 @@ function disease_progression(p::Person, id, sim)
     if p.health == E && p.health_changed == day - 3
         if rand() < 0.5
             p = start_quarantine(p, day)
-            for c in edges_to(sim, id, Val(Contact))
-                add_edge!(sim, id, c.from, Inform)
+            checked(foreach, neighborids(sim, id, Contact)) do nid
+                add_edge!(sim, id, nid, Inform())
             end
         end
         change_health(p, I, sim)
@@ -220,7 +222,7 @@ end
 function quarantine(p::Person, id, sim)
     day = getglobal(sim, :day)
 
-    if length(edges_to(sim, id, Val(Inform))) > 0 && p.quarantine_start < 0
+    if has_neighbor(sim, id, Inform) && p.quarantine_start < 0
         return Person(p.health, p.health_changed, day)
     elseif p.quarantine_start + 14 == day
         return Person(p.health, p.health_changed, -1)
@@ -258,7 +260,7 @@ function init(sim, filename)
 
     finish_init!(sim)
 
-    pushglobal!(sim, :reports, aggregate(sim, Val(Person), Report, +))
+    pushglobal!(sim, :reports, aggregate(sim, Report, +, Person))
 
     sim
 end
@@ -281,14 +283,14 @@ function runstep!(sim)
                       [ Inform ],
                       [])
 
-    report = aggregate(sim, Val(Person), Report, +)
+    report = aggregate(sim, Report, +, Person)
     pushglobal!(sim, :reports, report)
     println(report)
     sim
 end
 
 function runsimulation(sim)
-    init(sim, "events-mini.txt")
+    init(sim, "events-small.txt")
 
     for _ in 1:20
         runstep!(sim)
@@ -304,10 +306,9 @@ const sim = ModelTypes() |>
         register_edgetype!(EndOfDay) |>
         register_edgetype!(Infection) |>
         register_edgetype!(Inform) |>
-        construct("Episim-Nutshell",
-                  Params(θ=-0.001, tracing=0.25),
-                  Globals(reports = Vector(),
-                          day = 0))
+        construct_model("Episim-Nutshell") |>
+        new_simulation(Params(θ=-0.001, tracing=0.25),
+                       Globals(reports = Vector(), day = 0))
 
 
 #@report_opt runsimulation()

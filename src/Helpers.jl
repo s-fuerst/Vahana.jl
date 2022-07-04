@@ -13,7 +13,7 @@ Example:
 
 Instead of writing 
 
-```
+```@example
 nids = neighborids(sim, id, Contact)
 if nids != nothing
     foreach(nids) do nid
@@ -24,7 +24,7 @@ end
 
 you can use the checked function to write
 
-```
+```@example
 checked(foreach, neighborids(sim, id, Contact)) do nid
     add_edge!(sim, id, nid, Inform())
 end

@@ -4,3 +4,5 @@ Type specification(s) are at the end of the argument list
 
 For all raster related functions:
 - raster symbol is the second parameter
+
+	When functions are argument, there is always a version where the function is the first argument (ausnahme: aggregate)

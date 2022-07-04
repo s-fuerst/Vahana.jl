@@ -1,7 +1,7 @@
 import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
-export calc_raster, calc_raster_flexible, move_to!
+export calc_raster, calc_rasterstate, calc_rasterstate_flexible, move_to!
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
@@ -122,24 +122,80 @@ function connect_raster_neighbors!(sim,
 end
 
 """
-    calc_raster(sim, name::Symbol, f)
+    calc_raster(sim, raster::Symbol, f)
 
-Calculate the values for a raster `name` by applying `f` to each
-agentstate of the agents constructed by the `add_raster!` function.
+Calculate values for the raster `raster` by applying `f` to each
+cell ID of the cells constructed by the `add_raster!` function.
 
-Returns a matrix with those values.
+If the results of calc_raster depend only on the state of the cells
+(as in the following example) and all cells have the same type,
+[`calc_rasterstate`](@ref) and [`calc_rasterstate_flexible`](@ref) can
+be used as concise alternatives.
 
-See also [`add_raster!`](@ref)
+Returns a n-dimensional array (with the same dimensions as `raster`)
+with those values.
+
+Example
+
+The following code from the "Game of Life" example generates a
+Boolean matrix indicating which cells are alive (and therefore
+maps the internal graph structure to the usual representation of a
+cellular automaton):
+
+```@example
+    calc_raster(sim, :raster) do id
+        agentstate(sim, id, Cell).active
+    end
+```
+
+See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim, name::Symbol, f, t::Type{T}) where T
-    map(id -> agentstate(sim, id, t) |> f, sim.rasters[name])
+function calc_raster(sim, raster::Symbol, f) 
+    map(f, sim.rasters[raster])
 end
 
-function calc_raster_flexible(sim, name::Symbol, f)
-    map(id -> agentstate_flexible(sim, id) |> f, sim.rasters[name])
+calc_raster(f, sim, raster::Symbol) = calc_raster(sim, raster, f)
+
+
+"""
+    calc_rasterstate(sim, raster::Symbol, f, t::Type{T})
+
+Combined calc_raster with agentstate for the cells of the raster.
+
+Calculate values for the raster `raster` by applying `f` to the state of each
+cell.
+
+Returns a n-dimensional array (with the same dimensions as `raster`)
+with those values.
+
+Example
+
+Instead of
+```@example
+    calc_raster(sim, :raster) do id
+        agentstate(sim, id, Cell).active
+    end
+```
+it also possible to just write
+```@example
+    calc_rasterstate(sim, :raster, s -> s.active, Cell)
+```
+    
+See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
+"""
+function calc_rasterstate(sim, raster::Symbol, f, t::Type{T}) where T
+    map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
 end
 
+# """
+#     calc_rasterstateflexible(sim, raster::Symbol, f, t::Type{T})
+# """
+# function calc_rasterstate_flexible(sim, raster::Symbol, f)
+#     map(id -> agentstate_flexible(sim, id) |> f, sim.rasters[raster])
+# end
 
+
+# this is an Vahana internal function
 """
     cellid(sim, name::Symbol, pos)
 
