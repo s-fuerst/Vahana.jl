@@ -44,9 +44,42 @@ end
 
 
 
+
+function _stencil_core(metric, n::Int64, distance, d::Int64)
+    @assert metric in [ :chebyshev, :euclidean, :manhatten ]
+
+    stencil = Iterators.product([ (-d):d for _ in 1:n ]...) |> collect
+    stencil = reshape(stencil, length(stencil))
+    # remove the zero point from the list, as we do not want to create loops
+    filter!(s -> s !== zero(CartesianIndex{n}), stencil)
+    
+    if metric == :euclidean
+        filter!(s -> LinearAlgebra.norm(s) <= distance, stencil) 
+    elseif metric == :manhatten
+        filter!(s -> mapreduce(abs, +, s) <= distance, stencil)
+    end
+    map(CartesianIndex, stencil)
+end
+
+
+const stencil_cache = Dict{Tuple{Symbol, Int64, Int64}, Array{CartesianIndex}}()
+
+function stencil(metric, n::Int64, distance::Int64)
+    get!(stencil_cache, (metric, n, distance)) do
+        _stencil_core(metric, n, distance, distance)
+    end
+end
+
+
+function stencil(metric, n::Int64, distance::Float64)
+    d = distance |> floor |> Int
+    _stencil_core(metric, n, distance, d)
+end
+
+
+
 """
     connect_raster_neighbors!(sim, name::Symbol, edge_constructor; distance::Int, metric:: Symbol, periodic::Bool)
-
 
 All cells that are at most `distance` from each other (using the metric
 `metric`) are connected with edges, where the edges are created with
@@ -78,43 +111,16 @@ function connect_raster_neighbors!(sim,
                             distance = 1,
                             metric::Symbol = :chebyshev,
                             periodic = true)
-    # CartesianIndices are immutable, this function "replaces" setindex! 
-    replace_idx(ci::CartesianIndex, pos, value) = 
-        CartesianIndex([ (i == pos ? value : ci[i]) for i in 1:length(ci) ]...)
 
-    @assert metric in [ :chebyshev, :euclidean, :manhatten ]
+    raster = sim.rasters[name]
+    dims = size(raster)
+    st = stencil(metric, ndims(raster), distance)
 
-    grid = sim.rasters[name]
-    dims = size(grid)
-    n = ndims(grid)
-    d = distance |> floor |> Int
-    shift = Iterators.product([ (-d):d for _ in 1:n ]...) |> collect
-    shift = reshape(shift, length(shift))
-    # remove the zero point from the list, as we do not want to create loops
-    filter!(s -> s !== zero(CartesianIndex{n}), shift)
-    
-    if metric == :euclidean
-        filter!(s -> LinearAlgebra.norm(s) <= distance, shift) 
-    elseif metric == :manhatten
-        filter!(s -> mapreduce(abs, +, s) <= distance, shift)
-    end
-
-    for s in map(CartesianIndex, shift)
-        for org in keys(grid)
-            shifted = org + s
-            ignore = false
-            for i in 1:length(dims)
-                if shifted[i] < 1 || shifted[i] > dims[i]
-                    if periodic
-                        modval = mod1(shifted[i], dims[i])
-                        shifted = replace_idx(shifted, i, modval)
-                    else
-                        ignore = true
-                    end
-                end
-            end
-            if ! ignore
-                add_edge!(sim, grid[org], grid[shifted],
+    for org in keys(raster)
+        for s in st
+            shifted = _checkpos(org + s, dims, periodic)
+            if ! isnothing(shifted)
+                add_edge!(sim, raster[org], raster[shifted],
                           edge_constructor(org, shifted))
             end
         end
@@ -211,7 +217,7 @@ end
 
 
 """
-    move_to!(sim, name::Symbol, id::AgentID, pos, edge_from_raster, edge_to_raster) 
+    move_to!(sim, name::Symbol, id::AgentID, pos, edge_from_raster, edge_to_raster; distance = 0, metric = :chebyshev, periodic = true) 
 
 Creates up to two edges of type between the agent with ID `id` and the cell from the raster `name` at the position `pos`.
 
@@ -227,6 +233,8 @@ source node and the cell as target node. `edge_to_raster` can be
 `nothing`, in this case no edge will be added with the agent as source
 node.
 
+TODO DOC: distance etc.
+
 See also [`add_raster!`](@ref), [`raster_nodeid`](@ref) and [`add_edge!`](@ref) 
 """
 function move_to!(sim,
@@ -234,15 +242,58 @@ function move_to!(sim,
            id::AgentID,
            pos,
            edge_from_raster,
-           edge_to_raster) 
-    posid = cellid(sim, name, pos)
+           edge_to_raster;
+           distance = 0,
+           metric::Symbol = :chebyshev,
+           periodic = true)
+    raster = sim.rasters[name]
+    dims = size(raster)
+    st = stencil(metric, ndims(raster), distance)
+    pos = CartesianIndex(pos)
+
     if ! isnothing(edge_from_raster)
-        add_edge!(sim, posid, id, edge_from_raster)
+        add_edge!(sim, raster[pos], id, edge_from_raster)
     end
     if ! isnothing(edge_to_raster)
-        add_edge!(sim, id, posid, edge_to_raster)
+        add_edge!(sim, id, raster[pos], edge_to_raster)
+    end
+
+    if distance >= 1 
+        for s in st
+            shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)
+            if ! isnothing(shifted)
+                if ! isnothing(edge_from_raster)
+                    add_edge!(sim, raster[shifted], id, edge_from_raster)
+                end
+                if ! isnothing(edge_to_raster)
+                    add_edge!(sim, id, raster[shifted], edge_to_raster)
+                end
+            end
+        end
     end
 end
 
-# TODO
-# move_to! mit Radius (name ist mir unklar)
+function _checkpos(pos::CartesianIndex, dims, periodic)
+    cpos = Array{Int64}(undef, length(dims))
+    outofbounds = false
+    for i in 1:length(dims)
+        if pos[i] < 1 || pos[i] > dims[i]
+            outofbounds = true
+            cpos[i] = mod1(pos[i], dims[i])
+        else
+            cpos[i] = pos[i]
+        end
+    end
+    if ! outofbounds
+        pos
+    else
+        if periodic
+            CartesianIndex(cpos...)
+        else
+            nothing
+        end
+    end
+end
+
+
+

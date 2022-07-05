@@ -20,7 +20,7 @@
 export AgentID, AgentNr
 export agent_id
 export TypeID
-export type_nr
+export type_of
 
 export add_agent!, add_agents!
 export agentstate, agentstate_flexible
@@ -63,6 +63,14 @@ function type_nr(id::AgentID)::TypeID
     id >> (BITS_PROCESS + BITS_AGENTNR)
 end
 
+
+"""
+TODO DOC (und testen)
+"""
+function type_of(sim, id::AgentID)
+    sim.typeinfos.nodes_types[type_nr(id)]
+end
+    
 function process_nr(id::AgentID)::ProcessID
     (id >> (BITS_AGENTNR)) & (2 ^ BITS_PROCESS - 1)
 end

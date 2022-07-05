@@ -94,12 +94,14 @@ detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 
 ######################################## include all other files
 
+
+include("Helpers.jl")
+
 include("Agent.jl")
 include("Edge.jl")
 
 include("ModelTypes.jl")
 
-include("FactoryHelpers.jl")
 include("EdgeFieldFactory.jl")
 include("NodeFieldFactory.jl")
 
@@ -114,5 +116,4 @@ include("REPL.jl")
 include("GraphsSupport.jl")
 include("Raster.jl")
 
-include("Helpers.jl")
 end

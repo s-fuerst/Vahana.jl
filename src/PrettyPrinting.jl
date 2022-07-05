@@ -45,11 +45,26 @@ function construct_prettyprinting_functions(simsymbol)
             end
         end
 
-        function show_struct(io::IO, s, name)
+        function show_raster(io::IO, s)
+            if length(s.rasters) >= 1 
+                printstyled(io, "\nRaster(s):"; color = :cyan)
+                for (k,v) in sim.rasters
+#                    print(io, "\n\t $k: $(getfield(s, k))")
+                    print(io, "\n\t :$k with dimension $(size(v))")
+                end
+            end
+        end
+
+        
+        function show_struct(io::IO, s, name, withvalues)
             if nfields(s) >= 1 
                 printstyled(io, "\n$(name)(s):"; color = :cyan)
                 for k in typeof(s) |> fieldnames
-                    print(io, "\n\t $k: $(getfield(s, k))")
+                    if withvalues
+                        print(io, "\n\t :$k : $(getfield(s, k))")
+                    else
+                        print(io, "\n\t :$k")
+                    end
                 end
             end
         end
@@ -58,11 +73,12 @@ function construct_prettyprinting_functions(simsymbol)
         if sim.modelname != sim.name
             printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
         end
-        show_struct(io, sim.params, "Parameter")
+        show_struct(io, sim.params, "Parameter", true)
         show_agent_types(io, sim)
         show_edge_types(io, sim)
+        show_raster(io, sim)
         #   print(io, "Globals: ", sim.globals)
-        show_struct(io, sim.globals, "Global")
+        show_struct(io, sim.globals, "Global", false)
     end
 end
 

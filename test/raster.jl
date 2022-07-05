@@ -293,7 +293,6 @@ end
     connect_raster_neighbors!(sim,
                               :raster,
                               (_,_) -> GridE())
-    
 
     p1 = add_agent!(sim, MovingAgent(1))
     p2 = add_agent!(sim, MovingAgent(2))
@@ -306,7 +305,7 @@ end
     finish_init!(sim)
 
     apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
-    raster = calc_rasterstate_flexible(sim, :raster, c -> c.sum)
+    raster = calc_rasterstate(sim, :raster, c -> c.sum, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
@@ -318,7 +317,7 @@ end
                       [ OnPosition ],
                       [ OnPosition ])
     apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
-    raster = calc_rasterstate_flexible(sim, :raster, c -> c.sum)
+    raster = calc_rasterstate(sim, :raster, c -> c.sum, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 0
