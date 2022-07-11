@@ -1,4 +1,4 @@
-import LinearAlgebra
+ import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
 export calc_raster, calc_rasterstate, calc_rasterstate_flexible, move_to!

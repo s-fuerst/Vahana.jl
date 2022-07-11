@@ -98,13 +98,14 @@ The following functions can be used to access the graph in
 [`apply_transition!`](@ref), but the availability of this functions
 depends on the edge type traits:
 
-| function                                        | not available for edge type with the trait (combination)                      |
-|:------------------------------------------------|:------------------------------------------------------------------------------|
-| [`edges_to`](@ref)                              | `:IgnoreFrom` or `:Stateless`                                                 |
-| [`neighborids`](@ref), [`neighborstates`](@ref) | `:IgnoreFrom`                                                                 |
-| [`edgestates`](@ref), [`aggregate`](@ref)       | `:Stateless`                                                                  |
-| [`num_neighbors`](@ref)                         | `:SingleEdge`                                                                 |
-| [`has_neighbor`](@ref)                          | see below |
+| function                                  | not available for edge type with the trait (combination) |
+|:------------------------------------------|:---------------------------------------------------------|
+| [`edges_to`](@ref)                        | `:IgnoreFrom` or `:Stateless`                            |
+| [`neighborids`](@ref)                     | `:IgnoreFrom`                                            |
+| [`neighborstates`](@ref)                  | `:IgnoreFrom` or `:SingleEdge`                           |
+| [`edgestates`](@ref), [`aggregate`](@ref) | `:Stateless`                                             |
+| [`num_neighbors`](@ref)                   | `:SingleEdge`                                            |
+| [`has_neighbor`](@ref)                    | see below                                                |
 
 The function [`has_neighbor`](@ref) has a complicated rule. This
 function is not available for edge types with the trait combination

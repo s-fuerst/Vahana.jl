@@ -135,7 +135,7 @@ When the agents on the source side of the edges can have different
 types, and it is impossible to determine the Type{A} you can use
 [`neighborstates_flexible`](@ref) instead.
 
-`neighborstates` is not defined if T has the trait :IgnoreFrom.
+`neighborstates` is not defined if T has the trait :IgnoreFrom or :SingleEdge
 
 In a parallel run, this function can trigger communication between
 processes. In the case that the state of ALL agents is not needed in
@@ -150,8 +150,15 @@ and [`edgestates`](@ref)
 """
 function neighborstates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Type) end
 
-neighborstates(sim, id::AgentID, edgetype::Type, agenttype::Type) =
-    map(id -> agentstate(sim, id, agenttype), neighborids(sim, id, edgetype))  
+function neighborstates(sim, id::AgentID, edgetype::Type, agenttype::Type) 
+    @mayassert !(:SingleEdge in sim.typeinfos.edges_attr[edgetype][:traits]) """
+    neighborstates is not defined for $edgetype, as the :SingleEdge trait is set
+    """
+    checked(map, neighborids(sim, id, edgetype)) do id
+        agentstate(sim, id, agenttype)
+    end
+end
+
 
 """
     neighborstates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 

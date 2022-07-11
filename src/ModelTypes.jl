@@ -147,7 +147,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
     if :HasEdgeOnly in traits
         union!(traits, Set([:Stateless, :IgnoreFrom, :SingleEdge]))
     end
-    if show_single_edge_and_type_warning && :SingleEdge in traits && !config.quiet
+    if show_single_edge_and_type_warning && :SingleEdge in traits && !config.quiet &&
         :SingleAgentType in traits && !(:IgnoreFrom in traits && :Stateless in traits) 
         
         show_single_edge_and_type_warning = false

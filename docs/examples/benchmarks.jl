@@ -142,13 +142,13 @@ end
 
 ######################################## create edge table
 
-# println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
+println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 
-# for t in allEdgeTypes
-#     mt = prepare(t)
-#     run_benchmark(mt, t)
-#     GC.gc()
-# end
+for t in allEdgeTypes
+    mt = prepare(t)
+    run_benchmark(mt, t)
+    GC.gc()
+end
     
 ######################################## raster move_to!
 
@@ -173,12 +173,12 @@ const sim = ModelTypes() |>
     new_simulation(nothing, nothing)
 
 add_raster!(sim,
+            :grid,
             (20, 12),
-            _ -> GridNode(),
-            GridEdge();
-            name = :grid)
+            _ -> GridNode())
 
 id = add_agent!(sim, MovingAgent())
+
 
 @benchmark move_to!(sim, :grid, id, (4, 3), nothing, nothing)
 
