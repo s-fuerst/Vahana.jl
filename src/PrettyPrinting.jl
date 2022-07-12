@@ -38,9 +38,12 @@ function construct_prettyprinting_functions(simsymbol)
                     (:SingleAgentType in edgetypetraits &&
                     :size in keys(sim.typeinfos.edges_attr[t]))
                     print(io, "\n\t Type $t") 
-                else 
+                else
                     print(io, "\n\t Type $t \
-                               with $(_show_num_edges(sim, t)) Edges(s) for $(_show_length(sim, t)) Agent(s)")
+                               with $(_show_num_edges(sim, t)) Edges(s)")
+                    if ! (:SingleAgentType in edgetypetraits)
+                        print(io, " for $(_show_length(sim, t)) Agent(s)")
+                    end
                 end
             end
         end
@@ -69,7 +72,7 @@ function construct_prettyprinting_functions(simsymbol)
             end
         end
         
-        printstyled(io, "Model Name:", sim.modelname; color = :magenta)
+        printstyled(io, "Model Name: ", sim.modelname; color = :magenta)
         if sim.modelname != sim.name
             printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
         end
@@ -138,7 +141,7 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             print(" $(agentstate(sim, aid, agentT))")
         else
-            print(" $(agentstate_flexible(sim, e.from)))")
+            print(" $(agentstate_flexible(sim, e.from))")
         end
     end
 end

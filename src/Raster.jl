@@ -51,8 +51,8 @@ function _stencil_core(metric, n::Int64, distance, d::Int64)
     stencil = Iterators.product([ (-d):d for _ in 1:n ]...) |> collect
     stencil = reshape(stencil, length(stencil))
     # remove the zero point from the list, as we do not want to create loops
-    filter!(s -> s !== zero(CartesianIndex{n}), stencil)
-    
+    filter!(s -> s !== Tuple(zeros(Int64, n)), stencil)
+
     if metric == :euclidean
         filter!(s -> LinearAlgebra.norm(s) <= distance, stencil) 
     elseif metric == :manhatten
@@ -257,7 +257,7 @@ function move_to!(sim,
     if ! isnothing(edge_to_raster)
         add_edge!(sim, id, raster[pos], edge_to_raster)
     end
-
+    
     if distance >= 1 
         for s in st
             shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)

@@ -283,7 +283,7 @@ end
         MovingAgent(value)
     end
 
-    sim = new_simulation(raster_model, "Raster NodeID", nothing)
+    sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
                 :raster,
@@ -322,5 +322,56 @@ end
     @test raster[1,2] == 0
     @test raster[2,2] == 0
     @test raster[5,5] == 10
+end
+
+@testset "MoveTo_Dist" begin
+    sim = new_simulation(raster_model, nothing, nothing)
+
+    add_raster!(sim,
+                :raster,
+                (10,10),
+                _ -> Position(0))
+
+    
+    p1 = add_agent!(sim, MovingAgent(1))
+    p2 = add_agent!(sim, MovingAgent(1))
+    p3 = add_agent!(sim, MovingAgent(1))
+
+    move_to!(sim, :raster, p1, (4,4), OnPosition(), nothing;
+             distance = 2)
+    move_to!(sim, :raster, p2, (4,4), OnPosition(), nothing;
+             distance = 2, metric = :manhatten)
+    move_to!(sim, :raster, p3, (4,4), OnPosition(), nothing;
+             distance = 2.5, metric = :euclidean)
+
+    finish_init!(sim)
+
+    @test num_neighbors(sim, p1, OnPosition) == 25
+    @test num_neighbors(sim, p2, OnPosition) == 13
+    @test num_neighbors(sim, p3, OnPosition) == 21
+
+    ######################################## 4D
+    
+    sim = new_simulation(raster_model, nothing, nothing)
+
+    add_raster!(sim,
+                :raster,
+                (10,10,10,10),
+                _ -> Position(0))
+
+    
+    p1 = add_agent!(sim, MovingAgent(1))
+    p2 = add_agent!(sim, MovingAgent(1))
+
+    move_to!(sim, :raster, p1, (4,4,4,4), OnPosition(), nothing;
+             distance = 1)
+    move_to!(sim, :raster, p2, (4,4,4,4), OnPosition(), nothing;
+             distance = 1, metric = :manhatten)
+
+    finish_init!(sim)
+
+    @test num_neighbors(sim, p1, OnPosition) == 3*3*3*3
+    @test num_neighbors(sim, p2, OnPosition) == 1+4*2
+    
 end
 

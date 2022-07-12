@@ -217,12 +217,13 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             nr = _to2idx(to, $T)
 
             @mayassert begin
+                t = $T
                 at = $(attr[:to_agenttype])
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-            The :SingleAgentType trait is set, and the agent type is specified as $(at).
-            But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
+            The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
+            But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
             _check_size!(field, nr, $T)
@@ -235,12 +236,13 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             nr = _to2idx(to, $T)
 
             @mayassert begin
+                t = $T
                 at = $(attr[:to_agenttype])
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-            The :SingleAgentType trait is set, and the agent type is specified as $(at).
-            But the type of the `to` agent is $(sim.typeinfos.nodes_id2type[tnr]).
+            The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
+            But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
             _check_size!(field, nr, $T)
@@ -365,6 +367,23 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         end
     end
 
+    #- neighborstates
+    if !singleedge
+        @eval function neighborstates(sim::$simsymbol, id::AgentID,
+                               edgetype::Type, agenttype::Type) 
+            nid = neighborids(sim, id, edgetype)
+            isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
+        end
+    else
+        @eval function neighborstates(sim::$simsymbol, id::AgentID,
+                               edgetype::Type, agenttype::Type) 
+            checked(map, neighborids(sim, id, edgetype)) do id
+                agentstate(sim, id, agenttype)
+            end
+        end
+    end
+
+    
     #- edgestates
     if !stateless
         if ignorefrom
