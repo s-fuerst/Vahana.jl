@@ -1,6 +1,5 @@
 using Vahana
 using Test
-using BenchmarkTools
 
 enable_asserts(true)
 

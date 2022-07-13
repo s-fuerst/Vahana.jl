@@ -1,6 +1,13 @@
 module Vahana
 
+using Requires
+
 export enable_asserts, suppress_warnings, detect_stateless_trait
+
+function __init__()
+    @require Plots="91a5bcdd-55d7-5caf-9e0b-520d859cae80" include("PlotsSupport.jl")
+    @require Graphs="86223c79-3864-5bf0-83f7-82e725a168b6" include("GraphsSupport.jl")
+end
 
 # This is a dummy struct to define the stubs of functions like add_agent
 # with a type for the simulation. The real type of the simulation is
@@ -113,7 +120,6 @@ include("EdgesIterator.jl")
 include("PrettyPrinting.jl")
 include("REPL.jl")
 
-include("GraphsSupport.jl")
 include("Raster.jl")
 
 end

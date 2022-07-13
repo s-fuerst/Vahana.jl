@@ -36,3 +36,4 @@ See also [`construct_model`](@ref), [`aggregate`](@ref), [`setglobal!`](@ref) an
 """
 pushglobal!(sim, name, value) =
     setfield!(sim.globals, name, push!(getfield(sim.globals, name), value))
+

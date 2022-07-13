@@ -81,6 +81,14 @@ function construct_model(types::ModelTypes, name::String)
         nffs[C].aggregate(T, types, simsymbol) 
     end
 
+    for T in types.nodes_types
+        types.nodes_id2read[types.nodes_type2id[T]] =
+            @eval sim -> sim.$(readfield(Symbol(T)))
+        types.nodes_id2write[types.nodes_type2id[T]] =
+            @eval sim -> sim.$(writefield(Symbol(T)))
+    end
+
+    
     construct_prettyprinting_functions(simsymbol)
 
     Model(types, name)
@@ -126,8 +134,8 @@ function new_simulation(model::Model, params::P, globals::G; name = model.name) 
         typeinfos = $(model.types),
         rasters = Dict{Symbol, Array}(),
         initialized = false,
-        nodes_id2read = Vector{Function}(undef, MAX_TYPES),
-        nodes_id2write = Vector{Function}(undef, MAX_TYPES)
+        nodes_id2read = $(model.types.nodes_id2read),
+        nodes_id2write = $(model.types.nodes_id2write)
     )
 
     for T in sim.typeinfos.edges_types
@@ -136,10 +144,6 @@ function new_simulation(model::Model, params::P, globals::G; name = model.name) 
 
     for T in sim.typeinfos.nodes_types
         init_field!(sim, T)
-        sim.nodes_id2read[sim.typeinfos.nodes_type2id[T]] =
-            @eval sim -> sim.$(readfield(Symbol(T)))
-        sim.nodes_id2write[sim.typeinfos.nodes_type2id[T]] =
-            @eval sim -> sim.$(writefield(Symbol(T)))
     end
 
     sim
@@ -285,7 +289,7 @@ end
 ######################################## aggregate
 
 """
-    aggregate(sim, ::Type{T}, f, op; kwargs ...)
+    aggregate(sim, f, op, ::Type{T}; kwargs ...)
 
 Calculate an aggregated value, based on the state of all agents or
 edges of type T.
@@ -297,4 +301,4 @@ aggregate is based on mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
 """
-function aggregate(::__MODEL__, ::Type, f, op; kwargs...) end
+function aggregate(::__MODEL__, f, op, ::Type; kwargs...) end

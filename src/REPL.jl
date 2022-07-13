@@ -238,6 +238,17 @@ function show_agent(sim,
     end
 end
 
+"""
+TODO DOC 
+"""
 function num_edges(sim, t::Type{T}) where {T}
     _num_edges(sim, t)
 end
+
+"""
+TODO DOC 
+"""
+num_agents(sim, ::Type{T}) where T =
+    length(getproperty(sim, readfield(Symbol(T))))
+
+

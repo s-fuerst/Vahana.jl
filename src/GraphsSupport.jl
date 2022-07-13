@@ -1,5 +1,3 @@
-import Graphs
-
 export add_graph!
 
 """

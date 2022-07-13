@@ -368,17 +368,17 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     end
 
     #- neighborstates
-    if !singleedge
+    if singleedge
         @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                               edgetype::Type, agenttype::Type) 
+                               edgetype::Type{$MT}, agenttype::Type) 
             nid = neighborids(sim, id, edgetype)
             isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
         end
     else
         @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                               edgetype::Type, agenttype::Type) 
-            checked(map, neighborids(sim, id, edgetype)) do id
-                agentstate(sim, id, agenttype)
+                               edgetype::Type{$MT}, agenttype::Type) 
+            checked(map, neighborids(sim, id, edgetype)) do nid
+                agentstate(sim, nid, agenttype)
             end
         end
     end

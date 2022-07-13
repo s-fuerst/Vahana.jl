@@ -11,6 +11,8 @@ Base.@kwdef struct NodeFieldFactory
     aggregate
 end
 
+# TODO: add an exists_agent function
+
 AGENTSTATE_MSG = "The id of the agent does not match the given type"
 
 #################### Dict

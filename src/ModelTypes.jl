@@ -25,6 +25,8 @@ Base.@kwdef struct ModelTypes
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
+    nodes_id2read::Vector{Function} = Vector{Function}(undef, MAX_TYPES)
+    nodes_id2write::Vector{Function} = Vector{Function}(undef, MAX_TYPES)
 end
 
 """

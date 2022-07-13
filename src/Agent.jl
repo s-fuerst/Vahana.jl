@@ -25,6 +25,8 @@ export type_of
 export add_agent!, add_agents!
 export agentstate, agentstate_flexible
 
+export num_agents
+
 const TypeID = UInt8
 const BITS_TYPE = 8
 const MAX_TYPES = typemax(TypeID) 
@@ -164,3 +166,4 @@ using [`agentstate`](@ref) is preferable as it improves performance.
 """
 agentstate_flexible(sim, id::AgentID) =
      sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
+
