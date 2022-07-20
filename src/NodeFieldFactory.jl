@@ -123,7 +123,9 @@ nff_vec = NodeFieldFactory(
             idx = AgentNr(0)
             for state in read
                 idx += AgentNr(1)
-                maybeadd(write, idx, func(state, agent_id($typeid, idx), sim))
+                newstate = func(state, agent_id($typeid, idx), sim)
+                @mayassert newstate != nothing "You can not use Vectors for mortal agents" 
+                write[idx] = newstate
             end 
         end
     end,

@@ -11,5 +11,5 @@ function plotglobals(sim, names::Vector{Symbol})
         f = getglobal(sim, name)
         plot!(1:length(f), f, label = String(name))
     end
-    gui()
 end
+

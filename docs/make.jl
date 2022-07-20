@@ -15,14 +15,20 @@ cd(@__DIR__)
 
 Literate.markdown(joinpath(@__DIR__, "examples", "tutorial1.jl"), "src"; execute = false)
 
-#Literate.markdown(joinpath(@__DIR__, "examples", "tutorial2.jl"), "src"; execute = false)
+Literate.markdown(joinpath(@__DIR__, "examples", "predator.jl"), "src"; execute = false)
+
+Literate.markdown(joinpath(@__DIR__, "examples", "hegselmann.jl"), "src"; execute = false)
 
 makedocs(sitename="Vahana Documentation",
 #         format = Documenter.LaTeX(),
          format = Documenter.HTML(prettyurls = false),
          pages = [
              "Introduction" => "index.md",
-             "Tutorial" => "tutorial1.md",
+             "Tutorials" => [
+                 "Tutorial" => "tutorial1.md",
+                 "Opinion Model" => "hegselmann.md",
+                 "Predator / Prey" => "predator.md"
+             ],
              "Performance Tuning" => "performance.md",
              "API" => [
                  "Model Definition" => "definition.md",

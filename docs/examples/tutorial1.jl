@@ -1,8 +1,6 @@
 #=
 # Tutorial
 
-TODO: Goal of Tutorial
-
 # Model Background
 
 We have a simple but volatile market with $n$ buyers, $m$ sellers, and
@@ -69,6 +67,8 @@ and to select a seller from the list of known sellers.
 
 using Vahana
 using Random
+
+detect_stateless_trait(false); #hide
 
 # We have two types of agents, `Buyer` and `Seller`. In Vahana,
 # agents are defined as (immutable) structs. The structs define the

@@ -1,4 +1,12 @@
 export add_graph!
+# export edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
+export vahanagraph, vahanasimplegraph, simplegraph
+
+import Graphs:
+    edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
+
+import Base:
+    show, eltype
 
 """
     add_graph!(sim, graph, agent_constructor, edge_constructor) -> Vector{AgentID}
@@ -15,6 +23,10 @@ the Graphs.vertix as argument. For each edge of `graph` the
 The agent types of agents created by the `agent_constructor` must be
 already registered via [`register_agenttype!`](@ref) and vis a vis the edge
 type via [`register_edgetype!`](@ref).
+
+!!! info
+
+    add_graph! is only availabe after importing the Graphs.jl package
 
 Returns a vector with the IDs of the created agents.
 """
@@ -39,3 +51,169 @@ function add_graph!(sim, graph, agent_constructor, edge_constructor)
 end
 
 
+struct VahanaGraph  <: Graphs.AbstractGraph{Int64}
+    sim
+    agenttypes::Vector{DataType}
+    networks::Vector{DataType}
+    g2v::Vector{AgentID}
+    v2g::Dict{AgentID, Int64}
+    edges::Vector{Graphs.Edge}
+end
+
+struct VahanaSimpleGraph <: Graphs.AbstractSimpleGraph{Integer}
+    sim
+    agenttypes::Vector{DataType}
+    networks::Vector{DataType}
+    g2v::Vector{AgentID}
+    v2g::Dict{AgentID, Int64}
+    # for the AbstractSimpleGraph interface
+    vertices::UnitRange{Integer}
+    fadjlist::Vector{Vector{Integer}}
+    ne::Integer
+end
+
+
+function vahanasimplegraph(sim, agenttypes, networks)
+    # vsg = VahanaSimpleGraph(sim, agenttypes, networks,
+    #                         Vector{AgentID}(),
+    #                         Dict{AgentID, Int64}(),
+    #                         Vector{Graphs.Edge}())
+
+    g2v = Vector{AgentID}()
+    v2g = Dict{AgentID, Int64}()
+    ne = 0
+
+    nv = 0
+    for t in agenttypes
+        tid = sim.typeinfos.nodes_type2id[t]
+        for id in keys(_getread(sim, t))
+            nv += 1
+            aid = agent_id(tid, AgentNr(id))
+            push!(g2v, aid)
+            push!(v2g, aid => nv)
+        end
+    end
+
+    fadjlist = [ Vector{Integer}() for _ in 1:nv ]
+
+    for t in networks
+        for (to, e) in edges_iterator(_getread(sim, t))
+            f = get(v2g, e.from, nothing)
+            t = get(v2g, to, nothing)
+            if f != nothing && t != nothing
+                push!(fadjlist[f], t)
+            end
+        end
+    end
+
+    VahanaSimpleGraph(sim, agenttypes, networks, g2v, v2g, 1:nv, fadjlist, ne)
+end
+
+
+function vahanagraph(sim, agenttypes, networks)
+    vg = VahanaGraph(sim, agenttypes, networks,
+                     Vector{AgentID}(),
+                     Dict{AgentID, Int64}(),
+                     Vector{Graphs.Edge}())
+
+    idx = 1
+    for t in agenttypes
+        tid = sim.typeinfos.nodes_type2id[t]
+        for id in keys(_getread(sim, t))
+            aid = agent_id(tid, AgentNr(id))
+            push!(vg.g2v, aid)
+            push!(vg.v2g, aid => idx)
+            idx += 1
+        end
+    end
+
+    for t in networks
+        for (to, e) in edges_iterator(_getread(sim, t))
+            f = get(vg.v2g, e.from, nothing)
+            t = get(vg.v2g, to, nothing)
+            if f != nothing && t != nothing
+                push!(vg.edges, Graphs.Edge(f, t))
+            end
+        end
+    end
+
+    vg
+end
+
+# warning simplegraph does not support multiple edges
+
+    
+
+simplegraph(vg::VahanaGraph) =
+    Graphs.SimpleGraphs.SimpleDiGraphFromIterator(vg.edges)
+
+### AbstractGraph interface for VahanaGraph
+edges(vg::VahanaGraph) = vg.edges
+
+Base.eltype(vg::VahanaGraph) = Int64
+
+edgetype(vg::VahanaGraph) = Graphs.SimpleEdge{eltype(vg)}
+
+has_edge(vg::VahanaGraph, s, d) = Graphs.Edge(s, d) in vg.edges
+
+has_vertex(vg::VahanaGraph, v) = v <= length(vg.g2v)
+
+inneighbors(vg::VahanaGraph, v) =
+    map(e -> e.src, filter(e -> e.dst == v, vg.edges)) |> unique
+        
+ne(vg::VahanaGraph) = length(vg.edges)
+
+nv(vg::VahanaGraph) = length(vg.g2v)
+
+outneighbors(vg::VahanaGraph, v) = 
+    map(e -> e.dst, filter(e -> e.src == v, vg.edges)) |> unique
+
+vertices(vg::VahanaGraph) = 1:length(vg.g2v)
+
+is_directed(::VahanaGraph) = true
+
+is_directed(::Type{VahanaGraph}) = true
+
+Base.show(io::IO, mime::MIME"text/plain", vg::VahanaGraph) =
+    println(io, "Subgraph of $(vg.sim.name) {$(vg.agenttypes), $(vg.networks)}  {$(nv(vg)), $(ne(vg))}")
+
+### AbstractGraph interface for VahanaSimpleGraph
+#edges(vg::VahanaGraph) = vg.edges
+
+NEXT: eigentlich sollte der SimpleEdgeIter funktionieren (in simpleedgeiter)
+da ist wohl debugging angesagt
+
+eltype(vg::VahanaSimpleGraph) = Int64
+
+#eltype(::Type{SimpleEdgeIter{VahanaSimpleGraph{T}}}) where {T} = SimpleEdge{T}
+
+edgetype(vg::VahanaSimpleGraph) = Graphs.SimpleEdge{eltype(vg)}
+
+
+
+#has_edge(vg::VahanaGraph, s, d) = Graphs.Edge(s, d) in vg.edges
+
+# is implemented
+#has_vertex(vg::VahanaGraph, v) = v <= length(vg.g2v)
+
+inneighbors(vg::VahanaGraph, v) =
+    map(e -> e.src, filter(e -> e.dst == v, vg.edges)) |> unique
+        
+# is implemented
+#ne(vg::VahanaGraph) = length(vg.edges)
+
+# is implemented
+#nv(vg::VahanaGraph) = length(vg.g2v)
+
+outneighbors(vg::VahanaGraph, v) = 
+    map(e -> e.dst, filter(e -> e.src == v, vg.edges)) |> unique
+
+# is implemented
+#vertices(vg::VahanaGraph) = 1:length(vg.g2v)
+
+is_directed(::VahanaSimpleGraph) = true
+
+is_directed(::Type{VahanaSimpleGraph}) = true
+
+Base.show(io::IO, mime::MIME"text/plain", vg::VahanaSimpleGraph) =
+    println(io, "SimpleSubgraph of $(vg.sim.name) {$(vg.agenttypes), $(vg.networks)}  {$(nv(vg)), $(ne(vg))}")
