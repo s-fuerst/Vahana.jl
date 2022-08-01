@@ -5,8 +5,11 @@ using Requires
 export enable_asserts, suppress_warnings, detect_stateless_trait
 
 function __init__()
-    @require Plots="91a5bcdd-55d7-5caf-9e0b-520d859cae80" include("PlotsSupport.jl")
-    @require Graphs="86223c79-3864-5bf0-83f7-82e725a168b6" include("GraphsSupport.jl")
+    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" include("optional/MakieSupport.jl")
+
+    @require Graphs="86223c79-3864-5bf0-83f7-82e725a168b6" include("optional/GraphsSupport.jl")
+
+    @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" include("optional/GraphMakieSupport.jl")
 end
 
 # This is a dummy struct to define the stubs of functions like add_agent

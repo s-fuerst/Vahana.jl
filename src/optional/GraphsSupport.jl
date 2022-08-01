@@ -1,6 +1,8 @@
+println("Including GraphsSupport.jl")
+
 export add_graph!
 # export edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
-export vahanagraph, vahanasimplegraph, simplegraph
+export vahanagraph, vahanasimplegraph 
 
 import Graphs:
     edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
@@ -52,7 +54,10 @@ end
 
 ######################################## VahanaSimpleGraph
 
-
+# VahanaSimpleGraph is a concrete implementation
+# of an Graphs.AbstractSimpleGraph. We need this for Metis,
+# as it depends on the AbstractSimpleGraph structure instead
+# on the official AbstractGraph API.
 struct VahanaSimpleGraph <: Graphs.AbstractSimpleGraph{Integer}
     sim
     agenttypes::Vector{DataType}
@@ -66,6 +71,8 @@ struct VahanaSimpleGraph <: Graphs.AbstractSimpleGraph{Integer}
 end
 
 
+# like vahanagraph, only for the AbstractSimpleGraph, see also
+# the comment of VahanaSimpleGraph above
 function vahanasimplegraph(sim, agenttypes, networks)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
@@ -108,28 +115,30 @@ is_directed(::VahanaSimpleGraph) = true
 is_directed(::Type{VahanaSimpleGraph}) = true
 
 Base.show(io::IO, _::MIME"text/plain", vg::VahanaSimpleGraph) =
-    println(io, "SimpleSubgraph of $(vg.sim.name) {$(vg.agenttypes), $(vg.networks)}  {$(nv(vg)), $(ne(vg))}")
+    println(io, "VahanaSimpleGraph of $(vg.sim.name) for {$(vg.agenttypes), $(vg.networks)}  {$(nv(vg)), $(ne(vg))}")
 
 ######################################## VahanaGraph
 
-struct VahanaGraph  <: Graphs.AbstractGraph{Int64}
+struct VahanaGraph <: Graphs.AbstractGraph{Int64}
     sim
     agenttypes::Vector{DataType}
-    networks::Vector{DataType}
+    edgetypes::Vector{DataType}
     g2v::Vector{AgentID}
     v2g::Dict{AgentID, Int64}
     edges::Vector{Graphs.Edge}
+    edgetypeidx::Vector{Int64}
 end
 
-
-function vahanagraph(sim, agenttypes, networks)
+# SingleAgentType not supported (und IgnoreFrom sowieso nicht)
+function vahanagraph(sim, agenttypes, edgetypes)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
-
+    edgetype = Vector{Int64}()
+    
     nv = 0
-    for t in agenttypes
-        tid = sim.typeinfos.nodes_type2id[t]
-        for id in keys(_getread(sim, t))
+    for T in agenttypes
+        tid = sim.typeinfos.nodes_type2id[T]
+        for id in keys(_getread(sim, T))
             nv += 1
             aid = agent_id(tid, AgentNr(id))
             push!(g2v, aid)
@@ -138,17 +147,20 @@ function vahanagraph(sim, agenttypes, networks)
     end
 
     edges = Vector{Graphs.Edge}()
-    for t in networks
-        for (to, e) in edges_iterator(_getread(sim, t))
-            f = get(v2g, e.from, nothing)
+    edgetypeidx = 1
+    for T in edgetypes
+        for (to, e) in edges_iterator(_getread(sim, T))
+            f = get(v2g, hasproperty(e, :from) ? e.from : e, nothing)
             t = get(v2g, to, nothing)
             if f !== nothing && t !== nothing
                 push!(edges, Graphs.Edge(f, t))
+                push!(edgetype, edgetypeidx)
             end
         end
+        edgetypeidx += 1
     end
 
-    VahanaGraph(sim, agenttypes, networks, g2v, v2g, edges)
+    VahanaGraph(sim, agenttypes, edgetypes, g2v, v2g, edges, edgetype)
 end
 
 
@@ -180,5 +192,5 @@ is_directed(::VahanaGraph) = true
 is_directed(::Type{VahanaGraph}) = true
 
 Base.show(io::IO, mime::MIME"text/plain", vg::VahanaGraph) =
-    println(io, "Subgraph of $(vg.sim.name) {$(vg.agenttypes), $(vg.networks)}  {$(nv(vg)), $(ne(vg))}")
+    println(io, "VahanaGraph of $(vg.sim.name) for {$(vg.agenttypes), $(vg.edgetypes)}  {$(nv(vg)), $(ne(vg))}")
 

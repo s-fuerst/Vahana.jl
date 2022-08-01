@@ -156,6 +156,8 @@ init_cell(pos::CartesianIndex) =
 
 add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell)
 
+connect_raster_neighbors!(ppsim, :raster, (_,_) -> PreyView(); periodic = false)
+
 # Predator and Pray are starting on a random position.
 
 function random_pos(sim)
@@ -359,7 +361,7 @@ function step!(sim)
     update_globals(sim)
 end
 
-using Plots
+using GLMakie
 
 ## t is PreyPosition or PredatorPosition
 function plot_agents_on_cell(sim, t)
@@ -372,9 +374,7 @@ for _ in 1:200 step!(ppsim) end
 
 plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ])
 
-plot!()
-
-plot_agents_on_cell(ppsim, PredatorPosition)
+f = plot_agents_on_cell(ppsim, PredatorPosition)
 
 # # Tests
 
