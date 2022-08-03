@@ -1,6 +1,4 @@
-export plotsubgraph
-
-println("Including GraphMakieSupport.jl")
+export plotvahanagraph
 
 using GraphMakie, Makie, Colors
 
@@ -47,7 +45,31 @@ function _edgetostring(ax, idx) # from and to are vahanagraph indicies
     ""
 end
 
-function plotsubgraph(sim, agenttypes, edgetypes)
+"""
+    plotvahanagraph(vg::VahanaGraph)
+
+Creates an interactive Makie plot for the VahanaGraph `vg`.
+
+Returns the usual Makie combination of figure, axis, plot.
+
+!!! info 
+
+    `plotvahanagraph` is only available when the GraphMakie package
+    and a Makie backend is imported by the client.
+
+!!! warning
+
+    For the mouse hover interaction, the current state of the
+    simulation used to construct the VahanaGraph is accessed. In the
+    case that a transition function is called after the construction
+    of the VahanaGraph, and this transition function modifies the
+    structure of the Graph (add/removes nodes or edges), then this
+    changes are not reflected by the current implementation and can
+    cause errors.
+
+See also [`vahanagraph`](@ref)
+"""
+function plotvahanagraph(vg::VahanaGraph)
     agentcolors = distinguishable_colors(256,
                                          [RGB(1,1,1), RGB(0,0,0)],
                                          dropseed = true)
@@ -56,7 +78,6 @@ function plotsubgraph(sim, agenttypes, edgetypes)
                                         dropseed = true)    
 
 
-    vg = vahanagraph(sim, agenttypes, edgetypes)
     rv = 1:nv(vg)
     re = 1:ne(vg)
     p = graphplot(vg,

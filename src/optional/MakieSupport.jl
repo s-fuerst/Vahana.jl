@@ -1,11 +1,22 @@
-println("Including MakieSupport.jl")
-
 using Makie
 
 export plotglobals
 
 """
-TODO DOC 
+    plotglobals(sim, names::Vector{Symbol})
+
+Creates a Makie lineplot with one line for each global in `names`, wherby
+those global values must be Vectors (or Iterable).
+
+Returns figure, axis, plots. `plots` is a vector of Plots, which one plot for
+element of `names`.
+
+!!! info 
+
+    `plotglobals` is only available when a Makie backend is imported
+    by the client.
+
+See also [`pushglobal!`](@ref), [`getglobal`](@ref)
 """
 function plotglobals(sim, names::Vector{Symbol})
     f = Figure()

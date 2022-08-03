@@ -1,8 +1,6 @@
-println("Including GraphsSupport.jl")
-
 export add_graph!
-# export edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
-export vahanagraph, vahanasimplegraph 
+
+export vahanagraph
 
 import Graphs:
     edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
@@ -28,7 +26,9 @@ type via [`register_edgetype!`](@ref).
 
 !!! info
 
-    add_graph! is only availabe after importing the Graphs.jl package
+    add_graph! is only available when the Graphs.jl package is imported
+    by the model implementation. Therefore the "Vahana does not have
+    Graphs in its dependencies" warning can be ignored.
 
 Returns a vector with the IDs of the created agents.
 """
@@ -73,7 +73,37 @@ end
 
 # like vahanagraph, only for the AbstractSimpleGraph, see also
 # the comment of VahanaSimpleGraph above
-function vahanasimplegraph(sim, agenttypes, networks)
+"""
+    vahanasimplegraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType})
+
+Creates a subgraph with nodes for all agents that have one of the
+`agenttypes` types, and all edges that have one of the `edgetypes`
+types and whose both adjacent node types are in `agenttypes`.
+
+The default values for `agenttypes` and `edgetypes` are all registered
+agents/edgetypes (see [`register_agenttype!`](@ref) and
+[`register_edgetype!`](@ref)).
+
+This subgraphs implements the AbstractSimpleGraph interface from the
+Graphs.jl package.
+
+The edge types must not have the :IgnoreFrom trait.
+
+!!! info 
+
+    `vahanasimplegraph` is only available when the Graphs.jl package is
+    imported by the client.
+
+!!! warning    
+
+    The AbstractGraph interface allows multiple edges between
+    two nodes, but some function (e.g. those that convert the graph
+    into a binary (sparse)matrix can produce undefined results
+    for those graphs. So use this function with care. 
+""" # TODO write tests, , check :IgnoreFrom and print a warning
+function vahanasimplegraph(sim;
+              agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
+              edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
 
@@ -91,7 +121,7 @@ function vahanasimplegraph(sim, agenttypes, networks)
     fadjlist = [ Vector{Integer}() for _ in 1:nv ]
 
     ne = 0
-    for t in networks
+    for t in edgetypes
         for (to, e) in edges_iterator(_getread(sim, t))
             f = get(v2g, e.from, nothing)
             t = get(v2g, to, nothing)
@@ -102,7 +132,7 @@ function vahanasimplegraph(sim, agenttypes, networks)
         end
     end
 
-    VahanaSimpleGraph(sim, agenttypes, networks, g2v, v2g, 1:nv, fadjlist, ne)
+    VahanaSimpleGraph(sim, agenttypes, edgetypes, g2v, v2g, 1:nv, fadjlist, ne)
 end
 
 ### AbstractGraph interface for VahanaSimpleGraph
@@ -130,7 +160,38 @@ struct VahanaGraph <: Graphs.AbstractGraph{Int64}
 end
 
 # SingleAgentType not supported (und IgnoreFrom sowieso nicht)
-function vahanagraph(sim, agenttypes, edgetypes)
+"""
+    vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType})
+
+Creates a subgraph with nodes for all agents that have one of the
+`agenttypes` types, and all edges that have one of the `edgetypes`
+types and whose both adjacent node types are in `agenttypes`.
+
+The default values for `agenttypes` and `edgetypes` are all registered
+agents/edgetypes (see [`register_agenttype!`](@ref) and
+[`register_edgetype!`](@ref)).
+
+This subgraphs implements the AbstractGraph interface from the
+Graphs.jl package, so that e.g. GraphMakie can be used to visualize
+the subgraph. See also [`plotvahanagraph`](@ref).
+
+The edge types must not have the :IgnoreFrom trait.
+
+!!! info 
+
+    `vahanagraph` is only available when the Graphs.jl package is
+    imported by the client.
+
+!!! warning    
+
+    The AbstractGraph interface allows multiple edges between
+    two nodes, but some function (e.g. those that convert the graph
+    into a binary (sparse)matrix can produce undefined results
+    for those graphs. So use this function with care. 
+""" # TODO write tests, check :IgnoreFrom and print a warning
+function vahanagraph(sim;
+              agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
+              edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
     edgetype = Vector{Int64}()

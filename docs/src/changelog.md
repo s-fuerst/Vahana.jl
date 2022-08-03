@@ -6,7 +6,13 @@
   traits, see [Performance Tuning](performance.md) for details.
 
 - Added [`num_neighbors`](@ref) and [`has_neighbor`](@ref).
-  
+
+- AbstractGraphs and AbstractsSimpleGraphs can be constructed via
+  [`vahanagraph`](@ref) and [`vahanasimplegraph`](@ref). This allows
+  to use the Graphs.jl package to do graph analysis, the GraphMakie
+  package to visualize the graph and internally to use Metis to
+  partition the simulation.
+
 ### breaking changes:
 - Simulation construction, see [`construct_model`](@ref) for details.
 

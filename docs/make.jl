@@ -36,6 +36,7 @@ makedocs(sitename="Vahana Documentation",
                  "Transition Function" => "transition.md",
                  "Global Layer" => "between.md",
                  "REPL helpers" => "repl.md",
+                 "Plots" => "plots.md",
                  "Configuration" => "config.md"
                  # "All" => "index.md"
              ],

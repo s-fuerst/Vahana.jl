@@ -41,6 +41,13 @@ it is advisable to import only the SimpleGraphs module from Graphs.jl.
 add_graph!
 ```
 
+There is also two function with works the other way and converts the underlying graph of an simulation (or a subset of this graph) to a structure that fulfills the AbstractGraph or AbstractSimpleGraph interface from the Graphs.jl package.
+
+```@docs
+vahanagraph!
+vahanasimplegraph!
+```
+
 ## Raster 
 
 Spatial information can be added to the simulation in the form of one

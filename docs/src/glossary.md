@@ -25,3 +25,5 @@ Ist eigentlich eher immer Agentstate
 ## Source / Target
 
 ## Trait
+
+## VahanaGraph / VahanaSimpleGraph

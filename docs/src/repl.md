@@ -22,8 +22,6 @@ show_random_agent
 
 num_agents
 num_edges
-
-plotglobals
 ```
 
 `apply_transition` can be used to calculate a transition function
