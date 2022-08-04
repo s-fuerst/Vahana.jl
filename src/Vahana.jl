@@ -5,11 +5,12 @@ using Requires
 export enable_asserts, suppress_warnings, detect_stateless_trait
 
 function __init__()
-    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" include("optional/MakieSupport.jl")
-
-    @require Graphs="86223c79-3864-5bf0-83f7-82e725a168b6" include("optional/GraphsSupport.jl")
-
-    @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" include("optional/GraphMakieSupport.jl")
+    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
+        include("optional/MakieSupport.jl")
+    end
+    @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" begin
+        include("optional/GraphMakieSupport.jl")
+    end
 end
 
 # This is a dummy struct to define the stubs of functions like add_agent
@@ -125,4 +126,5 @@ include("REPL.jl")
 
 include("Raster.jl")
 
+include("GraphsSupport.jl")
 end

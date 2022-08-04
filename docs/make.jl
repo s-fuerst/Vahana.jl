@@ -40,5 +40,6 @@ makedocs(sitename="Vahana Documentation",
                  "Configuration" => "config.md"
                  # "All" => "index.md"
              ],
+             "Glossary" => "glossary.md",
              "Change Log" => "changelog.md"
          ])

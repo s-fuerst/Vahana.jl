@@ -1,5 +1,6 @@
-export plotvahanagraph
+export plot
 
+# TODO: try to remove the Colors dependency
 using GraphMakie, Makie, Colors
 
 import Graphs, Graphs.SimpleGraphs
@@ -46,7 +47,7 @@ function _edgetostring(ax, idx) # from and to are vahanagraph indicies
 end
 
 """
-    plotvahanagraph(vg::VahanaGraph)
+    plot(vg::VahanaGraph)
 
 Creates an interactive Makie plot for the VahanaGraph `vg`.
 
@@ -54,8 +55,8 @@ Returns the usual Makie combination of figure, axis, plot.
 
 !!! info 
 
-    `plotvahanagraph` is only available when the GraphMakie package
-    and a Makie backend is imported by the client.
+    `plot` is only available when the GraphMakie package and a
+    Makie backend is imported by the client.
 
 !!! warning
 
@@ -69,7 +70,7 @@ Returns the usual Makie combination of figure, axis, plot.
 
 See also [`vahanagraph`](@ref)
 """
-function plotvahanagraph(vg::VahanaGraph)
+function plot(vg::VahanaGraph)
     agentcolors = distinguishable_colors(256,
                                          [RGB(1,1,1), RGB(0,0,0)],
                                          dropseed = true)

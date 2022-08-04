@@ -64,55 +64,89 @@ The keyword `max` determine the maximal number of shown agents.
 """
 show_agents(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
 
-"""
-    show_random_agent(sim, ::Type{T}; kwargs...) 
+# """
+#     show_random_agent(sim, ::Type{T}; kwargs...) 
 
-Display detailed information of a random agent with Type T.
+# Display detailed information of a random agent with Type T.
 
-The optional arg `nedges` controls the maximal number of edges that are
-shown per network (per direction).
+# Keyword arguments:
+#     `nedges` controls the maximal number of edges that are
+#     shown per network (per direction).
 
-The optional `stateof` argument controls whether the state of the edge
-(the default) or the state of the adjacent agent (for any value except
-:Edge) is displayed.
+#     `stateof` controls whether the state of the edge
+#     (the default) or the state of the adjacent agent (for any value except
+#     :Edge) is displayed.
 
-"""
-function show_random_agent(sim, t::Type{T}; kwargs...) where T
-    if !sim.initialized
-        println("show_random_agent can not be called before finish_init!.")
-        return
-    end
+#     `source` controls whether all edges of the simulation should be
+#     traversed to find the edges where the agent `id` is the
+#     source. Since this can take some time for large graphs, this search
+#     can be disabled.
+# """
+# function show_random_agent(sim, t::Type{T}; kwargs...) where T
+#     if !sim.initialized
+#         println("show_random_agent can not be called before finish_init!.")
+#         return
+#     end
     
-    agents = _getread(sim, t) |>
-        keys
+#     agents = _getread(sim, t) |>
+#         keys
 
-    if length(agents) == 0
-        println("No agent of type $T found.")
-        return
-    end
+#     if length(agents) == 0
+#         println("No agent of type $T found.")
+#         return
+#     end
 
-    show_agent(sim, rand(agents), t; kwargs...)
-end
+#     show_agent(sim, rand(agents), t; kwargs...)
+# end
 
 """
-    show_agent(sim, id, Type{T}; nedges=5, stateof=:Edge) 
+    show_agent(sim, Type{T}, id=0; max=5, stateof=:Edge, source = true) 
 
 Display detailed information about the agent with ID `id`, or in the
-case that id is a value < 2^32, the information of the nth agent
-of type T created.
+case that id is a value < 2^32, the information of the nth agent of
+type T created. If `id` is 0 (the default value), a random agent of
+type T is selected.
 
-The optional arg `nedges` controls the maximal number of edges that are
-shown per network (per direction).
+Returns the ID of the agent (which is especially useful when a random
+agent is selected).
 
-The optional `stateof` argument controls whether the state of the edge
-(the default) or the state of the adjacent agent (for any value except
-:Edge) is displayed.
+Keyword arguments:
+
+    `max` controls the maximal number of edges that are
+    shown per network (per direction).
+
+    `stateof` controls whether the state of the edge
+    (the default) or the state of the adjacent agent (for any value except
+    :Edge) is displayed.
+
+    `source` controls whether all edges of the simulation should be
+    traversed to find the edges where the agent `id` is the
+    source. Since this can take some time for large graphs, this search
+    can be disabled.
 """
 function show_agent(sim,
-             id,
-             t::Type{T};
-             nedges=5,
-             stateof=:Edge) where T
+             t::Type{T},
+             id = 0;
+             max = 5,
+             stateof = :Edge,
+             source = true) where T
+    if !sim.initialized
+        println("show_agent can not be called before finish_init!.")
+        return
+    end
+
+    # find a random agent if no id is given (and no agent will ever have id 0
+    if id == 0
+        agents = _getread(sim, t) |> keys
+        
+        if length(agents) == 0
+            println("No agent of type $T found.")
+            return
+        end
+        id = rand(agents)
+    end
+        
+    
     typeid = sim.typeinfos.nodes_type2id[T]
     # id can be always the local nr, so we first ensure that id
     # is the complete agent_id
@@ -188,11 +222,11 @@ function show_agent(sim,
                         if :SingleEdge in edgetypetraits
                             _show_edge(sim, d, edgetypetraits, stateof, edgeT)
                         else
-                            for e in first(d, nedges)
+                            for e in first(d, max)
                                 _show_edge(sim, e, edgetypetraits, stateof, edgeT)
                             end
-                            if length(d) > nedges
-                                println("\n\t... ($(length(d)-nedges) not shown)")
+                            if length(d) > max
+                                println("\n\t... ($(length(d)-max) not shown)")
                             end
                         end
                     end
@@ -200,6 +234,8 @@ function show_agent(sim,
             end
         end
 
+        if ! source continue end
+            
         if :IgnoreFrom in edgetypetraits
             if !justcount
                 printstyled("\n\tFor edgetypes with the :IgnoreFrom trait " *
@@ -228,14 +264,15 @@ function show_agent(sim,
             else
                 printstyled("state of edge.to:"; color = :green)
             end
-            for ea in first(edges_agents, nedges)
+            for ea in first(edges_agents, max)
                 _show_edge(sim, ea, [], stateof, edgeT)
             end
-            if length(edges_agents) > nedges
-                println("\n\t... ($(length(edges_agents)-nedges) not shown)")
+            if length(edges_agents) > max
+                println("\n\t... ($(length(edges_agents)-max) not shown)")
             end
         end
     end
+    id
 end
 
 """

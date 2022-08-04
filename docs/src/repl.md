@@ -18,7 +18,6 @@ show_agents
 show_network
 
 show_agent
-show_random_agent
 
 num_agents
 num_edges
