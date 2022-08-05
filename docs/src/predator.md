@@ -32,7 +32,8 @@ We want to run the model with optimized performance, see
 ````@example predator
 detect_stateless_trait(true)
 
-enable_asserts(false)
+enable_asserts(true);
+nothing #hide
 ````
 
 ## AgentTypes
@@ -86,9 +87,24 @@ check which cell in the visible area contains food.
 struct PreyView end
 
 struct PredatorView end
+````
 
+VisiblePrey are edges from prey to predator. So far, all edge types
+connect animals to cells, and without an incoming edge from a prey,
+a predator don't know anything about the prey positions. The
+FollowPrey edges are created by the cells through the `find_prey`
+transition function, as the cells know which Prey is directly on the
+cell via the PreyPosition edges and therefore in the view of an
+predator via the PredatorView edges.
+
+````@example predator
 struct VisiblePrey end
+````
 
+The last two edge types are messages to inform the agents that they
+must die or found something to eat.
+
+````@example predator
 struct Die end
 
 struct Eat end
@@ -96,48 +112,32 @@ struct Eat end
 
 ## Params
 
+We follow the parameter structure from the PPHPC model, but use the
+same parameters for Prey and Predator for the example run.
+
 ````@example predator
 Base.@kwdef struct SpeciesParams
-    gain_from_food::Int64
-    loss_per_turn::Int64
-    repro_thres::Int64
-    repro_prob::Int64
+    gain_from_food::Int64 = 10
+    loss_per_turn::Int64 = 1
+    repro_thres::Int64 = 5
+    repro_prob::Int64 = 50
 end
 
 Base.@kwdef struct AllParams
-    raster_size::Tuple{Int64, Int64}
-    restart::Int64
-    predator::SpeciesParams
-    prey::SpeciesParams
-    num_predators::Int64
-    num_prey::Int64
+    raster_size::Tuple{Int64, Int64} = (100, 100)
+    restart::Int64 = 5
+    predator::SpeciesParams = SpeciesParams()
+    prey::SpeciesParams = SpeciesParams()
+    num_predators::Int64 = 500
+    num_prey::Int64 = 2000
 end
-
-predator_params = SpeciesParams(
-    gain_from_food = 10,
-    loss_per_turn = 1,
-    repro_thres = 5,
-    repro_prob = 50
-)
-
-prey_params = SpeciesParams(
-    gain_from_food = 10,
-    loss_per_turn = 1,
-    repro_thres = 5,
-    repro_prob = 50
-)
-
-ggparams = AllParams(
-    raster_size = (100, 100),
-    restart = 5,
-    predator = predator_params,
-    prey = prey_params,
-    num_predators = 500,
-    num_prey = 2000,
-)
 ````
 
 ## Globals
+
+We are creating timeseries for the predator and prey population, the
+number of cells with food and the average energy of the predators
+and prey.
 
 ````@example predator
 Base.@kwdef mutable struct PPGlobals
@@ -151,88 +151,107 @@ end
 
 ## Create Simulation
 
+We have now defined all the Julia structs needed to create the model
+and a simulation. We add some traits, mainly for performance reasons.
+
 ````@example predator
-const ppmodel = ModelTypes() |>
+const ppsim = ModelTypes() |>
     register_agenttype!(Predator) |>
     register_agenttype!(Prey) |>
-    register_agenttype!(Cell, :Vector; size = ggparams.raster_size[1] * ggparams.raster_size[2]) |>
+    register_agenttype!(Cell) |>
     register_edgetype!(PredatorPosition, :SingleAgentType; to_agenttype = Cell) |>
     register_edgetype!(PreyPosition, :SingleAgentType; to_agenttype = Cell) |>
     register_edgetype!(PredatorView) |>
-    register_edgetype!(PreyView, :SingleAgentType; to_agenttype = Prey) |>
-    register_edgetype!(VisiblePrey) |>
+    register_edgetype!(PreyView) |>
+    register_edgetype!(VisiblePrey, :SingleAgentType; to_agenttype = Predator) |>
     register_edgetype!(Die, :HasEdgeOnly) |>
     register_edgetype!(Eat, :HasEdgeOnly) |>
-    construct_model("Predator Prey")
+    construct_model("Predator Prey") |>
+    new_simulation(AllParams(), PPGlobals())
 ````
 
 ## Initialization
 
+First we add the Cells to the Simulation. Therefore we define a
+constructor functions for the cells. There is a 50% probability that a cell
+contains food (and in this case `countdown` is 0).
+
 ````@example predator
-function init_cell(pos::CartesianIndex)
-    if rand() < 0.5
-        Cell(pos, 0)
-    else
-        Cell(pos, ceil(rand() * param(ppsim, :restart)) |> Int64)
-    end
-end
-
-function random_pos(sim)
-    size = param(sim, :raster_size)
-    CartesianIndex(ceil(rand() * size[1]) |> Int64,
-                   ceil(rand() * size[2]) |> Int64)
-end
-
-function move_predator!(sim, id, newpos, withview)
-    move_to!(sim, :raster, id, newpos, nothing, PredatorPosition())
-    if withview
-        move_to!(sim, :raster, id, newpos, PredatorView(), PredatorView();
-                 distance = 1, metric = :manhatten)
-    end
-end
-
-function move_prey!(sim, id, newpos, withview)
-    move_to!(sim, :raster, id, newpos, nothing, PreyPosition())
-    if withview
-        move_to!(sim, :raster, id, newpos, PreyView(), nothing;
-                 distance = 1, metric = :manhatten)
-    end
-end
-
-
-const ppsim = new_simulation(ppmodel, ggparams, PPGlobals())
+init_cell(pos::CartesianIndex) =
+    Cell(pos, rand() < 0.5 ? 0 : rand(1:param(ppsim, :restart)))
 
 add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell)
 
+connect_raster_neighbors!(ppsim, :raster, (_,_) -> PreyView(); periodic = false)
+````
+
+Predator and Pray are starting on a random position.
+
+````@example predator
+function random_pos(sim)
+    size = param(sim, :raster_size)
+    CartesianIndex(rand(1:size[1]), rand(1:size[2]))
+end
+````
+
+We define two helper functions to move an agent to a new
+position. This will always add a (pos)edge from the agent to the
+cell at the `newpos` position. If the viewedge argument is
+specified, (view)edges will also be added from the agent to the cell
+and its neighbors.
+
+````@example predator
+function move!(sim, id, newpos, posedge, viewedge = nothing)
+    move_to!(sim, :raster, id, newpos, nothing, posedge())
+    if ! isnothing(viewedge)
+        move_to!(sim, :raster, id, newpos, viewedge(), viewedge();
+                 distance = 1, metric = :manhatten)
+    end
+end
+````
+
+Now we can add the Predator and Pray to the simulation, and use
+the `move!` function to create also the position and view edges.
+
+````@example predator
+energyrange = 1:(2*param(ppsim, :prey).gain_from_food)
 foreach(1:param(ppsim, :num_prey)) do _
-    energy = ceil(rand() * 2 * param(ppsim, :prey).gain_from_food) |> Int64
+    energy = rand(energyrange)
     pos = random_pos(ppsim)
     id = add_agent!(ppsim, Prey(energy, pos))
-    move_prey!(ppsim, id, pos, true)
+    move!(ppsim, id, pos, PreyPosition, PreyView)
 end
 
+energyrange = 1:(2*param(ppsim, :predator).gain_from_food)
 foreach(1:param(ppsim, :num_predators)) do _
-    energy = ceil(rand() * 2 * param(ppsim, :predator).gain_from_food) |> Int64
+    energy = rand(energyrange)
     pos = random_pos(ppsim)
     id = add_agent!(ppsim, Predator(energy, pos))
-    move_predator!(ppsim, id, pos, true)
+    move!(ppsim, id, pos, PredatorPosition, PredatorView)
 end
+````
 
+At the end of the initialization we have to call finish_init!
+
+````@example predator
 finish_init!(ppsim)
 ````
 
 ## Transition Functions
 
+As mentioned in the comment for the PredatorView, the cells are
+responsible to connect the Prey with the Predators. So each cell
+iterate over each prey on the cell and add edges to all predators
+the can view the cell.
+
 ````@example predator
 function find_prey(state::Cell, id, sim)
-    prey = neighborids(sim, id, PreyPosition)
-    if isnothing(prey)
-        return state
+    checked(foreach, neighborids(sim, id, PreyPosition)) do preyid
+        checked(foreach, neighborids(sim, id, PredatorView)) do predid
+            add_edge!(sim, preyid, predid, VisiblePrey())
+        end
     end
-
-    checked(foreach, neighborids(sim, id, PredatorView)) do predid
-        add_edge!(sim, rand(prey), predid, VisiblePrey())
-    end
+    state
 end
 
 
@@ -246,7 +265,7 @@ function move(state::Predator, id, sim)
         else
             rand(prey).pos
         end
-        move_predator!(sim, id, newpos, false)
+        move!(sim, id, newpos, PredatorPosition)
         Predator(e, newpos)
     else
         nothing
@@ -265,7 +284,7 @@ function move(state::Prey, id, sim)
             rand(withgrass)
         end
         newpos = agentstate(sim, nextcellid, Cell).pos
-        move_prey!(sim, id, newpos, false)
+        move!(sim, id, newpos, PreyPosition)
         Prey(e, newpos)
     else
         nothing
@@ -302,8 +321,8 @@ function try_eat(state::Cell, id, sim)
     end
 end
 
-function try_reproduce_imp(state, id, sim, C, move_fn, species_params)
-    move_fn(sim, id, state.pos, true)
+function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
+    move!(sim, id, state.pos, posedge, viewedge) # ist das wirklich notwendig?
     if has_neighbor(sim, id, Eat)
         state = C(state.energy + species_params.gain_from_food, state.pos)
     end
@@ -312,7 +331,7 @@ function try_reproduce_imp(state, id, sim, C, move_fn, species_params)
 
         energy_offspring = Int64(round(state.energy / 2))
         newid = add_agent!(sim, C(energy_offspring, state.pos))
-        move_fn(sim, newid, state.pos, true)
+        move!(sim, newid, state.pos, posedge, viewedge)
         C(state.energy - energy_offspring, state.pos)
     else
         state
@@ -321,13 +340,14 @@ end
 
 try_reproduce(state::Predator, id, sim) =
     try_reproduce_imp(state, id, sim, Predator,
-                    move_predator!, param(sim, :predator))
+                    PredatorPosition, PredatorView, param(sim, :predator))
 
 function try_reproduce(state::Prey, id, sim)
     if has_neighbor(sim, id, Die)
         return nothing
     end
-    try_reproduce_imp(state, id, sim, Prey, move_prey!, param(sim, :prey))
+    try_reproduce_imp(state, id, sim, Prey,
+                    PreyPosition, PreyView, param(sim, :prey))
 end
 
 function update_globals(sim)
@@ -377,7 +397,7 @@ function step!(sim)
     update_globals(sim)
 end
 
-using Plots
+using GLMakie
 
 # t is PreyPosition or PredatorPosition
 function plot_agents_on_cell(sim, t)
@@ -390,7 +410,7 @@ for _ in 1:200 step!(ppsim) end
 
 plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ])
 
-plot!()
+f = plot_agents_on_cell(ppsim, PredatorPosition)
 ````
 
 # Tests

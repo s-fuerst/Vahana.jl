@@ -44,8 +44,8 @@ add_graph!
 There is also two function with works the other way and converts the underlying graph of an simulation (or a subset of this graph) to a structure that fulfills the AbstractGraph or AbstractSimpleGraph interface from the Graphs.jl package.
 
 ```@docs
-vahanagraph!
-vahanasimplegraph!
+vahanagraph
+vahanasimplegraph
 ```
 
 ## Raster 

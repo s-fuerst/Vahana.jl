@@ -1,5 +1,7 @@
 using Documenter, Vahana
 
+using GraphMakie, Makie
+
 # this is a really dirty workaround, but for whatever reason the
 # sandboxing mechanism of Documenter clashes with the way Vahana
 # constructs the model.
@@ -20,7 +22,8 @@ Literate.markdown(joinpath(@__DIR__, "examples", "predator.jl"), "src"; execute 
 Literate.markdown(joinpath(@__DIR__, "examples", "hegselmann.jl"), "src"; execute = false)
 
 makedocs(sitename="Vahana Documentation",
-#         format = Documenter.LaTeX(),
+         #         format = Documenter.LaTeX(),
+         clean = false, 
          format = Documenter.HTML(prettyurls = false),
          pages = [
              "Introduction" => "index.md",

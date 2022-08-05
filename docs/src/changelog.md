@@ -28,6 +28,11 @@
   
 - `add_agenttype!` and `add_edgetype!` renamed to [`register_agenttype!`](@ref)
   and [`register_edgetype!`](@ref).
+  
+- `show_random_agent` is removed as [`show_agents`](@ref) shows now an
+  random agent when no id is given, so.
+  
+- `raster_nodeid` is renamed to [`cellid`](@ref)  
 
 ## v0.2
 #### new features:
@@ -35,9 +40,9 @@
   The cells of the raster are also Agents, which are created via the
   [`add_raster!`](@ref) function. Other Agents can be assigned to this
   cells via [`move_to!`](@ref) or by manually creating edges, whereby
-  the ids of the cells can be retrieved via
-  [`raster_nodeid`](@ref). [`calc_raster`](@ref) can be used to convert the
-  cell nodes to a ordinary matrix.
+  the ids of the cells can be retrieved via `raster_nodeid` (since
+  v0.4 [`cellid`])(@ref). [`calc_raster`](@ref) can be used to convert
+  the cell nodes to a ordinary matrix.
 
 #### breaking changes:
 - Function `add_grid!` renamed to [`add_raster!`](@ref).
@@ -50,7 +55,7 @@
 - `add_grid!` allows to add a grid to a Vahana simulation (renamed in v0.2 to [`add_raster!`](@ref))
 - [`neighborstates`](@ref) allows to get the state of all
   neighbors in a transition function.
-- For the REPL: [`show_agent`](@ref) and [`show_random_agent`](@ref).
+- For the REPL: [`show_agent`](@ref) and `show_random_agent`
 #### breaking changes:
 - Function `states` renamed to [`edgestates`](@ref)
 - Function `agentstate_from` is removed:

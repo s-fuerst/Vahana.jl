@@ -8,5 +8,5 @@ Visualization is not the main focus of Vahana, but two rudimentary auxiliary fun
 
 ```@docs
 plotglobals
-plotvahanagraph
+plot
 ```
