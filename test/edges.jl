@@ -67,7 +67,7 @@ model_edges = ModelTypes() |>
     register_edgetype!(EdgeSETs, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent, size = 10) |>
     register_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
     register_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    construct_model("edges")
+    construct_model("Test Edges")
 
 # All types (for copy, paste and adjust for the individual tests)
 #

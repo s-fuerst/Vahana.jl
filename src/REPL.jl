@@ -1,5 +1,5 @@
 export num_edges
-export show_network, show_agents, show_agent, show_random_agent
+export show_network, show_agents, show_agent, filter_agents
 
 using Printf
 
@@ -286,6 +286,16 @@ end
 TODO DOC 
 """
 num_agents(sim, ::Type{T}) where T =
-    length(getproperty(sim, readfield(Symbol(T))))
+    length()
 
+
+"""
+TODO DOC 
+"""
+function filter_agents(pred, sim, ::Type{T}) where T
+    agent_nrs =  keys(getproperty(sim, Vahana.readfield(Symbol(T))))
+    agent_ids = [ agent_id(sim, nr, T)
+                  for nr in agent_nrs]
+    filter(pred, agent_ids)
+end
 

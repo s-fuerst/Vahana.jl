@@ -17,7 +17,7 @@ model = ModelTypes() |>
     register_edgetype!(ESDict) |>
     register_edgetype!(ESLDict1) |> 
     register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |> # to = AVec 
-    construct_model("Core")
+    construct_model("Test Core")
 
 function add_example_network!(sim)
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed

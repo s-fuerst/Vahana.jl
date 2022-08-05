@@ -61,6 +61,10 @@ function agent_id(typeID::Int64, agent_nr::Int64)::AgentID
     agent_id(TypeID(typeID), AgentNr(agent_nr))
 end
 
+function agent_id(sim, agent_nr::AgentNr, ::Type{T}) where T
+    agent_id(sim.typeinfos.nodes_type2id[T], agent_nr)
+end
+
 function type_nr(id::AgentID)::TypeID
     id >> (BITS_PROCESS + BITS_AGENTNR)
 end

@@ -87,8 +87,9 @@ edgefield_constructor(T, info) = Meta.parse(construct_types(T, info)[1] * "()")
 # the "fallback" functions for the case that no specialized versions are needed.
 _check_size!(_, _, _) = nothing
 init_field!(_, _) = nothing
-_can_add(_, _, _) = true
+_can_add(_, _, _, _) = true
 
+show_second_edge_warning = true
 
 function construct_edge_functions(T::DataType, attr, simsymbol)
     ignorefrom = :IgnoreFrom in attr[:traits]
@@ -199,12 +200,33 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     # add_edge calls in this case. For the singletype case we can not
     # check if add_edge! was already called reliably.
     if singleedge && !singletype && !(ignorefrom && stateless)
-        @eval function _can_add(field, to::AgentID, ::Type{$T})
-            !haskey(field, to)
+        @eval function _can_add(field, to::AgentID, value, ::Type{$T})
+            if haskey(field, to)
+                if field[to] === value
+                    if ! config.quiet && show_second_edge_warning
+                        global show_second_edge_warning = false
+                        printstyled("""
+    
+An edge with agent $to as target was added the second time. Since the value of
+the edge (after applying traits like :IgnoreFrom) is identical to that of
+the first edge, this can be indented and is allowed. 
+
+This warning is only shown once is a Julia session and can be disabled
+by calling suppress_warnings(true) after importing Vahana.
+
+                    """; color = :red)
+                    end
+                    true
+                else
+                    false
+                end
+            else
+                true
+            end
         end
     end
 
-    #- _get_agent_container / _get_or_create_agent_container unifies
+    #- _get_agent_container / _get_agent_container! unifies
     # the access to the field, incl. possible needed steps like
     # resizing the underlying vector. The _get_ version return `nothing`
     # in the case, that there is no container for this agent, the _get_or_create_
@@ -229,7 +251,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             _check_size!(field, nr, $T)
             @inbounds isassigned(field, Int64(nr)) ? field[nr] : nothing
         end
-        @eval function _get_or_create_agent_container(sim::$simsymbol,
+        @eval function _get_agent_container!(sim::$simsymbol,
                                                to::AgentID,
                                                ::Type{$T},
                                                field)
@@ -252,7 +274,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             @inbounds field[nr]
         end
     else
-        @eval function _get_or_create_agent_container(::$simsymbol,
+        @eval function _get_agent_container!(::$simsymbol,
                                                to::AgentID,
                                                ::Type{$T},
                                                field)
@@ -269,17 +291,17 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         @eval function add_edge!(sim::$simsymbol, to::AgentID, ::Edge{$MT})
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))
-            @inbounds field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
+            @inbounds field[nr] = _get_agent_container!(sim, to, $T, field) + 1
         end
 
         @eval function add_edge!(sim::$simsymbol, ::AgentID, to::AgentID, ::$MT)
             nr = _to2idx(to, $T)
             field = sim.$(writefield(T))
-            @inbounds field[nr] = _get_or_create_agent_container(sim, to, $T, field) + 1
+            @inbounds field[nr] = _get_agent_container!(sim, to, $T, field) + 1
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            @mayassert _can_add(sim.$(writefield(T)), to, $T) """
+            @mayassert _can_add(sim.$(writefield(T)), to, _valuetostore(edge), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
@@ -290,7 +312,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
-            @mayassert _can_add(sim.$(writefield(T)), to, $T) """
+            @mayassert _can_add(sim.$(writefield(T)), to, _valuetostore(from, edgestate), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
@@ -301,20 +323,24 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            push!(_get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))),
+            push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
                   _valuetostore(edge))
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
-            push!(_get_or_create_agent_container(sim, to, $T, sim.$(writefield(T))),
+            push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
                   _valuetostore(from, edgestate))
         end
     end
 
     #- prepare_write! 
-    @eval function prepare_write!(sim::$simsymbol, t::Type{$MT})
-        sim.$(writefield(T)) = $FT()
-        init_field!(sim, t)
+    @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, t::Type{$MT})
+        if add_existing
+            sim.$(writefield(T)) = deepcopy(sim.$(readfield(T)))
+        else
+            sim.$(writefield(T)) = $FT()
+            init_field!(sim, t)
+        end
     end
 
     #- finish_write!
@@ -547,7 +573,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
             """
         end
     end
- end   
-     
+end   
+
 
 

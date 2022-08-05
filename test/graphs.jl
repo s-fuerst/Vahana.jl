@@ -11,7 +11,7 @@ struct GraphE end
 model_graph = ModelTypes() |>
     register_agenttype!(GraphA) |>
     register_edgetype!(GraphE) |>
-    construct_model("graph")
+    construct_model("Test Graph")
 
 @testset "Graphs" begin
     # calculate the sum of all ids

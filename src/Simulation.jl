@@ -205,7 +205,7 @@ function maybeadd(_,
     nothing
 end
 
-prepare_write!(sim) = t -> prepare_write!(sim, t)
+prepare_write!(sim, add_existing) = t -> prepare_write!(sim, t in add_existing, t)
 
 finish_write!(sim) = t -> finish_write!(sim, t)
 
@@ -241,13 +241,21 @@ function apply_transition!(sim,
                     func::Function,
                     compute::Vector,
                     networks::Vector,
-                    rebuild::Vector)
-    writeable = [ compute; rebuild ]
+                    rebuild::Vector;
+                    invariant_compute = false,
+                    add_existing = Vector{DataType}())
+    writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
-    foreach(prepare_write!(sim), writeable)
+    foreach(prepare_write!(sim, add_existing), writeable)
 
-    for C in compute
-        transition!(sim, func, C)
+    if invariant_compute
+        for C in compute
+            transition_edges_only!(sim, func, C)
+        end
+    else
+        for C in compute
+            transition!(sim, func, C)
+        end
     end
 
     foreach(finish_write!(sim), writeable)
@@ -259,8 +267,9 @@ function apply_transition!(func::Function,
                     sim,
                     compute::Vector,
                     networks::Vector,
-                    rebuild::Vector)
-    apply_transition!(sim, func, compute, networks, rebuild)
+                    rebuild::Vector;
+                    kwargs ...)
+    apply_transition!(sim, func, compute, networks, rebuild; kwargs ...)
 end
 
 
@@ -280,9 +289,10 @@ function apply_transition(sim,
                    func,
                    compute::Vector,
                    networks::Vector,
-                   rebuild::Vector) 
+                   rebuild::Vector;
+                   kwargs ...) 
     newsim = deepcopy(sim)
-    apply_transition!(newsim, func, compute, networks, rebuild)
+    apply_transition!(newsim, func, compute, networks, rebuild; kwargs ...)
     newsim
 end
 
