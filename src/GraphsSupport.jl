@@ -122,7 +122,7 @@ function vahanasimplegraph(sim;
 
     ne = 0
     for t in edgetypes
-        for (to, e) in edges_iterator(_getread(sim, t))
+        for (to, e) in edges_iterator(sim, t)
             f = get(v2g, e.from, nothing)
             t = get(v2g, to, nothing)
             if f !== nothing && t !== nothing
@@ -210,7 +210,7 @@ function vahanagraph(sim;
     edges = Vector{Graphs.Edge}()
     edgetypeidx = 1
     for T in edgetypes
-        for (to, e) in edges_iterator(_getread(sim, T))
+        for (to, e) in edges_iterator(sim, T)
             f = get(v2g, hasproperty(e, :from) ? e.from : e, nothing)
             t = get(v2g, to, nothing)
             if f !== nothing && t !== nothing

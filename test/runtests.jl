@@ -9,6 +9,9 @@ include("core.jl")
 
 include("edges.jl")
 
+# edgesiterator depends on edges.jl
+include("edgesiterator.jl")
+
 include("globals.jl")
 
 include("raster.jl")

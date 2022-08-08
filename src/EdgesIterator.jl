@@ -10,20 +10,39 @@ struct IterEdgesState
     nextedgeidx::Int64 # the next edge of in the inner edge iterator
 end
 
-struct IterEdgesWrapper
+struct IterEdgesWrapper 
+    sim
+    edgetype::DataType
+    read::Bool
     field
+    singleedge::Bool # the inner container is not a vector
 end
 
 """
-    edges_iterator(field)
+    edges_iterator(sim, edgetype)
 
 (Vahana internal function)
 
 Creates an wrapped type for an %EDGETYPE%_read/write field. For this
 type their exists iterate methods, which handle all the edgetype traits.
 """
-function edges_iterator(field)
-    IterEdgesWrapper(field)
+function edges_iterator(sim, t::DataType, read::Bool = true)
+    field = read ? _getread(sim, t) : _getwrite(sim, t)
+    if length(field) == 0
+        # for empty field, we can not detect singleedge, but this is also not
+        # necessary as the iteratore will return nothing immediately
+        IterEdgesWrapper(sim, t, read, field, false)
+    else
+        # we need an id for the field
+        id = field |> keys |> first
+        # hasmethod(length...) returns false, when the edge has the SingleEdge trait
+        IterEdgesWrapper(sim, t, read, field,
+                         :SingleEdge in sim.typeinfos.edges_attr[t][:traits])
+    end
+end
+
+function length(iw::IterEdgesWrapper)
+    _num_edges(iw.sim, iw.edgetype, ! iw.read)
 end
 
 function iterate(iw::IterEdgesWrapper)
@@ -32,7 +51,7 @@ function iterate(iw::IterEdgesWrapper)
     end
     field = iw.field
     ks = keys(field)
-    # If the container is a vector, remove all #undefs 
+    # If the agent container is a vector, remove all #undefs 
     if hasmethod(isassigned, (typeof(field), Int64))
         ks = filter(i -> isassigned(field, i), ks)
     end
@@ -44,28 +63,26 @@ function iterate(iw::IterEdgesWrapper)
 end
 
 
+
 function iterate(iw::IterEdgesWrapper, is::IterEdgesState)
     field = iw.field
     # innerisvec is false, if the edgetype has the trait :SingleEdge
-    innerisvec = hasmethod(length, (typeof(field[is.currentagentid]),))
-    len = 1
-    if innerisvec
-        len = length(field[is.currentagentid])
-    end
+    len = iw.singleedge ? 1 : length(field[is.currentagentid])
     if is.nextedgeidx <= len
-        if innerisvec
-            return ((is.currentagentid, field[is.currentagentid][is.nextedgeidx]),
-               IterEdgesState(is.agentiter, is.currentagentid, is.nextedgeidx + 1))
-        else
+        if iw.singleedge
             return ((is.currentagentid, field[is.currentagentid]),
                IterEdgesState(is.agentiter, is.currentagentid, is.nextedgeidx + 1))
+        else
+            return ((is.currentagentid, field[is.currentagentid][is.nextedgeidx]),
+               IterEdgesState(is.agentiter, is.currentagentid, is.nextedgeidx + 1))
         end
-    elseif length(is.agentiter) == 0
-        return nothing
-    end
     # this code is only reaced for is.nextedgeidx > len, which means
     # we move on our outer iterator to the next agent and call
     # the iterate function recursivly.
+    elseif length(is.agentiter) == 0
+        return nothing
+    end
     currentagentid = Iterators.take(is.agentiter, 1) |> only
+#    @show length(is.agentiter), currentagentid    
     iterate(iw, IterEdgesState(is.agentiter, currentagentid, 1))
 end

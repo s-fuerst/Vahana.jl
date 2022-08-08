@@ -1,5 +1,5 @@
 export num_edges
-export show_network, show_agents, show_agent, filter_agents
+export show_network, show_agents, show_agent, filter_agents, do_agents, do_edges, map_edges
 
 using Printf
 
@@ -21,14 +21,14 @@ function show_type(sim, t::Type{T}; write = false, max = 5) where T
     readfield = _getread(sim, t)
     if length(readfield) > 0
         printstyled("Read:\n"; color = :cyan)
-        _show_collection(edges_iterator(readfield), max)
+        _show_collection(edges_iterator(sim, t), max)
     end
 
     if write
         writefield = _getwrite(sim, t)
         if length(writefield) > 0
             printstyled("Write:\n"; color = :cyan)
-            _show_collection(edges_iterator(writefield), max)
+            _show_collection(edges_iterator(sim, t, true), max)
         end
     end
 end
@@ -246,7 +246,7 @@ function show_agent(sim,
     # collect the outgoing edges and overwrite the from id
         # with the to id
         edges_agents = Vector{Edge}()
-        for (eid, e) in edges_iterator(read_container)
+        for (eid, e) in edges_iterator(sim, edgeT)
             edge = _reconstruct_edge(e, edgetypetraits, edgeT)
             
             if id == edge.from
@@ -297,5 +297,17 @@ function filter_agents(pred, sim, ::Type{T}) where T
     agent_ids = [ agent_id(sim, nr, T)
                   for nr in agent_nrs]
     filter(pred, agent_ids)
+end
+
+function do_agents(g, f, sim, ::Type{T}) where T
+    agent_nrs =  keys(getproperty(sim, Vahana.readfield(Symbol(T))))
+    agent_ids = [ agent_id(sim, nr, T)
+                  for nr in agent_nrs]
+    f(g, agent_ids)
+end
+
+function map_edges(f, sim, t::Type{T}) where T
+    g = f ∘ (e -> e[2])
+    map(g, edges_iterator(sim, t))
 end
 

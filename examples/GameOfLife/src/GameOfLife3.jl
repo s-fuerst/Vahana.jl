@@ -51,19 +51,18 @@ end
 
 const model = ModelTypes() |>    
     register_agenttype!(Cell, :Vector; size = 40000) |> 
-#    register_agenttype!(Cell) |> 
     register_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=40000) |>
     register_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=40000) |>
     construct_model("GameOfLife")
 
 
 function init!(sim)
-    add_raster!(sim, 
+    add_raster!(sim,
+                :raster,
                 param(sim, :dims),
-                _ -> rand() < 0.2 ? Cell(true) : Cell(false),
-                Neighbor();
-                name = :raster)
+                _ -> rand() < 0.2 ? Cell(true) : Cell(false))
 
+    connect_raster_neighbors!(sim, :raster, (_,_) -> Neighbor()) 
 
     finish_init!(sim)
 
@@ -75,7 +74,7 @@ end
 function step!(sim)
     apply_transition!(sim, transition,
                       [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
-#    calc_raster(sim, :raster, c -> c.active, Cell)
+    calc_raster(sim, :raster, c -> c.active, Cell)
 end
 
 const sim = new_simulation(model,
@@ -87,7 +86,9 @@ init!(sim)
 
 # step!(sim)
 
-@benchmark apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+#@benchmark
+
+apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
 
 
 #@profilehtml for i in 1:20 step!(sim) end
