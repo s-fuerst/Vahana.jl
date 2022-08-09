@@ -106,7 +106,7 @@ Seller() = Seller(rand() + 0.5, 0);
 # price information to calculate his demand, it is a network from
 # sellers to buyers. We call this network `KnownSeller`.
 
-# As for the agents we must define a struct for each type of network.  The edges
+# As for the agents we must define a struct for each type of network. The edges
 # of the `KnownSeller` network do not carry additional information, so
 # we define them just as a struct without any field.
 
@@ -166,11 +166,11 @@ const model = ModelTypes() |>
     register_agenttype!(Seller) |>
     register_edgetype!(KnownSellers) |>
     register_edgetype!(Bought) |>
-    construct_model("Excess Demand")
+    construct_model("Excess Demand");
 
 # `construct_model` returns a blueprint for our simulation. Simulations
 # itself can be seen as instances of models, where each simulation has
-# it's individual state and set of parameters.  The Simulation is
+# it's individual state and set of parameters. The Simulation is
 # instanciated by the `new_simulation` function, which needs beside
 # the model also the parameters struct and the globals struct, whereby
 # the parameters and globals can be also `nothing`. 

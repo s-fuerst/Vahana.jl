@@ -1,6 +1,6 @@
 export add_graph!
 
-export vahanagraph
+export vahanagraph, vahanasimplegraph
 
 import Graphs:
     Graphs, edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
@@ -173,7 +173,7 @@ agents/edgetypes (see [`register_agenttype!`](@ref) and
 
 This subgraphs implements the AbstractGraph interface from the
 Graphs.jl package, so that e.g. GraphMakie can be used to visualize
-the subgraph. See also [`plotvahanagraph`](@ref).
+the subgraph. See also [`plot`](@ref).
 
 The edge types must not have the :IgnoreFrom trait.
 

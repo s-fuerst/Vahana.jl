@@ -235,6 +235,8 @@ added again inside of `func`. Also [`add_agent!`](@ref),
 [`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
 can be only called for types in `network` or `compute`.
 
+TODO DOC: keywords
+
 See also [`apply_transition`](@ref)
 """
 function apply_transition!(sim,

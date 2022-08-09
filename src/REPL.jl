@@ -1,5 +1,5 @@
 export num_edges
-export show_network, show_agents, show_agent, filter_agents, do_agents, do_edges, map_edges
+export show_network, show_agents, show_agent, do_agents, do_edges
 
 using Printf
 
@@ -17,18 +17,20 @@ function _printid(id, nrformatted = true)
 end    
 
 
-function show_type(sim, t::Type{T}; write = false, max = 5) where T
+function show_type(sim, t::Type{T}, what::Symbol; write = false, max = 5) where T
     readfield = _getread(sim, t)
     if length(readfield) > 0
         printstyled("Read:\n"; color = :cyan)
-        _show_collection(edges_iterator(sim, t), max)
+        iter = what == :Agent ? readfield : edges_iterator(sim, t)
+        _show_collection(iter, max)
     end
 
     if write
         writefield = _getwrite(sim, t)
         if length(writefield) > 0
             printstyled("Write:\n"; color = :cyan)
-            _show_collection(edges_iterator(sim, t, true), max)
+            iter = what == :Agent ? writefield : edges_iterator(sim, t, true)
+            _show_collection(iter, max)
         end
     end
 end
@@ -46,7 +48,8 @@ the initialization phase or current transition function are shown.
 
 The keyword `max` determine the maximal number of shown edges.
 """
-show_network(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
+show_network(sim, t::Type{T}; kwargs...) where T =
+    show_type(sim, t, :Edge; kwargs...)
 
 """
     show_agents(sim, ::Type{T}) where {T <: Agent}
@@ -62,42 +65,9 @@ the initialization phase or current transition function are shown.
 The keyword `max` determine the maximal number of shown agents.
 
 """
-show_agents(sim, t::Type{T}; kwargs...) where T = show_type(sim, t; kwargs...)
+show_agents(sim, t::Type{T}; kwargs...) where T =
+    show_type(sim, t, :Agent; kwargs...)
 
-# """
-#     show_random_agent(sim, ::Type{T}; kwargs...) 
-
-# Display detailed information of a random agent with Type T.
-
-# Keyword arguments:
-#     `nedges` controls the maximal number of edges that are
-#     shown per network (per direction).
-
-#     `stateof` controls whether the state of the edge
-#     (the default) or the state of the adjacent agent (for any value except
-#     :Edge) is displayed.
-
-#     `source` controls whether all edges of the simulation should be
-#     traversed to find the edges where the agent `id` is the
-#     source. Since this can take some time for large graphs, this search
-#     can be disabled.
-# """
-# function show_random_agent(sim, t::Type{T}; kwargs...) where T
-#     if !sim.initialized
-#         println("show_random_agent can not be called before finish_init!.")
-#         return
-#     end
-    
-#     agents = _getread(sim, t) |>
-#         keys
-
-#     if length(agents) == 0
-#         println("No agent of type $T found.")
-#         return
-#     end
-
-#     show_agent(sim, rand(agents), t; kwargs...)
-# end
 
 """
     show_agent(sim, Type{T}, id=0; max=5, stateof=:Edge, source = true) 
@@ -288,17 +258,9 @@ TODO DOC
 num_agents(sim, ::Type{T}) where T =
     length()
 
-
 """
 TODO DOC 
 """
-function filter_agents(pred, sim, ::Type{T}) where T
-    agent_nrs =  keys(getproperty(sim, Vahana.readfield(Symbol(T))))
-    agent_ids = [ agent_id(sim, nr, T)
-                  for nr in agent_nrs]
-    filter(pred, agent_ids)
-end
-
 function do_agents(g, f, sim, ::Type{T}) where T
     agent_nrs =  keys(getproperty(sim, Vahana.readfield(Symbol(T))))
     agent_ids = [ agent_id(sim, nr, T)
@@ -306,8 +268,11 @@ function do_agents(g, f, sim, ::Type{T}) where T
     f(g, agent_ids)
 end
 
-function map_edges(f, sim, t::Type{T}) where T
+"""
+TODO DOC 
+"""
+function do_edges(f, h, sim, t::Type{T}) where T
     g = f ∘ (e -> e[2])
-    map(g, edges_iterator(sim, t))
+    h(g, edges_iterator(sim, t) |> collect)
 end
 

@@ -361,7 +361,12 @@ function step!(sim)
     update_globals(sim)
 end
 
-using GLMakie
+for _ in 1:200 step!(ppsim) end
+
+# ## Plots
+
+using CairoMakie
+using Makie
 
 ## t is PreyPosition or PredatorPosition
 function plot_agents_on_cell(sim, t)
@@ -370,11 +375,14 @@ function plot_agents_on_cell(sim, t)
     end |> heatmap
 end
 
-for _ in 1:200 step!(ppsim) end
+# First the time series
 
 plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ])
 
-f = plot_agents_on_cell(ppsim, PredatorPosition)
+# And as an example a heatmap that show how many predators are on a
+# cell
+
+plot_agents_on_cell(ppsim, PredatorPosition)
 
 # # Tests
 

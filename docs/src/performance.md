@@ -77,7 +77,8 @@ TODO DOC for an example.
 	
 	This both traits should only be combined when it is guaranteed that to
 	each agent actually exactly one edge leads. Or when also `:IgnoreFrom`
-	and `:Stateless` is set, see TODO DOC.
+	and `:Stateless` is set, in this case it's only tracked if there exists an
+	edge to an agent (see also [Defined Functions](#Defined-Functions) below).
 	
 	If you combine `:SingleAgentType` and `:SingleEdge` without
 	`:IgnoreFrom` and `:Stateless`, you will get a warning when

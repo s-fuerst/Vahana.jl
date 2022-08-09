@@ -1,7 +1,7 @@
  import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
-export calc_raster, calc_rasterstate, calc_rasterstate_flexible, move_to!
+export calc_raster, calc_rasterstate, move_to!
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
@@ -201,7 +201,6 @@ end
 # end
 
 
-# this is an Vahana internal function
 """
     cellid(sim, name::Symbol, pos)
 
@@ -235,7 +234,7 @@ node.
 
 TODO DOC: distance etc.
 
-See also [`add_raster!`](@ref), [`raster_nodeid`](@ref) and [`add_edge!`](@ref) 
+See also [`add_raster!`](@ref), [`cellid`](@ref) and [`add_edge!`](@ref) 
 """
 function move_to!(sim,
            name::Symbol,

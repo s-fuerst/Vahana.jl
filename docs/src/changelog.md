@@ -32,7 +32,8 @@
 - `show_random_agent` is removed as [`show_agents`](@ref) shows now an
   random agent when no id is given, so.
   
-- `raster_nodeid` is renamed to [`cellid`](@ref)  
+- `raster_nodeid` is renamed to `cellid` and now not exported anymore (use 
+  [`connect_raster_neighbors!`](@ref) and [`move_to!`](@ref) instead).
 
 ## v0.2
 #### new features:
@@ -41,7 +42,7 @@
   [`add_raster!`](@ref) function. Other Agents can be assigned to this
   cells via [`move_to!`](@ref) or by manually creating edges, whereby
   the ids of the cells can be retrieved via `raster_nodeid` (since
-  v0.4 [`cellid`])(@ref). [`calc_raster`](@ref) can be used to convert
+  v0.4 `cellid`. [`calc_raster`](@ref) can be used to convert
   the cell nodes to a ordinary matrix.
 
 #### breaking changes:

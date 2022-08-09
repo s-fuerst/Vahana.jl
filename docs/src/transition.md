@@ -38,7 +38,7 @@ param
 getglobal
 ```
 
-## Agents
+## Get Agent(state)
 
 ```@docs
 agentstate
@@ -47,8 +47,7 @@ agentstate_flexible
 neighborstates
 neighborstates_flexible
 ```
-## Edges
-
+## Get Edge(state)
 
 ```@docs
 edges_to
@@ -67,3 +66,17 @@ function to test for `nothing`.
 ```@docs
 checked
 ```
+
+## Add Agents/Edges
+
+The following functions from the [Initialization] section
+(initialization.md) that add new agents or edges to a simulation can
+also be used inside a transition function, namely:
+
+* [`add_agent!`](@ref) and [`add_agents!`](@ref)
+* [`add_edge!`](@ref) and [`add_edges!`](@ref)
+* [`connect_raster_neighbors!`](@ref)
+* [`move_to!`](@ref)
+
+
+
