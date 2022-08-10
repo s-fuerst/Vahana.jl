@@ -151,3 +151,20 @@ apply_transition!(cgsim, step, [ HKAgent ], [ Knows ], [])
 
 apply_transition!(snapsim, step, [ HKAgent ], [ Knows ], [])
 
+import CairoMakie
+using GraphMakie
+g = SimpleGraphs.cycle_graph(50)
+
+
+cysim = new_simulation(hkmodel, HKParams(0.2), nothing);
+const agentids = add_graph!(cysim,
+                            g,
+                            _ -> HKAgent(rand()),
+                            _ -> Knows());
+
+
+foreach(id -> add_edge!(cysim, id, id, Knows()), agentids) 
+
+finish_init!(cysim)
+
+f, ax, plt = Vahana.plot(vahanagraph(cysim)) 

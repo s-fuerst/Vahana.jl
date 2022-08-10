@@ -18,12 +18,6 @@ show_agents
 show_network
 
 show_agent
-
-filter_agents
-
-num_agents
-num_edges
-
 ```
 
 `apply_transition` can be used to calculate a transition function

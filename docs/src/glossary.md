@@ -29,7 +29,11 @@ See also [`construct_model`](@ref).
 
 ## Network
 
-## Neighbor
+
+
+## Neighbor(hood)
+
+
 
 ## Raster / Grid / Spatial Layer
 
@@ -45,4 +49,3 @@ different parameters and state. See also [`new_simulation`](@ref).
 
 ## Trait
 
-## VahanaGraph / VahanaSimpleGraph

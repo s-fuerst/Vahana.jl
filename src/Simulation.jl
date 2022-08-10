@@ -211,7 +211,7 @@ finish_write!(sim) = t -> finish_write!(sim, t)
 
 
 """
-    apply_transition!(sim, func, compute, networks, rebuild)
+    apply_transition!(sim, func, compute, networks, rebuild; invariant_compute = false, add_existing = Vector{DataType}())
 
 Apply the transition function `func` to the simulation state. 
 
@@ -220,6 +220,10 @@ id::AgentID, sim::Simulation)` and must return either an agent of type
 T or `nothing`. If `nothing` is returned, the agent will be removed
 from the simulation, otherwise the agent with id `id` will have
 (starting with the next apply_transition! call) the returned state.
+In the case that all agents do not change their state and only modify
+the state of the simulation by adding edges or new agents, the
+keyword argument `invariant_compute` can be set to true. In this case the
+returned value of the transition function will be ignored.
 
 `compute` is a vector of Agent types. `func` is called for every agent
 with a type that is listed in `compute`, so a method for each of this types
@@ -230,12 +234,13 @@ functions like [`edges_to`](@ref) that access information about edges
 can be only called when the edge type is in the `network` vector.
 
 `rebuild` is a vector of Agent and/or Edge types. All the instances of
-agents or edges with a type in `rebuild` will be removed and must be
-added again inside of `func`. Also [`add_agent!`](@ref),
-[`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
-can be only called for types in `network` or `compute`.
-
-TODO DOC: keywords
+agents or edges with a type in (`rebuild` - `add_existing`) will be
+removed and must be added again inside of `func`.
+[`add_agent!`](@ref), [`add_agents!`](@ref), [`add_edge!`](@ref) and
+[`add_edges!`](@ref) can be only called for types in `rebuild` or
+`compute`. In the case, that a transition function should only add additional
+edges for some types, these types must be listed in the `add_existing`
+vector.
 
 See also [`apply_transition`](@ref)
 """

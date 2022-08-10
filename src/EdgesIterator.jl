@@ -23,8 +23,8 @@ end
 
 (Vahana internal function)
 
-Creates an wrapped type for an %EDGETYPE%_read/write field. For this
-type their exists iterate methods, which handle all the edgetype traits.
+Creates an wrapped type for an %EDGETYPE%_read/write field. This type 
+implements the Iterator interface.
 """
 function edges_iterator(sim, t::DataType, read::Bool = true)
     field = read ? _getread(sim, t) : _getwrite(sim, t)

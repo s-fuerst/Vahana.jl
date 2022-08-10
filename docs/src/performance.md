@@ -66,7 +66,8 @@ the concrete edge will be stored when [`add_edge!`](@ref) is called,
 but in this case Vahana still counts for each agent how many edges
 exists with the agent as target node. Often this (or just the
 information that such an edge exist) is sufficient information, see
-TODO DOC for an example.
+the `Die` or `Eat` edges of the [Predator example](predator.md) for an
+example.
 
 !!! danger
 
@@ -131,3 +132,10 @@ expresses the intent of the combination:
   [`has_neighbor`](@ref) are possible.
 
 
+## apply_transition! argument keywords
+
+The optional keywords `invariant_compute` and `add_existing` can be
+used to reuse already existing instances of agents and/or edges. The
+`find_prey` and `try_reproduce` transition functions of the
+[Predator/Prey model] are an example of this. Or check the
+documentation of [`apply_transition!`](@ref) for more detail.

@@ -232,9 +232,13 @@ source node and the cell as target node. `edge_to_raster` can be
 `nothing`, in this case no edge will be added with the agent as source
 node.
 
-TODO DOC: distance etc.
+Using the keyword arguments, it is possible to add additional edges to
+the surroundings of the cell at position `pos` in the same raster,
+i.e. to all cells at distance `distance` under metric `metric`, where
+valid metrics are :chebyshev, :euclidean and :manhatten`. And the
+keyword `periodic` determines whether all dimensions are cyclic.
 
-See also [`add_raster!`](@ref), [`cellid`](@ref) and [`add_edge!`](@ref) 
+See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
 function move_to!(sim,
            name::Symbol,

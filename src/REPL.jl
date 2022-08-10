@@ -29,7 +29,7 @@ function show_type(sim, t::Type{T}, what::Symbol; write = false, max = 5) where 
         writefield = _getwrite(sim, t)
         if length(writefield) > 0
             printstyled("Write:\n"; color = :cyan)
-            iter = what == :Agent ? writefield : edges_iterator(sim, t, true)
+            iter = what == :Agent ? writefield : edges_iterator(sim, t, false)
             _show_collection(iter, max)
         end
     end
@@ -82,17 +82,15 @@ agent is selected).
 
 Keyword arguments:
 
-    `max` controls the maximal number of edges that are
-    shown per network (per direction).
+`max` controls the maximal number of edges that are shown per network
+(per direction).
 
-    `stateof` controls whether the state of the edge
-    (the default) or the state of the adjacent agent (for any value except
-    :Edge) is displayed.
+`stateof` controls whether the state of the edge (the default) or the
+state of the adjacent agent (for any value except :Edge) is displayed.
 
-    `source` controls whether all edges of the simulation should be
-    traversed to find the edges where the agent `id` is the
-    source. Since this can take some time for large graphs, this search
-    can be disabled.
+`source` controls whether all edges of the simulation should be
+traversed to find the edges where the agent `id` is the source. Since
+this can take some time for large graphs, this search can be disabled.
 """
 function show_agent(sim,
              t::Type{T},
