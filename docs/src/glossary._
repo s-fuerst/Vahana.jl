@@ -1,5 +1,6 @@
 # Glossary
 
+
 ## Agent / Node 
 
 In Vahana, agents are implemented as nodes of a graph. Thus, agent and
@@ -17,8 +18,8 @@ therefore a position in the space of the raster. See also [`add_raster!`](@ref).
 ## Global Layer
 
 
-
 ## Interagent Layer
+
 
 ## Model
 

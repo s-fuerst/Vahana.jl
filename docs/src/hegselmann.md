@@ -52,7 +52,8 @@ We have now all elements to create an uninitialized simulation.
 const hkmodel = ModelTypes() |>
     register_agenttype!(HKAgent) |>
     register_edgetype!(Knows) |>
-    construct_model("Hegselmann-Krause")
+    construct_model("Hegselmann-Krause");
+nothing #hide
 ````
 
 # Add the graph
@@ -68,8 +69,8 @@ We show here for both use cases one example and are creating for each
 one an own simulation
 
 ````@example hegselmann
-cgsim = new_simulation(hkmodel, HKParams(0.2), nothing);
-snapsim = new_simulation(hkmodel, HKParams(0.2), nothing)
+const cgsim = new_simulation(hkmodel, HKParams(0.2), nothing);
+const snapsim = new_simulation(hkmodel, HKParams(0.2), nothing)
 ````
 
 ## SimpleGraphs
@@ -170,7 +171,8 @@ function step(agent, id, sim)
         abs(other.opinion - agent.opinion) < ε
     end
     HKAgent(mean(map(a -> a.opinion, accepted)))
-end
+end;
+nothing #hide
 ````
 
 We can now apply the transition function to the complete graph simulation
@@ -183,6 +185,69 @@ Or to our facebook dataset
 
 ````@example hegselmann
 apply_transition!(snapsim, step, [ HKAgent ], [ Knows ], [])
+````
+
+# Plot
+
+Finally, we show the visualization possibilities for graphs, and import the
+necessary packages for this and create a colormap for the nodes.
+
+````@example hegselmann
+import CairoMakie, GraphMakie, NetworkLayout, Colors, Makie, Graphs
+
+colors = Colors.range(Colors.colorant"red", stop=Colors.colorant"green", length=100);
+nothing #hide
+````
+
+Vahana implements an interactive plot function based on GraphMakie, where
+agents and edges are given different colors per type by default, and
+the state of each agent/edge is displayed via mouse hover
+actions. We are using a helper function to modify the node colors to
+indicate the agent's opinion and add a color bar to the plot.
+
+````@example hegselmann
+function plot_opinion(sim)
+    vg = vahanagraph(sim)
+    f, _, plt = Vahana.plot(vg)
+    plt.node_color[] = [ colors[nodestate(vg, i).opinion * 100 |> ceil |> Int]
+                         for i in 1:Graphs.nv(vg) ]
+    Makie.Colorbar(f[:, 2]; colormap = colors)
+    f
+end;
+nothing #hide
+````
+
+Since the complete graph is very unclear and the facebook dataset is
+too large, we construct a clique graph for it using Graphs.jl.
+
+````@example hegselmann
+const cysim = new_simulation(hkmodel, HKParams(0.25), nothing);
+const cyids = add_graph!(cysim,
+                         SimpleGraphs.clique_graph(7, 8),
+                         _ -> HKAgent(rand()),
+                         _ -> Knows());
+
+
+foreach(id -> add_edge!(cysim, id, id, Knows()), cyids)
+
+finish_init!(cysim);
+nothing #hide
+````
+
+First we plot the initial state
+
+````@example hegselmann
+plot_opinion(cysim)
+````
+
+And then the state after 500 iterations
+
+````@example hegselmann
+for _ in 1:500
+    apply_transition!(cysim, step, [ HKAgent ], [ Knows ], [])
+end
+
+plot_opinion(cysim)
 ````
 
 ---

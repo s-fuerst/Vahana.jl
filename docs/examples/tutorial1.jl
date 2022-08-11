@@ -284,7 +284,7 @@ function calc_demand(b::Buyer, id, sim)
     y = b.B * (1 - b.α) / s.p
     add_edge!(sim, id, seller_edge.from, Bought(x, y))
     b
-end
+end;
 
 # ## `calc_price`
 
@@ -309,7 +309,7 @@ function calc_price(s::Seller, id, sim)
     end
     q = reduce(+, edges)
     Seller(q.y / q.x * s.p, q.y)
-end
+end;
 
 # ## applying the transition functions
 

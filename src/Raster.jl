@@ -133,7 +133,7 @@ end
 Calculate values for the raster `raster` by applying `f` to each
 cell ID of the cells constructed by the `add_raster!` function.
 
-If the results of calc_raster depend only on the state of the cells
+If the results of `calc_raster` depend only on the state of the cells
 (as in the following example) and all cells have the same type,
 [`calc_rasterstate`](@ref) and [`calc_rasterstate_flexible`](@ref) can
 be used as concise alternatives.

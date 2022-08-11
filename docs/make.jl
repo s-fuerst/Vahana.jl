@@ -22,9 +22,9 @@ Literate.markdown(joinpath(@__DIR__, "examples", "predator.jl"), "src"; execute 
 Literate.markdown(joinpath(@__DIR__, "examples", "hegselmann.jl"), "src"; execute = false)
 
 makedocs(sitename="Vahana Documentation",
-         #         format = Documenter.LaTeX(),
-         clean = false, 
+#         format = Documenter.LaTeX(),
          format = Documenter.HTML(prettyurls = false),
+         clean = false, 
          pages = [
              "Introduction" => "index.md",
              "Tutorials" => [
@@ -37,12 +37,12 @@ makedocs(sitename="Vahana Documentation",
                  "Model Definition" => "definition.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
-                 "Global Layer" => "between.md",
+                 "Global Layer" => "global.md",
                  "REPL helpers" => "repl.md",
                  "Plots" => "plots.md",
                  "Configuration" => "config.md"
                  # "All" => "index.md"
              ],
-             "Glossary" => "glossary.md",
+#             "Glossary" => "glossary.md",
              "Change Log" => "changelog.md"
          ])

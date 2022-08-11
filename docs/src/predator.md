@@ -18,6 +18,8 @@ locations with prey to demonstrate how features like this can be
 implemented in Vahana.
 
 ````@example predator
+using CairoMakie
+
 using Vahana
 
 using Random
@@ -116,10 +118,10 @@ same parameters for Prey and Predator for the example run.
 
 ````@example predator
 Base.@kwdef struct SpeciesParams
-    gain_from_food::Int64 = 10
+    gain_from_food::Int64 = 5
     loss_per_turn::Int64 = 1
     repro_thres::Int64 = 5
-    repro_prob::Int64 = 50
+    repro_prob::Int64 = 20
 end
 
 Base.@kwdef struct AllParams
@@ -146,7 +148,8 @@ Base.@kwdef mutable struct PPGlobals
     cells_with_food = Vector{Int64}()
     mean_predator_energy = Vector{Float64}()
     mean_prey_energy = Vector{Float64}()
-end
+end;
+nothing #hide
 ````
 
 ## Create the Simulation
@@ -190,7 +193,8 @@ Predator and Pray are starting on a random position.
 function random_pos(sim)
     size = param(sim, :raster_size)
     CartesianIndex(rand(1:size[1]), rand(1:size[2]))
-end
+end;
+nothing #hide
 ````
 
 We define two helper functions to move an animal to a new
@@ -204,7 +208,8 @@ function move!(sim, id, newpos, posedge, viewedge)
     move_to!(sim, :raster, id, newpos, nothing, posedge)
     move_to!(sim, :raster, id, newpos, viewedge, viewedge;
              distance = 1, metric = :manhatten)
-end
+end;
+nothing #hide
 ````
 
 Now we can add the Predator and Pray to the simulation, and use
@@ -241,15 +246,22 @@ responsible to connect the Prey with the Predators. So each cell
 iterate over each prey on the cell and add edges to all predators
 the can view the cell.
 
+It may seem strange that the transition function does not return the state of
+the cell. The `apply_transition!` method has the keyword argument
+`invariant_compute`, if this is set to true as we do this later when
+we call `find_prey`, Vahana knows that the state of the agents being
+called will not be change and the return values of the transition
+functions are ignored.
+
 ````@example predator
-function find_prey(state::Cell, id, sim)
+function find_prey(::Cell, id, sim)
     checked(foreach, neighborids(sim, id, PreyPosition)) do preyid
         checked(foreach, neighborids(sim, id, PredatorView)) do predid
             add_edge!(sim, preyid, predid, VisiblePrey())
         end
     end
-    state
-end
+end;
+nothing #hide
 ````
 
 If a predator has enough energy left to move and there is a prey in the
@@ -277,7 +289,8 @@ function move(state::Predator, id, sim)
     else
         nothing
     end
-end
+end;
+nothing #hide
 ````
 
 The difference in the movement of the prey compared to the movement of
@@ -303,7 +316,8 @@ function move(state::Prey, id, sim)
     else
         nothing
     end
-end
+end;
+nothing #hide
 ````
 
 If a cell has no grass and the countdown field is therefore > 0, the
@@ -312,7 +326,8 @@ countdown is decreased by 1.
 ````@example predator
 function grow_food(state::Cell, _, _)
     Cell(state.pos, max(state.countdown - 1, 0))
-end
+end;
+nothing #hide
 ````
 
 In the try_eat transition function, each cell checks whether predator and
@@ -356,11 +371,21 @@ function try_eat(state::Cell, id, sim)
     else
         state
     end
-end
+end;
+nothing #hide
 ````
 
 The reproduction rule for predator and prey is almost the same, so we
-first define a function that can be used for both species.
+first define a function that can be used for both species. In this function we first
+check if the animal found something to eat. In this case on of the
+previous transition functions did create a edge of typ `Eat` with
+the animal as target, so we can use the `has_neighbor` function to check
+if this is the case.
+
+If the energy of the animal is above the threshold given as
+parameter, an offspring is added to the simulation via the
+`add_agent` call and the offspring is also moved it to the same
+position as its parent.
 
 ````@example predator
 function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
@@ -377,20 +402,41 @@ function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
     else
         state
     end
-end
+end;
+nothing #hide
+````
 
+For the Predator we can just call the reproduce function with the necessary
+arguments.
+
+````@example predator
 try_reproduce(state::Predator, id, sim) =
     try_reproduce_imp(state, id, sim, Predator,
                     PredatorPosition(), PredatorView(), param(sim, :predator))
+````
 
+The prey animal needs an extra step because it might have been eaten
+by a predator. So we check if there is a `Die` edge leading to the
+prey animal, and if so, the prey animal is removed from the
+simulation (by returning nothing). Otherwise, we again just call the
+reproduce function defined above.
+
+````@example predator
 function try_reproduce(state::Prey, id, sim)
     if has_neighbor(sim, id, Die)
         return nothing
     end
     try_reproduce_imp(state, id, sim, Prey,
                     PreyPosition(), PreyView(), param(sim, :prey))
-end
+end;
+nothing #hide
+````
 
+We update the global values and use the `aggregate` method to count
+the population and the number of cells with food. Based on the
+values, we can then also calculate the mean energy values.
+
+````@example predator
 function update_globals(sim)
     pushglobal!(sim, :predator_pop, aggregate(sim, _ -> 1, +, Predator; init = 0))
     pushglobal!(sim, :prey_pop, aggregate(sim, _ -> 1, +, Prey; init = 0))
@@ -402,10 +448,30 @@ function update_globals(sim)
     pushglobal!(sim, :mean_prey_energy,
                 aggregate(sim, p -> p.energy, +, Prey; init = 0) /
                     last(getglobal(sim, :prey_pop)))
-end
+end;
+nothing #hide
+````
 
-update_globals(ppsim)
+We add to our time series the initialzation values.
 
+````@example predator
+update_globals(ppsim);
+nothing #hide
+````
+
+And finally we define in which order our transitions functions are called.
+Worth mentioning here are the keyword arguments in `find_prey` and
+`try_reproduce`. In the `find_prey` transition the state of the cell
+itself does not change, it only creates `VisiblePrey` edges. By
+`invariant_compute = true` Vahana knows that the state of the cells
+are constant with respect to this transition function.
+
+The add_existing keyword in the try_reproduce transition function signify that
+the currently existing position and view edges should not be
+removed, and only additional edges should be added, in our case the
+position of the potential offspring.
+
+````@example predator
 function step!(sim)
     apply_transition!(sim, move,
                       [ Prey ],
@@ -415,7 +481,8 @@ function step!(sim)
     apply_transition!(sim, find_prey,
                       [ Cell ],
                       [ PreyPosition, PredatorView ],
-                      [ VisiblePrey ])
+                      [ VisiblePrey ];
+                      invariant_compute = true)
 
     apply_transition!(sim, move,
                       [ Predator ],
@@ -438,19 +505,19 @@ function step!(sim)
                                        PredatorView, PreyView ])
 
     update_globals(sim)
-end
+end;
+nothing #hide
+````
 
-@time for _ in 1:400 step!(ppsim) end
+Now we can run the simulation
+
+````@example predator
+for _ in 1:400 step!(ppsim) end
 ````
 
 ## Plots
 
 To visualize the results we use the Makie package.
-
-````@example predator
-using CairoMakie
-using Makie
-````
 
 ### Time series
 
@@ -482,16 +549,17 @@ function `connect_raster_neighbors!` the neighborhood of the nodes
 in the network coincides with a spatial neighborhood.
 
 It would be nice to have a colorbar for the heatmaps so we define a small
-helper function that can be used in a pipe
+helper function that can be used in a pipe.
 
 ````@example predator
 function add_colorbar(hm)
-    Colorbar(hm.figure[:,2], hm.plot)
+    Makie.Colorbar(hm.figure[:,2], hm.plot)
     hm
-end
+end;
+nothing #hide
 ````
 
-First we visualize the position of the Predators
+#### Predators Positions
 
 ````@example predator
 calc_raster(ppsim, :raster) do id
@@ -499,7 +567,7 @@ calc_raster(ppsim, :raster) do id
 end |> heatmap |> add_colorbar
 ````
 
-We do this now to visualise the position of the Prey
+#### Prey Positions
 
 ````@example predator
 calc_raster(ppsim, :raster) do id
@@ -507,124 +575,13 @@ calc_raster(ppsim, :raster) do id
 end |> heatmap |> add_colorbar
 ````
 
-And can also show easily which cells contains food
+#### Cells that contains food
 
 ````@example predator
 calc_raster(ppsim, :raster) do id
-    agentstate(ppsim, id, Cell).countdown != 0
+    agentstate(ppsim, id, Cell).countdown == 0
 end |> heatmap |> add_colorbar
 ````
-
-# Tests
-
-using Test
-
-Base.@kwdef struct TestParams
-    raster_size::Tuple{Int64, Int64}
-    restart::Int64
-    predator::SpeciesParams
-    prey::SpeciesParams
-end
-
-function runtests()
-    predator_params = SpeciesParams(
-        gain_from_food = 10,
-        loss_per_turn = 1,
-        repro_thres = 6,
-        repro_prob = 100
-    )
-
-    prey_params = SpeciesParams(
-        gain_from_food = 10,
-        loss_per_turn = 1,
-        repro_thres = 6,
-        repro_prob = 100
-    )
-
-    testparams = TestParams(
-        raster_size = (100, 100),
-        restart = 5,
-        predator = predator_params,
-        prey = prey_params
-    )
-
-    test = new_simulation(model, testparams, nothing; name = "Test")
-
-    @testset "PredatorPrey" begin
-        cellids = add_raster!(test, :raster, testparams.raster_size,
-                              pos -> Cell(pos, (pos[1]*3 + pos[2]) % 20))
-
-        ## prey1 should be removed in move
-        prey1 = add_agent!(test, Prey(1, CartesianIndex(2,2)))
-        move_prey!(test, prey1, CartesianIndex(2,2), true)
-        ## prey2 should move to Pos(5,5) and Eat (and reproduce)
-        prey2 = add_agent!(test, Prey(5, CartesianIndex(5,6)))
-        move_prey!(test, prey2, CartesianIndex(5,6), true)
-        ## prey3 should not find anything to Eat, but still reproduce
-        prey3 = add_agent!(test, Prey(9, CartesianIndex(7,7)))
-        move_prey!(test, prey3, CartesianIndex(7,7), true)
-        ## prey4 shoud be eaten by pred2
-        prey4 = add_agent!(test, Prey(5, CartesianIndex(12,12)))
-        move_prey!(test, prey4, CartesianIndex(12,12), true)
-        ## pred1 should be removed in move
-        pred1 = add_agent!(test, Predator(1, CartesianIndex(17, 17)))
-        move_predator!(test, pred1, CartesianIndex(17, 17), true)
-        ## pred2 should be move to pos(12,12) and eat prey4
-        pred2 = add_agent!(test, Predator(5, CartesianIndex(12,13)))
-        move_predator!(test, pred2, CartesianIndex(12, 13), true)
-
-        finish_init!(test)
-
-        apply_transition!(test, find_prey,
-                          [ Cell ],
-                          [ PreyPosition, PredatorView ],
-                          [ VisiblePrey ])
-
-        @test num_edges(test, VisiblePrey) == 1
-
-        apply_transition!(test, move,
-                          [ Prey ],
-                          [ PreyView ],
-                          [ PreyPosition ])
-
-        apply_transition!(test, move,
-                          [ Predator ],
-                          [ PredatorView, VisiblePrey ],
-                          [ PredatorPosition ])
-
-        ## prey and predator removed?
-        @test num_agents(test, Predator) == 1
-        @test num_agents(test, Prey) == 3
-
-        ## energy reduced by one
-        @test agentstate(test, prey2, Prey).energy == 4
-
-        ## prey2 moved to (5,5) as there is something to eat
-        @test agentstate(test, prey2, Prey).pos == CartesianIndex(5,5)
-
-        apply_transition!(test, grow_food, [ Cell ], [], [])
-        @test agentstate(test, cellids[1][1], Cell).countdown == 3
-
-        apply_transition!(test, try_eat,
-                          [ Cell ],
-                          [ PredatorPosition, PreyPosition ],
-                          [ Die, Eat ])
-        @test num_edges(test, Die) == 1
-        @test num_edges(test, Eat) == 2
-        @test agentstate(test, cellids[5,5], Cell).countdown == params.restart
-
-        apply_transition!(test, try_reproduce,
-                          [ Predator, Prey ],
-                          [ Die, Eat ],
-                          [ PredatorPosition, PreyPosition,
-                            PredatorView, PreyView ])
-
-        ## two offsprings, one was eaten: 3 + 2 - 1
-        @test num_agents(test, Prey) == 4
-        @test agentstate(test, prey2, Prey).energy == 7
-        @test agentstate(test, prey3, Prey).energy == 4
-    end
-end
 
 ---
 

@@ -13,6 +13,8 @@
 # locations with prey to demonstrate how features like this can be
 # implemented in Vahana.
 
+using CairoMakie
+
 using Vahana
 
 using Random
@@ -95,10 +97,10 @@ struct Eat end
 # same parameters for Prey and Predator for the example run.
 
 Base.@kwdef struct SpeciesParams
-    gain_from_food::Int64 = 10
+    gain_from_food::Int64 = 5
     loss_per_turn::Int64 = 1
     repro_thres::Int64 = 5
-    repro_prob::Int64 = 50
+    repro_prob::Int64 = 20
 end
 
 Base.@kwdef struct AllParams
@@ -122,7 +124,7 @@ Base.@kwdef mutable struct PPGlobals
     cells_with_food = Vector{Int64}()
     mean_predator_energy = Vector{Float64}()
     mean_prey_energy = Vector{Float64}()
-end
+end;
 
 # ## Create the Simulation
 
@@ -161,7 +163,7 @@ add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell)
 function random_pos(sim)
     size = param(sim, :raster_size)
     CartesianIndex(rand(1:size[1]), rand(1:size[2]))
-end
+end;
 
 # We define two helper functions to move an animal to a new
 # position. This will add a single (pos)edge from the animal to the
@@ -173,7 +175,7 @@ function move!(sim, id, newpos, posedge, viewedge)
     move_to!(sim, :raster, id, newpos, nothing, posedge)
     move_to!(sim, :raster, id, newpos, viewedge, viewedge;
              distance = 1, metric = :manhatten)
-end
+end;
 
 # Now we can add the Predator and Pray to the simulation, and use
 # the `move!` function to create also the position and view edges.
@@ -218,7 +220,7 @@ function find_prey(::Cell, id, sim)
             add_edge!(sim, preyid, predid, VisiblePrey())
         end
     end
-end
+end;
 
 # If a predator has enough energy left to move and there is a prey in the
 # predator's field of view, a random prey is selected and its position
@@ -244,7 +246,7 @@ function move(state::Predator, id, sim)
     else
         nothing
     end
-end
+end;
 
 # The difference in the movement of the prey compared to the movement of
 # the predator is that the prey is looking for cells with grass instead of
@@ -268,14 +270,14 @@ function move(state::Prey, id, sim)
     else
         nothing
     end
-end
+end;
 
 # If a cell has no grass and the countdown field is therefore > 0, the
 # countdown is decreased by 1.
 
 function grow_food(state::Cell, _, _)
     Cell(state.pos, max(state.countdown - 1, 0))
-end
+end;
 
 # In the try_eat transition function, each cell checks whether predator and
 # prey are on the cell at the same time. In this case, the cell
@@ -317,7 +319,7 @@ function try_eat(state::Cell, id, sim)
     else
         state
     end
-end
+end;
 
 # The reproduction rule for predator and prey is almost the same, so we
 # first define a function that can be used for both species. In this function we first
@@ -345,7 +347,7 @@ function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
     else
         state
     end
-end
+end;
 
 # For the Predator we can just call the reproduce function with the necessary
 # arguments.
@@ -366,7 +368,7 @@ function try_reproduce(state::Prey, id, sim)
     end
     try_reproduce_imp(state, id, sim, Prey,
                     PreyPosition(), PreyView(), param(sim, :prey))
-end
+end;
 
 # We update the global values and use the `aggregate` method to count
 # the population and the number of cells with food. Based on the
@@ -383,11 +385,11 @@ function update_globals(sim)
     pushglobal!(sim, :mean_prey_energy,
                 aggregate(sim, p -> p.energy, +, Prey; init = 0) /
                     last(getglobal(sim, :prey_pop)))
-end
+end;
 
 # We add to our time series the initialzation values.
 
-update_globals(ppsim)
+update_globals(ppsim);
 
 # And finally we define in which order our transitions functions are called.
 # Worth mentioning here are the keyword arguments in `find_prey` and
@@ -434,7 +436,7 @@ function step!(sim)
                                        PredatorView, PreyView ])
 
     update_globals(sim)
-end
+end;
 
 # Now we can run the simulation 
 
@@ -443,9 +445,6 @@ for _ in 1:400 step!(ppsim) end
 # ## Plots
 
 # To visualize the results we use the Makie package.
-
-using CairoMakie
-using Makie
 
 # ### Time series
 
@@ -456,7 +455,7 @@ using Makie
 # If the default result is displayed, the Julia function `first` can be used
 # to extract the mapping from the returned tuple.
 
-plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first 
+plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first
 
 # ### Spatial distribution
 
@@ -475,27 +474,27 @@ plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first
 # in the network coincides with a spatial neighborhood.
 
 # It would be nice to have a colorbar for the heatmaps so we define a small
-# helper function that can be used in a pipe
+# helper function that can be used in a pipe.
 function add_colorbar(hm)
-    Colorbar(hm.figure[:,2], hm.plot)
+    Makie.Colorbar(hm.figure[:,2], hm.plot)
     hm
-end
+end;
 
-# First we visualize the position of the Predators
+# #### Predators Positions
 
 calc_raster(ppsim, :raster) do id
     num_neighbors(ppsim, id, PredatorPosition)
 end |> heatmap |> add_colorbar
 
 
-# We do this now to visualise the position of the Prey 
+# #### Prey Positions 
 
 calc_raster(ppsim, :raster) do id
     num_neighbors(ppsim, id, PreyPosition)
 end |> heatmap |> add_colorbar
 
-# And can also show easily which cells contains food
+# #### Cells that contains food
 
 calc_raster(ppsim, :raster) do id
-    agentstate(ppsim, id, Cell).countdown != 0
+    agentstate(ppsim, id, Cell).countdown == 0
 end |> heatmap |> add_colorbar 

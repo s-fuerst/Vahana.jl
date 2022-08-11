@@ -94,7 +94,7 @@ T must have been previously registered by calling
 
 `add_agent!` returns a new AgentID, which can be used to create edges
 from or to this agent before [`finish_init!`](@ref) is called (in the
-case that add_agent! is called in the initialization phase), or before
+case that `add_agent!` is called in the initialization phase), or before
 the transition funcion is finished (in the case that add_agent! is
 called in an [`apply_transition!`](@ref) callback). Do not use the ID
 for other purposes, they are not guaranteed to be stable.

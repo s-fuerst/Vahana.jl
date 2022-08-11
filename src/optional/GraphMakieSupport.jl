@@ -1,9 +1,9 @@
-export plot
+export plot, nodestate
 
 # TODO: try to remove the Colors dependency
 using GraphMakie, Makie, Colors
 
-import Graphs, Graphs.SimpleGraphs
+import Graphs, Graphs.SimpleGraphs, NetworkLayout
 
 function _agenttostring(ax, idx)
     vg = ax.scene.plots[2].input_args[1].val
@@ -90,6 +90,8 @@ function plot(vg::VahanaGraph)
                                  for i in re ],
                   elabels = [ "" for _ in re ])
 
+    p.plot.layout[] = NetworkLayout.Stress()
+    
     p.plot.elabels_align = (:left, :bottom)
     p.plot.elabels_rotation = 0
 
@@ -109,4 +111,8 @@ function plot(vg::VahanaGraph)
     register_interaction!(p.axis, :ehover, EdgeHoverHandler(_edge_hover_action))
     
     p.figure, p.axis, p.plot
+end
+
+function nodestate(vg::VahanaGraph, idx::Int64)
+    agentstate_flexible(vg.sim, vg.g2v[idx])
 end

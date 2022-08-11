@@ -219,7 +219,7 @@ A transition function must have the following signature: `function(agent::T,
 id::AgentID, sim::Simulation)` and must return either an agent of type
 T or `nothing`. If `nothing` is returned, the agent will be removed
 from the simulation, otherwise the agent with id `id` will have
-(starting with the next apply_transition! call) the returned state.
+(starting with the next `apply_transition!` call) the returned state.
 In the case that all agents do not change their state and only modify
 the state of the simulation by adding edges or new agents, the
 keyword argument `invariant_compute` can be set to true. In this case the
