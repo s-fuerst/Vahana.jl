@@ -78,9 +78,9 @@ end
 
 function init(params::Params)
     sim = Simulation("Game of Life", params, Globals(Vector(), Vector()))
-    add_agenttype!(sim, Cell)
-    add_edgetype!(sim, Neighbor)
-    add_edgetype!(sim, ActiveNeighbor)
+    register_agenttype!(sim, Cell)
+    register_edgetype!(sim, Neighbor)
+    register_edgetype!(sim, ActiveNeighbor)
 
     add_grid!(sim, 
               param(sim, :dims),

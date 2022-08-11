@@ -1,5 +1,7 @@
-######################################## <: EdgeState
+_getread(sim, ::Type{T}) where T = getproperty(sim, readfield(Symbol(T)))
+_getwrite(sim, ::Type{T}) where T = getproperty(sim, writefield(Symbol(T)))
 
+######################################## <: EdgeState
 
 function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
     show(io, mime, edge.from)
@@ -11,118 +13,157 @@ end
 
 ######################################## Simulation
 
-function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
-    function show_agent_types(io::IO, typeids, coll)
-        if length(typeids) >= 1 
-            printstyled(io, "\nAgent(s):"; color = :cyan)
-            for (k, v) in typeids
-                print(io, "\n\t Type $k (ID: $(typeids[k])) \
-                           with $(show_length(coll[v])) Agent(s)")
+function construct_prettyprinting_functions(simsymbol)
+    @eval function Base.show(io::IO, ::MIME"text/plain", sim::$simsymbol)
+        function show_agent_types(io::IO, sim)
+            nodes_types = sim.typeinfos.nodes_types
+            if length(nodes_types) >= 1
+                printstyled(io, "\nAgent(s):"; color = :cyan)
+            end
+            for t in nodes_types
+                print(io, "\n\t Type $t \
+                           with $(_show_length(sim, t)) Agent(s)")
             end
         end
-    end
 
-    function show_edge_types(io::IO, edges)
-        if length(edges) >= 1 
-            printstyled(io, "\nNetwork(s):"; color = :cyan)
-            for (k, v) in edges
-                print(io, "\n\t $k \
-                           with $(show_num_edges(v)) Edge(s) for $(show_length(v)) Agent(s)")
+        function show_edge_types(io::IO, sim)
+            edges_types = sim.typeinfos.edges_types
+            if length(edges_types) >= 1
+                printstyled(io, "\nNetworks(s):"; color = :cyan)
+            end
+            for t in edges_types
+                edgetypetraits = sim.typeinfos.edges_attr[t][:traits]
+                if (:SingleEdge in edgetypetraits &&
+                    :SingleAgentType in edgetypetraits) ||
+                    (:SingleAgentType in edgetypetraits &&
+                    :size in keys(sim.typeinfos.edges_attr[t]))
+                    print(io, "\n\t Type $t") 
+                else
+                    print(io, "\n\t Type $t \
+                               with $(_show_num_edges(sim, t)) Edges(s)")
+                    if ! (:SingleAgentType in edgetypetraits)
+                        print(io, " for $(_show_length(sim, t)) Agent(s)")
+                    end
+                end
             end
         end
-    end
 
-    function show_struct(io::IO, s, name)
-        if nfields(s) >= 1 
-            printstyled(io, "\n$(name)(s):"; color = :cyan)
-            for k in typeof(s) |> fieldnames
-                print(io, "\n\t $k: $(getfield(s, k))")
+        function show_raster(io::IO, s)
+            if length(s.rasters) >= 1 
+                printstyled(io, "\nRaster(s):"; color = :cyan)
+                for (k,v) in sim.rasters
+#                    print(io, "\n\t $k: $(getfield(s, k))")
+                    print(io, "\n\t :$k with dimension $(size(v))")
+                end
             end
         end
+
+        
+        function show_struct(io::IO, s, name, withvalues)
+            if nfields(s) >= 1 
+                printstyled(io, "\n$(name)(s):"; color = :cyan)
+                for k in typeof(s) |> fieldnames
+                    if withvalues
+                        print(io, "\n\t :$k : $(getfield(s, k))")
+                    else
+                        print(io, "\n\t :$k")
+                    end
+                end
+            end
+        end
+        
+        printstyled(io, "Model Name: ", sim.modelname; color = :magenta)
+        if sim.modelname != sim.name
+            printstyled(io, "\nSimulation Name: ", sim.name; color = :magenta)
+        end
+        show_struct(io, sim.params, "Parameter", true)
+        show_agent_types(io, sim)
+        show_edge_types(io, sim)
+        show_raster(io, sim)
+        #   print(io, "Globals: ", sim.globals)
+        show_struct(io, sim.globals, "Global", false)
     end
-    
-    printstyled(io, "Simulation Name: ", sim.name; color = :magenta)
-    show_struct(io, sim.params, "Parameter")
-    show_agent_types(io, sim.agent_typeids, sim.agents)
-    show_edge_types(io, sim.edges)
- #   print(io, "Globals: ", sim.globals)
-    show_struct(io, sim.globals, "Global")
 end
 
 ######################################## Collections
 
-function show_collection(io, mime, coll)
-    for (k, v) in first(coll, 5)
-        show(io, mime, k)
-        print(io, " => ")
-        show(io, mime, v)
-        println()
+
+function _show_collection(iter, max)
+    count = 1
+    for (k, v) in iter
+        _printid(k)
+        print(" => ")
+        println(v)
+        count += 1
+        if count > max
+            break
+        end
     end
-    if length(coll) > 5
+    if count > max
         println("...")
     end
 end
 
-function show_length(coll)
-    string(length(coll))
+# In the :IgnoreFrom case we set edge.from to 0.
+function _reconstruct_edge(e, edgetypetraits, edgeT)
+    if :Stateless in edgetypetraits
+        if :IgnoreFrom in edgetypetraits
+            Edge(AgentID(0), edgeT())
+        else
+            Edge(e, edgeT())
+        end
+    elseif :IgnoreFrom in edgetypetraits
+        Edge(AgentID(0), e)
+    else
+        e
+    end
+end        
+
+function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
+    e = _reconstruct_edge(e, edgetypetraits, edgeT)
+    if !(:IgnoreFrom in edgetypetraits) && e.from == 0
+        return
+    end
+    print("\n\t")
+    if :IgnoreFrom in edgetypetraits
+        print("unknown           ")
+    else
+        _printid(e.from)
+    end
+    if stateof == :Edge || :IgnoreFrom in edgetypetraits
+        print(" $(e.state)")
+    else
+        # for the to edges we get an empty edgetype traits, as we constructed
+        # those edges they don't have the same traits
+        # But here we need the original traits, so we access them directly
+        if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:traits]
+            agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
+            aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
+            print(" $(agentstate(sim, aid, agentT))")
+        else
+            print(" $(agentstate_flexible(sim, e.from))")
+        end
+    end
 end
 
 ######################################## Buffered Collections
 
-function show_buffered_collection(io::IO, mime::MIME"text/plain", coll) 
-#    printstyled(io, typeof(coll), "\n"; color = :magenta)
-    if length(coll.containers[coll.read]) > 0 
-        printstyled(io, "Read:\n"; color = :cyan)
-        show_collection(io, mime, coll.containers[coll.read])
-    end
-    if coll.read != coll.write
-        printstyled(io, "Write:\n"; color = :cyan)
-        show_collection(io, mime, coll.containers[coll.write])
-    end
-end
 
-function Base.show(io::IO, mime::MIME"text/plain", bad::BufferedAgentDict{T}) where {T}
-    show_buffered_collection(io, mime, bad)
-end
-
-function Base.show(io::IO, mime::MIME"text/plain", bed::BufferedEdgeDict{T}) where {T}
-    show_buffered_collection(io, mime, bed)
-end
-
-function show_buffered_length(coll) 
-    cs = coll.containers
-    if coll.read != coll.write
-        "$(length(cs[coll.read]))/$(length(cs[coll.write])) (R/W)"
+function _show_length(sim, ::Type{T}) where {T} 
+    read = getproperty(sim, readfield(Symbol(T)))
+    write = getproperty(sim, writefield(Symbol(T)))
+    if !sim.initialized 
+        "$(length(read))/$(length(write)) (R/W)"
     else
-        "$(length(cs[coll.read]))"
+        "$(length(read))"
     end
 end
 
-function show_length(coll::BufferedAgentDict{T}) where {T}
-    show_buffered_length(coll)
-end
-
-
-function show_length(coll::BufferedEdgeDict{T}) where {T}
-    show_buffered_length(coll)
-end
-
-function _num_edges(coll)
-    if length(coll) > 0
-        mapreduce(length, +, values(coll))
+function _show_num_edges(sim, t::Type{T}) where {T}
+    if !sim.initialized 
+        "$(_num_edges(sim, t))/$(_num_edges(sim, t, true)) (R/W)"
     else
-        0
+        "$(_num_edges(sim, t))"
     end
 end
-
-function show_num_edges(coll::BufferedEdgeDict{T}) where {T}
- 
-    cs = coll.containers
-    if coll.read != coll.write
-        "$(_num_edges(cs[coll.read]))/$(_num_edges(cs[coll.write])) (R/W)"
-    else
-        "$(_num_edges(cs[coll.read]))"
-    end
-end
-    
 

@@ -10,12 +10,12 @@ using Vahana, Random, SparseArrays
 
 import Graphs
 
-struct Cell <: Agent
+struct Cell 
     active::Bool
     pos::Tuple{Int64, Int64}
 end
 
-struct Neighbor <: EdgeState end
+struct Neighbor  end
 
 Base.@kwdef struct Params
     dims::Tuple{Int64, Int64}
@@ -30,7 +30,7 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    n = mapreduce(a -> a.active, +, neighborstates(sim, id, Neighbor))
+    n = mapreduce(a -> a.active, +, neighborstates_flexible(sim, id, Neighbor))
     rules = param(sim, :rules)
     if c.active == true && n <= rules[4] && n >= rules[1]
         return Cell(true, c.pos)
@@ -41,26 +41,33 @@ function transition(c::Cell, id, sim)
  end
 
 function countactive!(sim)
-    pushglobal!(sim, :numactive, aggregate(sim, Cell, c -> c.active, +))
+    pushglobal!(sim, :numactive, aggregate(sim, c -> c.active, +, Cell))
 end
 
 function addgrid!(sim)
-    dims = param(sim, :dims)
-    spm4c(c::Cell) = sparse([c.pos[1]], [c.pos[2]],
-                            [c.active],
-                            dims[1], dims[2])
-    pushglobal!(sim, :grid, aggregate(sim, Cell, spm4c, +))
+#    r = calc_rasterstate(sim, :raster, c -> c.active, Cell)
+    r = calc_raster(sim, :raster) do id
+        agentstate(sim, id, Cell).active
+    end
+    
+    pushglobal!(sim, :grid, sparse(r))
 end 
 
-function init(params::Params)
-    sim = Simulation("Game of Life", params, Globals(Vector(), Vector()))
-    add_agenttype!(sim, Cell)
-    add_edgetype!(sim, Neighbor)
+model = ModelTypes() |>
+    register_agenttype!(Cell) |>
+    register_edgetype!(Neighbor) |>
+    construct_model("Game of Life")
 
-    add_grid!(sim, 
-              param(sim, :dims),
-              pos -> rand() < 0.2 ? Cell(true, pos) : Cell(false, pos),
-              Neighbor())
+
+function init(params::Params)
+    sim = new_simulation(model, params, Globals(Vector(), Vector()))
+
+    add_raster!(sim,
+                :raster,
+                param(sim, :dims),
+                pos -> rand() < 0.2 ? Cell(true, pos) : Cell(false, pos))
+
+    connect_raster_neighbors!(sim, :raster, (_,_) -> Neighbor())
 
     finish_init!(sim)
 

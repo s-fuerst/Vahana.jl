@@ -1,44 +1,107 @@
-export Simulation
-export add_agenttype!, add_edgetype!
-export add_agent!, add_agents!, add_edge!, add_edges!
+export construct_model
+export new_simulation
 export finish_init!
-export typeid
-export apply_transition, apply_transition!, apply_transition_params
-export agentstate, param
-export neighborstates
-export edges_to
+export apply_transition, apply_transition!
+export param
 export aggregate
-export setglobal!, getglobal, pushglobal!
 
-const MAX_TYPES = typemax(TypeID)
 """
-    struct Simulation
+    construct_model(types::ModelTypes, name::String)
 
-The internal structure of a simulation. Model developers should not
-access these fields directly.
+Adds a structure and methods corresponding to the type information of
+`types` to the Julia session. The new structure is named `name`, and
+all methods are specific to this structure using Julia's multiple
+dispatch concept, so it is possible to have different models in the
+same Julia session (as long as `name` is different).
+
+Returns a [`Model`](@ref) that can be used in [`new_simulation`](@ref) to create 
+a concrete simulation.
 """
-Base.@kwdef struct Simulation{P, G}
-    name::String
-    params::P
-    globals::G
+function construct_model(types::ModelTypes, name::String) 
+    simsymbol = Symbol(name)
+    
+    edgefields = [
+        map(["_read", "_write"]) do RW
+            Expr(Symbol("="),
+                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[T]))),
+                 :($(edgefield_constructor(T, types.edges_attr[T]))))
+        end 
+        for T in types.edges_types ] |> Iterators.flatten |> collect
 
-    # TODO: rename to agent_colls
-    agents::Vector{AgentCollection} = Vector{AgentCollection}(undef, MAX_TYPES)
-    agent_typeids::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
+    nodefields = [
+        map(["_read", "_write"]) do RW
+            Expr(Symbol("="),
+                 :($(Symbol(T, RW))::$(nffs[C].type(T, types))),
+                 :($(nffs[C].constructor(T, types))))
+        end 
+        for (T,C) in types.nodes ] |> Iterators.flatten |> collect
 
-    edges::Dict{DataType, EdgeCollection} = Dict{DataType, EdgeCollection}()
+    nodeids = [
+        Expr(Symbol("="),
+             :($(Symbol(T, "_nextid"))::AgentNr),
+             :(AgentNr(1)))
+        for (T,_) in types.nodes ]
 
-    rasters::Dict{Symbol, Array{AgentID,2}} = Dict{Symbol, Array{AgentID,2}}()
+    fields = Expr(:block,
+                  :(modelname::String),
+                  :(name::String),
+                  :(params::P),
+                  :(globals::G),
+                  :(typeinfos::ModelTypes),
+                  :(rasters::Dict{Symbol, Array}),
+                  :(nodes_id2read::Vector{Function}),
+                  :(nodes_id2write::Vector{Function}),
+                  :(initialized::Bool),
+                  edgefields...,
+                  nodefields...,
+                  nodeids...)
+    
+    # the true in the second arg makes the struct mutable
+    strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)
+
+    
+    kwdefqn = QuoteNode(Symbol("@kwdef"))
+    # nothing in third argument is for the expected LineNumberNode
+    # see also https://github.com/JuliaLang/julia/issues/43976
+    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
+
+    # Construct all type specific functions for the edge types
+    for T in types.edges_types
+        construct_edge_functions(T, types.edges_attr[T], simsymbol)
+    end
+
+    # Construct all type specific functions for the agent types
+    for (T, C) in types.nodes
+        nffs[C].init_field(T, types, simsymbol) 
+        nffs[C].add_agent(T, types, simsymbol)  
+        nffs[C].agentstate(T, types, simsymbol) 
+        nffs[C].prepare_write(T, types, simsymbol) 
+        nffs[C].transition(T, types, simsymbol) 
+        nffs[C].finish_write(T, types, simsymbol) 
+        nffs[C].aggregate(T, types, simsymbol) 
+    end
+
+    for T in types.nodes_types
+        types.nodes_id2read[types.nodes_type2id[T]] =
+            @eval sim -> sim.$(readfield(Symbol(T)))
+        types.nodes_id2write[types.nodes_type2id[T]] =
+            @eval sim -> sim.$(writefield(Symbol(T)))
+    end
+
+    
+    construct_prettyprinting_functions(simsymbol)
+
+    Model(types, name)
 end
 
+
 """
-    Simulation(name::String, params, globals)
+    new_simulation(model::Model, params, globals; name)
 
-Create a new simulation object, which stores the complete state of a simulation. 
+Creates and return a new simulation object, which stores the complete state 
+of a simulation. 
 
-`name` is used as meta-information about the simulation and has no
-effect on the dynamics, since `name` is not accessible in the
-transition functions. 
+`model` is an `Model` instance created by [`construct_model`](@ref).
 
 `params` must be a struct (or `nothing`) that contains all parameters of a
 simulation. Parameter values are constant in a simulation run and can be
@@ -48,324 +111,74 @@ retrieved via the [`param`](@ref) function.
 accessible for all agents via the [`getglobal`](@ref) function. The values can
 be changed by calling [`setglobal!`](@ref) or [`pushglobal!`](@ref). 
 
-The simulation starts in an uninitialized state. After registering all
-types of the simulation and adding the agents and edges for the
-initial state, it is necessary to call [`finish_init!`](@ref) before
-applying a transition function for the first time.
+The optional keyword argument `name` is used as meta-information about
+the simulation and has no effect on the dynamics, since `name` is not
+accessible in the transition functions. If `name` is not given, the
+name of the model is used instead.
 
-See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref), [`param`](@ref),
+The simulation starts in an uninitialized state. After adding the
+agents and edges for the initial state, it is necessary to call
+[`finish_init!`](@ref) before applying a transition function for the first
+time.
+
+See also [`construct_model`](@ref), [`param`](@ref),
 [`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
 and [`finish_init!`](@ref)
 """
-function Simulation(name::String,
-             params::P,
-             globals::G) where {P, G}
-    Simulation(name = name, params = params, globals = globals)
+function new_simulation(model::Model, params::P, globals::G; name = model.name) where {P, G}
+    sim = @eval $(Symbol(model.name))(
+        modelname = $(model.name),
+        name = $name,
+        params = $params,
+        globals = $globals,
+        typeinfos = $(model.types),
+        rasters = Dict{Symbol, Array}(),
+        initialized = false,
+        nodes_id2read = $(model.types.nodes_id2read),
+        nodes_id2write = $(model.types.nodes_id2write)
+    )
+
+    for T in sim.typeinfos.edges_types
+        init_field!(sim, T)
+    end
+
+    for T in sim.typeinfos.nodes_types
+        init_field!(sim, T)
+    end
+
+    sim
 end
 
-"""
-    getglobal(sim::Simulation, name)
+# pipeable versions 
+construct_model(name::String) = types -> construct_model(types, name)
 
-Returns the value of the field `name` of the `globals` struct from the
-[`Simulation`](@ref) constructor.
+new_simulation(params::P, globals::G; kwargs...) where {P, G} =
+    model -> new_simulation(model, params, globals; kwargs...)
 
-See also [`Simulation`](@ref), [`setglobal!`](@ref) and [`pushglobal!`](@ref)
-"""
-getglobal(sim::Simulation, name) = getfield(sim.globals, name)
+# construct(name::String, params::P, globals::G) where {P, G} =
+#     types -> construct(types, name, params, globals)
 
-"""
-    setglobal!(sim::Simulation, name, value)
-
-Set the value of the field `name` of the `globals` struct from the
-[`Simulation`](@ref) constructor. 
-
-`setglobal!` must not be called within a transition function. 
-
-See also [`Simulation`](@ref), [`aggregate`](@ref), [`pushglobal!`](@ref) and
-[`getglobal`](@ref)
-"""
-setglobal!(sim::Simulation, name, value) = setfield!(sim.globals, name, value)
-
-"""
-    pushglobal!(sim::Simulation, name, value)
-
-In the case that a field of the `globals` struct from the Simulation
-constructor is a vector (e.g. for time series data), `pushglobal!` can
-be used to add a value to this vector, instead of writing
-`setglobal!(sim, name, push!(getglobal(sim, name), value)`.
-
-`pushglobal!` must not be called within a transition function. 
-
-See also [`Simulation`](@ref), [`aggregate`](@ref), [`setglobal!`](@ref) and
-[`getglobal`](@ref)
-"""
-pushglobal!(sim::Simulation, name, value) =
-    setfield!(sim.globals, name, push!(getfield(sim.globals, name), value))
-
-
-function all_agentcolls(sim)
-    # TODO: Check if you could/should use genetors instead of comprehensions
-    # also for the other cases
-    [ sim.agents[i] for i in 1:length(sim.agent_typeids) ]
-end
-
-function some_agentcolls(sim, types)
-    [ sim.agents[v] for (k, v) in sim.agent_typeids if k in types ]
-end
-
-function all_edgecolls(sim)
-    values(sim.edges) |> collect
-end
-
-function some_edgecolls(sim, types)
-    [ v for (k, v) in sim.edges if k in types ]
-end
 
 """
     finish_init!(sim::Simulation)
 
 Finish the initialization phase of the simulation. 
 
-Must be called before applying a transition function. All types of agents and
-edges must be registered before `finish_init!` is called.
+Must be called before applying a transition function. 
 
-See also [`add_agenttype!`](@ref), [`add_edgetype!`](@ref) and
+See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
 """
-function finish_init!(sim::Simulation)
-    foreach(finishinit!, all_agentcolls(sim))
-    foreach(finishinit!, all_edgecolls(sim))
+function finish_init!(sim)
+    foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
+    foreach(finish_write!(sim), sim.typeinfos.edges_types)
+    sim.initialized = true
     sim
 end 
 
-######################################## Types
-
-function typeid(sim, ::Type{T})::TypeID where {T <: Agent}
-    sim.agent_typeids[T]
-end
-
-"""
-    add_agenttype!(sim::Simulation, ::Type{T}) where {T <: Agent}
-
-Register an additional agent type to `sim`. 
-
-An agent type is an struct that define the state for agents of type `T`.
-These structs must be a subtype of `Agent`, and also bits
-types, meaning the type is immutable and contains only primitive types
-and other bits types.
-
-Can only be called before [`finish_init!`](@ref)
-
-See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
-"""
-function add_agenttype!(sim::Simulation, ::Type{T}) where {T <: Agent} 
-    # TODO: improve assertion error messages (for all adds)
-    # TODO: check that the same type is not added twice (for all adds)
-    # TODO: check that finish_init! is not called
-    @assert isbitstype(T)
-    ids = sim.agent_typeids
-
-    type_number = length(ids) + 1
-    @assert type_number < typemax(TypeID) "Can not add new type, 
-                                maximal number of types already registered"
-    push!(ids, T => type_number)
-    
-    sim.agents[type_number] = BufferedAgentDict{T}()
-    type_number
-end
-
-"""
-    add_edgetype!(sim::Simulation, ::Type{T}) where {T <: EdgeState}
-
-Register an additional edge type to `sim`. 
-
-An edge type is an struct that define the state for edges of type `T`.
-These structs must be a subtype of `EdgeState`, and also bits
-types, meaning the type is immutable and contains only primitive types
-and other bits types.
-
-Can only be called before [`finish_init!`](@ref)
-
-See also [`add_edge!`](@ref) and [`add_edges!`](@ref) 
-"""
-function add_edgetype!(sim::Simulation, ::Type{T}) where {T <: EdgeState}
-    @assert isbitstype(T)
-    push!(sim.edges, T => BufferedEdgeDict{Edge{T}}())
-end
-
-######################################## Agents
-
-"""
-    add_agent!(sim::Simulation, agent::T) -> AgentID
-
-Add a single agent of type T to the simulation `sim`.
-
-T must have been previously registered in the simulation by calling
-[`add_agenttype!`](@ref).
-
-`add_agent!` returns a new AgentID, which can be used to create edges
-from or to this agent. Do not use the ID for other purposes, they are
-not guaranteed to be stable.
-
-See also [`add_agents!`](@ref), [`add_agenttype!`](@ref),
-[`add_edge!`](@ref) and [`add_edges!`](@ref)
-
-"""
-function add_agent!(sim::Simulation, agent::T) where {T <: Agent}
-    # TODO add a better error message if type is not registered
-    typeid = sim.agent_typeids[T]
-    coll = sim.agents[typeid]
-    coll.id_counter = coll.id_counter + 1
-    agentid = agent_id(typeid, coll.id_counter)
-    sim.agents[typeid][agentid] = agent
-    agentid
-end
-
-"""
-    add_agents!(sim::Simulation, agents) -> Vector{AgentID}
-
-Add multiple agents at once to the simulation `sim`.
-
-`agents` can be any iterable set of agents, or an arbitrary number of
-agents as arguments. 
-
-The types of the agents must have been previously registered in the
-simulation by calling [`add_agenttype!`](@ref).
-
-`add_agents!` returns a vector of AgentIDs, which can be used
-to create edges from or to this agents. Do not use the ID for other
-purposes, they are not guaranteed to be stable.
-
-See also [`add_agent!`](@ref), [`add_agenttype!`](@ref),
-[`add_edge!`](@ref) and [`add_edges!`](@ref)
-
-"""
-function add_agents!(sim::Simulation, agents) 
-    [ add_agent!(sim, a) for a in agents ]
-end
-
-function add_agents!(sim::Simulation, agents::T...) where {T <: Agent}
-    [ add_agent!(sim, a) for a in agents ]
-end
-
-
-######################################## Edges
-
-"""
-    add_edge!(sim::Simulation, to::AgentID, edge::Edge{T}) where {T <: EdgeState}
-
-Add a single edge to the simulation `sim`. The edges is directed from
-the agent with ID `edge.from` to the agent with ID `to`.
-
-T must have been previously registered in the simulation by calling
-[`add_edgetype!`](@ref).
-
-See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
-"""
-function add_edge!(sim::Simulation, to::AgentID, edge::Edge{T}) where
-    {T <: EdgeState }
-    add!(sim.edges[statetype(edge)], edge, to)
-    nothing
-end
-
-"""
-    add_edge!(sim::Simulation, from::AgentID, to::AgentID, state::T) where {T<:EdgeState}
-
-Add a single edge to the simulation `sim`. The edge is directed
-from the agent with ID `from` to the agent with ID `to` and has the
-state `state`. 
-
-T must have been previously registered in the simulation by calling
-[`add_edgetype!`](@ref).
-
-In the case, that the EdgeState type T does not have any fields, it
-is also possible to just use T as forth parameter instead of T.
-
-See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edges!`](@ref)
-"""
-function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
-            ::Type{T}) where {T<:EdgeState}
-    add_edge!(sim, to, Edge{T}(from, T()))
-end
-
-function add_edge!(sim::Simulation, from::AgentID, to::AgentID,
-            state::T) where {T<:EdgeState}
-    add_edge!(sim, to, Edge{T}(from, state))
-end
-
-"""
-    add_edges!(sim::Simulation, to::AgentID, edges)
-
-Add multiple `edges` at once to the simulation `sim`, with all edges
-are directed to `to`.
-
-`edges` can be any iterable set of agents, or an arbitrary number of
-edges as arguments. 
-
-T must have been previously registered in the simulation by calling
-[`add_edgetype!`](@ref).
-
-See also [`Edge`](@ref) [`add_edgetype!`](@ref) and [`add_edge!`](@ref)
-"""
-function add_edges!(sim::Simulation, to::AgentID, edges::Vector{Edge{T}}) where {T <: EdgeState}
-    [ add_edge!(sim, to, e) for e in edges ]
-    nothing
-end
-
-function add_edges!(sim::Simulation, to::AgentID, edges::Edge{T}...) where {T <: EdgeState}
-    [ add_edge!(sim, to, e) for e in edges ]
-    nothing
-end
 
 ######################################## Transition
 
-"""
-    edges_to(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Edges{T}}
-
-Returns all incoming edges for agent `id` of network `T`.
-
-Should only be used inside a transition function and only for the ID specified
-as a transition function parameter. Calling edges_to outside a transition function
-or with other IDs may result in undefined behavior.
-
-See also [`apply_transition!`](@ref), [`neighborstates`](@ref),
-[`edgestates`](@ref) and [`neighbors`](@ref)
-"""
-edges_to(sim::Simulation, id::AgentID, edgetype) = 
-    get(read_container(sim.edges[edgetype]),
-        id,
-        Vector{statetype(sim.edges[edgetype])}())
-
-
-"""
-    agentstate(sim::Simulation, id::AgentID) -> T<:Agent
-
-Returns the agent with `id`.
-"""
-agentstate(sim::Simulation, id::AgentID) =
-    sim.agents[type_nr(id)][id]
-
-"""
-    neighborstates(sim::Simulation, id::AgentID, edgetype::T) -> Vector{Agent}
-
-Returns all incoming neighbors of agent `id` for the network `T`.
-
-Should only be used inside a transition function and only for the ID specified
-as a transition function parameter. Calling agents_to outside a transition function
-or with other IDs may result in undefined behavior.
-
-In a parallel run, this function can trigger communication between
-processes. In the case that the state of ALL agents is not needed in
-the transition function, the performance can be likely increased by
-using [`edges_to`](@ref) instead and calling [`agentstate`](@ref) only
-for the agents whose state is actually used in the transition
-function.
-
-See also [`apply_transition!`](@ref), [`edgestates`](@ref) and
-[`neighbors`](@ref)
-"""
-neighborstates(sim::Simulation, id::AgentID, edgetype) =
-    map(e -> agentstate(sim, e.from), edges_to(sim, id, edgetype))  
 
 """
     param(sim::Simulation, name)
@@ -373,34 +186,32 @@ neighborstates(sim::Simulation, id::AgentID, edgetype) =
 Returns the value of the field `name` of the `params` struct from the
 Simulation constructor.
 
-See also [`Simulation`](@ref)
+See also [`construct_model`](@ref)
 """
-param(sim::Simulation, name) = getfield(sim.params, name)
+param(sim, name) = getfield(sim.params, name)
 
-
-# func(agent, id, networks, sim)
-# where edges is Dict{Type, Edges} for all networks
-# must calls add_agents for new agents (assuming agents without edges are
-# useless) and also add_edge! (TODO: add an add_edges! method)
-# returns agent, which gets the same id as agent input
-
-function maybeadd(coll::AgentCollection{T},
-           id::AgentID,
-           agent::T) where {T <: Agent}
+function maybeadd(coll,
+           id,
+           agent) 
     # the coll[id] writes into another container then
     # we use for the iteration
-    coll[id] = agent
+    @inbounds coll[id] = agent
     nothing
 end
 
-function maybeadd(::AgentCollection{T},
-           ::AgentID,
-           ::Nothing) where {T <: Agent}
+function maybeadd(_,
+           ::AgentNr,
+           ::Nothing)
     nothing
 end
+
+prepare_write!(sim, add_existing) = t -> prepare_write!(sim, t in add_existing, t)
+
+finish_write!(sim) = t -> finish_write!(sim, t)
+
 
 """
-    apply_transition!(sim, func, compute, networks, rebuild)
+    apply_transition!(sim, func, compute, networks, rebuild; invariant_compute = false, add_existing = Vector{DataType}())
 
 Apply the transition function `func` to the simulation state. 
 
@@ -408,43 +219,66 @@ A transition function must have the following signature: `function(agent::T,
 id::AgentID, sim::Simulation)` and must return either an agent of type
 T or `nothing`. If `nothing` is returned, the agent will be removed
 from the simulation, otherwise the agent with id `id` will have
-(starting with the next apply_transition! call) the returned state.
+(starting with the next `apply_transition!` call) the returned state.
+In the case that all agents do not change their state and only modify
+the state of the simulation by adding edges or new agents, the
+keyword argument `invariant_compute` can be set to true. In this case the
+returned value of the transition function will be ignored.
 
 `compute` is a vector of Agent types. `func` is called for every agent
 with a type that is listed in `compute`, so a method for each of this types
 must be implemented.
 
-`network` is a vector of Edge types. Inside of `func`
-[`edges_to`](@ref) can be only called for types in `network`.
+`network` is a vector of Edge types. Inside of `func` all the
+functions like [`edges_to`](@ref) that access information about edges
+can be only called when the edge type is in the `network` vector.
 
 `rebuild` is a vector of Agent and/or Edge types. All the instances of
-agents or edges with a type in `rebuild` will be removed and must be
-added again inside of `func`. Also [`add_agent!`](@ref),
-[`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
-can be only called for types in `network` or `compute`.
+agents or edges with a type in (`rebuild` - `add_existing`) will be
+removed and must be added again inside of `func`.
+[`add_agent!`](@ref), [`add_agents!`](@ref), [`add_edge!`](@ref) and
+[`add_edges!`](@ref) can be only called for types in `rebuild` or
+`compute`. In the case, that a transition function should only add additional
+edges for some types, these types must be listed in the `add_existing`
+vector.
 
 See also [`apply_transition`](@ref)
 """
 function apply_transition!(sim,
-                    func,
+                    func::Function,
                     compute::Vector,
                     networks::Vector,
-                    rebuild::Vector)
-    writeable = [ compute; rebuild ]
-    
-    foreach(prepare_write!, some_agentcolls(sim, writeable))
-    foreach(prepare_write!, some_edgecolls(sim, writeable))
+                    rebuild::Vector;
+                    invariant_compute = false,
+                    add_existing = Vector{DataType}())
+    writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
-    for coll in some_agentcolls(sim, compute)
-        for (id, state) in coll
-            maybeadd(coll, id, func(state, id, sim))
-        end 
+    foreach(prepare_write!(sim, add_existing), writeable)
+
+    if invariant_compute
+        for C in compute
+            transition_edges_only!(sim, func, C)
+        end
+    else
+        for C in compute
+            transition!(sim, func, C)
+        end
     end
 
-    foreach(finish_write!, some_agentcolls(sim, writeable))
-    foreach(finish_write!, some_edgecolls(sim, writeable))
+    foreach(finish_write!(sim), writeable)
+
     sim
 end
+
+function apply_transition!(func::Function,
+                    sim,
+                    compute::Vector,
+                    networks::Vector,
+                    rebuild::Vector;
+                    kwargs ...)
+    apply_transition!(sim, func, compute, networks, rebuild; kwargs ...)
+end
+
 
 """
     apply_transition(sim, func, compute, networks, rebuild) -> Simulation
@@ -462,23 +296,17 @@ function apply_transition(sim,
                    func,
                    compute::Vector,
                    networks::Vector,
-                   rebuild::Vector) 
+                   rebuild::Vector;
+                   kwargs ...) 
     newsim = deepcopy(sim)
-    apply_transition!(newsim, func, compute, networks, rebuild)
+    apply_transition!(newsim, func, compute, networks, rebuild; kwargs ...)
     newsim
 end
-
-function apply_transition_params(sim, compute::DataType, networks::Vector)
-    coll = some_agentcolls(sim, [ compute ])[1]
-    (id, state) = coll |> first
-    (state, id)
-end
-
 
 ######################################## aggregate
 
 """
-    aggregate(sim, ::Type{T}, f, op; kwargs ...)
+    aggregate(sim, f, op, ::Type{T}; kwargs ...)
 
 Calculate an aggregated value, based on the state of all agents or
 edges of type T.
@@ -486,27 +314,8 @@ edges of type T.
 `f` is applied to all of these agents or edges and then `op` is used to
 reduce (aggregate) the values returned by `f`.
 
-aggregate is based on [`Base.mapreduce`](@ref), `f`, `op` and `kwargs` are
+aggregate is based on mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
-
-See also [`Base.mapreduce`](@ref)
 """
-function aggregate(sim::Simulation, ::Type{T}, f, op;
-            kwargs...) where {T<:Agent}
-    agents = sim.agents[sim.agent_typeids[T]] |>
-        read_container |>
-        values
-    mapreduce(f, op, agents; kwargs...)
-end
-
-function aggregate(sim::Simulation, ::Type{T}, f, op;
-            kwargs...) where {T}
-    edges = sim.edges[T] |>
-        read_container |>
-        values |>
-        Iterators.flatten |>
-        collect |>
-        edgestates
-    mapreduce(f, op, edges; kwargs...)
-end
+function aggregate(::__MODEL__, f, op, ::Type; kwargs...) end
