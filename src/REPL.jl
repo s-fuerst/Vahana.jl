@@ -254,13 +254,13 @@ end
 TODO DOC 
 """
 num_agents(sim, ::Type{T}) where T =
-    length()
+    length(getproperty(sim, readfield(Symbol(T))))
 
 """
 TODO DOC 
 """
 function do_agents(g, f, sim, ::Type{T}) where T
-    agent_nrs =  keys(getproperty(sim, Vahana.readfield(Symbol(T))))
+    agent_nrs =  keys(getproperty(sim, readfield(Symbol(T))))
     agent_ids = [ agent_id(sim, nr, T)
                   for nr in agent_nrs]
     f(g, agent_ids)
