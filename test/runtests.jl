@@ -18,3 +18,4 @@ include("raster.jl")
 
 include("graphs.jl")
 
+include("mpi.jl")

@@ -1,6 +1,6 @@
 module Vahana
 
-using Requires
+using Requires, MPI
 
 export enable_asserts, suppress_warnings, detect_stateless_trait
 
@@ -11,6 +11,8 @@ function __init__()
     @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" begin
         include("optional/GraphMakieSupport.jl")
     end
+
+    mpiinit()
 end
 
 # This is a dummy struct to define the stubs of functions like add_agent
@@ -108,8 +110,13 @@ detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 
 include("Helpers.jl")
 
+include("MPIinit.jl")
+
+
 include("Agent.jl")
 include("Edge.jl")
+
+include("MPI.jl")
 
 include("ModelTypes.jl")
 

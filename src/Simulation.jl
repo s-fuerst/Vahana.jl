@@ -169,7 +169,9 @@ Must be called before applying a transition function.
 See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
 """
-function finish_init!(sim)
+function finish_init!(sim;
+               partition::Dict{AgentID, ProcessID} =
+                   Dict{AgentID, ProcessID}())
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
     sim.initialized = true

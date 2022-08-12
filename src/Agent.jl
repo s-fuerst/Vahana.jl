@@ -17,7 +17,7 @@
 # development, but the implementation found here had most time a noticeable
 # performance advantage and a better memory usage).
 
-export AgentID, AgentNr
+export AgentID, AgentNr, ProcessID
 export agent_id
 export TypeID
 # export type_of
@@ -48,10 +48,8 @@ const AgentID = UInt64
 const shift_type = BITS_PROCESS + BITS_AGENTNR
 
 function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
-    rank = 1
-    
     AgentID(typeID) << shift_type +
-        rank << BITS_AGENTNR +
+        mpi.rank << BITS_AGENTNR +
         agent_nr
 end
 
