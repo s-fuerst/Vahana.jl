@@ -4,6 +4,8 @@ using Vahana
 
 # All ids are the initial ids 
 
+@assert mod(mpi.size, 2) == 0 We need as minimum 2 PEs and also an even number of PEs
+
 struct AgentState1
     id::Int64
 end
@@ -30,12 +32,9 @@ sim = new_simulation(model, nothing, nothing)
 part = Dict{AgentID, ProcessID}()
 
 if mpi.isroot 
-    @show mpi.size mpi.rank mpi.isroot
-
     agentids = add_agents!(sim, [ AgentState1(i) for i in 1:mpi.size ])
     agentids2 = add_agents!(sim, [ AgentState2(i, true) for i in 1:mpi.size ])
-
-    @show agentids
+    
 
     for i in 1:mpi.size
         fromid = agentids[mod1(i-1, mpi.size)]
@@ -47,7 +46,7 @@ if mpi.isroot
 
     for i in 1:mpi.size
         part[agentids[i]] = i
-        part[agentids2[i]] = i
+        part[agentids2[i]] = mod1(i, 2)
     end
 end
 
@@ -60,3 +59,7 @@ else
     @test num_agents(sim, AgentState1) == 0
     @test num_agents(sim, AgentState2) == 0
 end
+
+Vahana.distribute!(sim, part)
+
+#@info "After distribute!" mpi.rank sim
