@@ -5,17 +5,17 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-include("core.jl")
+# include("core.jl")
 
-include("edges.jl")
+# include("edges.jl")
 
-# edgesiterator depends on edges.jl
-include("edgesiterator.jl")
+# # edgesiterator depends on edges.jl
+# include("edgesiterator.jl")
 
-include("globals.jl")
+# include("globals.jl")
 
-include("raster.jl")
+# include("raster.jl")
 
-include("graphs.jl")
+# include("graphs.jl")
 
 include("mpi.jl")

@@ -12,6 +12,8 @@ testdir = string(@__DIR__) * "/mpi"
 istest(f) = endswith(f, ".jl") && startswith(f, "test_")
 testfiles = sort(filter(istest, readdir(testdir)))
 
+testdir = "/home/fuerst/.julia/dev/Vahana/test/mpi"
+
 @testset "$f" for f in testfiles
     mpiexec() do mpirun
         cmd(n=nprocs) = `$mpirun -n $n $(Base.julia_cmd()) $(joinpath(testdir, f))`
