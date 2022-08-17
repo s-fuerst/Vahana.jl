@@ -2,6 +2,10 @@ using Test
 
 using Vahana
 
+enable_asserts(true)
+
+suppress_warnings(true)
+
 # All ids are the initial ids 
 
 @assert mod(mpi.size, 2) == 0 We need as minimum 2 PEs and also an even number of PEs

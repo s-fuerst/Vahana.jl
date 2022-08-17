@@ -27,15 +27,15 @@ Creates an wrapped type for an %EDGETYPE%_read/write field. This type
 implements the Iterator interface.
 """
 function edges_iterator(sim, t::DataType, read::Bool = true)
+    @assert !(has_trait(sim, t, :Stateless) &&
+        has_trait(sim, t, :IgnoreFrom)) 
+
     field = read ? _getread(sim, t) : _getwrite(sim, t)
     if length(field) == 0
         # for empty field, we can not detect singleedge, but this is also not
         # necessary as the iteratore will return nothing immediately
         IterEdgesWrapper(sim, t, read, field, false)
     else
-        # we need an id for the field
-        id = field |> keys |> first
-        # hasmethod(length...) returns false, when the edge has the SingleEdge trait
         IterEdgesWrapper(sim, t, read, field,
                          :SingleEdge in sim.typeinfos.edges_attr[t][:traits])
     end
@@ -54,6 +54,10 @@ function iterate(iw::IterEdgesWrapper)
     # If the agent container is a vector, remove all #undefs 
     if hasmethod(isassigned, (typeof(field), Int64))
         ks = filter(i -> isassigned(field, i), ks)
+    end
+    # in the case that no key is left, we also return immediately
+    if length(ks) == 0
+        return nothing
     end
     # create an stateful iterator for the keys (the agentids), which
     # is added the the state of the outer iterator 

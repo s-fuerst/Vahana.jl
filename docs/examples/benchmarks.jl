@@ -14,10 +14,10 @@ struct EdgeState
 end
 
 statelessEdgeTypes = [ "EdgeS", "EdgeSE", "EdgeST", "EdgeSI", "EdgeSET", "EdgeSEI", "EdgeSTI", "EdgeSETI",
-                       "EdgeSTF", "EdgeSETF", "EdgeSTFI", "EdgeSETFI" ]
+                       "EdgeSTF", "EdgeSTFI" ]
 
 statefulEdgeTypes = [ "edge", "EdgeE", "EdgeT", "EdgeI", "EdgeET", "EdgeEI", "EdgeTI", "EdgeETI",
-                      "EdgeTF", "EdgeETF", "EdgeTFI", "EdgeETFI" ]
+                      "EdgeTF", "EdgeTFI" ]
 
 allEdgeTypes = vcat(statefulEdgeTypes, statelessEdgeTypes)
 

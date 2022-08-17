@@ -53,6 +53,7 @@ function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
         agent_nr
 end
 
+
 function agent_id(typeID::Int64, agent_nr::Int64)::AgentID
     @mayassert typeID <= typemax(TypeID)
     @mayassert agent_nr <= typemax(AgentNr)
@@ -61,6 +62,10 @@ end
 
 function agent_id(sim, agent_nr::AgentNr, ::Type{T}) where T
     agent_id(sim.typeinfos.nodes_type2id[T], agent_nr)
+end
+
+function agent_id(sim, agent_nr::Int64, ::Type{T}) where T
+    agent_id(sim.typeinfos.nodes_type2id[T], AgentNr(agent_nr))
 end
 
 function type_nr(id::AgentID)::TypeID

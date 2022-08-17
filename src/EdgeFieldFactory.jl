@@ -75,7 +75,7 @@ function construct_types(T, attr::Dict{Symbol, Any})
         "Vector{$B}"
     end
 
-    A*C(B)*"}", C(B)
+    A*C(B)*"}", C(B), B
 end
 
 edgefield_type(T, info) = Meta.parse(construct_types(T, info)[1])
@@ -101,10 +101,14 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
 
     # FT is an abbrev. for FieldType (the type for the all the edges of a edgetype)
     # CT is an abbrev. for ContainerType (the type of the container for the edges
-    # of a single agent)
+    # of a single agent). CE is an abbrev. for ContainerElement (B in the table
+    # above).
     type_strings = construct_types(T, attr)
     FT = Meta.parse(type_strings[1]) |> eval
     CT = Meta.parse(type_strings[2]) |> eval
+    CE = Meta.parse(type_strings[3]) |> eval
+    # we need this when we send the edges via MPI
+    attr[:containerelement] = CE
     MT = startswith(string(T), "Main") ? T : @eval Main.$(Symbol(T))
     
     #### Functions that helps to write generic versions of the edge functions
@@ -252,9 +256,9 @@ by calling suppress_warnings(true) after importing Vahana.
             @inbounds isassigned(field, Int64(nr)) ? field[nr] : nothing
         end
         @eval function _get_agent_container!(sim::$simsymbol,
-                                               to::AgentID,
-                                               ::Type{$T},
-                                               field)
+                                      to::AgentID,
+                                      ::Type{$T},
+                                      field)
             nr = _to2idx(to, $T)
 
             @mayassert begin
@@ -275,9 +279,9 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     else
         @eval function _get_agent_container!(::$simsymbol,
-                                               to::AgentID,
-                                               ::Type{$T},
-                                               field)
+                                      to::AgentID,
+                                      ::Type{$T},
+                                      field)
             get!(_construct_container_func($CT), field, to)
         end
         @eval function _get_agent_container(::$simsymbol, to::AgentID, ::Type{$T}, field)
@@ -508,7 +512,15 @@ by calling suppress_warnings(true) after importing Vahana.
     end
 
     if !singleedge
-        if !singletype
+        if ignorefrom && stateless
+            @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
+                field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+                if length(field) == 0
+                    return 0
+                end
+                mapreduce(id -> field[id], +, keys(field))
+            end
+        elseif !singletype
             @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
                 field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
                 if length(field) == 0

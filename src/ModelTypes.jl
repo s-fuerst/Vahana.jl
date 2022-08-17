@@ -185,6 +185,14 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
         """; color = :red)
         end
     end
+    if haskey(kwargs, :size)
+        @assert !(:SingleEdge in traits && :SingleAgentType in traits) """
+    
+        The keyword argument size can not be used as the type $T
+        has the traits :SingleEdge and :SingleAgentType.
+        
+        """
+    end        
     types.edges_attr[T][:traits] = traits
     types
 end
@@ -192,3 +200,5 @@ end
 register_edgetype!(t::Type{T}, props...; kwargs...) where T =
     types -> register_edgetype!(types, t, props...; kwargs...) 
 
+has_trait(sim, T::DataType, trait::Symbol) = 
+    trait in sim.typeinfos.edges_attr[T][:traits]
