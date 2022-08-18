@@ -58,6 +58,8 @@ end
 # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
 # | Int64              | x       | x      | num_neighbors | MPI_reduce         |
 function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataType)
+    updateid(id::AgentID) = idmapping[id] |> AgentID
+
     CE = sim.typeinfos.edges_attr[T][:containerelement]
     ST = Vector{Tuple{AgentID, CE}} 
     perPE = [ ST() for _ in 1:mpi.size ]
@@ -106,14 +108,13 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 
     MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
-    transform(id::AgentID) = idmapping[id] |> AgentID
-    
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
         container = getproperty(sim, writefield(Symbol(T)))
          
         for (to, numedges) in recvbuf.data
             @assert numedges > 0
-            to = transform(to)
+            to = updateid(to)
+            # fromid will be ignored, so we use an dummy id
             add_edge!(sim, AgentID(0), to, T())
             if has_trait(sim, T, :SingleAgentType)
                 container[agent_nr(to)] = numedges
@@ -123,33 +124,87 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
         end
     elseif has_trait(sim, T, :Stateless)
         for (to, from) in recvbuf.data
-            add_edge!(sim, from, transform(to), T())
+            add_edge!(sim, updateid(from), updateid(to), T())
         end
     elseif has_trait(sim, T, :IgnoreFrom)
         for (to, edgestate) in recvbuf.data
-            # the fromid will be ignored, so we use an dummy id
-            add_edge!(sim, AgentID(0), transform(to), edgestate)
+            # fromid will be ignored, so we use an dummy id
+            add_edge!(sim, AgentID(0), updateid(to), edgestate)
         end
     else
         for (to, edge) in recvbuf.data
-            add_edge!(sim, transform(to), edge)
+            add_edge!(sim, updateid(to), Edge(updateid(edge.from), edge.state))
         end
     end
 end
 
+"""
+    join(vec::Vector{T}) :: Vector{T}
+
+Join a vector that is distributed over serveral processes. vec can be [].
+
+# Example
+rank 0: vec = [1, 2]
+rank 1: vec = []
+rank 2: vec = [4]
+
+join(vec) return [1, 2, 4] on all ranks
+"""
+function join(vec::Vector{T}) where T
+    # transfer the vector sizes
+    # TODO: check that this implementation is really faster then the Alltoall version
+    sizes = Vector{Int32}(undef, mpi.size)
+    sizes[mpi.rank + 1] = length(vec)
+
+    send = MPI.VBuffer(sizes, fill(Int32(1), mpi.size), fill(Int32(mpi.rank), mpi.size))
+    recv = MPI.VBuffer(sizes, fill(Int32(1), mpi.size))
+
+    MPI.Alltoallv!(send, recv, mpi.comm)
+    sizes = recv.data
+
+    # transfer the vector itself
+    displace = append!([0], cumsum(sizes)[1 : length(sizes) - 1])
+    values = Vector{T}(undef, sum(sizes))
+    values[displace[mpi.rank+1] + 1 : displace[mpi.rank+1] + sizes[mpi.rank+1]] = vec
+
+    send = MPI.VBuffer(values,
+                       fill(Int32(sizes[mpi.rank + 1]), mpi.size),
+                       fill(Int32(displace[mpi.rank + 1]), mpi.size))
+    recv = MPI.VBuffer(values, sizes)
+
+    MPI.Alltoallv!(send, recv, mpi.comm)
+    
+    recv.data
+end
+
+
 function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     node_types = sim.typeinfos.nodes_types
     edge_types = sim.typeinfos.edges_types
-    # We reconstruct the whole graph
+    # We reconstruct the whole graph, so we call prepare_write for
+    # all agent and edgetypes
     foreach(prepare_write!(sim, []), [ node_types; edge_types ])
-
-    # Send all agentstates and collect the idmapping
+    
+    # Send all agentstates and collect the idmapping, as the agent
+    # gets an new id in this process. idmapping is a Dict that allows
+    # to get the new id when only the old id is known.
     idmapping = Dict{Int64, Int64}()
     ssm = create_structured_send_map(sim, sendmap)
     for T in node_types
         merge!(idmapping, sendagents!(sim, ssm[T], T))
     end
 
+    # Currently, a PE knows only the idmapping of the agent that was
+    # mapped to this PE. We collect now this information. As we can not send
+    # the Dict directly, we join the keys and values indepently and create
+    # a new dict afterwards
+    allkeys = join(keys(idmapping) |> collect)
+    allvalues = join(values(idmapping) |> collect)
+    idmapping = Dict(allkeys .=> allvalues)
+
+    # Now we have distribute only the agents, and we have the mapping
+    # of the agents. We know transfer the edges, and are updating also
+    # the id of the agents by this way
     for T in edge_types
         sendedges!(sim, sendmap, idmapping, T)
     end

@@ -70,6 +70,12 @@ statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeEI, MPIE
     register_edgetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size * 2) |>
     construct_model("MPI EdgeTypes");
 
+# TODO: Implement agentstate, then we can check that the edges are correct
+function check(ET)
+    (agent, id, sim) -> begin
+        @test has_neighbor(sim, id, ET)
+    end
+end
 
 function testforedgetype(ET)
     sim = new_simulation(model, nothing, nothing)
@@ -82,6 +88,7 @@ function testforedgetype(ET)
         agentids2 = add_agents!(sim, [ AgentState2(i, true) for i in 1:mpi.size ])
 
         for i in 1:mpi.size
+            # the edges construct a directed cycle
             fromid = agentids[mod1(i-1, mpi.size)]
             toid = agentids[i]
             toid2 = agentids2[i]
@@ -109,19 +116,14 @@ function testforedgetype(ET)
     @test num_agents(sim, AgentState1) == (mpi.isroot ? mpi.size : 0)
     @test num_agents(sim, AgentState2) == (mpi.isroot ? mpi.size : 0)
 
-    apply_transition!(sim, [ AgentState1 ], [], []; invariant_compute = true) do _, id, sim
-        @test has_neighbor(sim, id, ET)
-    end
-    
-    
     num_edges_per_PE = Vahana.has_trait(sim, ET, :SingleAgentType) ? 1 : 2
     @test num_edges(sim, ET) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
+    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
+    
     Vahana.distribute!(sim, part)
 
-    apply_transition!(sim, [ AgentState1 ], [], []; invariant_compute = true) do _, id, sim
-        @test has_neighbor(sim, id, ET)
-    end
+    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
     
     @test num_agents(sim, AgentState1) == 1
     @test num_agents(sim, AgentState2) == (mpi.rank < 2 ? mpi.size / 2 : 0)
@@ -133,8 +135,9 @@ function testforedgetype(ET)
         @test num_edges(sim, ET) ==
             num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
     end
-
 end
+
+
 
 #CurrentEdgeType = MPIEdgeSTsI
 CurrentEdgeType = Nothing
