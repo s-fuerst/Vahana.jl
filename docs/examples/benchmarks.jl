@@ -13,10 +13,10 @@ struct EdgeState
     v::Float64
 end
 
-statelessEdgeTypes = [ "EdgeS", "EdgeSE", "EdgeST", "EdgeSI", "EdgeSET", "EdgeSEI", "EdgeSTI", "EdgeSETI",
-                       "EdgeSTF", "EdgeSTFI" ]
+statelessEdgeTypes = [ "EdgeS", "EdgeSE", "EdgeST", "EdgeSI", "EdgeSEI", "EdgeSTI", "EdgeSETI",
+                       "EdgeSTF", "EdgeSTFI", "EdgeSETFI" ]
 
-statefulEdgeTypes = [ "edge", "EdgeE", "EdgeT", "EdgeI", "EdgeET", "EdgeEI", "EdgeTI", "EdgeETI",
+statefulEdgeTypes = [ "edge", "EdgeE", "EdgeT", "EdgeI", "EdgeEI", "EdgeTI",
                       "EdgeTF", "EdgeTFI" ]
 
 allEdgeTypes = vcat(statefulEdgeTypes, statelessEdgeTypes)

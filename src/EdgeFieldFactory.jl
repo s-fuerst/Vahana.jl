@@ -511,17 +511,23 @@ by calling suppress_warnings(true) after importing Vahana.
         @eval _removeundef(::Type{$MT}) = edges -> edges
     end
 
-    if !singleedge
-        if ignorefrom && stateless
-            @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
-                field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
-                if length(field) == 0
-                    return 0
-                end
-                mapreduce(id -> field[id], +, keys(field))
+    if ignorefrom && stateless
+        @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
+            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            if length(field) == 0
+                return 0
             end
-        elseif !singletype
-            @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
+            mapreduce(id -> field[id], +, keys(field))
+        end
+    elseif singleedge
+        @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
+            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            # TODO: performance improvement with _countundef?
+            length(_removeundef(t)(field))
+        end
+    else
+        if !singletype
+            @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
                 field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
                 if length(field) == 0
                     return 0
@@ -529,7 +535,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 mapreduce(id -> length(field[id]), +, keys(field))
             end
         else
-            @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
+            @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
                 field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
                 if length(field) == 0
                     return 0
@@ -543,12 +549,6 @@ by calling suppress_warnings(true) after importing Vahana.
                 n
             end
         end 
-    else
-        @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
-            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
-            # TODO: performance improvement with _countundef?
-            length(_removeundef(t)(field))
-        end
     end
 
     #- aggregate

@@ -16,13 +16,10 @@ struct EdgeI foo::Int64 end
 struct EdgeSE end
 struct EdgeST end
 struct EdgeSI end
-struct EdgeET foo::Int64 end
 struct EdgeEI foo::Int64 end
 struct EdgeTI foo::Int64 end
-struct EdgeSET end
 struct EdgeSEI end
 struct EdgeSTI end
-struct EdgeETI foo::Int64 end
 struct EdgeSETI end
 
 struct EdgeTs foo::Int64 end
@@ -30,12 +27,11 @@ struct EdgeTsI foo::Int64 end
 
 struct EdgeSTs end
 struct EdgeSTsI end
+struct EdgeSETsI end
 
-statelessEdgeTypes = [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
-                       EdgeSTs, EdgeSTsI  ]
+statelessEdgeTypes = [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI, EdgeSTs, EdgeSTsI, EdgeSETsI  ]
 
-statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeETI,
-                      EdgeTs, EdgeTsI ]
+statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
 
 model_edges = ModelTypes() |>
     register_agenttype!(Agent) |>
@@ -47,26 +43,18 @@ model_edges = ModelTypes() |>
     register_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
     register_edgetype!(EdgeST, :Stateless, :SingleAgentType; to_agenttype = Agent) |>
     register_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
-    register_edgetype!(EdgeET, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
     register_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
     register_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    register_edgetype!(EdgeSET, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = Agent) |>
     register_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
     register_edgetype!(EdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    register_edgetype!(EdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
     register_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
     register_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = Agent, size = 10) |>
     register_edgetype!(EdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
     register_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = Agent, size = 10) |>
     register_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
+    register_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
     construct_model("Test Edges")
 
-# All types (for copy, paste and adjust for the individual tests)
-#
-# [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeET, EdgeEI, EdgeTI, EdgeETI,
-#   EdgeTs, EdgeETs, EdgeTsI, EdgeETsI,
-#   EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
-#   EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
 
 hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
 
@@ -130,13 +118,11 @@ function runedgestest()
                 e = edges_to(sim, a2id, t)
                 @test e === nothing
             end
-            for t in [EdgeE, EdgeET, EdgeETs]
+            for t in [EdgeE]
                 e = edges_to(sim, a3id, t)
                 @test e == Edge(a2id, t(1))
             end
-            for t in  [ EdgeI, EdgeEI, EdgeTI, EdgeETI, EdgeTsI, EdgeETsI,
-                       EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
-                       EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
+            for t in  [ EdgeI, EdgeEI, EdgeTI, EdgeTsI, EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI, EdgeSTs, EdgeSTsI, EdgeSETsI  ]
                 @test_throws AssertionError edges_to(sim, a1id, t)
             end
         end
@@ -149,12 +135,12 @@ function runedgestest()
                 e = neighborids(sim, a2id, t)
                 @test e === nothing
             end
-            for t in [EdgeE, EdgeET, EdgeETs, EdgeSE, EdgeSET, EdgeSETs]
+            for t in [EdgeE, EdgeSE]
                 e = neighborids(sim, a3id, t)
                 @test e == a2id
             end
             for t in [EdgeI, EdgeTI, EdgeTsI, EdgeSI, EdgeSTI, EdgeSTsI,
-                     EdgeEI, EdgeETI, EdgeETsI, EdgeSEI, EdgeSETI, EdgeSETsI]
+                     EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError neighborids(sim, a1id, t)
             end
         end
@@ -167,12 +153,12 @@ function runedgestest()
                 e = edgestates(sim, a2id, t)
                 @test e === nothing
             end
-            for t in [EdgeE, EdgeET, EdgeETs, EdgeEI, EdgeETI, EdgeETsI]
+            for t in [EdgeE, EdgeEI]
                 e = edgestates(sim, a3id, t)
                 @test e == t(1)
             end
             for t in [EdgeS, EdgeST, EdgeSTs, EdgeSI, EdgeSTI, EdgeSTsI,
-                     EdgeSE, EdgeSET, EdgeSETs, EdgeSEI, EdgeSETI, EdgeSETsI]
+                     EdgeSE, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError edgestates(sim, a1id, t)
             end
         end
@@ -184,8 +170,7 @@ function runedgestest()
                 @test num_neighbors(sim, a2id, t) == 0
                 @test num_neighbors(sim, a3id, t) == 2
             end
-            for t in [EdgeE, EdgeET, EdgeETs, EdgeEI, EdgeETI, EdgeETsI,
-                     EdgeSE, EdgeSET, EdgeSETs, EdgeSET, EdgeSETI, EdgeSETsI]
+            for t in [EdgeE, EdgeEI, EdgeSE, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError num_neighbors(sim, a1id, t)
             end
         end
@@ -198,22 +183,17 @@ function runedgestest()
                 @test has_neighbor(sim, a2id, t) == false
                 @test has_neighbor(sim, a3id, t) == true
             end
-            for t in [ EdgeET, EdgeETs ]
-                @test_throws AssertionError has_neighbor(sim, a1id, t)
-            end
         end
-
-            
         
         @testset "aggregate" begin
             for t in [ EdgeD, EdgeT, EdgeI, EdgeTI, EdgeTs, EdgeTsI ]
                 @test aggregate(sim, a -> a.foo, +, t) == 6
             end
-            for t in [ EdgeE, EdgeET, EdgeEI, EdgeETI, EdgeETs, EdgeETsI ]
+            for t in [ EdgeE, EdgeEI ]
                 @test aggregate(sim, a -> a.foo, +, t) == 4
             end
-            for t in  [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSET, EdgeSEI, EdgeSTI, EdgeSETI,
-                       EdgeSTs, EdgeSETs, EdgeSTsI, EdgeSETsI  ]
+            for t in  [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
+                       EdgeSTs, EdgeSTsI, EdgeSETsI  ]
                 @test_throws AssertionError aggregate(sim, t, a -> a.foo, +)
             end
         end
@@ -242,16 +222,18 @@ end
         @test num_edges(sim, t) == 0
     end
 
+    # We need a gap
     id1 = add_agent!(sim, Agent(0))
     id2 = add_agent!(sim, Agent(0))
+    id3 = add_agent!(sim, Agent(0))
 
     for t in [ statefulEdgeTypes; statelessEdgeTypes ]
         if fieldcount(t) > 0
             add_edge!(sim, id1, id1, t(0))
-            add_edge!(sim, id2, id2, t(0))
+            add_edge!(sim, id3, id3, t(0))
         else
             add_edge!(sim, id1, id1, t())
-            add_edge!(sim, id2, id2, t())
+            add_edge!(sim, id3, id3, t())
         end
     end
 

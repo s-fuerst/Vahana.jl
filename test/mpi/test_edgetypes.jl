@@ -30,13 +30,10 @@ struct MPIEdgeI fromid::AgentID; toid::AgentID end
 struct MPIEdgeSE end
 struct MPIEdgeST end
 struct MPIEdgeSI end
-struct MPIEdgeET fromid::AgentID; toid::AgentID end
 struct MPIEdgeEI fromid::AgentID; toid::AgentID end
 struct MPIEdgeTI fromid::AgentID; toid::AgentID end
-struct MPIEdgeSET end
 struct MPIEdgeSEI end
 struct MPIEdgeSTI end
-struct MPIEdgeETI fromid::AgentID; toid::AgentID end
 struct MPIEdgeSETI end
 
 struct MPIEdgeTs fromid::AgentID; toid::AgentID end
@@ -44,10 +41,11 @@ struct MPIEdgeTsI fromid::AgentID; toid::AgentID end
 
 struct MPIEdgeSTs end
 struct MPIEdgeSTsI end
+struct MPIEdgeSETsI end
 
-statelessMPIEdgeTypes = [ MPIEdgeS, MPIEdgeSE, MPIEdgeST, MPIEdgeSI, MPIEdgeSET, MPIEdgeSEI, MPIEdgeSTI, MPIEdgeSETI, MPIEdgeSTs, MPIEdgeSTsI  ]
+statelessMPIEdgeTypes = [ MPIEdgeS, MPIEdgeSE, MPIEdgeST, MPIEdgeSI, MPIEdgeSEI, MPIEdgeSTI, MPIEdgeSETI, MPIEdgeSTs, MPIEdgeSTsI, MPIEdgeSETsI  ]
 
-statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeET, MPIEdgeEI, MPIEdgeTI, MPIEdgeETI, MPIEdgeTs, MPIEdgeTsI ]
+statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeEI, MPIEdgeTI, MPIEdgeTs, MPIEdgeTsI ]
 
 @time model = ModelTypes() |>
     register_agenttype!(AgentState1) |>
@@ -60,18 +58,16 @@ statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeET, MPIE
     register_edgetype!(MPIEdgeSE, :Stateless, :SingleEdge) |>
     register_edgetype!(MPIEdgeST, :Stateless, :SingleAgentType; to_agenttype = AgentState1) |>
     register_edgetype!(MPIEdgeSI, :Stateless, :IgnoreFrom) |>
-    register_edgetype!(MPIEdgeET, :SingleEdge, :SingleAgentType; to_agenttype = AgentState1) |>
     register_edgetype!(MPIEdgeEI, :SingleEdge, :IgnoreFrom) |>
     register_edgetype!(MPIEdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeSET, :Stateless, :SingleEdge, :SingleAgentType; to_agenttype = AgentState1) |>
     register_edgetype!(MPIEdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
     register_edgetype!(MPIEdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeETI, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
     register_edgetype!(MPIEdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeTs, :SingleAgentType; to_agenttype = AgentState1, size = mpi.size) |>
-    register_edgetype!(MPIEdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size) |>
-    register_edgetype!(MPIEdgeSTs, :Stateless, :SingleAgentType; to_agenttype = AgentState1, size = mpi.size) |>
-    register_edgetype!(MPIEdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size) |>
+    register_edgetype!(MPIEdgeTs, :SingleAgentType; to_agenttype = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size* 2) |>
+    register_edgetype!(MPIEdgeSTs, :Stateless, :SingleAgentType; to_agenttype = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size * 2) |>
     construct_model("MPI EdgeTypes");
 
 
@@ -84,7 +80,6 @@ function testforedgetype(ET)
         @info "===== run test for edgetype" ET
         agentids = add_agents!(sim, [ AgentState1(i) for i in 1:mpi.size ])
         agentids2 = add_agents!(sim, [ AgentState2(i, true) for i in 1:mpi.size ])
-        
 
         for i in 1:mpi.size
             fromid = agentids[mod1(i-1, mpi.size)]
@@ -114,44 +109,41 @@ function testforedgetype(ET)
     @test num_agents(sim, AgentState1) == (mpi.isroot ? mpi.size : 0)
     @test num_agents(sim, AgentState2) == (mpi.isroot ? mpi.size : 0)
 
+    apply_transition!(sim, [ AgentState1 ], [], []; invariant_compute = true) do _, id, sim
+        @test has_neighbor(sim, id, ET)
+    end
+    
+    
     num_edges_per_PE = Vahana.has_trait(sim, ET, :SingleAgentType) ? 1 : 2
     @test num_edges(sim, ET) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
-    @info "Before distribute!" mpi.rank mpi.size 
-
-    sleep(0.5)
-    MPI.Barrier(mpi.comm)
-    
     Vahana.distribute!(sim, part)
 
-    @info "After distribute!" mpi.rank 
-
+    apply_transition!(sim, [ AgentState1 ], [], []; invariant_compute = true) do _, id, sim
+        @test has_neighbor(sim, id, ET)
+    end
+    
     @test num_agents(sim, AgentState1) == 1
     @test num_agents(sim, AgentState2) == (mpi.rank < 2 ? mpi.size / 2 : 0)
 
+    
     if Vahana.has_trait(sim, ET, :SingleAgentType)
         @test num_edges(sim, ET) == num_agents(sim, AgentState1) 
     else
         @test num_edges(sim, ET) ==
             num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
     end
+
 end
 
-CurrentEdgeType = MPIEdgeSEI
-
+#CurrentEdgeType = MPIEdgeSTsI
+CurrentEdgeType = Nothing
 
 if CurrentEdgeType === Nothing
     for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
         testforedgetype(ET)
     end
 else
-#    testforedgetype(MPIEdgeS)
-#    testforedgetype(MPIEdgeSE)
-#    testforedgetype(MPIEdgeST)
-#    testforedgetype(MPIEdgeSI)
-#   testforedgetype(CurrentEdgeType)
-    testforedgetype(MPIEdgeSET)
-    testforedgetype(MPIEdgeS)
-#    testforedgetype(CurrentEdgeType)
-#   testforedgetype(CurrentEdgeType)
+    testforedgetype(MPIEdgeSTI)
+    testforedgetype(CurrentEdgeType)
 end

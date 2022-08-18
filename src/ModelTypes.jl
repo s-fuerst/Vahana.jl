@@ -1,7 +1,7 @@
 export ModelTypes
 export register_agenttype!, register_edgetype!
 
-    
+
 
 """
     ModelTypes
@@ -64,7 +64,7 @@ and other bits types.
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
 function register_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
-                 size::Int64 = 0) where T
+                      size::Int64 = 0) where T
     @assert !(Symbol(T) in keys(types.nodes)) "Each type can be added only once"
     @assert isbitstype(T)
     type_number = length(types.nodes_type2id) + 1
@@ -121,7 +121,7 @@ See also [Edge Traits](./performance.md#Edge-Traits), [`add_edge!`](@ref) and
 [`add_edges!`](@ref) 
 """
 function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
-                kwargs...)  where T
+                     kwargs...)  where T
     global show_single_edge_and_type_warning
     @assert !(T in types.edges_types) "Each type can be added only once"
     @assert isbitstype(T)
@@ -174,7 +174,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
         if config.detect_stateless
             union!(traits, Set([:Stateless]))
         elseif !config.quiet
-        printstyled("""
+            printstyled("""
 
         Edgetype $T is a struct without any field, so you can increase the
         performance by setting the :Stateless trait. You can also
@@ -185,14 +185,14 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
         """; color = :red)
         end
     end
-    if haskey(kwargs, :size)
-        @assert !(:SingleEdge in traits && :SingleAgentType in traits) """
-    
-        The keyword argument size can not be used as the type $T
-        has the traits :SingleEdge and :SingleAgentType.
+    @assert !(:SingleAgentType in traits && :SingleEdge in traits &&
+        !(:Stateless in traits && :IgnoreFrom in traits)) """
+
+        The traits :SingleEdge and :SingleAgentType can be only combined
+        when the type $T has also the traits :Stateless and :IgnoreFrom.
         
         """
-    end        
+    
     types.edges_attr[T][:traits] = traits
     types
 end
