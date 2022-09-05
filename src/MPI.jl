@@ -113,14 +113,13 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
          
         for (to, numedges) in recvbuf.data
             @assert numedges > 0
-            to = updateid(to)
-            # fromid will be ignored, so we use an dummy id
-            add_edge!(sim, AgentID(0), to, T())
-            if has_trait(sim, T, :SingleAgentType)
-                container[agent_nr(to)] = numedges
+            up = if has_trait(sim, T, :SingleAgentType)
+                updateid(to) |> agent_nr
             else
-                container[to] = numedges
+                updateid(to)
             end
+            Vahana._check_size!(container, up, T)
+            container[up] = numedges
         end
     elseif has_trait(sim, T, :Stateless)
         for (to, from) in recvbuf.data
