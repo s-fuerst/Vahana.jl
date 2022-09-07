@@ -111,19 +111,26 @@ function testforedgetype(ET)
         end
     end
 
-    finish_init!(sim; partition = part)
+    # copy the simulation, so that we can test with an manual partition
+    # so that we can test that the agents/edges are moved to the expected
+    # nodes and also the partitioning via Metis later
+    simautopar = deepcopy(sim)
 
-    @test num_agents(sim, AgentState1) == (mpi.isroot ? mpi.size : 0)
-    @test num_agents(sim, AgentState2) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState1; write = true) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState2; write = true) == (mpi.isroot ? mpi.size : 0)
 
     num_edges_per_PE = Vahana.has_trait(sim, ET, :SingleAgentType) ? 1 : 2
-    @test num_edges(sim, ET) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
+    @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
-    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
+    @time finish_init!(sim; partition = part)
+
+
+    # apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
     
-    Vahana.distribute!(sim, part)
+    # Vahana.distribute!(sim, part)
 
-    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
+    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
+
     
     @test num_agents(sim, AgentState1) == 1
     @test num_agents(sim, AgentState2) == (mpi.rank < 2 ? mpi.size / 2 : 0)
@@ -135,6 +142,10 @@ function testforedgetype(ET)
         @test num_edges(sim, ET) ==
             num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
     end
+
+    # we check now the partitioning via Metis
+    @time finish_init!(simautopar)
+    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
 end
 
 

@@ -164,7 +164,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
     if :SingleAgentType in traits
         @assert haskey(kwargs, :to_agenttype) """
 
-        For type $T the :SingleAgentType property is set, but in this
+        For type $T the :SingleAgentType trait is set, but in this
         case the agent type must also be specified via the
         to_agenttype keyword.
 

@@ -17,7 +17,7 @@ testdir = "/home/fuerst/.julia/dev/Vahana/test/mpi"
 @testset "$f" for f in testfiles
     mpiexec() do mpirun
         cmd(n=nprocs) = `$mpirun -n $n $(Base.julia_cmd()) $(joinpath(testdir, f))`
-        run(cmd(2))
+        run(cmd())
         @test true
     end
 end

@@ -102,8 +102,9 @@ The edge types must not have the :IgnoreFrom trait.
     for those graphs. So use this function with care. 
 """ # TODO write tests, , check :IgnoreFrom and print a warning
 function vahanasimplegraph(sim;
-              agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
-              edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
+                    agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
+                    edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
+                    show_ignorefrom_warning = true)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
 
@@ -122,11 +123,26 @@ function vahanasimplegraph(sim;
 
     ne = 0
     for t in edgetypes
+        if has_trait(sim, t, :IgnoreFrom)
+            if show_ignorefrom_warning
+                printstyled("""
+    
+                Edgetype $t has the :IgnoreFrom trait, therefore edges of this 
+                type can not added those edges to the created subgraph
+
+                """; color = :red)
+            end
+            continue
+        end
         for (to, e) in edges_iterator(sim, t)
-            f = get(v2g, e.from, nothing)
-            t = get(v2g, to, nothing)
-            if f !== nothing && t !== nothing
-                push!(fadjlist[f], t)
+            if has_trait(sim, t, :Stateless)
+                fid = get(v2g, e, nothing)
+            else
+                fid = get(v2g, e.from, nothing)
+            end
+            tid = get(v2g, to, nothing)
+            if fid !== nothing && tid !== nothing
+                push!(fadjlist[fid], tid)
                 ne += 1
             end
         end
@@ -190,8 +206,8 @@ The edge types must not have the :IgnoreFrom trait.
     for those graphs. So use this function with care. 
 """ # TODO write tests, check :IgnoreFrom and print a warning
 function vahanagraph(sim;
-              agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
-              edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
+                     agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
+                     edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
     edgetype = Vector{Int64}()
@@ -238,7 +254,7 @@ has_vertex(vg::VahanaGraph, v) = v <= length(vg.g2v)
 
 inneighbors(vg::VahanaGraph, v) =
     map(e -> e.src, filter(e -> e.dst == v, vg.edges)) |> unique
-        
+
 ne(vg::VahanaGraph) = length(vg.edges)
 
 nv(vg::VahanaGraph) = length(vg.g2v)

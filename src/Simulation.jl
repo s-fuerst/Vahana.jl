@@ -170,10 +170,27 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
 """
 function finish_init!(sim;
-               partition::Dict{AgentID, ProcessID} =
-                   Dict{AgentID, ProcessID}())
+               distribute = mpi.size > 1,
+               partition = Dict{AgentID, ProcessID}()) 
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
+
+    if distribute 
+        @assert mpi.size > 1
+        if length(partition) == 0 && mpi.isroot
+            @info "Partitioning the Simulation"
+            vsg = vahanasimplegraph(sim)
+            part = Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+            for (i, p) in enumerate(part)
+                partition[vsg.g2v[i]] = p
+            end
+        end
+        if mpi.isroot
+            @info "Distributing the simulation"
+        end
+        distribute!(sim, partition)
+    end
+    
     sim.initialized = true
     sim
 end 

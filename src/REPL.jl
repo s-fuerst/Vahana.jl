@@ -246,15 +246,17 @@ end
 """
 TODO DOC 
 """
-function num_edges(sim, t::Type{T}) where {T}
-    _num_edges(sim, t)
+function num_edges(sim, t::Type{T}; write = false) where T
+    _num_edges(sim, t, write)
 end
 
 """
 TODO DOC 
 """
-num_agents(sim, ::Type{T}) where T =
-    length(getproperty(sim, readfield(Symbol(T))))
+num_agents(sim, ::Type{T}; write = false) where T = 
+     write ?
+        length(getproperty(sim, writefield(Symbol(T)))) :
+        length(getproperty(sim, readfield(Symbol(T))))
 
 """
 TODO DOC 

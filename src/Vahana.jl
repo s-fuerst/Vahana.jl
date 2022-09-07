@@ -1,6 +1,6 @@
 module Vahana
 
-using Requires, MPI
+using Requires, MPI, Metis
 
 export enable_asserts, suppress_warnings, detect_stateless_trait
 
