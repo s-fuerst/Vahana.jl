@@ -33,7 +33,8 @@ nff_dict = NodeFieldFactory(
             nextid = sim.$(nextidfield(T))
             sim.$(nextidfield(T)) = nextid + 1
             sim.$(writefield(T))[nextid] = agent
-            agent_id($typeid, nextid)
+            push!(sim.$(reusefield(T)), 0)
+            agent_id($typeid, Reuse(0), nextid)
         end 
     end,
 
@@ -60,14 +61,14 @@ nff_dict = NodeFieldFactory(
             read::Dict{AgentNr, $T} = sim.nodes_id2read[$typeid](sim)
             write::Dict{AgentNr, $T} = sim.nodes_id2write[$typeid](sim)
             for (agentnr::AgentNr, state::$T) in read
-                agentid = agent_id($typeid, agentnr)
+                agentid = agent_id(sim, $typeid, agentnr)
                 maybeadd(write, agentnr, func(state, agentid, sim))
             end 
         end,
         @eval function transition_edges_only!(sim::$simsymbol, func, ::Type{$T})
             read::Dict{AgentNr, $T} = sim.nodes_id2read[$typeid](sim)
             for (agentnr::AgentNr, state::$T) in read
-                agentid = agent_id($typeid, agentnr)
+                agentid = agent_id(sim, $typeid, agentnr)
                 func(state, agentid, sim)
             end 
         end
@@ -87,6 +88,7 @@ nff_dict = NodeFieldFactory(
 )
 
 #################### Vec
+# for Vectors (immortal agents) we set reuse always fix to 0
 nff_vec = NodeFieldFactory(
     type = (T, _) -> :(Vector{$T}),
     constructor = (T, _) -> :(Vector{$T}()),
@@ -113,8 +115,9 @@ nff_vec = NodeFieldFactory(
             @eval function add_agent!(sim::$simsymbol, agent::$T)
                 agentid = sim.$(nextidfield(T))
                 sim.$(nextidfield(T)) = agentid + 1
+                push!(sim.$(reusefield(T)), 0)
                 @inbounds sim.$(writefield(T))[agentid] = agent
-                agent_id($typeid, agentid)
+                immortal_agent_id($typeid, agentid)
             end
         else
             @eval typeid = $info.nodes_type2id[$T]
@@ -124,8 +127,9 @@ nff_vec = NodeFieldFactory(
                 if agentid > size(sim.$(writefield(T)), 1)
                     resize!(sim.$(writefield(T)), agentid)
                 end
+                push!(sim.$(reusefield(T)), 0)
                 @inbounds sim.$(writefield(T))[agentid] = agent
-                agent_id($typeid, agentid)
+                immortal_agent_id($typeid, agentid)
             end
         end
     end,
@@ -146,7 +150,7 @@ nff_vec = NodeFieldFactory(
             idx = AgentNr(0)
             for state::$T in read
                 idx += AgentNr(1)
-                newstate = func(state, agent_id($typeid, idx), sim)
+                newstate = func(state, immortal_agent_id($typeid, idx), sim)
                 @mayassert newstate !== nothing "You can not use Vectors for mortal agents" 
                 write[idx] = newstate
             end 
@@ -157,7 +161,7 @@ nff_vec = NodeFieldFactory(
             idx = AgentNr(0)
             for state::$T in read
                 idx += AgentNr(1)
-                func(state, agent_id($typeid, idx), sim)
+                func(state, immortal_agent_id($typeid, idx), sim)
             end 
         end
     end,

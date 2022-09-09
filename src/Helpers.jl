@@ -48,3 +48,5 @@ readfield(T) = Symbol(T, "_read")
 
 nextidfield(T) = Symbol(T, "_nextid")
 
+reusefield(T) = Symbol(T, "_reuse")
+

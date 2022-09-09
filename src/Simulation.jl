@@ -42,6 +42,12 @@ function construct_model(types::ModelTypes, name::String)
              :(AgentNr(1)))
         for (T,_) in types.nodes ]
 
+    nodereuse = [
+        Expr(Symbol("="),
+             :($(Symbol(T, "_reuse"))::Vector{Reuse}),
+             :(Vector{Reuse}()))
+        for (T,_) in types.nodes ]
+    
     fields = Expr(:block,
                   :(modelname::String),
                   :(name::String),
@@ -54,7 +60,8 @@ function construct_model(types::ModelTypes, name::String)
                   :(initialized::Bool),
                   edgefields...,
                   nodefields...,
-                  nodeids...)
+                  nodeids...,
+                  nodereuse...)
     
     # the true in the second arg makes the struct mutable
     strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)

@@ -1,9 +1,17 @@
-# The overall AgentID is composed of three parts:
+# The overall AgentID is composed of four parts:
 #
 # - The TypeID by which the AgentType of the agent can be determined.
 #
 # - The ProcessID, which in the MPI implementation is the rank on which
 #   the agent is currently managed.
+#
+# - Reuse is a counter for the AgentNr. All agentstates are stored in
+#   arrays, even for "mortal" agents, so we can have agentstates in
+#   the array of agents, that are not "living" anymore (and an
+#   additional bitarray that tracks this). This array entries can be
+#   reused, but the new agent in this entry needs a new id. Reuse will
+#   be increased in this case, so that the id will be different, even
+#   with the same result for AgentNr
 #
 # - The AgentNr which says: "This is the nth agent of type TypeID
 #   created on Process ID" (so on different processes there can be
@@ -17,9 +25,9 @@
 # development, but the implementation found here had most time a noticeable
 # performance advantage and a better memory usage).
 
-export AgentID, AgentNr, ProcessID
-export agent_id
-export TypeID
+export AgentID#, AgentNr, ProcessID
+export agent_id, immortal_agent_id
+#export TypeID
 # export type_of
 
 export add_agent!, add_agents!
@@ -29,62 +37,93 @@ export num_agents
 
 const TypeID = UInt8
 const BITS_TYPE = 8
-const MAX_TYPES = typemax(TypeID) 
+const MAX_TYPES = 2 ^ BITS_TYPE
 
 const ProcessID = UInt32
-const BITS_PROCESS = 24
+const BITS_PROCESS = 12
+
+const Reuse = UInt32
+const BITS_REUSE = 12
 
 const AgentNr = UInt32
 const BITS_AGENTNR = 32
 
 const AgentID = UInt64
 
+const reuse_mask = (2 ^ BITS_REUSE - 1) << BITS_AGENTNR
+
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE
 @assert round(log2(typemax(ProcessID))) >= BITS_PROCESS
+@assert round(log2(typemax(Reuse))) >= BITS_REUSE
 @assert round(log2(typemax(AgentNr))) >= BITS_AGENTNR
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
-    BITS_PROCESS + BITS_AGENTNR 
+    BITS_PROCESS + BITS_REUSE + BITS_AGENTNR 
 
-const shift_type = BITS_PROCESS + BITS_AGENTNR
+const shift_type = BITS_PROCESS + BITS_REUSE + BITS_AGENTNR
 
-function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
+function agent_id(typeID::TypeID, reuse::Reuse, agent_nr::AgentNr)::AgentID
+    @mayassert typeID <= 2 ^ BITS_TYPE
+    @mayassert agent_nr <= 2 ^ BITS_AGENTNR
     AgentID(typeID) << shift_type +
-        mpi.rank << BITS_AGENTNR +
+        mpi.rank << (BITS_REUSE + BITS_AGENTNR) +
+        reuse << BITS_AGENTNR + # TODO
         agent_nr
 end
 
+function immortal_agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
+    @mayassert typeID <= 2 ^ BITS_TYPE
+    @mayassert agent_nr <= 2 ^ BITS_AGENTNR
+    AgentID(typeID) << shift_type +
+        mpi.rank << (BITS_REUSE + BITS_AGENTNR) +
+        agent_nr
+end
 
-function agent_id(typeID::Int64, agent_nr::Int64)::AgentID
-    @mayassert typeID <= typemax(TypeID)
-    @mayassert agent_nr <= typemax(AgentNr)
-    agent_id(TypeID(typeID), AgentNr(agent_nr))
+remove_reuse(agentID::AgentID) = ~reuse_mask & agentID
+
+function agent_id(typeID::Int64, reuse::Int64, agent_nr::Int64)::AgentID
+    agent_id(TypeID(typeID), Reuse(reuse), AgentNr(agent_nr))
+end
+
+@inline function _reuse(sim, typeID, agent_nr)
+    T = sim.typeinfos.nodes_id2type[typeID]
+    getproperty(sim, reusefield(Symbol(T)))[agent_nr]
+end
+    
+function agent_id(sim, typeID::TypeID, agent_nr::AgentNr)::AgentID
+    agent_id(typeID, _reuse(sim, typeID, agent_nr), agent_nr)
 end
 
 function agent_id(sim, agent_nr::AgentNr, ::Type{T}) where T
-    agent_id(sim.typeinfos.nodes_type2id[T], agent_nr)
+    typeID = sim.typeinfos.nodes_type2id[T]
+    agent_id(typeID, _reuse(sim, typeID, agent_nr), agent_nr)
 end
 
 function agent_id(sim, agent_nr::Int64, ::Type{T}) where T
-    agent_id(sim.typeinfos.nodes_type2id[T], AgentNr(agent_nr))
+    typeID = sim.typeinfos.nodes_type2id[T]
+    agent_id(typeID, _reuse(sim, typeID, agent_nr), AgentNr(agent_nr))
 end
 
 function type_nr(id::AgentID)::TypeID
-    id >> (BITS_PROCESS + BITS_AGENTNR)
+    id >> (BITS_PROCESS + BITS_REUSE + BITS_AGENTNR)
 end
 
 function type_of(sim, id::AgentID)
     sim.typeinfos.nodes_types[type_nr(id)]
 end
-    
+
 function process_nr(id::AgentID)::ProcessID
-    (id >> (BITS_AGENTNR)) & (2 ^ BITS_PROCESS - 1)
+    (id >> (BITS_REUSE + BITS_AGENTNR)) & (2 ^ BITS_PROCESS - 1)
+end
+
+function reuse_nr(id::AgentID)::ProcessID
+    (id >> (BITS_AGENTNR)) & (2 ^ BITS_REUSE - 1)
 end
 
 function agent_nr(id::AgentID)::AgentNr
     id & (2 ^ BITS_AGENTNR - 1)
 end
 
-@assert agent_id(3, 1) |> type_nr == 3
+@assert agent_id(3, 0, 1) |> type_nr == 3
 
 
 """
@@ -168,5 +207,5 @@ agent is determined at runtime. If the type is known at compile time,
 using [`agentstate`](@ref) is preferable as it improves performance.
 """
 agentstate_flexible(sim, id::AgentID) =
-     sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
+    sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
 

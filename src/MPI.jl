@@ -42,7 +42,7 @@ function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     # we need oldid as key and newid as value
     idmapping = Dict{AgentID, AgentID}() 
     foreach(recvbuf.data) do (id, agent)
-        idmapping[id] = add_agent!(sim, agent)
+        idmapping[remove_reuse(id)] = add_agent!(sim, agent)
     end
     idmapping
 end
@@ -56,7 +56,7 @@ end
 # | (Vector){Edge{$T}} |         |        | edges_to      | [(toid, Edge{$T})] |
 # | (Vector){AgentID}  | x       |        | neighborids   | [(toid, fromid)]   |
 # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
-# | Int64              | x       | x      | num_neighbors | MPI_reduce         |
+# | Int64              | x       | x      | num_neighbors | num_neighbors      |
 function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataType)
     updateid(id::AgentID) = idmapping[id] |> AgentID
 
@@ -76,12 +76,14 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     for (to, e) in iter
         id = if has_trait(sim, T, :SingleAgentType)
             AT = sim.typeinfos.edges_attr[T][:to_agenttype]
-            agent_id(sim, to, AT)
+            @info mpi.rank to
+            typeID = sim.typeinfos.nodes_type2id[T]
+            # we don't know the reuse value of the agent, so we call immortal
+            immortal_agent_id(typeID, to)
         else
             to
         end
-        # in the :SingleEdge, :SingleAgentType case we check via
-        # the sendmap if there is really this agent on the PE
+        # kann es überhaupt sein, dass die id nicht in der sandmap ist
         if haskey(sendmap, id)
             # in the SingleAgentType version, we also get entries with 0 edges
             # we skip them, there is no need to use bandwith for that
@@ -110,7 +112,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
         container = getproperty(sim, writefield(Symbol(T)))
-         
+
         for (to, numedges) in recvbuf.data
             @assert numedges > 0
             up = if has_trait(sim, T, :SingleAgentType)
@@ -201,8 +203,8 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     allvalues = join(values(idmapping) |> collect)
     idmapping = Dict(allkeys .=> allvalues)
 
-    # Now we have distribute only the agents, and we have the mapping
-    # of the agents. We know transfer the edges, and are updating also
+    # Till now we have distribute only the agents, and we have the mapping
+    # of the agents-ids. We now transfer the edges, and are updating also
     # the id of the agents by this way
     for T in edge_types
         sendedges!(sim, sendmap, idmapping, T)

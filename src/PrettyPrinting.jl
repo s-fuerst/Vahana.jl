@@ -138,7 +138,7 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
         # But here we need the original traits, so we access them directly
         if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:traits]
             agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
-            aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
+            aid = agent_id(sim, sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             print(" $(agentstate(sim, aid, agentT))")
         else
             print(" $(agentstate_flexible(sim, e.from))")

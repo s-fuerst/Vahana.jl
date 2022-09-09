@@ -80,7 +80,7 @@ end
 function testforedgetype(ET)
     sim = new_simulation(model, nothing, nothing)
 
-    part = Dict{AgentID, ProcessID}()
+    part = Dict{AgentID, UInt32}()
 
     if mpi.isroot
         @info "===== run test for edgetype" ET

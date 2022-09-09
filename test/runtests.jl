@@ -7,10 +7,10 @@ suppress_warnings(true)
 
 # include("core.jl")
 
-# include("edges.jl")
-# runedgestest()
+include("edges.jl")
+#runedgestest()
 
-# # edgesiterator depends on edges.jl
+# edgesiterator depends on edges.jl
 # include("edgesiterator.jl")
 
 # include("globals.jl")
