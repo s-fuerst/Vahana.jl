@@ -74,7 +74,7 @@ end
 # like vahanagraph, only for the AbstractSimpleGraph, see also
 # the comment of VahanaSimpleGraph above
 """
-    vahanasimplegraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType})
+    vahanasimplegraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true)
 
 Creates a subgraph with nodes for all agents that have one of the
 `agenttypes` types, and all edges that have one of the `edgetypes`
@@ -100,7 +100,7 @@ The edge types must not have the :IgnoreFrom trait.
     two nodes, but some function (e.g. those that convert the graph
     into a binary (sparse)matrix can produce undefined results
     for those graphs. So use this function with care. 
-""" # TODO write tests, , check :IgnoreFrom and print a warning
+""" 
 function vahanasimplegraph(sim;
                     agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
                     edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
@@ -177,7 +177,7 @@ end
 
 # SingleAgentType not supported (und IgnoreFrom sowieso nicht)
 """
-    vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType})
+    vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true)
 
 Creates a subgraph with nodes for all agents that have one of the
 `agenttypes` types, and all edges that have one of the `edgetypes`
@@ -206,8 +206,8 @@ The edge types must not have the :IgnoreFrom trait.
     for those graphs. So use this function with care. 
 """ # TODO write tests, check :IgnoreFrom and print a warning
 function vahanagraph(sim;
-                     agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
-                     edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
+              agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
+              edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
     edgetype = Vector{Int64}()
@@ -226,6 +226,17 @@ function vahanagraph(sim;
     edges = Vector{Graphs.Edge}()
     edgetypeidx = 1
     for T in edgetypes
+        if has_trait(sim, T, :IgnoreFrom)
+            if show_ignorefrom_warning
+                printstyled("""
+    
+                Edgetype $T has the :IgnoreFrom trait, therefore edges of this 
+                type can not added those edges to the created subgraph
+
+                """; color = :red)
+            end
+            continue
+        end
         for (to, e) in edges_iterator(sim, T)
             f = get(v2g, hasproperty(e, :from) ? e.from : e, nothing)
             t = get(v2g, to, nothing)

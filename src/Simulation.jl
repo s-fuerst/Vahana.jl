@@ -186,7 +186,7 @@ function finish_init!(sim;
         @assert mpi.size > 1
         if length(partition) == 0 && mpi.isroot
             @info "Partitioning the Simulation"
-            vsg = vahanasimplegraph(sim)
+            vsg = vahanasimplegraph(sim; show_ignorefrom_warning = false)
             part = Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
             for (i, p) in enumerate(part)
                 partition[vsg.g2v[i]] = p

@@ -2,8 +2,6 @@ using MPI
 
 using Logging
 
-
-
 # Distributing the whole graph to the different processes.
 # 
 # This function is called from finish_init!, per default the sendmap
@@ -217,21 +215,16 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     end
 end
 
-"""
-    join(vec::Vector{T}) :: Vector{T}
-
-Join a vector that is distributed over serveral processes. vec can be [].
-
-# Example
-rank 0: vec = [1, 2]
-rank 1: vec = []
-rank 2: vec = [4]
-
-join(vec) return [1, 2, 4] on all ranks
-"""
+# Join a vector that is distributed over serveral processes. vec can be [].
+#
+# # Example
+# rank 0: vec = [1, 2]
+# rank 1: vec = []
+# rank 2: vec = [4]
+#
+# join(vec) returns [1, 2, 4] on all ranks
 function join(vec::Vector{T}) where T
     # transfer the vector sizes
-    # TODO: check that this implementation is really faster then the Alltoall version
     sizes = Vector{Int32}(undef, mpi.size)
     sizes[mpi.rank + 1] = length(vec)
 
@@ -255,5 +248,3 @@ function join(vec::Vector{T}) where T
     
     recv.data
 end
-
-
