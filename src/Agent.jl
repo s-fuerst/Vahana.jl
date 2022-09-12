@@ -50,7 +50,6 @@ const BITS_AGENTNR = 32
 
 const AgentID = UInt64
 
-const reuse_mask = (2 ^ BITS_REUSE - 1) << BITS_AGENTNR
 
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE
 @assert round(log2(typemax(ProcessID))) >= BITS_PROCESS
@@ -78,6 +77,9 @@ function immortal_agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
         agent_nr
 end
 
+# When we send an agent to another process, the new process can not
+# access the reuse value of the old process. 
+const reuse_mask = (2 ^ BITS_REUSE - 1) << BITS_AGENTNR
 remove_reuse(agentID::AgentID) = ~reuse_mask & agentID
 
 function agent_id(typeID::Int64, reuse::Int64, agent_nr::Int64)::AgentID

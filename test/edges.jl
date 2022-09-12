@@ -140,7 +140,7 @@ function runedgestest()
                 @test e == a2id
             end
             for t in [EdgeI, EdgeTI, EdgeTsI, EdgeSI, EdgeSTI, EdgeSTsI,
-                     EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
+                   EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError neighborids(sim, a1id, t)
             end
         end
@@ -158,14 +158,14 @@ function runedgestest()
                 @test e == t(1)
             end
             for t in [EdgeS, EdgeST, EdgeSTs, EdgeSI, EdgeSTI, EdgeSTsI,
-                     EdgeSE, EdgeSEI, EdgeSETI, EdgeSETsI]
+                   EdgeSE, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError edgestates(sim, a1id, t)
             end
         end
         
         @testset "num_neighbors" begin
             for t in [EdgeD, EdgeT, EdgeTs, EdgeI, EdgeTI, EdgeTsI,
-                     EdgeS, EdgeST, EdgeSTs, EdgeST, EdgeSTI, EdgeSTsI]
+                   EdgeS, EdgeST, EdgeSTs, EdgeST, EdgeSTI, EdgeSTsI]
                 @test num_neighbors(sim, a1id, t) == 1
                 @test num_neighbors(sim, a2id, t) == 0
                 @test num_neighbors(sim, a3id, t) == 2
@@ -177,8 +177,8 @@ function runedgestest()
 
         @testset "has_neighbor" begin
             for t in [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
-                      EdgeSTs, EdgeSTsI, EdgeSETsI, EdgeD, EdgeE, EdgeT, EdgeI,
-                      EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
+                    EdgeSTs, EdgeSTsI, EdgeSETsI, EdgeD, EdgeE, EdgeT, EdgeI,
+                    EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
                 @test has_neighbor(sim, a1id, t) == true
                 @test has_neighbor(sim, a2id, t) == false
                 @test has_neighbor(sim, a3id, t) == true
@@ -193,7 +193,7 @@ function runedgestest()
                 @test aggregate(sim, a -> a.foo, +, t) == 4
             end
             for t in  [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
-                       EdgeSTs, EdgeSTsI, EdgeSETsI  ]
+                     EdgeSTs, EdgeSTsI, EdgeSETsI  ]
                 @test_throws AssertionError aggregate(sim, t, a -> a.foo, +)
             end
         end
@@ -207,39 +207,39 @@ function runedgestest()
         #     end
         # end
     end
-end
 
-@testset "num_edges" begin
-    sim = new_simulation(model_edges, nothing, nothing)
+    @testset "num_edges" begin
+        sim = new_simulation(model_edges, nothing, nothing)
 
-    for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-        @test num_edges(sim, t) == 0
-    end
-
-    finish_init!(sim)
-    
-    for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-        @test num_edges(sim, t) == 0
-    end
-
-    # We need a gap
-    id1 = add_agent!(sim, Agent(0))
-    id2 = add_agent!(sim, Agent(0))
-    id3 = add_agent!(sim, Agent(0))
-
-    for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-        if fieldcount(t) > 0
-            add_edge!(sim, id1, id1, t(0))
-            add_edge!(sim, id3, id3, t(0))
-        else
-            add_edge!(sim, id1, id1, t())
-            add_edge!(sim, id3, id3, t())
+        for t in [ statefulEdgeTypes; statelessEdgeTypes ]
+            @test num_edges(sim, t) == 0
         end
-    end
 
-    finish_init!(sim)
+        finish_init!(sim)
+        
+        for t in [ statefulEdgeTypes; statelessEdgeTypes ]
+            @test num_edges(sim, t) == 0
+        end
 
-    for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-        @test num_edges(sim, t) == 2
-    end
-end    
+        # We need a gap
+        id1 = add_agent!(sim, Agent(0))
+        id2 = add_agent!(sim, Agent(0))
+        id3 = add_agent!(sim, Agent(0))
+
+        for t in [ statefulEdgeTypes; statelessEdgeTypes ]
+            if fieldcount(t) > 0
+                add_edge!(sim, id1, id1, t(0))
+                add_edge!(sim, id3, id3, t(0))
+            else
+                add_edge!(sim, id1, id1, t())
+                add_edge!(sim, id3, id3, t())
+            end
+        end
+
+        finish_init!(sim)
+
+        for t in [ statefulEdgeTypes; statelessEdgeTypes ]
+            @test num_edges(sim, t) == 2
+        end
+    end    
+end

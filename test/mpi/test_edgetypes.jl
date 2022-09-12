@@ -8,6 +8,8 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
+MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
+
 # All ids are the initial ids 
 
 @assert mod(mpi.size, 2) == 0 """
@@ -155,7 +157,11 @@ CurrentEdgeType = Nothing
 
 if CurrentEdgeType === Nothing
     for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
-        testforedgetype(ET)
+        try testforedgetype(ET)
+        catch e
+            @info mpi.rank e
+            Sys.exit(1)
+        end
     end
 else
     testforedgetype(MPIEdgeSTI)
