@@ -4,9 +4,13 @@ using Vahana
 
 using MPI
 
+using Logging
+
 enable_asserts(true)
 
 suppress_warnings(true)
+
+Logging.disable_logging(Logging.Info)
 
 MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
 
@@ -49,7 +53,7 @@ statelessMPIEdgeTypes = [ MPIEdgeS, MPIEdgeSE, MPIEdgeST, MPIEdgeSI, MPIEdgeSEI,
 
 statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeEI, MPIEdgeTI, MPIEdgeTs, MPIEdgeTsI ]
 
-@time model = ModelTypes() |>
+model = ModelTypes() |>
     register_agenttype!(AgentState1) |>
     register_agenttype!(AgentState2) |>
     register_edgetype!(MPIEdgeD) |>
@@ -124,7 +128,7 @@ function testforedgetype(ET)
     num_edges_per_PE = Vahana.has_trait(sim, ET, :SingleAgentType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
-    @time finish_init!(sim; partition = part)
+    finish_init!(sim; partition = part)
 
 
     # apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
@@ -146,7 +150,7 @@ function testforedgetype(ET)
     end
 
     # we check now the partitioning via Metis
-    @time finish_init!(simautopar)
+    finish_init!(simautopar)
     apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
 end
 

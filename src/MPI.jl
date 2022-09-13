@@ -15,6 +15,11 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # all agent and edgetypes
     foreach(prepare_write!(sim, []), [ node_types; edge_types ])
 
+    # we also reset the nextid count to 1 for every nodetype
+    foreach(node_types) do T
+        setproperty!(sim, nextidfield(T), AgentNr(1))
+    end
+    
     # We add structure to the simple AgentID -> ProcessID mapping,
     # so that we can combine all agents of the AgentTypes etc.
     ssm = create_structured_send_map(sim, sendmap)
@@ -47,6 +52,8 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     end
 
     foreach(finish_write!(sim), [ node_types; edge_types ])
+
+    idmapping
 end
 
 
@@ -77,7 +84,7 @@ function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     # need also the AgentID to create the mappning from the old
     # AgentID to the new AgentID
     ST = Vector{Tuple{AgentID,T}} 
-      
+    
     longvec = reduce(vcat, perPE)
     sendbuf = if length(longvec) > 0
         agentstates = map(longvec) do id
@@ -154,14 +161,20 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
             # the reuse bits here too
             remove_reuse(to)
         end
-        # in the SingleAgentType version, we also get entries with 0 edges
-        # we skip them, there is no need to use bandwith for that
-        if has_trait(sim, T, :Stateless) &&
-            has_trait(sim, T, :IgnoreFrom) &&
-            e == 0
-            continue
+        # in the default finish_init! case with an initialization
+        # that does not care about mpi.isroot, we have edges on
+        # all ranks, but on the sendmap there are only the edges
+        # of rank 0, as this are the only edges we want to distribute
+        if haskey(sendmap, id)
+            # in the SingleAgentType version, we also get entries with 0 edges
+            # we skip them, there is no need to use bandwith for that
+            if has_trait(sim, T, :Stateless) &&
+                has_trait(sim, T, :IgnoreFrom) &&
+                e == 0
+                continue
+            end
+            push!(perPE[sendmap[id]], (id, e))
         end
-        push!(perPE[sendmap[id]], (id, e))
     end
 
     # for sending them via AllToAll we flatten the perPE structure 
@@ -198,7 +211,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
             Vahana._check_size!(container, up, T)
             container[up] = numedges
         end
-    # Else iterate of the received edges and add them via add_edge!    
+        # Else iterate of the received edges and add them via add_edge!    
     elseif has_trait(sim, T, :Stateless)
         for (to, from) in recvbuf.data
             add_edge!(sim, updateid(from), updateid(to), T())

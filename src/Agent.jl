@@ -82,6 +82,10 @@ end
 const reuse_mask = (2 ^ BITS_REUSE - 1) << BITS_AGENTNR
 remove_reuse(agentID::AgentID) = ~reuse_mask & agentID
 
+const process_mask = (2 ^ BITS_PROCESS - 1) << (BITS_AGENTNR + BITS_REUSE)
+remove_process(agentID::AgentID) = ~process_mask & agentID
+
+
 function agent_id(typeID::Int64, reuse::Int64, agent_nr::Int64)::AgentID
     agent_id(TypeID(typeID), Reuse(reuse), AgentNr(agent_nr))
 end

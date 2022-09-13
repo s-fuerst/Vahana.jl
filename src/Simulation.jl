@@ -162,16 +162,24 @@ construct_model(name::String) = types -> construct_model(types, name)
 new_simulation(params::P, globals::G; kwargs...) where {P, G} =
     model -> new_simulation(model, params, globals; kwargs...)
 
-# construct(name::String, params::P, globals::G) where {P, G} =
-#     types -> construct(types, name, params, globals)
-
-
 """
-    finish_init!(sim::Simulation)
+    finish_init!(sim::Simulation; distribute::Bool, partition::Dict{AgentID, ProcessID}())
 
 Finish the initialization phase of the simulation. 
 
 Must be called before applying a transition function. 
+
+When a simulation is run on multiple PEs, per default the graph found
+on rank 0 will be partitioned using Metis, and distributed to the
+different ranks. Which means that it's allowed to run the
+initialization phase on all ranks (there is no need for a mpi.isroot
+check), but then all added agents and edges on other ranks then 0 will
+be discarded. If this is not intended, a `partition` must be given, or
+`distribute` must be set to false.
+
+`partition` is a dict that must incl. all agentids created on the rank
+as keys, the corresponding value is the rank on which the agent will be
+"living" after `finish_init!`.
 
 See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 [`apply_transition!`](@ref)
@@ -182,7 +190,7 @@ function finish_init!(sim;
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
-    if distribute 
+    idmapping = if distribute 
         @assert mpi.size > 1
         if length(partition) == 0 && mpi.isroot
             @info "Partitioning the Simulation"
@@ -193,13 +201,22 @@ function finish_init!(sim;
             end
         end
         if mpi.isroot
-            @info "Distributing the simulation"
+            @info "Distributing the Simulation"
         end
         distribute!(sim, partition)
+    else
+        idmapping = Dict{AgentID, AgentID}()
+        for T in sim.typeinfos.nodes_types
+            tid = sim.typeinfos.nodes_type2id[T]
+            for id in keys(_getread(sim, T))
+                aid = agent_id(sim, tid, AgentNr(id))
+                idmapping[remove_reuse(aid)] = aid
+            end
+        end
+        idmapping
     end
-    
     sim.initialized = true
-    sim
+    idmapping
 end 
 
 
