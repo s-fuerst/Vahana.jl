@@ -103,7 +103,7 @@ end
 
 
 """
-    new_simulation(model::Model, params, globals; name)
+    new_simulation(model::Model, params = nothing, globals = nothing; name)
 
 Creates and return a new simulation object, which stores the complete state 
 of a simulation. 
@@ -132,7 +132,10 @@ See also [`construct_model`](@ref), [`param`](@ref),
 [`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
 and [`finish_init!`](@ref)
 """
-function new_simulation(model::Model, params::P, globals::G; name = model.name) where {P, G}
+function new_simulation(model::Model,
+                 params::P = nothing,
+                 globals::G = nothing;
+                 name = model.name) where {P, G}
     sim = @eval $(Symbol(model.name))(
         modelname = $(model.name),
         name = $name,
@@ -296,7 +299,7 @@ function apply_transition!(sim,
                     add_existing = Vector{DataType}())
     writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
-    foreach(prepare_write!(sim, add_existing), writeable)
+    foreach(prepare_write!(sim, [add_existing; compute]), writeable)
 
     if invariant_compute
         for C in compute

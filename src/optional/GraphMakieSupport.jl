@@ -1,6 +1,5 @@
 export plot, nodestate
 
-# TODO: try to remove the Colors dependency
 using GraphMakie, Makie, Colors
 
 import Graphs, Graphs.SimpleGraphs, NetworkLayout
@@ -41,9 +40,10 @@ function _edgetostring(ax, idx) # from and to are vahanagraph indicies
                 str *= "\n $f=$(getfield(es, f))"
             end
         end
-        return str
+        str
+    else
+        ""
     end
-    ""
 end
 
 """

@@ -204,7 +204,7 @@ The edge types must not have the :IgnoreFrom trait.
     two nodes, but some function (e.g. those that convert the graph
     into a binary (sparse)matrix can produce undefined results
     for those graphs. So use this function with care. 
-""" # TODO write tests, check :IgnoreFrom and print a warning
+""" 
 function vahanagraph(sim;
               agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
               edgetypes::Vector{DataType} = sim.typeinfos.edges_types)

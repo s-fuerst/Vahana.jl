@@ -65,7 +65,7 @@ function agent_id(typeID::TypeID, reuse::Reuse, agent_nr::AgentNr)::AgentID
     @mayassert agent_nr <= 2 ^ BITS_AGENTNR
     AgentID(typeID) << shift_type +
         mpi.rank << (BITS_REUSE + BITS_AGENTNR) +
-        reuse << BITS_AGENTNR + # TODO
+        reuse << BITS_AGENTNR + 
         agent_nr
 end
 

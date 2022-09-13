@@ -7,6 +7,11 @@ suppress_warnings(true)
 
 include("core.jl")
 
+# TODO, when we have MPI-Agents supported:
+# - check that addexisting works for the default case
+# - and that for immortal agents an exception is throws, when they are added to rebuild
+#include("addexisting.jl")
+
 include("edges.jl")
 # runedgestest()
 
