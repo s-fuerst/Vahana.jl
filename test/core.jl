@@ -10,7 +10,7 @@ struct ESLDict1 end
 struct ESLDict2 end
 
 model = ModelTypes() |>
-    register_agenttype!(ADict, :Vector) |>
+    register_agenttype!(ADict) |>
     register_agenttype!(AVec, :Vector) |>
     register_agenttype!(AVecFixed, :Vector; size = 10) |>
     register_agenttype!(ASLDict) |>

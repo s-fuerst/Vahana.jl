@@ -73,8 +73,12 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
     push!(types.nodes_types, T)
     types.nodes_type2id[T] = type_number
     types.nodes_id2type[type_number] = T
-    
-    types.nodes[T] = C
+
+    if fieldcount(T) == 0
+        types.nodes[T] = :Stateless
+    else
+        types.nodes[T] = C
+    end        
     attr = Dict{Symbol,Any}()
     types.nodes_attr[T] = attr
     if size > 0
