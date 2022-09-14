@@ -85,7 +85,7 @@ function construct_model(types::ModelTypes, name::String)
         nffs[C].prepare_write(T, types, simsymbol) 
         nffs[C].transition(T, types, simsymbol) 
         nffs[C].finish_write(T, types, simsymbol) 
-        nffs[C].aggregate(T, types, simsymbol) 
+        nffs[C].aggregate(T, types, simsymbol)
     end
 
     for T in types.nodes_types
@@ -152,8 +152,9 @@ function new_simulation(model::Model,
         init_field!(sim, T)
     end
 
-    for T in sim.typeinfos.nodes_types
+    for (T, C) in sim.typeinfos.nodes
         init_field!(sim, T)
+        nffs[C].register_atexit(sim, T)
     end
 
     sim
@@ -218,7 +219,12 @@ function finish_init!(sim;
         end
         idmapping
     end
+
+    foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
+    foreach(finish_write!(sim), sim.typeinfos.edges_types)
+
     sim.initialized = true
+
     idmapping
 end 
 
@@ -301,9 +307,11 @@ function apply_transition!(sim,
 
     foreach(prepare_write!(sim, [add_existing; compute]), writeable)
 
+    MPI.Barrier(MPI.COMM_WORLD)
+    
     if invariant_compute
         for C in compute
-            transition_edges_only!(sim, func, C)
+            transition_invariant_compute!(sim, func, C)
         end
     else
         for C in compute
@@ -311,6 +319,8 @@ function apply_transition!(sim,
         end
     end
 
+    MPI.Barrier(MPI.COMM_WORLD)
+    
     foreach(finish_write!(sim), writeable)
 
     sim

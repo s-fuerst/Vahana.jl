@@ -10,7 +10,7 @@ struct ESLDict1 end
 struct ESLDict2 end
 
 model = ModelTypes() |>
-    register_agenttype!(ADict) |>
+    register_agenttype!(ADict, :Vector) |>
     register_agenttype!(AVec, :Vector) |>
     register_agenttype!(AVecFixed, :Vector; size = 10) |>
     register_agenttype!(ASLDict) |>
@@ -88,6 +88,7 @@ end
     @testset "agentstate" begin
         @testrank a1id agentstate_flexible(sim, a1id) == ADict(1)
         @testrank a2id agentstate(sim, a2id, ADict) == ADict(2)
+        @test agentstate(sim, avids[1], AVec) == AVec(1)
         @testrank avids[1] agentstate(sim, avids[1], AVec) == AVec(1)
         @testrank avfids[1] agentstate(sim, avfids[1], AVecFixed) == AVecFixed(1)
         @testrank avids[10] agentstate(sim, avids[10], AVec) == AVec(10)
@@ -105,26 +106,26 @@ end
         @testrank a2id edges_to(sim, a2id, ESLDict1) === nothing
     end
 
-    # @testset "neighbors & edgestates" begin
-    #     @test length(neighborids(sim, avids[1], ESLDict2)) == 1
-    #     @test length(neighborids(sim, avids[10], ESLDict2)) == 1
+    @testset "neighbors & edgestates" begin
+        @testrank avids[1] length(neighborids(sim, avids[1], ESLDict2)) == 1
+        @testrank avids[10] length(neighborids(sim, avids[10], ESLDict2)) == 1
 
-    #     @test_throws AssertionError neighborids(sim, a2id, ESLDict2)
+        @test_throws AssertionError neighborids(sim, a2id, ESLDict2)
 
-    #     edges = edges_to(sim, a1id, ESLDict1)
-    #     @test (edges)[1].from == avids[1]
-    #     @test (edges)[10].from == avids[10]
-    #     edges = neighborids(sim, avids[10], ESLDict2)
-    #     @test edges[1] == avfids[10]
-    # end
+        edges = edges_to(sim, a1id, ESLDict1)
+        @testrank a1id (edges)[1].from == avids[1]
+        @testrank a1id (edges)[10].from == avids[10]
+        edges = neighborids(sim, avids[10], ESLDict2)
+        @testrank avids[10] edges[1] == avfids[10]
+    end
 
     @testset "neighborstates" begin
         if Vahana.process_nr(a1id) == mpi.rank
             @info "test"
             @test neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
         end
-        # @testrank a1id neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
-        # @testrank a1id neighborstates_flexible(sim, a1id, ESDict)[2] == ADict(3)
+        @testrank a1id neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
+        @testrank a1id neighborstates_flexible(sim, a1id, ESDict)[2] == ADict(3)
     end
 
     # working on a deepcopy should be possible and not change the
@@ -140,54 +141,54 @@ end
         @testrank avids[1] size(neighborids(copy, avids[1], ESLDict2), 1) == 2
     end
     
-    # @testset "transition" begin
-    #     # we need this for each node factory
-    #     copy = deepcopy(sim)
-    #     # we want to check two iterations with the sum_state_neighbors,
-    #     # so we just add an edge loop for the agents where we check the sum
-    #     add_edge!(copy, a1id, a1id, ESLDict1())
-    #     add_edge!(copy, avids[1], avids[1], ESLDict2())
-    #     add_edge!(copy, avfids[1], avfids[1], ESLDict1())
-    #     # for avfids[1] we need a second edge
-    #     add_edge!(copy, avfids[2], avfids[1], ESLDict1())
-    #     # and also avfids[2] should keep its value
-    #     add_edge!(copy, avfids[2], avfids[2], ESLDict1())
+    @testset "transition" begin
+        # we need this for each node factory
+        copy = deepcopy(sim)
+        # we want to check two iterations with the sum_state_neighbors,
+        # so we just add an edge loop for the agents where we check the sum
+        add_edge!(copy, a1id, a1id, ESLDict1())
+        add_edge!(copy, avids[1], avids[1], ESLDict2())
+        add_edge!(copy, avfids[1], avfids[1], ESLDict1())
+        # for avfids[1] we need a second edge
+        add_edge!(copy, avfids[2], avfids[1], ESLDict1())
+        # and also avfids[2] should keep its value
+        add_edge!(copy, avfids[2], avfids[2], ESLDict1())
 
-    #     # now check apply_transtition! for the different nodefieldfactories
-    #     copydict = deepcopy(copy)
-    #     apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
-    #                       [ ADict ], [ ESLDict1 ], [])
-    #     @test agentstate(copydict, a1id, ADict) == ADict(sum(1:10) + 1)
-    #     apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
-    #                       [ ADict ], [ ESLDict1 ], [])
-    #     @test agentstate(copydict, a1id, ADict) == ADict(2 * sum(1:10) + 1)
+        # now check apply_transtition! for the different nodefieldfactories
+        copydict = deepcopy(copy)
+        apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
+                          [ ADict ], [ ESLDict1 ], [])
+        @testrank a1id agentstate(copydict, a1id, ADict) == ADict(sum(1:10) + 1)
+        apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
+                          [ ADict ], [ ESLDict1 ], [])
+        @testrank a1id agentstate(copydict, a1id, ADict) == ADict(2 * sum(1:10) + 1)
 
-    #     copyvec = deepcopy(copy)
-    #     apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-    #                       [ AVec ], [ ESLDict2 ], [])
-    #     @test agentstate(copyvec, avids[1], AVec) == AVec(2)
-    #     apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-    #                       [ AVec ], [ ESLDict2 ], [])
-    #     @test agentstate(copyvec, avids[1], AVec) == AVec(3)
-    #     apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-    #                       [ AVec ], [ ESLDict2 ], [])
-    #     @test agentstate(copyvec, avids[1], AVec) == AVec(4)
+        copyvec = deepcopy(copy)
+        apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
+                          [ AVec ], [ ESLDict2 ], [])
+        @testrank avids[1] agentstate(copyvec, avids[1], AVec) == AVec(2)
+        apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
+                          [ AVec ], [ ESLDict2 ], [])
+        @testrank avids[1] agentstate(copyvec, avids[1], AVec) == AVec(3)
+        apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
+                          [ AVec ], [ ESLDict2 ], [])
+        @testrank avids[1] agentstate(copyvec, avids[1], AVec) == AVec(4)
 
-    #     copyvecfix = deepcopy(copy)
-    #     apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-    #                       [ AVecFixed ], [ ESLDict1 ], [])
-    #     @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(3)
-    #     apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-    #                       [ AVecFixed ], [ ESLDict1 ], [])
-    #     @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(5)
-    #     apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-    #                       [ AVecFixed ], [ ESLDict1 ], [])
-    #     @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(7)
+        copyvecfix = deepcopy(copy)
+        apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
+                          [ AVecFixed ], [ ESLDict1 ], [])
+        @testrank avfids[1] agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(3)
+        apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
+                          [ AVecFixed ], [ ESLDict1 ], [])
+        @testrank avfids[1] agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(5)
+        apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
+                          [ AVecFixed ], [ ESLDict1 ], [])
+        @testrank avfids[1] agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(7)
 
-    #     # check return nothing (currently only supported by Dicts)
-    #     apply_transition!(copydict, nothing_transition, [ ADict ], [], [])
-    #     @test_throws KeyError agentstate_flexible(copydict, a1id)
-    # end
+        # TODO check return nothing (currently only supported by Dicts)
+        # apply_transition!(copydict, nothing_transition, [ ADict ], [], [])
+        # @test_throws KeyError agentstate_flexible(copydict, a1id)
+    end
 
     @testset "num_neighbors" begin
         @testrank a1id num_neighbors(sim, a1id, ESDict) == 4

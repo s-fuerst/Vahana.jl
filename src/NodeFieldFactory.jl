@@ -9,6 +9,7 @@ Base.@kwdef struct NodeFieldFactory
     transition
     finish_write
     aggregate
+    register_atexit = (_, _) -> nothing
 end
 
 AGENTSTATE_MSG = "The id of the agent does not match the given type"
@@ -63,7 +64,7 @@ nff_dict = NodeFieldFactory(
                 maybeadd(write, agentnr, func(state, agentid, sim))
             end 
         end,
-        @eval function transition_edges_only!(sim::$simsymbol, func, ::Type{$T})
+        @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
             read::Dict{AgentNr, $T} = sim.nodes_id2read[$typeid](sim)
             for (agentnr::AgentNr, state::$T) in read
                 agentid = agent_id(sim, $typeid, agentnr)
@@ -85,7 +86,7 @@ nff_dict = NodeFieldFactory(
     end, 
 )
 
-#################### Vec
+######################################## Vec
 # for Vectors (immortal agents) we set reuse always fix to 0
 nff_vec = NodeFieldFactory(
     type = (T, _) -> :(Vector{$T}),
@@ -153,7 +154,7 @@ nff_vec = NodeFieldFactory(
                 write[idx] = newstate
             end 
         end
-        @eval function transition_edges_only!(sim::$simsymbol, func, ::Type{$T})
+        @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
             read::Vector{$T} = sim.nodes_id2read[$typeid](sim)
             # an own counter (with the correct type) is faster then enumerate 
             idx = AgentNr(0)
@@ -178,13 +179,6 @@ nff_vec = NodeFieldFactory(
         end
     end,
     
-    
-    # finish_write = (T, _, simsymbol) -> begin
-    #     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
-    #         sim.$(readfield(T)) = deepcopy(sim.$(writefield(T)))
-    #     end
-    # end,
-
     aggregate = (T, _, simsymbol) -> begin
         @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
             mapreduce(f, op, sim.$(readfield(T)); kwargs...)
@@ -243,8 +237,17 @@ nff_distvec = NodeFieldFactory(
 
     agentstate = (T, _, simsymbol) -> begin
         @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
-            @mayassert type_nr(id) == sim.typeinfos.nodes_type2id[$T] AGENTSTATE_MSG 
-            @inbounds sim.$(readfield(T))[agent_nr(id)]
+            @mayassert type_nr(id) == sim.typeinfos.nodes_type2id[$T] AGENTSTATE_MSG
+            r = process_nr(id)
+            if r == mpi.rank
+                @inbounds sim.$(readfield(T))[agent_nr(id)]
+            else
+                win = sim.typeinfos.nodes_attr[$T][:window]
+                as = Vector{$T}(undef, 1)
+                MPI.Get!(as, r, agent_nr(id) - 1, win)
+                MPI.Win_flush(win; rank = r)
+                @inbounds as[1]
+            end
         end
     end,
 
@@ -262,7 +265,7 @@ nff_distvec = NodeFieldFactory(
                 write[idx] = newstate
             end 
         end
-        @eval function transition_edges_only!(sim::$simsymbol, func, ::Type{$T})
+        @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
             read::Vector{$T} = sim.nodes_id2read[$typeid](sim)
             # an own counter (with the correct type) is faster then enumerate 
             idx = AgentNr(0)
@@ -283,24 +286,48 @@ nff_distvec = NodeFieldFactory(
 
     finish_write = (T, _, simsymbol) -> begin
         @eval function finish_write!(sim::$simsymbol, ::Type{$T})
+            # finish the last epoch
+            if haskey(sim.typeinfos.nodes_attr[$T], :window)
+                win = sim.typeinfos.nodes_attr[$T][:window]
+                for rank in 0:(mpi.size-1)
+                    MPI.Win_unlock(win; rank = rank)
+                end
+                MPI.free(win)
+                delete!(sim.typeinfos.nodes_attr[$T], :window)
+            end
             sim.$(readfield(T)) = sim.$(writefield(T))
+            # TODO: Add infokeys
+            win = MPI.Win_create(sim.$(readfield(T)), MPI.COMM_WORLD)
+            sim.typeinfos.nodes_attr[$T][:window] = win
+            for rank in 0:(mpi.size-1)
+                MPI.Win_lock(win; rank = rank, type = :shared, nocheck = true)
+            end
         end
     end,
-    
-    
-    # finish_write = (T, _, simsymbol) -> begin
-    #     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
-    #         sim.$(readfield(T)) = deepcopy(sim.$(writefield(T)))
-    #     end
-    # end,
+
 
     aggregate = (T, _, simsymbol) -> begin
         @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
             mapreduce(f, op, sim.$(readfield(T)); kwargs...)
         end
     end, 
+
+    ## this is not a constructed function
+    register_atexit = (sim, T) -> begin
+        atexit() do
+            if haskey(sim.typeinfos.nodes_attr[T], :window)
+                win = sim.typeinfos.nodes_attr[T][:window]
+                @info "atexit unlocked $T"
+                for rank in 0:(mpi.size-1)
+                    MPI.Win_unlock(win; rank = rank)
+                end
+                MPI.free(win)
+            end
+        end
+    end,
+    
 )
 
 
-nffs = Dict(:Dict => nff_dict, :Vector => nff_vec)
+nffs = Dict(:Dict => nff_dict, :Vector => nff_distvec)
 

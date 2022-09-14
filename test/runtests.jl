@@ -12,10 +12,10 @@ include("core.jl")
 # - and that for immortal agents an exception is throws, when they are added to rebuild
 #include("addexisting.jl")
 
-include("edges.jl")
+# include("edges.jl")
 # runedgestest()
 
-# edgesiterator depends on edges.jl
+# # edgesiterator depends on edges.jl
 # include("edgesiterator.jl")
 
 # include("globals.jl")

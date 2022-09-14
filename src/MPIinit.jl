@@ -12,7 +12,7 @@ end
 const mpi = VMPI(nothing, 0, 0, false)
 
 function mpiinit() 
-    MPI.Init()
+    MPI.Init(;threadlevel = :single)
 
     mpi.comm = MPI.COMM_WORLD
     mpi.rank = MPI.Comm_rank(mpi.comm)

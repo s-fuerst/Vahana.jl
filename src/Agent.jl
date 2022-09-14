@@ -213,5 +213,5 @@ agent is determined at runtime. If the type is known at compile time,
 using [`agentstate`](@ref) is preferable as it improves performance.
 """
 agentstate_flexible(sim, id::AgentID) =
-    sim.nodes_id2read[type_nr(id)](sim)[agent_nr(id)]
+    agentstate(sim, id, sim.typeinfos.nodes_id2type[type_nr(id)])
 
