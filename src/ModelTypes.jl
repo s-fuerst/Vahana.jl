@@ -20,7 +20,6 @@ See also [`construct_model`](@ref),
 Base.@kwdef struct ModelTypes
     edges_attr = Dict{DataType, Dict{Symbol, Any}}()
     edges_types = Vector{DataType}()
-    nodes = Dict{DataType, Symbol}()
     nodes_attr = Dict{DataType, Dict{Symbol, Any}}()
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
@@ -63,9 +62,9 @@ and other bits types.
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
-function register_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
+function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
                       size::Int64 = 0) where T
-    @assert !(Symbol(T) in keys(types.nodes)) "Each type can be added only once"
+    @assert !(Symbol(T) in types.nodes_types) "Each type can be added only once"
     @assert isbitstype(T)
     type_number = length(types.nodes_type2id) + 1
     @assert type_number < MAX_TYPES "Can not add new type, 
@@ -74,15 +73,21 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, C::Symbol = :Dict;
     types.nodes_type2id[T] = type_number
     types.nodes_id2type[type_number] = T
 
-    if fieldcount(T) == 0
-        types.nodes[T] = :Stateless
-    else
-        types.nodes[T] = C
-    end        
-    attr = Dict{Symbol,Any}()
-    types.nodes_attr[T] = attr
+
+    # TODO check traits
+
+    # if fieldcount(T) == 0
+    #     types.nodes[T] = :Stateless
+    # else
+    #     types.nodes[T] = C
+    # end        
+    types.nodes_attr[T] = Dict{Symbol,Any}()
+
+    traits = Set{Symbol}(traits)
+    types.nodes_attr[T][:traits] = traits
+        
     if size > 0
-        attr[:size] = size
+        types.nodes_attr[T][:size] = size
     end
     types
 end

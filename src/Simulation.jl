@@ -17,36 +17,45 @@ same Julia session (as long as `name` is different).
 Returns a [`Model`](@ref) that can be used in [`new_simulation`](@ref) to create 
 a concrete simulation.
 """
-function construct_model(types::ModelTypes, name::String) 
+function construct_model(typeinfos::ModelTypes, name::String) 
     simsymbol = Symbol(name)
     
     edgefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(edgefield_type(T, types.edges_attr[T]))),
-                 :($(edgefield_constructor(T, types.edges_attr[T]))))
+                 :($(Symbol(T, RW))::$(edgefield_type(T, typeinfos.edges_attr[T]))),
+                 :($(edgefield_constructor(T, typeinfos.edges_attr[T]))))
         end 
-        for T in types.edges_types ] |> Iterators.flatten |> collect
+        for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
 
     nodefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(nffs[C].type(T, types))),
-                 :($(nffs[C].constructor(T, types))))
+                 :($(Symbol(T, RW))::$(Vector{T})),
+                 :($(Vector{T}())))
         end 
-        for (T,C) in types.nodes ] |> Iterators.flatten |> collect
+        for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
 
+    # TODO filter immortal
+    nodedied = [
+        map(["_died_read", "_died_write"]) do RW
+            Expr(Symbol("="),
+                 :($(Symbol(T, RW))::$(Vector{Bool})),
+                 :($(Vector{Bool}())))
+        end 
+        for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
+    
     nodeids = [
         Expr(Symbol("="),
              :($(Symbol(T, "_nextid"))::AgentNr),
              :(AgentNr(1)))
-        for (T,_) in types.nodes ]
+        for T in typeinfos.nodes_types ]
 
     nodereuse = [
         Expr(Symbol("="),
              :($(Symbol(T, "_reuse"))::Vector{Reuse}),
              :(Vector{Reuse}()))
-        for (T,_) in types.nodes ]
+        for T in typeinfos.nodes_types ]
     
     fields = Expr(:block,
                   :(modelname::String),
@@ -65,40 +74,34 @@ function construct_model(types::ModelTypes, name::String)
     
     # the true in the second arg makes the struct mutable
     strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)
-
     
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
 
-    # Construct all type specific functions for the edge types
-    for T in types.edges_types
-        construct_edge_functions(T, types.edges_attr[T], simsymbol)
+    # Construct all type specific functions for the edge typeinfos
+    for T in typeinfos.edges_types
+        construct_edge_functions(T, typeinfos.edges_attr[T], simsymbol)
     end
 
-    # Construct all type specific functions for the agent types
-    for (T, C) in types.nodes
-        nffs[C].init_field(T, types, simsymbol) 
-        nffs[C].add_agent(T, types, simsymbol)  
-        nffs[C].agentstate(T, types, simsymbol) 
-        nffs[C].prepare_write(T, types, simsymbol) 
-        nffs[C].transition(T, types, simsymbol) 
-        nffs[C].finish_write(T, types, simsymbol) 
-        nffs[C].aggregate(T, types, simsymbol)
+    # Construct all type specific functions for the agent typeinfos
+    for T in typeinfos.nodes_types
+        construct_agent_functions(T, typeinfos, simsymbol)
     end
 
-    for T in types.nodes_types
-        types.nodes_id2read[types.nodes_type2id[T]] =
+    # TODO check if we still need this, and if this can be moved
+    # to init_field!
+    for T in typeinfos.nodes_types
+        typeinfos.nodes_id2read[typeinfos.nodes_type2id[T]] =
             @eval sim -> sim.$(readfield(Symbol(T)))
-        types.nodes_id2write[types.nodes_type2id[T]] =
+        typeinfos.nodes_id2write[typeinfos.nodes_type2id[T]] =
             @eval sim -> sim.$(writefield(Symbol(T)))
     end
 
-    
     construct_prettyprinting_functions(simsymbol)
 
-    Model(types, name)
+    Model(typeinfos, name)
 end
 
 
@@ -152,9 +155,10 @@ function new_simulation(model::Model,
         init_field!(sim, T)
     end
 
-    for (T, C) in sim.typeinfos.nodes
+    for T in sim.typeinfos.nodes_types
         init_field!(sim, T)
-        nffs[C].register_atexit(sim, T)
+        # TODO: replace this
+ #       nffs[C].register_atexit(sim, T)
     end
 
     sim

@@ -64,10 +64,10 @@ end
 # we use this tests are for the distributed version, in this case
 # the tests should be only run on the rank that the id is currently
 # living
-macro testrank(aid, ex)
+macro onrankof(aid, ex)
     quote
         if Vahana.process_nr($(esc(aid))) == mpi.rank
-            @test($(esc(ex)))
+            $(esc(ex))
         end
     end
 end
@@ -86,46 +86,43 @@ end
     a1id, a2id, a3id = newids(a1id), newids(a2id), newids(a3id)
     avids, avfids = newids(avids), newids(avfids)
     @testset "agentstate" begin
-        @testrank a1id agentstate_flexible(sim, a1id) == ADict(1)
-        @testrank a2id agentstate(sim, a2id, ADict) == ADict(2)
-        @test agentstate(sim, avids[1], AVec) == AVec(1)
-        @testrank avids[1] agentstate(sim, avids[1], AVec) == AVec(1)
-        @testrank avfids[1] agentstate(sim, avfids[1], AVecFixed) == AVecFixed(1)
-        @testrank avids[10] agentstate(sim, avids[10], AVec) == AVec(10)
-        @testrank avfids[10] agentstate(sim, avfids[10], AVecFixed) == AVecFixed(10)
+        @onrankof a1id @test agentstate(sim, a1id, ADict) == ADict(1)
+        @onrankof a1id @test agentstate_flexible(sim, a1id) == ADict(1)
+        @onrankof a1id @test agentstate_flexible(sim, a1id) == ADict(1)
+        @onrankof a2id @test agentstate(sim, a2id, ADict) == ADict(2)
+        @onrankof avids[1] @test agentstate(sim, avids[1], AVec) == AVec(1)
+        @onrankof avfids[1] @test agentstate(sim, avfids[1], AVecFixed) == AVecFixed(1)
+        @onrankof avids[10] @test agentstate(sim, avids[10], AVec) == AVec(10)
+        @onrankof avfids[10] @test agentstate(sim, avfids[10], AVecFixed) == AVecFixed(10)
     #     # calling agentstate with the wrong typ should throw an AssertionError
         @test_throws AssertionError agentstate(sim, a2id, AVec)
         @test_throws AssertionError agentstate(sim, avids[1], ADict)
     end
 
     @testset "edges_to" begin
-        @testrank a1id size(edges_to(sim, a1id, ESDict), 1) == 4
-        @testrank a1id size(edges_to(sim, a1id, ESLDict1), 1) == 10
+        @onrankof a1id @test size(edges_to(sim, a1id, ESDict), 1) == 4
+        @onrankof a1id @test size(edges_to(sim, a1id, ESLDict1), 1) == 10
         # # Check that we can call edges_to also for an empty set of neighbors
-        @testrank a2id edges_to(sim, a2id, ESDict) === nothing
-        @testrank a2id edges_to(sim, a2id, ESLDict1) === nothing
+        @onrankof a2id @test edges_to(sim, a2id, ESDict) === nothing
+        @onrankof a2id @test edges_to(sim, a2id, ESLDict1) === nothing
     end
 
     @testset "neighbors & edgestates" begin
-        @testrank avids[1] length(neighborids(sim, avids[1], ESLDict2)) == 1
-        @testrank avids[10] length(neighborids(sim, avids[10], ESLDict2)) == 1
+        @onrankof avids[1] @test length(neighborids(sim, avids[1], ESLDict2)) == 1
+        @onrankof avids[10] @test length(neighborids(sim, avids[10], ESLDict2)) == 1
 
         @test_throws AssertionError neighborids(sim, a2id, ESLDict2)
 
         edges = edges_to(sim, a1id, ESLDict1)
-        @testrank a1id (edges)[1].from == avids[1]
-        @testrank a1id (edges)[10].from == avids[10]
+        @onrankof a1id @test (edges)[1].from == avids[1]
+        @onrankof a1id @test (edges)[10].from == avids[10]
         edges = neighborids(sim, avids[10], ESLDict2)
-        @testrank avids[10] edges[1] == avfids[10]
+        @onrankof avids[10] @test edges[1] == avfids[10]
     end
 
     @testset "neighborstates" begin
-        if Vahana.process_nr(a1id) == mpi.rank
-            @info "test"
-            @test neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
-        end
-        @testrank a1id neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
-        @testrank a1id neighborstates_flexible(sim, a1id, ESDict)[2] == ADict(3)
+        @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
+        @onrankof a1id @test neighborstates_flexible(sim, a1id, ESDict)[2] == ADict(3)
     end
 
     # working on a deepcopy should be possible and not change the
@@ -135,10 +132,10 @@ end
         add_edge!(copy, a2id, a1id, ESDict(20))
         add_edge!(copy, a2id, avids[1], ESLDict2())
         @test_throws AssertionError add_edge!(copy, a2id, avfids[1], ESLDict2())
-        @testrank a1id size(edges_to(sim, a1id, ESDict), 1) == 4
-        @testrank a1id size(edges_to(copy, a1id, ESDict), 1) == 5
-        @testrank avids[1] size(neighborids(sim, avids[1], ESLDict2), 1) == 1
-        @testrank avids[1] size(neighborids(copy, avids[1], ESLDict2), 1) == 2
+        @onrankof a1id @test size(edges_to(sim, a1id, ESDict), 1) == 4
+        @onrankof a1id @test size(edges_to(copy, a1id, ESDict), 1) == 5
+        @onrankof avids[1] @test size(neighborids(sim, avids[1], ESLDict2), 1) == 1
+        @onrankof avids[1] @test size(neighborids(copy, avids[1], ESLDict2), 1) == 2
     end
     
     @testset "transition" begin
@@ -158,32 +155,32 @@ end
         copydict = deepcopy(copy)
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
                           [ ADict ], [ ESLDict1 ], [])
-        @testrank a1id agentstate(copydict, a1id, ADict) == ADict(sum(1:10) + 1)
+        @onrankof a1id @test agentstate(copydict, a1id, ADict) == ADict(sum(1:10) + 1)
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
                           [ ADict ], [ ESLDict1 ], [])
-        @testrank a1id agentstate(copydict, a1id, ADict) == ADict(2 * sum(1:10) + 1)
+        @onrankof a1id @test agentstate(copydict, a1id, ADict) == ADict(2 * sum(1:10) + 1)
 
         copyvec = deepcopy(copy)
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
                           [ AVec ], [ ESLDict2 ], [])
-        @testrank avids[1] agentstate(copyvec, avids[1], AVec) == AVec(2)
+        @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(2)
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
                           [ AVec ], [ ESLDict2 ], [])
-        @testrank avids[1] agentstate(copyvec, avids[1], AVec) == AVec(3)
+        @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(3)
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
                           [ AVec ], [ ESLDict2 ], [])
-        @testrank avids[1] agentstate(copyvec, avids[1], AVec) == AVec(4)
+        @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(4)
 
         copyvecfix = deepcopy(copy)
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
                           [ AVecFixed ], [ ESLDict1 ], [])
-        @testrank avfids[1] agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(3)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(3)
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
                           [ AVecFixed ], [ ESLDict1 ], [])
-        @testrank avfids[1] agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(5)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(5)
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
                           [ AVecFixed ], [ ESLDict1 ], [])
-        @testrank avfids[1] agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(7)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(7)
 
         # TODO check return nothing (currently only supported by Dicts)
         # apply_transition!(copydict, nothing_transition, [ ADict ], [], [])
@@ -191,10 +188,10 @@ end
     end
 
     @testset "num_neighbors" begin
-        @testrank a1id num_neighbors(sim, a1id, ESDict) == 4
-        @testrank a2id num_neighbors(sim, a2id, ESDict) == 0
+        @onrankof a1id @test num_neighbors(sim, a1id, ESDict) == 4
+        @onrankof a2id @test num_neighbors(sim, a2id, ESDict) == 0
         @test_throws AssertionError num_neighbors(sim, a2id, ESLDict2)
-        @testrank avids[1] num_neighbors(sim, avids[1], ESLDict2) == 1
+        @onrankof avids[1] @test num_neighbors(sim, avids[1], ESLDict2) == 1
     end
 
     # this hack should help that the output is not scrambled

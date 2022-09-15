@@ -1,3 +1,7 @@
+
+
+
+
 Base.@kwdef struct NodeFieldFactory 
     type = (T, _) -> :(Vector{$T})
     constructor = (T, _) -> :(Vector{$T}())
@@ -16,8 +20,7 @@ AGENTSTATE_MSG = "The id of the agent does not match the given type"
 
 # TODO: check if we get a noticeable performance improvment, when we
 # compile this function for each T
-function _get_next_id(sim, T, mortal)
-    reusefield = getproperty(sim, reusefield(T))
+function _get_next_id(sim, T, reusefield, nextidfield, mortal)
     if mortal 
         attrs = sim.typeinfos.nodes_attr[T]
         if length(attrs[:reuseable]) > 0
@@ -29,7 +32,6 @@ function _get_next_id(sim, T, mortal)
         end
     end
     # if immortal or no reusable row was found, use the next row
-    nextidfield = getproperty(sim, nextidfield(T))
     nr = nextidfield
     nextidfield = nextidfield + 1
     if nr > length(reusefield)
@@ -38,7 +40,7 @@ function _get_next_id(sim, T, mortal)
     reusefield[nr] = 0
     (0, nr)
 end
-    
+
 #################### Mortal, Stateless
 # for Vectors (immortal agents) we set reuse always fix to 0
 nff_mortal_stateless = NodeFieldFactory(
@@ -75,15 +77,20 @@ nff_mortal_stateless = NodeFieldFactory(
         if haskey(info.nodes_attr[T], :size)
             # TODO: remove the @eval for the typeids?
             @eval typeid = $info.nodes_type2id[$T]
+            # As the agent is stateless, we store only true or false for living/died.
+            # we track this already in :died, but MPI RMA does not work for
+            # bitvectors
             @eval function add_agent!(sim::$simsymbol, agent::$T)
-                (reuse, nr) = _get_next_id(sim, $T, true)
+                (reuse, nr) = _get_next_id(sim, $T, sim.$(reusefield(T)),
+                                           sim.$(nextidfield(T)), true)
                 @inbounds sim.$(writefield(T))[nr] = true
                 agent_id($typeid, reuse, nr) 
             end
         else
             @eval typeid = $info.nodes_type2id[$T]
             @eval function add_agent!(sim::$simsymbol, agent::$T)
-                (reuse, nr) = _get_next_id(sim, $T, true)
+                (reuse, nr) = _get_next_id(sim, $T, sim.$(reusefield(T)),
+                                           sim.$(nextidfield(T)), true)
                 if nr > length(sim.$(writefield(T)))
                     resize!(sim.$(writefield(T)), nr)
                 end
@@ -121,22 +128,29 @@ nff_mortal_stateless = NodeFieldFactory(
             idx = AgentNr(0)
             for state::$T in read
                 idx += AgentNr(1)
-                newstate = func(state, agent_id(sim, $typeid, idx), sim)
-                if isnothing(newstate)
-                    attrs[:died][idx] = true
-                    push!(attrs[:reuseable], idx)
-                else
-                    write[idx] = newstate
+                # jump over died agents
+                if ! attrs[:died][idx]
+                    newstate = func(state, agent_id(sim, $typeid, idx), sim)
+                    if isnothing(newstate)
+                        attrs[:died][idx] = true
+                        push!(attrs[:reuseable], idx)
+                    else
+                        write[idx] = newstate
+                    end
                 end
             end 
         end
         @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
             read::Vector{$T} = sim.nodes_id2read[$typeid](sim)
+            attrs = sim.typeinfos.nodes_attr[$T]
             # an own counter (with the correct type) is faster then enumerate 
             idx = AgentNr(0)
             for state::$T in read
                 idx += AgentNr(1)
-                func(state, immortal_agent_id($typeid, idx), sim)
+                # jump over died agents
+                if ! attrs[:died][idx]
+                    func(state, immortal_agent_id($typeid, idx), sim)
+                end
             end 
         end
     end,
@@ -328,23 +342,21 @@ nff_mortal = NodeFieldFactory(
         if haskey(info.nodes_attr[T], :size)
             @eval typeid = $info.nodes_type2id[$T]
             @eval function add_agent!(sim::$simsymbol, agent::$T)
-                agentid = sim.$(nextidfield(T))
-                sim.$(nextidfield(T)) = agentid + 1
-                push!(sim.$(reusefield(T)), 0)
-                @inbounds sim.$(writefield(T))[agentid] = agent
-                immortal_agent_id($typeid, agentid)
+                (reuse, nr) = _get_next_id(sim, $T, sim.$(reusefield(T)),
+                                           sim.$(nextidfield(T)), true)
+                @inbounds sim.$(writefield(T))[nr] = agent
+                agent_id($typeid, Reuse(reuse), nr)
             end
         else
             @eval typeid = $info.nodes_type2id[$T]
             @eval function add_agent!(sim::$simsymbol, agent::$T)
-                agentid = sim.$(nextidfield(T))
-                sim.$(nextidfield(T)) = agentid + 1
-                if agentid > size(sim.$(writefield(T)), 1)
-                    resize!(sim.$(writefield(T)), agentid)
+                (reuse, nr) = _get_next_id(sim, $T, sim.$(reusefield(T)),
+                                           sim.$(nextidfield(T)), true)
+                if nr > length(sim.$(writefield(T)))
+                    resize!(sim.$(writefield(T)), nr)
                 end
-                push!(sim.$(reusefield(T)), 0)
-                @inbounds sim.$(writefield(T))[agentid] = agent
-                immortal_agent_id($typeid, agentid)
+                @inbounds sim.$(writefield(T))[nr] = agent
+                agent_id($typeid, Reuse(reuse), nr)
             end
         end
     end,
@@ -371,22 +383,34 @@ nff_mortal = NodeFieldFactory(
         @eval function transition!(sim::$simsymbol, func, ::Type{$T})
             read::Vector{$T} = sim.nodes_id2read[$typeid](sim)
             write::Vector{$T} = sim.nodes_id2write[$typeid](sim)
+            attrs = sim.typeinfos.nodes_attr[$T]
             # an own counter (with the correct type) is faster then enumerate 
             idx = AgentNr(0)
             for state::$T in read
                 idx += AgentNr(1)
-                newstate = func(state, immortal_agent_id($typeid, idx), sim)
-                @mayassert newstate !== nothing "You can not use Vectors for mortal agents" 
-                write[idx] = newstate
+                # jump over died agents
+                if ! attrs[:died][idx]
+                    newstate = func(state, agent_id(sim, $typeid, idx), sim)
+                    if isnothing(newstate)
+                        attrs[:died][idx] = true
+                        push!(attrs[:reuseable], idx)
+                    else
+                        write[idx] = newstate
+                    end
+                end
             end 
         end
         @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
             read::Vector{$T} = sim.nodes_id2read[$typeid](sim)
+            attrs = sim.typeinfos.nodes_attr[$T]
             # an own counter (with the correct type) is faster then enumerate 
             idx = AgentNr(0)
             for state::$T in read
                 idx += AgentNr(1)
-                func(state, immortal_agent_id($typeid, idx), sim)
+                # jump over died agents
+                if ! attrs[:died][idx]
+                    func(state, immortal_agent_id($typeid, idx), sim)
+                end
             end 
         end
     end,
