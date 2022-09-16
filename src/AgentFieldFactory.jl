@@ -1,24 +1,29 @@
-TODO: Rewrite attrs[:died] to read/write 
-
-
 AGENTSTATE_MSG = "The id of the agent does not match the given type"
+
+function _free_win(sim, T, name)
+    if haskey(sim.typeinfos.nodes_attr[T], name)
+        win = sim.typeinfos.nodes_attr[T][name]
+        MPI.free(win)
+        delete!(sim.typeinfos.nodes_attr[T], name)
+    end
+end
+
 
 # attr is sim.typeinfos.nodes_attr[T]
 function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
-    stateless = :Stateless in attr[:traits]
+    stateless = fieldcount(T) == 0
     immortal = :Immortal in attr[:traits]
     checkliving = :CheckLiving in attr[:traits]
     fixedsize = haskey(attr, :size)
     
     _size = if fixedsize 
-        attr[T][:size]
+        attr[:size]
     else
         0
     end
     
-    # TODO: add ::$simsymbol to all functions
-    @eval function init_field!(sim, ::Type{$T})
+    @eval function init_field!(sim::$simsymbol, ::Type{$T})
         sim.$(readfield(T)) = Vector{$T}()
         sim.$(writefield(T)) = Vector{$T}()
         sim.$(reusefield(T)) = Vector{Reuse}()
@@ -28,8 +33,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         if ! $immortal
             attrs = sim.typeinfos.nodes_attr[$T]
             attrs[:reuseable] = Vector{AgentNr}()
-            # we cannot use a bitvector, as MPI RMA does not work with bitvectors
-            attrs[:died] = Vector{Bool}()
+            sim.$(diedreadfield(T)) = Vector{Bool}()
+            sim.$(diedwritefield(T)) = Vector{Bool}()
         end
         if $fixedsize
             resize!(sim.$(writefield(T)), $_size)
@@ -37,7 +42,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $immortal
                 # Strictly speaking they did not die, but they were
                 # also never born
-                fill(attrs[:died], $_size, true)
+                fill(sim.$(diedreadfield(T)), $_size, true)
+                fill(sim.$(diedwritefield(T)), $_size, true)
             end
         end
         nothing
@@ -45,21 +51,19 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     
     typeid = typeinfos.nodes_type2id[T]
 
-    # TODO: check if we get a noticeable performance improvment, when we
-    # move the attrs[:died] etc. to direct sim fields
-    @eval function _get_next_id(sim, ::Type{$T})
+    @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
         reusefield = sim.$(reusefield(T))
         if ! $immortal
-            # TODO: check if we can use attr instead (but does this work with deepcopy?)
-            attrs = sim.typeinfos.nodes_attr[T]
+            # TODO AGENT: check if we can use attr instead (but does this work with deepcopy?)
+            attrs = sim.typeinfos.nodes_attr[$T]
             if length(attrs[:reuseable]) > 0
                 nr = pop!(attrs[:reuseable])
-                # TODO: remove the assertion when we know that this is working
-                @assert attrs[:died][nr]
+                # TODO AGENT: remove the assertion when we know that this is working
+                @assert sim.$(diedwritefield(T))[nr]
                 reuse::UInt64 = reusefield[nr] + 1
-                # TODO: write a test that check this
+                # TODO AGENT: write a test that check this
                 if reuse < 2 ^ BITS_REUSE
-                    attrs[:died][nr] = false
+                    sim.$(diedwritefield(T))[nr] = false
                     reusefield[nr] = reuse
                     return (reuse, nr)
                 end
@@ -73,11 +77,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 resize!(reusefield, nr)
                 resize!(sim.$(writefield(T)), nr)
                 if ! $immortal
-                    resize!(attrs[:died], nr)
+                    resize!(sim.$(diedwritefield(T)), nr)
                 end
             end
         end
-        # TODO: add an assterions that we have ids left
+        # TODO AGENT: add an assterions that we have ids left
         reusefield[nr] = 0
         (0, nr)
     end
@@ -85,23 +89,22 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     # As the agent is stateless, we store only true or false for living/died.
     # we track this already in :died, but MPI RMA does not work for
     # bitvectors
-    @eval function add_agent!(sim, agent::$T)
+    @eval function add_agent!(sim::$simsymbol, agent::$T)
         (reuse, nr) = _get_next_id(sim, $T)
-        @info reuse nr
-        if ! fixedsize
+        if ! $fixedsize
             if nr > length(sim.$(writefield(T)))
                 resize!(sim.$(writefield(T)), nr)
             end
         end
-        if stateless
+        if $stateless
             @inbounds sim.$(writefield(T))[nr] = true
         else
             @inbounds sim.$(writefield(T))[nr] = agent
         end
-        if immortal
+        if $immortal
             immortal_agent_id($typeid, nr)
         else
-            agent_id($typeid, reuse, nr)
+            agent_id($typeid, Reuse(reuse), nr)
         end
     end
 
@@ -113,14 +116,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $immortal && $checkliving
                 attrs = sim.typeinfos.nodes_attr[$T]
                 nr = agent_nr(id)
-                if attrs[:died][nr]
+                if sim.$(diedreadfield(T))[nr]
                     return nothing
                 end
             end
             if $stateless
                 return T()
             end
-            if $immortal
+            if $immortal || ! $checkliving
                 nr = agent_nr(id)
             end
             @inbounds sim.$(readfield(T))[nr]
@@ -139,7 +142,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if $stateless
                 return T()
             end
-            if $immortal 
+            if $immortal || ! $checkliving
                 nr = agent_nr(id)
             end
             win_state = sim.typeinfos.nodes_attr[$T][:window_state]
@@ -161,7 +164,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             idx += AgentNr(1)
             # jump over died agents
             if $checkliving
-                if attrs[:died][idx]
+                if sim.$(diedreadfield(T))[idx]
                     continue
                 end
             end
@@ -171,7 +174,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 write[idx] = newstate
             else
                 if isnothing(newstate)
-                    attrs[:died][idx] = true
+                    sim.$(diedwritefield(T))[idx] = true
                     push!(attrs[:reuseable], idx)
                 else
                     write[idx] = newstate
@@ -182,14 +185,13 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
         read::Vector{$T} = sim.nodes_id2read[$typeid](sim)
-        attrs = sim.typeinfos.nodes_attr[$T]
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
         for state::$T in read
             idx += AgentNr(1)
             # jump over died agents
             if $checkliving
-                if attrs[:died][idx]
+                if sim.$(diedreadfield(T))[idx]
                     continue
                 end
             end
@@ -201,10 +203,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         if $immortal
             @assert add_existing == true
             sim.$(writefield(T)) = deepcopy(sim.$(readfield(T)))
+            sim.$(diedwritefield(T)) = deepcopy(sim.$(diedreadfield(T)))
         else
             if add_existing
                 sim.$(writefield(T)) = deepcopy(sim.$(readfield(T)))
+                sim.$(diedwritefield(T)) = deepcopy(sim.$(diedreadfield(T)))
             else
+                #TODO AGENT: anschauen und auf died achten
+                @assert false 
                 sim.$(writefield(T)) = Vector{$T}()
                 sim.$(reusefield(T)) = Vector{Reuse}()
                 sim.$(nextidfield(T)) = 1
@@ -229,13 +235,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         end
     end
     
-    function _free_win(sim, T, name)
-        if haskey(sim.typeinfos.nodes_attr[T], name)
-            win = sim.typeinfos.nodes_attr[T][name]
-            MPI.free(win)
-            delete!(sim.typeinfos.nodes_attr[T], name)
-        end
-    end
     
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
         attrs = sim.typeinfos.nodes_attr[$T]
@@ -243,12 +242,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         _free_win(sim, $T, :window_died)
         _free_win(sim, $T, :window_state)
         sim.$(readfield(T)) = sim.$(writefield(T))
-        # TODO: Add infokeys
-        win_died = MPI.Win_create(attrs[:died], MPI.COMM_WORLD)
+        # TODO AGENT: Add infokeys
+        win_died = MPI.Win_create(sim.$(diedreadfield(T)), MPI.COMM_WORLD)
         sim.typeinfos.nodes_attr[$T][:window_died] = win_died
 
-        win_state = MPI.Win_create(sim.$(readfield(T)), MPI.COMM_WORLD)
-        sim.typeinfos.nodes_attr[$T][:window_state] = win_state
+        if ! $stateless
+            win_state = MPI.Win_create(sim.$(readfield(T)), MPI.COMM_WORLD)
+            sim.typeinfos.nodes_attr[$T][:window_state] = win_state
+        end
     end
 
 

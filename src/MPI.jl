@@ -77,7 +77,7 @@ function create_structured_send_map(sim, sendmap::Dict{AgentID, ProcessID})
     ssm
 end
 
-
+# TODO AGENTS: send also the died fields
 # Distribute agents of agenttype T to the different PEs. 
 function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     # ST is the transmitted datatype. Beside the state itself (T) we

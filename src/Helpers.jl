@@ -42,11 +42,15 @@ end
 #################### field symbols
 # create symbol for the different fields of an agent/edgetype
 
-writefield(T) = Symbol(T, "_write")
+writefield(T) = Symbol(T, "_state_write")
 
-readfield(T) = Symbol(T, "_read")
+readfield(T) = Symbol(T, "_state_read")
 
 nextidfield(T) = Symbol(T, "_nextid")
 
 reusefield(T) = Symbol(T, "_reuse")
+
+diedwritefield(T) = Symbol(T, "_died_write")
+
+diedreadfield(T) = Symbol(T, "_died_read")
 

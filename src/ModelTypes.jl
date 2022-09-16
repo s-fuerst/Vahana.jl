@@ -74,7 +74,7 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
     types.nodes_id2type[type_number] = T
 
 
-    # TODO check traits
+    # TODO AGENT check traits
 
     # if fieldcount(T) == 0
     #     types.nodes[T] = :Stateless

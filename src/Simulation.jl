@@ -21,7 +21,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
     simsymbol = Symbol(name)
     
     edgefields = [
-        map(["_read", "_write"]) do RW
+        map(["_state_read", "_state_write"]) do RW
             Expr(Symbol("="),
                  :($(Symbol(T, RW))::$(edgefield_type(T, typeinfos.edges_attr[T]))),
                  :($(edgefield_constructor(T, typeinfos.edges_attr[T]))))
@@ -29,14 +29,14 @@ function construct_model(typeinfos::ModelTypes, name::String)
         for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
 
     nodefields = [
-        map(["_read", "_write"]) do RW
+        map(["_state_read", "_state_write"]) do RW
             Expr(Symbol("="),
                  :($(Symbol(T, RW))::$(Vector{T})),
                  :($(Vector{T}())))
         end 
         for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
 
-    # TODO filter immortal
+    # TODO AGENT filter immortal
     nodedied = [
         map(["_died_read", "_died_write"]) do RW
             Expr(Symbol("="),
@@ -69,6 +69,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(initialized::Bool),
                   edgefields...,
                   nodefields...,
+                  nodedied...,
                   nodeids...,
                   nodereuse...)
     
@@ -157,7 +158,7 @@ function new_simulation(model::Model,
 
     for T in sim.typeinfos.nodes_types
         init_field!(sim, T)
-        # TODO: replace this
+        # TODO AGENT: replace this
  #       nffs[C].register_atexit(sim, T)
     end
 
