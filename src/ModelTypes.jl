@@ -1,8 +1,6 @@
 export ModelTypes
 export register_agenttype!, register_edgetype!
 
-
-
 """
     ModelTypes
 
@@ -24,8 +22,6 @@ Base.@kwdef struct ModelTypes
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
-    nodes_id2read::Vector{Function} = Vector{Function}(undef, MAX_TYPES)
-    nodes_id2write::Vector{Function} = Vector{Function}(undef, MAX_TYPES)
 end
 
 """
@@ -75,12 +71,6 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
 
 
     # TODO AGENT check traits
-
-    # if fieldcount(T) == 0
-    #     types.nodes[T] = :Stateless
-    # else
-    #     types.nodes[T] = C
-    # end        
     types.nodes_attr[T] = Dict{Symbol,Any}()
 
     traits = Set{Symbol}(traits)

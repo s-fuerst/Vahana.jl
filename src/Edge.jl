@@ -213,5 +213,3 @@ See also [`apply_transition!`](@ref), [`edges_to`](@ref),
 and [`edgestates`](@ref)
 """
 function has_neighbor(::__MODEL__, id::AgentID, edgetype::Type) end
-
-

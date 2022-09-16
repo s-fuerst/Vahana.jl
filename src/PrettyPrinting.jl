@@ -1,6 +1,3 @@
-_getread(sim, ::Type{T}) where T = getproperty(sim, readfield(Symbol(T)))
-_getwrite(sim, ::Type{T}) where T = getproperty(sim, writefield(Symbol(T)))
-
 ######################################## <: EdgeState
 
 function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
@@ -42,7 +39,7 @@ function construct_prettyprinting_functions(simsymbol)
                     print(io, "\n\t Type $t \
                                with $(_show_num_edges(sim, t)) Edges(s)")
                     if ! (:SingleAgentType in edgetypetraits)
-                        print(io, " for $(_show_length(sim, t)) Agent(s)")
+                        print(io, " for $(_show_length(sim, t, :Edges)) Agent(s)")
                     end
                 end
             end
@@ -90,6 +87,7 @@ end
 
 function _show_collection(iter, max)
     count = 1
+    @info iter max
     for (k, v) in iter
         _printid(k)
         print(" => ")
@@ -148,10 +146,14 @@ end
 
 ######################################## Buffered Collections
 
-
-function _show_length(sim, ::Type{T}) where {T} 
-    read = getproperty(sim, readfield(Symbol(T)))
-    write = getproperty(sim, writefield(Symbol(T)))
+function _show_length(sim, ::Type{T}, what = :Agents) where T
+    if what == :Agents
+        read = readstate(sim, T)
+        write = writestate(sim, T)
+    else
+        read = readedge(sim, T)
+        write = writeedge(sim, T)
+    end
     if !sim.initialized 
         "$(length(read))/$(length(write)) (R/W)"
     else

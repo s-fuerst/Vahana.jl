@@ -331,7 +331,8 @@ by calling suppress_warnings(true) after importing Vahana.
                   _valuetostore(edge))
         end
 
-        @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
+        @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
+                          edgestate::$MT)
             push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
                   _valuetostore(from, edgestate))
         end
@@ -586,6 +587,3 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 end   
-
-
-

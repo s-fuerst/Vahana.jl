@@ -17,20 +17,24 @@ function _printid(id, nrformatted = true)
 end    
 
 
-function show_type(sim, t::Type{T}, what::Symbol; write = false, max = 5) where T
-    readfield = _getread(sim, t)
+function show_type(sim, ::Type{T}, what::Symbol; write = false, max = 5) where T
+    if what == :Agent
+        readfield = readstate(sim, T)
+        writefield = writestate(sim, T)
+    else
+        readfield = readedge(sim, T)
+        writefield = writeedge(sim, T)
+    end
+    @info readfield
     if length(readfield) > 0
         printstyled("Read:\n"; color = :cyan)
-        iter = what == :Agent ? readfield : edges_iterator(sim, t)
-        _show_collection(iter, max)
+        _show_collection(enumerate(readfield), max)
     end
 
     if write
-        writefield = _getwrite(sim, t)
         if length(writefield) > 0
             printstyled("Write:\n"; color = :cyan)
-            iter = what == :Agent ? writefield : edges_iterator(sim, t, false)
-            _show_collection(iter, max)
+            _show_collection(writefield, max)
         end
     end
 end
@@ -52,7 +56,7 @@ show_network(sim, t::Type{T}; kwargs...) where T =
     show_type(sim, t, :Edge; kwargs...)
 
 """
-    show_agents(sim, ::Type{T}) where {T <: Agent}
+    show_agents(sim, ::Type{T}) 
 
 Display (some of) the agents of the type T.
 
@@ -105,7 +109,7 @@ function show_agent(sim,
 
     # find a random agent if no id is given (and no agent will ever have id 0
     if id == 0
-        agents = _getread(sim, t) |> keys
+        agents = readstate(sim, T) |> keys
         
         if length(agents) == 0
             println("No agent of type $T found.")
@@ -137,7 +141,7 @@ function show_agent(sim,
     printstyled("\nNetwork(s):"; color = :cyan)
     for edgeT in sim.typeinfos.edges_types
         edgeTheadershown = false
-        read_container = getproperty(sim, readfield(Symbol(edgeT)))
+        read_container = readedge(sim, edgeT)
         edgetypetraits = sim.typeinfos.edges_attr[edgeT][:traits]
         justcount = :IgnoreFrom in edgetypetraits && :Stateless in edgetypetraits
         
@@ -240,6 +244,7 @@ function show_agent(sim,
             end
         end
     end
+    println()
     id
 end
 
@@ -253,18 +258,19 @@ end
 """
 TODO DOC 
 """
-num_agents(sim, ::Type{T}; write = false) where T = 
+num_agents(sim, ::Type{T}; write = false) where T =
+    #TODO AGENT: we can now implement a method with correct values for
+    #fixed sizes
      write ?
-        length(getproperty(sim, writefield(Symbol(T)))) :
-        length(getproperty(sim, readfield(Symbol(T))))
+        length(writestate(sim, T)) :
+        length(readstate(sim, T))
 
 """
 TODO DOC 
 """
 function do_agents(g, f, sim, ::Type{T}) where T
-    agent_nrs =  keys(getproperty(sim, readfield(Symbol(T))))
     agent_ids = [ agent_id(sim, nr, T)
-                  for nr in agent_nrs]
+                  for nr in keys(@readstate(T))]
     f(g, agent_ids)
 end
 

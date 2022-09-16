@@ -42,15 +42,61 @@ end
 #################### field symbols
 # create symbol for the different fields of an agent/edgetype
 
-writefield(T) = Symbol(T, "_state_write")
+# TODO: adjust edgefieldfactory to macros
+writefield(T) = Symbol(T, "_write")
 
-readfield(T) = Symbol(T, "_state_read")
+readfield(T) = Symbol(T, "_read")
 
-nextidfield(T) = Symbol(T, "_nextid")
+# nextidfield(T) = Symbol(T, "_nextid")
 
-reusefield(T) = Symbol(T, "_reuse")
+macro nextid(T)
+    field = Symbol(T, "_nextid")
+    :( sim.$(field) ) |> esc
+end 
 
-diedwritefield(T) = Symbol(T, "_died_write")
+macro reuse(T)
+    field = Symbol(T, "_reuse")
+    :( sim.$(field) ) |> esc
+end
+reuse(sim, T) = getproperty(sim, Symbol(T, "_reuse"))
 
-diedreadfield(T) = Symbol(T, "_died_read")
+macro died(T)
+    field = Symbol(T, "_died")
+    :( sim.$(field) ) |> esc
+end
 
+macro readstate(T)
+    field = Symbol(T, "_read")
+    :( sim.$(field).state ) |> esc
+end
+readstate(sim, T) = getproperty(sim, Symbol(T, "_read")).state
+
+macro writestate(T)
+    field = Symbol(T, "_write")
+    :( sim.$(field).state ) |> esc
+end
+writestate(sim, T) = getproperty(sim, Symbol(T, "_write")).state
+
+macro readreuseable(T)
+    field = Symbol(T, "_read")
+    :( sim.$(field).reuseable ) |> esc
+end
+
+macro writereuseable(T)
+    field = Symbol(T, "_write")
+    :( sim.$(field).reuseable ) |> esc
+end
+
+
+macro writeedge(T)
+    field = Symbol(T, "_write")
+    :( sim.$(field) ) |> esc
+end
+writeedge(sim, T) =getproperty(sim, Symbol(T, "_write"))
+
+
+macro readedge(T)
+    field = Symbol(T, "_read")
+    :( sim.$(field) ) |> esc
+end
+readedge(sim, T) =getproperty(sim, Symbol(T, "_read"))

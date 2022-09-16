@@ -20,8 +20,8 @@ include("edgesiterator.jl")
 
 include("globals.jl")
 
-include("raster.jl")
+# include("raster.jl")
 
-include("graphs.jl")
+# include("graphs.jl")
 
 include("mpi.jl")

@@ -30,7 +30,7 @@ function edges_iterator(sim, t::DataType, read::Bool = true)
     @assert !(has_trait(sim, t, :Stateless) &&
         has_trait(sim, t, :IgnoreFrom)) 
 
-    field = read ? _getread(sim, t) : _getwrite(sim, t)
+    field = read ? readedge(sim, t) : writeedge(sim, t)
     if length(field) == 0
         # for empty field, we can not detect singleedge, but this is also not
         # necessary as the iteratore will return nothing immediately

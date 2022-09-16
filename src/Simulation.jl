@@ -5,6 +5,15 @@ export apply_transition, apply_transition!
 export param
 export aggregate
 
+# this is mutable, as we assign write -> read in finish_write!
+mutable struct AgentFields{T}
+    state::Vector{T}
+    # This is a Vector of rows (AgentNr) that can be reused for the
+    # next agents. It is redudant to died: died[e in reuseable] == true
+    # Also this field is for immortal agents always just an empty vector
+    reuseable::Vector{AgentNr}
+end
+
 """
     construct_model(types::ModelTypes, name::String)
 
@@ -21,7 +30,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
     simsymbol = Symbol(name)
     
     edgefields = [
-        map(["_state_read", "_state_write"]) do RW
+        map(["_read", "_write"]) do RW
             Expr(Symbol("="),
                  :($(Symbol(T, RW))::$(edgefield_type(T, typeinfos.edges_attr[T]))),
                  :($(edgefield_constructor(T, typeinfos.edges_attr[T]))))
@@ -29,34 +38,31 @@ function construct_model(typeinfos::ModelTypes, name::String)
         for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
 
     nodefields = [
-        map(["_state_read", "_state_write"]) do RW
+        map(["_read", "_write"]) do RW
             Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(Vector{T})),
-                 :($(Vector{T}())))
+                 :($(Symbol(T, RW))::$(AgentFields{T})),
+                 :($(AgentFields{T}(Vector{T}(), Vector{AgentNr}()))))
         end 
         for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
 
-    # TODO AGENT filter immortal
-    nodedied = [
-        map(["_died_read", "_died_write"]) do RW
-            Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(Vector{Bool})),
-                 :($(Vector{Bool}())))
-        end 
-        for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
-    
     nodeids = [
         Expr(Symbol("="),
              :($(Symbol(T, "_nextid"))::AgentNr),
              :(AgentNr(1)))
         for T in typeinfos.nodes_types ]
 
+    nodedied = [
+        Expr(Symbol("="),
+             :($(Symbol(T, "_died"))::Vector{Bool}),
+             :(Vector{Bool}()))
+        for T in typeinfos.nodes_types ]
+    
     nodereuse = [
         Expr(Symbol("="),
              :($(Symbol(T, "_reuse"))::Vector{Reuse}),
              :(Vector{Reuse}()))
         for T in typeinfos.nodes_types ]
-    
+
     fields = Expr(:block,
                   :(modelname::String),
                   :(name::String),
@@ -64,13 +70,11 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(globals::G),
                   :(typeinfos::ModelTypes),
                   :(rasters::Dict{Symbol, Array}),
-                  :(nodes_id2read::Vector{Function}),
-                  :(nodes_id2write::Vector{Function}),
                   :(initialized::Bool),
                   edgefields...,
                   nodefields...,
-                  nodedied...,
                   nodeids...,
+                  nodedied...,
                   nodereuse...)
     
     # the true in the second arg makes the struct mutable
@@ -88,16 +92,8 @@ function construct_model(typeinfos::ModelTypes, name::String)
 
     # Construct all type specific functions for the agent typeinfos
     for T in typeinfos.nodes_types
+        @info "Agent_Functions" T
         construct_agent_functions(T, typeinfos, simsymbol)
-    end
-
-    # TODO check if we still need this, and if this can be moved
-    # to init_field!
-    for T in typeinfos.nodes_types
-        typeinfos.nodes_id2read[typeinfos.nodes_type2id[T]] =
-            @eval sim -> sim.$(readfield(Symbol(T)))
-        typeinfos.nodes_id2write[typeinfos.nodes_type2id[T]] =
-            @eval sim -> sim.$(writefield(Symbol(T)))
     end
 
     construct_prettyprinting_functions(simsymbol)
@@ -148,8 +144,6 @@ function new_simulation(model::Model,
         typeinfos = $(model.types),
         rasters = Dict{Symbol, Array}(),
         initialized = false,
-        nodes_id2read = $(model.types.nodes_id2read),
-        nodes_id2write = $(model.types.nodes_id2write)
     )
 
     for T in sim.typeinfos.edges_types
@@ -216,8 +210,9 @@ function finish_init!(sim;
     else
         idmapping = Dict{AgentID, AgentID}()
         for T in sim.typeinfos.nodes_types
+            @info T keys(readstate(sim, T))
             tid = sim.typeinfos.nodes_type2id[T]
-            for id in keys(_getread(sim, T))
+            for id in keys(readstate(sim, T))
                 aid = agent_id(sim, tid, AgentNr(id))
                 idmapping[remove_reuse(aid)] = aid
             end

@@ -92,7 +92,7 @@ end
 
 @inline function _reuse(sim, typeID, agent_nr)
     T = sim.typeinfos.nodes_id2type[typeID]
-    getproperty(sim, reusefield(Symbol(T)))[agent_nr]
+    reuse(sim, T)[agent_nr]
 end
     
 function agent_id(sim, typeID::TypeID, agent_nr::AgentNr)::AgentID

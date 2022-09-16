@@ -135,7 +135,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 
     # The iterator for the edges depends on the traits of the edgetype
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
-        iter = getproperty(sim, readfield(Symbol(T)))
+        iter = @readedge(T)
         if has_trait(sim, T, :SingleAgentType)
             iter = enumerate(iter)
         end
@@ -199,7 +199,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     # In the case that the edgetype count only the number of edges, write
     # this number directly into the edges container of the receiving PE
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
-        container = getproperty(sim, writefield(Symbol(T)))
+        container = @writeedge(T)
 
         for (to, numedges) in recvbuf.data
             @assert numedges > 0

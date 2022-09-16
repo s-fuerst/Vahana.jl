@@ -297,6 +297,3 @@ function _checkpos(pos::CartesianIndex, dims, periodic)
         end
     end
 end
-
-
-
