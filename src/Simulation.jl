@@ -71,6 +71,8 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(typeinfos::ModelTypes),
                   :(rasters::Dict{Symbol, Array}),
                   :(initialized::Bool),
+                  :(transition::Bool),
+                  :(num_transitions::Int64),
                   edgefields...,
                   nodefields...,
                   nodeids...,
@@ -143,6 +145,8 @@ function new_simulation(model::Model,
         typeinfos = $(model.types),
         rasters = Dict{Symbol, Array}(),
         initialized = false,
+        transition = false,
+        num_transitions = 0,
     )
 
     for T in sim.typeinfos.edges_types
@@ -262,7 +266,7 @@ finish_write!(sim) = t -> finish_write!(sim, t)
 
 
 """
-    apply_transition!(sim, func, compute, networks, rebuild; invariant_compute = false, add_existing = Vector{DataType}())
+    apply_transition!(sim, func, compute, accessible, rebuild; invariant_compute = false, add_existing = Vector{DataType}())
 
 Apply the transition function `func` to the simulation state. 
 
@@ -280,9 +284,10 @@ returned value of the transition function will be ignored.
 with a type that is listed in `compute`, so a method for each of this types
 must be implemented.
 
-`network` is a vector of Edge types. Inside of `func` all the
-functions like [`edges_to`](@ref) that access information about edges
-can be only called when the edge type is in the `network` vector.
+`accessible` is a vector of Agent types. This vector must list all
+Agent types whose state is accessed directly (e.g. via
+[`agentstate`](@ref) or indirectly (e.g. via [`neighborstates`](@ref)
+in the transition function.
 
 `rebuild` is a vector of Agent and/or Edge types. All the instances of
 agents or edges with a type in (`rebuild` - `add_existing`) will be
@@ -298,7 +303,7 @@ See also [`apply_transition`](@ref)
 function apply_transition!(sim,
                     func::Function,
                     compute::Vector,
-                    networks::Vector,
+                    accessible::Vector,
                     rebuild::Vector;
                     invariant_compute = false,
                     add_existing = Vector{DataType}())
@@ -306,6 +311,10 @@ function apply_transition!(sim,
 
     foreach(prepare_write!(sim, [add_existing; compute]), writeable)
 
+    foreach(T -> prepare_mpi!(sim, T), accessible)
+
+    sim.transition = true
+    
     MPI.Barrier(MPI.COMM_WORLD)
     
     if invariant_compute
@@ -319,19 +328,24 @@ function apply_transition!(sim,
     end
 
     MPI.Barrier(MPI.COMM_WORLD)
+
+    foreach(T -> finish_mpi!(sim, T), accessible)
     
     foreach(finish_write!(sim), writeable)
 
+    sim.transition = false
+    sim.num_transitions = sim.num_transitions + 1
+    
     sim
 end
 
 function apply_transition!(func::Function,
                     sim,
                     compute::Vector,
-                    networks::Vector,
+                    accessible::Vector,
                     rebuild::Vector;
                     kwargs ...)
-    apply_transition!(sim, func, compute, networks, rebuild; kwargs ...)
+    apply_transition!(sim, func, compute, accessible, rebuild; kwargs ...)
 end
 
 

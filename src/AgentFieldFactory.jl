@@ -1,38 +1,5 @@
 AGENTSTATE_MSG = "The id of the agent does not match the given type"
 
-function _free_wins(sim, T)
-    # we call in finish_init! finish_write! without prepare_write!
-    # before, so it's possible that the windows are not created
-    # (they are not existing in the initialization phase) 
-    if haskey(sim.typeinfos.nodes_attr[T], :window_died)
-        win = sim.typeinfos.nodes_attr[T][:window_died]
-        MPI.free(win)
-        delete!(sim.typeinfos.nodes_attr[T], :window_died)
-    end
-    if haskey(sim.typeinfos.nodes_attr[T], :window_state)
-        win = sim.typeinfos.nodes_attr[T][:window_state]
-        MPI.free(win)
-        delete!(sim.typeinfos.nodes_attr[T], :window_state)
-    end
-end
-
-function _create_wins(sim, T)
-
-    # TODO AGENT: Add infokeys to create
-    # TODO AGENT: the died field is always the same, we don't have
-    # read and write anymore, so we don't need to create and free it
-    # every transition
-    @assert ! haskey(sim.typeinfos.nodes_attr[T], :window_died)
-    win_died = MPI.Win_create(died(sim, T), MPI.COMM_WORLD)
-    sim.typeinfos.nodes_attr[T][:window_died] = win_died
-
-    if fieldcount(T) > 0
-    @assert ! haskey(sim.typeinfos.nodes_attr[T], :window_state)
-        win_state = MPI.Win_create(readstate(sim, T), MPI.COMM_WORLD)
-        sim.typeinfos.nodes_attr[T][:window_state] = win_state
-    end
-end 
-
 # The died/reuseable stuff is a little bit tricky: We need the died
 # vector to easy check that an agent is still living in agentstate or
 # the transition functions.  But when we want to reuse a row, we do
@@ -172,6 +139,13 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             $type_nr(id) == sim.typeinfos.nodes_type2id[$T]
         end AGENTSTATE_MSG
 
+        @mayassert begin
+            T = $T
+            sim.typeinfos.nodes_attr[$T][:mpi_prepared]
+        end """
+          $T must be in the `accessible` parameter of the transition function.
+        """
+
         r = process_nr(id)
         if r == mpi.rank
             # highest priority: does the agent is still living
@@ -212,8 +186,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $checkliving
                 nr = agent_nr(id)
             end
-            @info "win_state" $T
+            @info "win_state" mpi.rank $T
             win_state = sim.typeinfos.nodes_attr[$T][:window_state]
+            @info "behind state" mpi.rank 
             as = Vector{$T}(undef, 1)
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
             MPI.Get!(as, r, nr - 1, win_state)
@@ -289,7 +264,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 empty!(@readreuseable($T))
             end
         end
-        _create_wins(sim, $T)
         # win_died = MPI.Win_create(@died($T), MPI.COMM_WORLD)
         # sim.typeinfos.nodes_attr[$T][:window_died] = win_died
 
@@ -302,10 +276,43 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
         # finish the last epoch
-        _free_wins(sim, $T)
         @readstate($T) = @writestate($T)
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
         foreach(nr -> @died($T)[nr] = true,  @writereuseable($T)) 
+    end
+
+    @eval function prepare_mpi!(sim, ::Type{$T})
+        # TODO AGENT: Add infokeys to create
+        # TODO AGENT: the died field is always the same, we don't have
+        # read and write anymore, so we don't need to create and free it
+        # every transition
+        @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
+        win_died = MPI.Win_create(died(sim, $T), MPI.COMM_WORLD)
+        sim.typeinfos.nodes_attr[$T][:window_died] = win_died
+
+        if ! $stateless
+            @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_state)
+            @rankonly 1 @info "create" $T
+
+            win_state = MPI.Win_create(readstate(sim, $T), MPI.COMM_WORLD)
+            sim.typeinfos.nodes_attr[$T][:window_state] = win_state
+        end
+
+        sim.typeinfos.nodes_attr[$T][:mpi_prepared] = true
+    end 
+
+    @eval function finish_mpi!(sim, ::Type{$T})
+        win = sim.typeinfos.nodes_attr[$T][:window_died]
+        MPI.free(win)
+        delete!(sim.typeinfos.nodes_attr[$T], :window_died)
+
+        if ! $stateless
+            win = sim.typeinfos.nodes_attr[$T][:window_state]
+            MPI.free(win)
+            delete!(sim.typeinfos.nodes_attr[$T], :window_state)
+        end
+
+        sim.typeinfos.nodes_attr[$T][:mpi_prepared] = false
     end
 
     aggregate = (T, _, simsymbol) -> begin

@@ -117,7 +117,7 @@ end
 
 macro rankonly(rank, ex)
     quote
-        if rank == mpi.rank
+        if $rank == mpi.rank
             $(esc(ex))
         end
     end
