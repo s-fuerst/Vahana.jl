@@ -12,7 +12,7 @@ suppress_warnings(true)
 
 Logging.disable_logging(Logging.Info)
 
-MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
+#MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
 
 # All ids are the initial ids 
 
@@ -84,6 +84,7 @@ function check(ET)
 end
 
 function testforedgetype(ET)
+    @info "testfor" ET
     sim = new_simulation(model, nothing, nothing)
 
     part = Dict{AgentID, UInt32}()
@@ -154,18 +155,11 @@ function testforedgetype(ET)
     apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
 end
 
-
-
-#CurrentEdgeType = MPIEdgeSTsI
 CurrentEdgeType = Nothing
 
 if CurrentEdgeType === Nothing
     for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
-        try testforedgetype(ET)
-        catch e
-            @info mpi.rank e
-            Sys.exit(1)
-        end
+        testforedgetype(ET)
     end
 else
     testforedgetype(MPIEdgeSTI)

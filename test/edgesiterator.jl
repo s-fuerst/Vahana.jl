@@ -22,15 +22,12 @@
             end
         end
 
-#        @info "after adding stuff" eisim
-
         expected = hastrait(ET, "E") ? 10 : 20
         
         @test Vahana.edges_iterator(eisim, ET, false) |> length == expected
         @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length == expected
 
         finish_init!(eisim)
-
             
         @test Vahana.edges_iterator(eisim, ET) |> length == expected
         @test Vahana.edges_iterator(eisim, ET) |> collect |> length == expected

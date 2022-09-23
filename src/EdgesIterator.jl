@@ -26,17 +26,17 @@ end
 Creates an wrapped type for an %EDGETYPE%_read/write field. This type 
 implements the Iterator interface.
 """
-function edges_iterator(sim, t::DataType, read::Bool = true)
+function edges_iterator(sim, t::DataType, r::Bool = true)
     @assert !(has_trait(sim, t, :Stateless) &&
         has_trait(sim, t, :IgnoreFrom)) 
 
-    field = read ? readedge(sim, t) : writeedge(sim, t)
+    field = r ? read(sim, t) : write(sim, t)
     if length(field) == 0
         # for empty field, we can not detect singleedge, but this is also not
         # necessary as the iteratore will return nothing immediately
-        IterEdgesWrapper(sim, t, read, field, false)
+        IterEdgesWrapper(sim, t, r, field, false)
     else
-        IterEdgesWrapper(sim, t, read, field,
+        IterEdgesWrapper(sim, t, r, field,
                          :SingleEdge in sim.typeinfos.edges_attr[t][:traits])
     end
 end

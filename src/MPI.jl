@@ -17,13 +17,14 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
 
     # we also reset the nextid count to 1 for every nodetype
     foreach(node_types) do T
-        setproperty!(sim, nextidfield(T), AgentNr(1))
+        nextid(sim, T) = AgentNr(1)
     end
     
     # We add structure to the simple AgentID -> ProcessID mapping,
     # so that we can combine all agents of the AgentTypes etc.
     ssm = create_structured_send_map(sim, sendmap)
-    
+
+
     # First we send all agentstates and collect the idmapping, as the
     # agent gets an new id in this process. idmapping is a Dict that
     # allows to get the new id when only the old id is known.
@@ -135,7 +136,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 
     # The iterator for the edges depends on the traits of the edgetype
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
-        iter = @readedge(T)
+        iter = read(sim, T)
         if has_trait(sim, T, :SingleAgentType)
             iter = enumerate(iter)
         end
@@ -199,7 +200,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     # In the case that the edgetype count only the number of edges, write
     # this number directly into the edges container of the receiving PE
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
-        container = @writeedge(T)
+        container = write(sim, T)
 
         for (to, numedges) in recvbuf.data
             @assert numedges > 0

@@ -87,7 +87,6 @@ end
 
 function _show_collection(iter, max)
     count = 1
-    @info iter max
     for (k, v) in iter
         _printid(k)
         print(" => ")
@@ -148,16 +147,16 @@ end
 
 function _show_length(sim, ::Type{T}, what = :Agents) where T
     if what == :Agents
-        read = readstate(sim, T)
-        write = writestate(sim, T)
+        r = readstate(sim, T)
+        w = writestate(sim, T)
     else
-        read = readedge(sim, T)
-        write = writeedge(sim, T)
+        r = read(sim, T)
+        w = write(sim, T)
     end
     if !sim.initialized 
-        "$(length(read))/$(length(write)) (R/W)"
+        "$(length(r))/$(length(w)) (R/W)"
     else
-        "$(length(read))"
+        "$(length(r))"
     end
 end
 

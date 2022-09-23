@@ -53,6 +53,7 @@ macro nextid(T)
     field = Symbol(T, "_nextid")
     :( sim.$(field) ) |> esc
 end 
+nextid(sim, T) = getproperty(sim, Symbol(T, "_nextid"))
 
 macro reuse(T)
     field = Symbol(T, "_reuse")
@@ -64,6 +65,7 @@ macro died(T)
     field = Symbol(T, "_died")
     :( sim.$(field) ) |> esc
 end
+died(sim, T) = getproperty(sim, Symbol(T, "_died"))
 
 macro readstate(T)
     field = Symbol(T, "_read")
@@ -88,15 +90,44 @@ macro writereuseable(T)
 end
 
 
-macro writeedge(T)
+macro write(T)
     field = Symbol(T, "_write")
     :( sim.$(field) ) |> esc
 end
-writeedge(sim, T) =getproperty(sim, Symbol(T, "_write"))
+write(sim, T) =getproperty(sim, Symbol(T, "_write"))
 
 
-macro readedge(T)
+macro read(T)
     field = Symbol(T, "_read")
     :( sim.$(field) ) |> esc
 end
-readedge(sim, T) =getproperty(sim, Symbol(T, "_read"))
+read(sim, T) =getproperty(sim, Symbol(T, "_read"))
+
+
+# we use this tests are for the distributed version, in this case
+# the tests should be only run on the rank that the id is currently
+# living
+macro onrankof(aid, ex)
+    quote
+        if Vahana.process_nr($(esc(aid))) == mpi.rank
+            $(esc(ex))
+        end
+    end
+end
+
+macro rankonly(rank, ex)
+    quote
+        if rank == mpi.rank
+            $(esc(ex))
+        end
+    end
+end
+
+macro rootonly(ex)
+    quote
+        if 0 == mpi.rank
+            $(esc(ex))
+        end
+    end
+end
+

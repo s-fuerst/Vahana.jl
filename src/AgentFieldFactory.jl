@@ -1,13 +1,37 @@
 AGENTSTATE_MSG = "The id of the agent does not match the given type"
 
-function _free_win(sim, T, name)
-    if haskey(sim.typeinfos.nodes_attr[T], name)
-        win = sim.typeinfos.nodes_attr[T][name]
+function _free_wins(sim, T)
+    # we call in finish_init! finish_write! without prepare_write!
+    # before, so it's possible that the windows are not created
+    # (they are not existing in the initialization phase) 
+    if haskey(sim.typeinfos.nodes_attr[T], :window_died)
+        win = sim.typeinfos.nodes_attr[T][:window_died]
         MPI.free(win)
-        delete!(sim.typeinfos.nodes_attr[T], name)
+        delete!(sim.typeinfos.nodes_attr[T], :window_died)
+    end
+    if haskey(sim.typeinfos.nodes_attr[T], :window_state)
+        win = sim.typeinfos.nodes_attr[T][:window_state]
+        MPI.free(win)
+        delete!(sim.typeinfos.nodes_attr[T], :window_state)
     end
 end
 
+function _create_wins(sim, T)
+
+    # TODO AGENT: Add infokeys to create
+    # TODO AGENT: the died field is always the same, we don't have
+    # read and write anymore, so we don't need to create and free it
+    # every transition
+    @assert ! haskey(sim.typeinfos.nodes_attr[T], :window_died)
+    win_died = MPI.Win_create(died(sim, T), MPI.COMM_WORLD)
+    sim.typeinfos.nodes_attr[T][:window_died] = win_died
+
+    if fieldcount(T) > 0
+    @assert ! haskey(sim.typeinfos.nodes_attr[T], :window_state)
+        win_state = MPI.Win_create(readstate(sim, T), MPI.COMM_WORLD)
+        sim.typeinfos.nodes_attr[T][:window_state] = win_state
+    end
+end 
 
 # The died/reuseable stuff is a little bit tricky: We need the died
 # vector to easy check that an agent is still living in agentstate or
@@ -31,10 +55,16 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     immortal = :Immortal in attr[:traits]
     checkliving = :CheckLiving in attr[:traits]
     fixedsize = haskey(attr, :size)
-
+    
     # in this case we don't have an active died vector, and
     # therefore we can not check the died status anyway
     if immortal && !fixedsize
+        if checkliving
+            @assert true """
+
+
+            """
+        end
         checkliving = false
     end
     
@@ -46,6 +76,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     # TODO?: better name would be init_agentcontainer! 
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
+        @read($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
+        @write($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
+        @nextid($T) = AgentNr(1)
+        @died($T) = Vector{Bool}()
+        @reuse($T) = Vector{Reuse}()
         if $fixedsize
             resize!(@readstate($T), $_size)
             resize!(@writestate($T), $_size)
@@ -177,8 +212,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $checkliving
                 nr = agent_nr(id)
             end
+            @info "win_state" $T
             win_state = sim.typeinfos.nodes_attr[$T][:window_state]
-            as = Vector{T}(undef, 1)
+            as = Vector{$T}(undef, 1)
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
             MPI.Get!(as, r, nr - 1, win_state)
             MPI.Win_unlock(win_state; rank = r)
@@ -230,42 +266,44 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, ::Type{$T})
-        if $immortal # immortal => add_existing; so we can ignore reuseable
-            @assert add_existing == true 
+        if $immortal 
+            # while distributing the initial graph we also kill immortal agents
+            if sim.initialized == true
+                # TODO: add error message
+                @assert add_existing == true
+            end
+        else
+            @write($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
+        end
+        if add_existing
             @writestate($T) = deepcopy(@readstate($T))
         else
-            # We always only track the newly died agents in reuseable,
-            # see also the longer comment at the top of this file
-            empty!(@writereuseable($T))
-            if add_existing
-                @writestate($T) = deepcopy(@readstate($T))
-            else
-                empty!(@writestate($T))
-                # We restart counting form 1 (but of course reuse will be used)
-                empty!(@readreuseable($T))
-                @nextid($T) = 1
+            if $fixedsize
                 resize!(@writestate($T), $_size)
             end
+            # We restart counting from 1 (but of course reuse will be used)
+            @nextid($T) = 1
+            if ! $immortal
+                # As we start from 1, we empty the reuseable nrs
+                # vector (all are reuseable now)
+                empty!(@readreuseable($T))
+            end
         end
+        _create_wins(sim, $T)
+        # win_died = MPI.Win_create(@died($T), MPI.COMM_WORLD)
+        # sim.typeinfos.nodes_attr[$T][:window_died] = win_died
+
+        # if ! $stateless
+        #     win_state = MPI.Win_create(@readstate($T), MPI.COMM_WORLD)
+        #     sim.typeinfos.nodes_attr[$T][:window_state] = win_state
+        # end
+        
     end
     
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
-        attrs = sim.typeinfos.nodes_attr[$T]
         # finish the last epoch
-        _free_win(sim, $T, :window_died)
-        _free_win(sim, $T, :window_state)
+        _free_wins(sim, $T)
         @readstate($T) = @writestate($T)
-        # TODO AGENT: Add infokeys to create
-        # TODO AGENT: the died field is always the same, we don't have
-        # read and write anymore, so we don't need to create and free it
-        # every transition
-        win_died = MPI.Win_create(@died($T), MPI.COMM_WORLD)
-        attrs[:window_died] = win_died
-
-        if ! $stateless
-            win_state = MPI.Win_create(@readstate($T), MPI.COMM_WORLD)
-            attrs[:window_state] = win_state
-        end
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
         foreach(nr -> @died($T)[nr] = true,  @writereuseable($T)) 
     end

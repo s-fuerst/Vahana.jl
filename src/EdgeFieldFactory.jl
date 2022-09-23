@@ -162,22 +162,25 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     # the size if necessary (for other cases it's again a noop).
     if singletype
         if isbitstype(CT)
-            # for bitstype we must initialize the new memory
+        #for bitstype we must initialize the new memory
             if singletype_size == 0
                 @eval function _check_size!(field, nr::AgentNr, ::Type{$T})
                     s = length(field)
                     if (s < nr)
                         resize!(field, nr)
-                        ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
-                              pointer(field, s+1), 0, (nr-s) * sizeof($CT))
+                        Base.securezero!(view(field, s+1:nr))
+                        # TODO: compare performance with memset
+                       # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
+                        #       pointer(field, s+1), Int8(0), (nr-s) * sizeof($CT))
                     end
                 end
             else
                 @eval function init_field!(sim::$simsymbol, ::Type{$MT})
-                    field = sim.$(writefield(T))
-                    resize!(field, $singletype_size)
-                    ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
-                          pointer(field), 0, $singletype_size * sizeof($CT))
+#                    field = sim.$(writefield(T))
+                    resize!(@write($T), $singletype_size)
+                    Base.securezero!(@write($T))
+                    # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
+                    #       pointer(field), 0, $singletype_size * sizeof($CT))
                 end
                 @eval function _check_size!(_, ::AgentNr, ::Type{$T})
                 end
@@ -185,7 +188,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         else
             if singletype_size == 0
                 @eval function _check_size!(field, nr::AgentNr, ::Type{$T})
-                    s = size(field, 1)
+                    s = length(field)
                     if (s < nr)
                         resize!(field, nr)
                     end

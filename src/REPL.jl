@@ -22,10 +22,10 @@ function show_type(sim, ::Type{T}, what::Symbol; write = false, max = 5) where T
         readfield = readstate(sim, T)
         writefield = writestate(sim, T)
     else
-        readfield = readedge(sim, T)
-        writefield = writeedge(sim, T)
+        readfield = read(sim, T)
+        writefield = write(sim, T)
     end
-    @info readfield
+
     if length(readfield) > 0
         printstyled("Read:\n"; color = :cyan)
         _show_collection(enumerate(readfield), max)
@@ -141,7 +141,7 @@ function show_agent(sim,
     printstyled("\nNetwork(s):"; color = :cyan)
     for edgeT in sim.typeinfos.edges_types
         edgeTheadershown = false
-        read_container = readedge(sim, edgeT)
+        read_container = read(sim, edgeT)
         edgetypetraits = sim.typeinfos.edges_attr[edgeT][:traits]
         justcount = :IgnoreFrom in edgetypetraits && :Stateless in edgetypetraits
         

@@ -111,7 +111,7 @@ function vahanasimplegraph(sim;
     nv = 0
     for t in agenttypes
         tid = sim.typeinfos.nodes_type2id[t]
-        for id in keys(_getread(sim, t))
+        for id in 1:length(readstate(sim, t))
             nv += 1
             aid = agent_id(sim, tid, AgentNr(id))
             push!(g2v, aid)
@@ -215,7 +215,7 @@ function vahanagraph(sim;
     nv = 0
     for T in agenttypes
         tid = sim.typeinfos.nodes_type2id[T]
-        for id in keys(_getread(sim, T))
+        for id in 1:length(readstate(sim, T))
             nv += 1
             aid = agent_id(sim, tid, AgentNr(id))
             push!(g2v, aid)

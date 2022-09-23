@@ -70,12 +70,34 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
     types.nodes_id2type[type_number] = T
 
 
-    # TODO AGENT check traits
     types.nodes_attr[T] = Dict{Symbol,Any}()
 
     traits = Set{Symbol}(traits)
+    for trait in traits
+        @assert trait in [:Immortal, :CheckLiving] """
+
+        The agent type trait $trait is unknown for type $T. The following traits are
+        supported: 
+            :Immortal
+            :CheckLiving
+
+        A fixed (maximal) number of agents can be given via the optional size keyword.
+
+        """
+    end
+
+    if :Immortal in traits && :CheckLiving in traits && size == 0
+        printstyled("""
+
+        The simultaneous use of the :Immortal and :CheckLiving traits
+        is only possible if the maximum number of agents is also
+        specified via the size keyword.
+
+        """; color = :red)
+    end
+
     types.nodes_attr[T][:traits] = traits
-        
+    
     if size > 0
         types.nodes_attr[T][:size] = size
     end

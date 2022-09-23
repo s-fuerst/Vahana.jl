@@ -92,7 +92,6 @@ function construct_model(typeinfos::ModelTypes, name::String)
 
     # Construct all type specific functions for the agent typeinfos
     for T in typeinfos.nodes_types
-        @info "Agent_Functions" T
         construct_agent_functions(T, typeinfos, simsymbol)
     end
 
@@ -189,12 +188,13 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
 """
 function finish_init!(sim;
                distribute = mpi.size > 1,
-               partition = Dict{AgentID, ProcessID}()) 
+               partition = Dict{AgentID, ProcessID}())
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
     idmapping = if distribute 
         @assert mpi.size > 1
+        # we are creating an own partition only when no partition is given
         if length(partition) == 0 && mpi.isroot
             @info "Partitioning the Simulation"
             vsg = vahanasimplegraph(sim; show_ignorefrom_warning = false)
@@ -210,7 +210,6 @@ function finish_init!(sim;
     else
         idmapping = Dict{AgentID, AgentID}()
         for T in sim.typeinfos.nodes_types
-            @info T keys(readstate(sim, T))
             tid = sim.typeinfos.nodes_type2id[T]
             for id in keys(readstate(sim, T))
                 aid = agent_id(sim, tid, AgentNr(id))

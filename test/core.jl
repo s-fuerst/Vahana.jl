@@ -1,8 +1,27 @@
+import Vahana.@onrankof
+
+
 # A for Agent, one type per difference container type
 struct ADict     foo::Int64 end
 struct AVec      foo::Int64 end
 struct AVecFixed foo::Int64 end
 struct ASLDict end
+
+function create_mpi_wins(sim)
+    Vahana._create_wins(sim, ADict)
+    Vahana._create_wins(sim, AVec)
+    Vahana._create_wins(sim, AVecFixed)
+    Vahana._create_wins(sim, ASLDict)
+end
+
+function free_mpi_wins(sim)
+    Vahana._free_wins(sim, ADict)
+    Vahana._free_wins(sim, AVec)
+    Vahana._free_wins(sim, AVecFixed)
+    Vahana._free_wins(sim, ASLDict)
+end
+
+
 
 # ES = EdgeState and ESL = EdgeStateless
 struct ESDict  foo::Int64 end
@@ -11,8 +30,8 @@ struct ESLDict2 end
 
 model = ModelTypes() |>
     register_agenttype!(ADict) |>
-    register_agenttype!(AVec, :Vector) |>
-    register_agenttype!(AVecFixed, :Vector; size = 10) |>
+    register_agenttype!(AVec, :Immortal) |>
+    register_agenttype!(AVecFixed, :Immortal; size = 10) |>
     register_agenttype!(ASLDict) |>
     register_edgetype!(ESDict) |>
     register_edgetype!(ESLDict1) |> 
@@ -61,16 +80,6 @@ function nothing_transition(agent, id, sim)
     nothing
 end
 
-# we use this tests are for the distributed version, in this case
-# the tests should be only run on the rank that the id is currently
-# living
-macro onrankof(aid, ex)
-    quote
-        if Vahana.process_nr($(esc(aid))) == mpi.rank
-            $(esc(ex))
-        end
-    end
-end
 
 @testset "Core" begin
     sim = new_simulation(model, nothing, nothing)
@@ -121,8 +130,12 @@ end
     end
 
     @testset "neighborstates" begin
-        @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AVec)[1] == AVec(1)
-        @onrankof a1id @test neighborstates_flexible(sim, a1id, ESDict)[2] == ADict(3)
+        create_mpi_wins(sim)
+        @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AVec)[1] ==
+            AVec(1)
+        @onrankof a1id @test neighborstates_flexible(sim, a1id, ESDict)[2] ==
+            ADict(3)
+        free_mpi_wins(sim)
     end
 
     # working on a deepcopy should be possible and not change the
@@ -155,32 +168,58 @@ end
         copydict = deepcopy(copy)
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
                           [ ADict ], [ ESLDict1 ], [])
-        @onrankof a1id @test agentstate(copydict, a1id, ADict) == ADict(sum(1:10) + 1)
+        create_mpi_wins(sim)
+        @onrankof a1id @test agentstate(copydict, a1id, ADict) ==
+            ADict(sum(1:10) + 1)
+        free_mpi_wins(sim)
+        
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
                           [ ADict ], [ ESLDict1 ], [])
-        @onrankof a1id @test agentstate(copydict, a1id, ADict) == ADict(2 * sum(1:10) + 1)
+        create_mpi_wins(sim)
+        @onrankof a1id @test agentstate(copydict, a1id, ADict) ==
+            ADict(2 * sum(1:10) + 1)
+        free_mpi_wins(sim)
 
         copyvec = deepcopy(copy)
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
                           [ AVec ], [ ESLDict2 ], [])
+        create_mpi_wins(sim)
         @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(2)
+        free_mpi_wins(sim)
+
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
                           [ AVec ], [ ESLDict2 ], [])
+        create_mpi_wins(sim)
         @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(3)
+        free_mpi_wins(sim)
+
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
                           [ AVec ], [ ESLDict2 ], [])
+        create_mpi_wins(sim)
         @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(4)
+        free_mpi_wins(sim)
 
         copyvecfix = deepcopy(copy)
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
                           [ AVecFixed ], [ ESLDict1 ], [])
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(3)
+        create_mpi_wins(sim)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) ==
+            AVecFixed(3)
+        free_mpi_wins(sim)
+
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
                           [ AVecFixed ], [ ESLDict1 ], [])
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(5)
+        create_mpi_wins(sim)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) ==
+            AVecFixed(5)
+        free_mpi_wins(sim)
+
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
                           [ AVecFixed ], [ ESLDict1 ], [])
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) == AVecFixed(7)
+        create_mpi_wins(sim)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) ==
+            AVecFixed(7)
+        free_mpi_wins(sim)
 
         # TODO check return nothing (currently only supported by Dicts)
         # apply_transition!(copydict, nothing_transition, [ ADict ], [], [])
