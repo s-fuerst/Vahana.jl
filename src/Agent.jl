@@ -62,6 +62,7 @@ const shift_type = BITS_PROCESS + BITS_REUSE + BITS_AGENTNR
 
 function agent_id(typeID::TypeID, reuse::Reuse, agent_nr::AgentNr)::AgentID
     @mayassert typeID <= 2 ^ BITS_TYPE
+    @mayassert reuse <= 2 ^ BITS_REUSE
     @mayassert agent_nr <= 2 ^ BITS_AGENTNR
     AgentID(typeID) << shift_type +
         mpi.rank << (BITS_REUSE + BITS_AGENTNR) +
@@ -90,24 +91,8 @@ function agent_id(typeID::Int64, reuse::Int64, agent_nr::Int64)::AgentID
     agent_id(TypeID(typeID), Reuse(reuse), AgentNr(agent_nr))
 end
 
-@inline function _reuse(sim, typeID, agent_nr)
-    T = sim.typeinfos.nodes_id2type[typeID]
-    reuse(sim, T)[agent_nr]
-end
-    
-function agent_id(sim, typeID::TypeID, agent_nr::AgentNr)::AgentID
-    agent_id(typeID, _reuse(sim, typeID, agent_nr), agent_nr)
-end
-
-function agent_id(sim, agent_nr::AgentNr, ::Type{T}) where T
-    typeID = sim.typeinfos.nodes_type2id[T]
-    agent_id(typeID, _reuse(sim, typeID, agent_nr), agent_nr)
-end
-
-function agent_id(sim, agent_nr::Int64, ::Type{T}) where T
-    typeID = sim.typeinfos.nodes_type2id[T]
-    agent_id(typeID, _reuse(sim, typeID, agent_nr), AgentNr(agent_nr))
-end
+# there are other agent_id functions specialized for each AgentType constructed
+# via the construct_agent_functions
 
 function type_nr(id::AgentID)::TypeID
     id >> (BITS_PROCESS + BITS_REUSE + BITS_AGENTNR)

@@ -153,13 +153,19 @@ function testforedgetype(ET)
     apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
 end
 
-CurrentEdgeType = Nothing
+@testset "EdgeTypes" begin
+    CurrentEdgeType = Nothing
 
-if CurrentEdgeType === Nothing
-    for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
-        testforedgetype(ET)
+    if CurrentEdgeType === Nothing
+        for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
+            testforedgetype(ET)
+        end
+    else
+        testforedgetype(MPIEdgeSTI)
+        testforedgetype(CurrentEdgeType)
     end
-else
-    testforedgetype(MPIEdgeSTI)
-    testforedgetype(CurrentEdgeType)
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
+
+

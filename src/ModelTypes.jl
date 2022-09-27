@@ -56,6 +56,8 @@ and other bits types.
     to ignore this for now.
 
 
+TODO DOC traits
+
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
 function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
@@ -69,27 +71,26 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
     types.nodes_type2id[T] = type_number
     types.nodes_id2type[type_number] = T
 
-
     types.nodes_attr[T] = Dict{Symbol,Any}()
 
     traits = Set{Symbol}(traits)
     for trait in traits
-        @assert trait in [:Immortal, :CheckLiving] """
+        @assert trait in [:Immortal, :Unsecure] """
 
         The agent type trait $trait is unknown for type $T. The following traits are
         supported: 
             :Immortal
-            :CheckLiving
+            :Unsecure
 
         A fixed (maximal) number of agents can be given via the optional size keyword.
 
         """
     end
 
-    if :Immortal in traits && :CheckLiving in traits && size == 0
+    if :Immortal in traits && :Unsecure in traits && size == 0
         printstyled("""
 
-        The simultaneous use of the :Immortal and :CheckLiving traits
+        The simultaneous use of the :Immortal and :Unsecure traits
         is only possible if the maximum number of agents is also
         specified via the size keyword.
 
@@ -109,8 +110,8 @@ end
 
 register_agenttype!(t::Type{T}) where T = types -> register_agenttype!(types, t) 
 
-register_agenttype!(t::Type{T}, c::Symbol; kwargs...) where T =
-    types -> register_agenttype!(types, t, c; kwargs...) 
+register_agenttype!(t::Type{T}, traits...; kwargs...) where T =
+    types -> register_agenttype!(types, t, traits...; kwargs...) 
 
 
 show_single_edge_and_type_warning = true

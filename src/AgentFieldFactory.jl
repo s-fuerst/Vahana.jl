@@ -12,28 +12,21 @@
 # died not seperated for read and write, as died is only used 
 # in the read actions and updated in finish_write!
 
-# attr is sim.typeinfos.nodes_attr[T]
 function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
     # in the case that the AgentType is stateless, we only check
     # in mpi calls the value of the died entry
     stateless = fieldcount(T) == 0
     immortal = :Immortal in attr[:traits]
-    checkliving = :CheckLiving in attr[:traits]
+    checkliving = ! (:Unsecure in attr[:traits])
     fixedsize = haskey(attr, :size)
     
     # in this case we don't have an active died vector, and
     # therefore we can not check the died status anyway
-    if immortal && !fixedsize
-        if checkliving
-            @assert true """
-
-
-            """
-        end
+    if immortal && ! fixedsize
         checkliving = false
     end
-    
+
     _size = if fixedsize 
         attr[:size]
     else
@@ -52,7 +45,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             resize!(@writestate($T), $_size)
             resize!(@reuse($T), $_size)
             fill!(@reuse($T), 0)
-            if ! $immortal
+            if $checkliving
                 resize!(@died($T), $_size)
                 # Strictly speaking they did not die, but they were
                 # also never born
@@ -65,11 +58,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     typeid = typeinfos.nodes_type2id[T]
 
     @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
-        @info "in _get_next" $immortal
         if ! $immortal
-            @info "check length" @readreuseable($T)
             if length(@readreuseable($T)) > 0
-                @info "something is reuseable"
                 nr = pop!(@readreuseable($T))
                 # TODO AGENT: remove the assertion when we know that
                 # this is working
@@ -83,10 +73,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                     # cast it back to the correct type
                     reuse = Reuse(reuse)
                     @reuse($T)[nr] = reuse
-                    @info "reused" reuse nr
                     return (reuse, nr)
                 else
-                    @info "call recursive"
                     _get_next_id(sim, $T)
                 end
             end
@@ -99,10 +87,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if nr > length(@reuse($T))
                 resize!(@reuse($T), nr)
                 @reuse($T)[nr] = 0
-                resize!(@writestate($T), nr)
-                if ! $immortal
+                if $checkliving
                     resize!(@died($T), nr)
                 end
+            end
+            if nr > length(@writestate($T))
+                resize!(@writestate($T), nr)
             end
         end
         (0, nr)
@@ -114,13 +104,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         `finish_init!` is called) or within a transition function called by
         `apply_transition`.
         """
-        @info "in add_agent!"
         (reuse, nr) = _get_next_id(sim, $T)
-        if ! $fixedsize
-            if nr > length(@writestate($T))
-                resize!(@writestate($T), nr)
-            end
-        end
         @inbounds @writestate($T)[nr] = agent
         if $immortal
             immortal_agent_id($typeid, nr)
@@ -154,7 +138,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
             # if it's living, but has no state, we can return directly
             if $stateless
-                return T()
+                return $T()
             end
             # we haven't calculate nr in the !checkliving case
             # but need it now (maybe the compiler is clever enough
@@ -192,18 +176,21 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         end
     end
 
+    @eval agent_id(sim::$simsymbol, agent_nr, ::Type{$T}) =
+        agent_id($typeid, @reuse($T)[agent_nr], agent_nr)
+    
     @eval function transition!(sim::$simsymbol, func, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
             # jump over died agents
-            if $checkliving
+            if ! $immortal
                 if @died($T)[idx]
                     continue
                 end
             end
-            newstate = func(state, agent_id(sim, $typeid, idx), sim)
+            newstate = func(state, agent_id(sim, idx, $T), sim)
             if $immortal
                 @mayassert begin
                     newstate !== nothing
@@ -224,13 +211,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         idx = AgentNr(0)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
-            # jump over died agents
-            if $checkliving
-                if @died(T)[idx]
+            if ! $immortal
+                if @died($T)[idx]
                     continue
                 end
             end
-            func(state, agent_id(sim, $typeid, idx), sim)
+            func(state, agent_id(sim, idx, $T), sim)
         end 
     end
 
@@ -238,7 +224,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         if $immortal 
             # while distributing the initial graph we also kill immortal agents
             if sim.initialized == true
-                # TODO: add error message
                 @assert begin
                     T = $T
                     add_existing == true
@@ -300,9 +285,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         sim.typeinfos.nodes_attr[$T][:mpi_prepared] = false
     end
 
-    aggregate = (T, _, simsymbol) -> begin
-        @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
-            mapreduce(f, op, sim.$(readfield(T)); kwargs...)
-        end
-    end
-end
+    # @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
+    #     mapreduce(f, op, sim.$(readfield(T)); kwargs...)
+    # end
+ end

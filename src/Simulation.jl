@@ -218,7 +218,7 @@ function finish_init!(sim;
         for T in sim.typeinfos.nodes_types
             tid = sim.typeinfos.nodes_type2id[T]
             for id in keys(readstate(sim, T))
-                aid = agent_id(sim, tid, AgentNr(id))
+                aid = agent_id(sim, AgentNr(id), T)
                 idmapping[remove_reuse(aid)] = aid
             end
         end

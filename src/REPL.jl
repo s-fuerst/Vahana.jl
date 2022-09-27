@@ -23,7 +23,7 @@ function show_type(sim, ::Type{T}, what::Symbol; write = false, max = 5) where T
         writefield = writestate(sim, T)
     else
         readfield = read(sim, T)
-        writefield = write(sim, T)
+        writefield = Vahana.write(sim, T)
     end
 
     if length(readfield) > 0
@@ -123,7 +123,7 @@ function show_agent(sim,
     # id can be always the local nr, so we first ensure that id
     # is the complete agent_id
     if id <= typemax(AgentNr)
-        id = agent_id(sim, sim.typeinfos.nodes_type2id[T], UInt32(id))
+        id = agent_id(sim, UInt32(id), T)
     end
     # first we print the id of the agent and the state of the agent
     printstyled("Id / Local Nr: "; color = :cyan)
@@ -160,7 +160,7 @@ function show_agent(sim,
             T == sim.typeinfos.edges_attr[edgeT][:to_agenttype])
             # unify the agentid. For vector (:SingleAgent) types, this must
             # be the index, and for dict types, the AgentID
-            aid = agent_id(sim, sim.typeinfos.nodes_type2id[T], agent_nr(id))
+            aid = agent_id(sim, agent_nr(id), T)
             nid = :SingleAgentType in edgetypetraits ? agent_nr(id) : aid
             # check that this agent has some edges
             if nid in filter(id -> type_nr(AgentID(id)) == typeid,

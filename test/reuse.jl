@@ -1,9 +1,7 @@
 struct ReuseAgent end
 
-CHECKLIVING verbessern und überdenken (besser in der anderen Reihenfolge)
-
 sim = ModelTypes() |>
-    register_agenttype!(ReuseAgent, :CheckLiving) |>
+    register_agenttype!(ReuseAgent) |>
     construct_model("Reuse2") |> 
     new_simulation(nothing, nothing)
 
