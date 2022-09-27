@@ -1,4 +1,10 @@
+# for whatever reason there is a pipline error when MPI.Init() is called before
+# run(`mpiexec ...`), so first the mpi versions of the tests are called, before
+# the single threaded versions. 
+#include("mpi.jl")
+
 using Vahana
+
 using Test
 
 enable_asserts(true)
@@ -7,15 +13,14 @@ suppress_warnings(true)
 
 include("core.jl")
 
-# TODO, when we have MPI-Agents supported:
-# - check that addexisting works for the default case
-# - and that for immortal agents an exception is throws, when they are added to rebuild
-#include("addexisting.jl")
+include("addexisting.jl")
+
+include("reuse.jl")
 
 include("edges.jl")
-runedgestest()
+#runedgestest()
 
-# edgesiterator depends on edges.jl
+#edgesiterator depends on edges.jl
 include("edgesiterator.jl")
 
 # include("globals.jl")
@@ -24,4 +29,3 @@ include("edgesiterator.jl")
 
 # include("graphs.jl")
 
-#include("mpi.jl")

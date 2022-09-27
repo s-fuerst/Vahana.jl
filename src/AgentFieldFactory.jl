@@ -1,23 +1,22 @@
-AGENTSTATE_MSG = "The id of the agent does not match the given type"
-
 # The died/reuseable stuff is a little bit tricky: We need the died
 # vector to easy check that an agent is still living in agentstate or
 # the transition functions.  But when we want to reuse a row, we do
 # not want to iterate over the died vector until we found a true
 # value.  As people that are dying, are dead at step t+1 and not at
-# step t, we can not set the died flag for step t. Instead we add
-# this information to write.reuseable, which starts in an interation
-# always empty and only contains the rows of agents that died
-# at step t.
-# In finish_write! we then merge read.reuseable and write.reusable to
+# step t, we can not set the died flag for step t. Instead we add this
+# information to write.reuseable, which starts in an interation always
+# empty and only contains the rows of agents that died at step t.  In
+# finish_write! we then merge read.reuseable and write.reusable to
 # read.reuseable and set all the died flags to true for the
 # write.reusable entries. This (hopefully) also expains, why we have
-# died not seperated for read and write, as died is only used in read
-# actions and updated in finish_write!
+# died not seperated for read and write, as died is only used 
+# in the read actions and updated in finish_write!
 
 # attr is sim.typeinfos.nodes_attr[T]
 function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
+    # in the case that the AgentType is stateless, we only check
+    # in mpi calls the value of the died entry
     stateless = fieldcount(T) == 0
     immortal = :Immortal in attr[:traits]
     checkliving = :CheckLiving in attr[:traits]
@@ -66,8 +65,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     typeid = typeinfos.nodes_type2id[T]
 
     @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
+        @info "in _get_next" $immortal
         if ! $immortal
+            @info "check length" @readreuseable($T)
             if length(@readreuseable($T)) > 0
+                @info "something is reuseable"
                 nr = pop!(@readreuseable($T))
                 # TODO AGENT: remove the assertion when we know that
                 # this is working
@@ -78,12 +80,18 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 # TODO AGENT: write a test that check this
                 if reuse < 2 ^ BITS_REUSE
                     @died($T)[nr] = false
-                    @reuse($T)[nr] = reuse |> Reuse
+                    # cast it back to the correct type
+                    reuse = Reuse(reuse)
+                    @reuse($T)[nr] = reuse
+                    @info "reused" reuse nr
                     return (reuse, nr)
+                else
+                    @info "call recursive"
+                    _get_next_id(sim, $T)
                 end
             end
         end
-        # not immortal or no reusable row was found, use the next row
+        # immortal or no reusable row was found, use the next row
         nr = @nextid($T)
         # TODO AGENT: add an assterions that we have ids left
         @nextid($T) = nr + 1
@@ -97,36 +105,23 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 end
             end
         end
-        if $immortal
-            return (0, nr)
-        else
-            reuse = @reuse($T)[nr] |> UInt64
-            reuse = reuse + 1
-            # TODO AGENT: write a test that check this
-            if reuse < 2 ^ BITS_REUSE
-                @died($T)[nr] = false
-                @reuse($T)[nr] = reuse |> Reuse
-                return (reuse, nr)
-            end
-            _get_next_id(sim, $T)
-        end
+        (0, nr)
     end
     
-    # As the agent is stateless, we store only true or false for living/died.
-    # we track this already in :died, but MPI RMA does not work for
-    # bitvectors
     @eval function add_agent!(sim::$simsymbol, agent::$T)
+        @mayassert sim.initialized == false || sim.transition """
+        You can call add_agent! only in the initialization phase (until
+        `finish_init!` is called) or within a transition function called by
+        `apply_transition`.
+        """
+        @info "in add_agent!"
         (reuse, nr) = _get_next_id(sim, $T)
         if ! $fixedsize
             if nr > length(@writestate($T))
                 resize!(@writestate($T), nr)
             end
         end
-        if $stateless
-            @inbounds @writestate($T)[nr] = true
-        else
-            @inbounds @writestate($T)[nr] = agent
-        end
+        @inbounds @writestate($T)[nr] = agent
         if $immortal
             immortal_agent_id($typeid, nr)
         else
@@ -137,7 +132,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
         @mayassert begin
             $type_nr(id) == sim.typeinfos.nodes_type2id[$T]
-        end AGENTSTATE_MSG
+        end "The id of the agent does not match the given type"
 
         @mayassert begin
             T = $T
@@ -151,7 +146,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             # highest priority: does the agent is still living
             if $checkliving
                 nr = agent_nr(id)
-                if @died($T)[nr]
+                # TODO AGENT: increase reuse in finish_write,
+                # then we can remove the died memory access here
+                if @died($T)[nr] || @reuse($T)[nr] > reuse_nr(id)
                     return nothing
                 end
             end
@@ -186,9 +183,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $checkliving
                 nr = agent_nr(id)
             end
-            @info "win_state" mpi.rank $T
             win_state = sim.typeinfos.nodes_attr[$T][:window_state]
-            @info "behind state" mpi.rank 
             as = Vector{$T}(undef, 1)
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
             MPI.Get!(as, r, nr - 1, win_state)
@@ -204,7 +199,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             idx += AgentNr(1)
             # jump over died agents
             if $checkliving
-                if @died(T)[idx]
+                if @died($T)[idx]
                     continue
                 end
             end
@@ -216,7 +211,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 @writestate($T)[idx] = newstate
             else
                 if isnothing(newstate)
-                    @died(T)[idx] = true
                     push!(@writereuseable($T), idx)
                 else
                     @writestate($T)[idx] = newstate
@@ -245,7 +239,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             # while distributing the initial graph we also kill immortal agents
             if sim.initialized == true
                 # TODO: add error message
-                @assert add_existing == true
+                @assert begin
+                    T = $T
+                    add_existing == true
+                end "You cannot rebuild $T because it has the trait :Immortal."
             end
         else
             @write($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
@@ -259,19 +256,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             # We restart counting from 1 (but of course reuse will be used)
             @nextid($T) = 1
             if ! $immortal
-                # As we start from 1, we empty the reuseable nrs
+                # As we start from 1, we empty the reuseable `nr`
                 # vector (all are reuseable now)
                 empty!(@readreuseable($T))
             end
         end
-        # win_died = MPI.Win_create(@died($T), MPI.COMM_WORLD)
-        # sim.typeinfos.nodes_attr[$T][:window_died] = win_died
-
-        # if ! $stateless
-        #     win_state = MPI.Win_create(@readstate($T), MPI.COMM_WORLD)
-        #     sim.typeinfos.nodes_attr[$T][:window_state] = win_state
-        # end
-        
     end
     
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
@@ -283,16 +272,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     @eval function prepare_mpi!(sim, ::Type{$T})
         # TODO AGENT: Add infokeys to create
-        # TODO AGENT: the died field is always the same, we don't have
-        # read and write anymore, so we don't need to create and free it
-        # every transition
         @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
         win_died = MPI.Win_create(died(sim, $T), MPI.COMM_WORLD)
         sim.typeinfos.nodes_attr[$T][:window_died] = win_died
 
         if ! $stateless
             @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_state)
-            @rankonly 1 @info "create" $T
 
             win_state = MPI.Win_create(readstate(sim, $T), MPI.COMM_WORLD)
             sim.typeinfos.nodes_attr[$T][:window_state] = win_state

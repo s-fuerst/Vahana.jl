@@ -2,7 +2,7 @@ struct ComputeAgent end
 struct ConstructedAgent end
 struct Connection end
 
-function test_for_model(model)
+function test_model(model)
     sim = new_simulation(model)
 
     computeid = add_agent!(sim, ComputeAgent())
@@ -48,6 +48,25 @@ function test_for_model(model)
     @test num_edges(sim, Connection) == 1
 end
 
+function test_assertion(model)
+    sim = new_simulation(model)
+
+    computeid = add_agent!(sim, ComputeAgent())
+    constructedid = add_agent!(sim, ConstructedAgent())
+    add_edge!(sim, constructedid, computeid, Connection())
+
+    finish_init!(sim)
+
+    @test_throws AssertionError apply_transition!(sim,
+                                                  [ ComputeAgent ],
+                                                  [],
+                                                  [ ConstructedAgent,
+                                                    Connection ]) do state, _, _
+        state
+    end
+end
+
+
 @testset "addexisiting" begin
     model = ModelTypes() |>
         register_agenttype!(ComputeAgent) |>
@@ -55,14 +74,22 @@ end
         register_edgetype!(Connection) |>
         construct_model("Test add_existing")
 
-    test_for_model(model)
+    test_model(model)
 
-    model_vec = ModelTypes() |>
-        register_agenttype!(ComputeAgent) |>
-        register_agenttype!(ConstructedAgent, :Vector) |>
+    model_imm_comp = ModelTypes() |>
+        register_agenttype!(ComputeAgent, :Immortal) |>
+        register_agenttype!(ConstructedAgent) |>
         register_edgetype!(Connection) |>
         construct_model("Test add_existing vector")
 
-    test_for_model(model_vec)
+    test_model(model_imm_comp)
+
+    model_imm_cons = ModelTypes() |>
+        register_agenttype!(ComputeAgent) |>
+        register_agenttype!(ConstructedAgent, :Immortal) |>
+        register_edgetype!(Connection) |>
+        construct_model("Test add_existing vector")
+
+    test_assertion(model_imm_cons)
 end
 

@@ -83,11 +83,13 @@ macro readreuseable(T)
     field = Symbol(T, "_read")
     :( sim.$(field).reuseable ) |> esc
 end
+readreuseable(sim, T) = getproperty(sim, Symbol(T, "_read")).reuseable
 
 macro writereuseable(T)
     field = Symbol(T, "_write")
     :( sim.$(field).reuseable ) |> esc
 end
+writereuseable(sim, T) = getproperty(sim, Symbol(T, "_write")).reuseable
 
 
 macro write(T)

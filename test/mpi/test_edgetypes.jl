@@ -84,13 +84,11 @@ function check(ET)
 end
 
 function testforedgetype(ET)
-    @info "testfor" ET
     sim = new_simulation(model, nothing, nothing)
 
     part = Dict{AgentID, UInt32}()
 
     if mpi.isroot
-        @info "===== run test for edgetype" ET
         agentids = add_agents!(sim, [ AgentState1(i) for i in 1:mpi.size ])
         agentids2 = add_agents!(sim, [ AgentState2(i, true) for i in 1:mpi.size ])
 

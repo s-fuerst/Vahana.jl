@@ -165,7 +165,9 @@ end
 # pipeable versions 
 construct_model(name::String) = types -> construct_model(types, name)
 
-new_simulation(params::P, globals::G; kwargs...) where {P, G} =
+new_simulation(params::P = nothing,
+               globals::G = nothing;
+               kwargs...) where {P, G} =
     model -> new_simulation(model, params, globals; kwargs...)
 
 """
@@ -307,6 +309,8 @@ function apply_transition!(sim,
                     rebuild::Vector;
                     invariant_compute = false,
                     add_existing = Vector{DataType}())
+    @assert sim.initialized "You must call finish_init! before apply_transition!"
+    
     writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
     foreach(prepare_write!(sim, [add_existing; compute]), writeable)

@@ -166,7 +166,6 @@ function runedgestest()
         @testset "num_neighbors" begin
             for t in [EdgeD, EdgeT, EdgeTs, EdgeI, EdgeTI, EdgeTsI,
                    EdgeS, EdgeST, EdgeSTs, EdgeST, EdgeSTI, EdgeSTsI]
-                @info t
                 @test num_neighbors(sim, a1id, t) == 1
                 @test num_neighbors(sim, a2id, t) == 0
                 @test num_neighbors(sim, a3id, t) == 2
@@ -213,7 +212,6 @@ function runedgestest()
         sim = new_simulation(model_edges, nothing, nothing)
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-            @info t
             @test num_edges(sim, t) == 0
         end
 
@@ -222,7 +220,6 @@ function runedgestest()
         finish_init!(sim)
         
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-            @info t
             @test num_edges(sim, t) == 0
         end
 
@@ -244,7 +241,6 @@ function runedgestest()
         finish_init!(sim)
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-            @info t
             @test num_edges(sim, t) == 2
         end
     end    

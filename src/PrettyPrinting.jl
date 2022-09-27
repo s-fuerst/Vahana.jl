@@ -19,7 +19,7 @@ function construct_prettyprinting_functions(simsymbol)
             end
             for t in nodes_types
                 print(io, "\n\t Type $t \
-                           with $(_show_length(sim, t)) Agent(s)")
+                           with $(_show_num_agents(sim, t)) Agent(s)")
             end
         end
 
@@ -39,7 +39,7 @@ function construct_prettyprinting_functions(simsymbol)
                     print(io, "\n\t Type $t \
                                with $(_show_num_edges(sim, t)) Edges(s)")
                     if ! (:SingleAgentType in edgetypetraits)
-                        print(io, " for $(_show_length(sim, t, :Edges)) Agent(s)")
+                        print(io, " for $(_show_num_a_with_e(sim, t)) Agent(s)")
                     end
                 end
             end
@@ -143,28 +143,30 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
     end
 end
 
-######################################## Buffered Collections
+######################################## 
 
-function _show_length(sim, ::Type{T}, what = :Agents) where T
-    if what == :Agents
-        r = readstate(sim, T)
-        w = writestate(sim, T)
-    else
-        r = read(sim, T)
-        w = write(sim, T)
-    end
+function _show_num_a_with_e(sim, ::Type{T}) where T
     if !sim.initialized 
-        "$(length(r))/$(length(w)) (R/W)"
+        "$(length(read(sim, T)))/$(length(write(sim, T))) (R/W)"
     else
-        "$(length(r))"
+        "$(length(read(sim, T)))"
     end
 end
 
+function _show_num_agents(sim, t::Type{T}) where {T}
+    if !sim.initialized 
+        "$(num_agents(sim, t))/$(num_agents(sim, t; write = true)) (R/W)"
+    else
+        "$(num_agents(sim, t))"
+    end
+end
+
+
 function _show_num_edges(sim, t::Type{T}) where {T}
     if !sim.initialized 
-        "$(_num_edges(sim, t))/$(_num_edges(sim, t, true)) (R/W)"
+        "$(num_edges(sim, t))/$(num_edges(sim, t; write = true)) (R/W)"
     else
-        "$(_num_edges(sim, t))"
+        "$(num_edges(sim, t))"
     end
 end
 

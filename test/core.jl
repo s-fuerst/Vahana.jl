@@ -83,7 +83,7 @@ end
     idmap = finish_init!(sim)
 
     newids(ids) = map(ids) do id
-        idmap[id |> Vahana.remove_reuse |> Vahana.remove_process]
+        idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
     end
     
     a1id, a2id, a3id = newids(a1id), newids(a2id), newids(a3id)
@@ -166,9 +166,7 @@ end
         copydict = deepcopy(copy)
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
                           [ ADict ], allagenttypes, [])
-        @info "before" sim.typeinfos.nodes_attr[ADict]
         create_mpi_wins(copydict)
-        @info "after" sim.typeinfos.nodes_attr[ADict]
         @onrankof a1id @test agentstate(copydict, a1id, ADict) ==
             ADict(sum(1:10) + 1)
         free_mpi_wins(copydict)
