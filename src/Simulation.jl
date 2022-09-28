@@ -28,7 +28,7 @@ a concrete simulation.
 """
 function construct_model(typeinfos::ModelTypes, name::String) 
     simsymbol = Symbol(name)
-    
+
     edgefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
@@ -63,6 +63,13 @@ function construct_model(typeinfos::ModelTypes, name::String)
              :(Vector{Reuse}()))
         for T in typeinfos.nodes_types ]
 
+
+    edgestorage = [
+        Expr(Symbol("="),
+             :($(Symbol(T, "_storage"))::$(edgestorage_type(T, typeinfos.edges_attr[T]))),
+             :($(edgestorage_constructor(T, typeinfos.edges_attr[T]))))
+        for T in typeinfos.edges_types ] 
+
     fields = Expr(:block,
                   :(modelname::String),
                   :(name::String),
@@ -74,6 +81,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(transition::Bool),
                   :(num_transitions::Int64),
                   edgefields...,
+                  edgestorage...,
                   nodefields...,
                   nodeids...,
                   nodedied...,
@@ -81,7 +89,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
     
     # the true in the second arg makes the struct mutable
     strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)
-    
+
     kwdefqn = QuoteNode(Symbol("@kwdef"))
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
@@ -90,6 +98,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
     # Construct all type specific functions for the edge typeinfos
     for T in typeinfos.edges_types
         construct_edge_functions(T, typeinfos.edges_attr[T], simsymbol)
+        construct_sendedge_functions(T, typeinfos.edges_attr[T], simsymbol)
     end
 
     # Construct all type specific functions for the agent typeinfos
@@ -151,6 +160,7 @@ function new_simulation(model::Model,
 
     for T in sim.typeinfos.edges_types
         init_field!(sim, T)
+        init_storage!(sim, T)
     end
 
     for T in sim.typeinfos.nodes_types
@@ -171,35 +181,39 @@ new_simulation(params::P = nothing,
     model -> new_simulation(model, params, globals; kwargs...)
 
 """
-    finish_init!(sim::Simulation; distribute::Bool, partition::Dict{AgentID, ProcessID}())
+    finish_init!(sim::Simulation; distribute::Bool, 
+                 partition::Dict{AgentID, ProcessID})
 
 Finish the initialization phase of the simulation. 
 
-Must be called before applying a transition function. 
+`partition` is an option keyword and allows to specify an assignment
+of the agents to the individual MPI ranks. The dictonary must contain
+all agentids created on the rank as key, the corresponding value is
+the rank on which the agent "lives" after `finish_init`.
 
-When a simulation is run on multiple PEs, per default the graph found
-on rank 0 will be partitioned using Metis, and distributed to the
-different ranks. Which means that it's allowed to run the
-initialization phase on all ranks (there is no need for a mpi.isroot
-check), but then all added agents and edges on other ranks then 0 will
-be discarded. If this is not intended, a `partition` must be given, or
-`distribute` must be set to false.
+`finish_init!` must be called before applying a transition function. 
 
-`partition` is a dict that must incl. all agentids created on the rank
-as keys, the corresponding value is the rank on which the agent will be
-"living" after `finish_init!`.
+!!! info 
 
-See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref) and
-[`apply_transition!`](@ref)
+    When a simulation is run on multiple PEs, per default the graph
+    found on rank 0 will be partitioned using Metis, and distributed
+    to the different ranks. Which means that it's allowed to run the
+    initialization phase on all ranks (there is no need for a
+    mpi.isroot check), but then all added agents and edges on other
+    ranks then 0 will be discarded. If this is not intended, a
+    `partition` must be given, or `distribute` must be set to false.
+
+
+See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
+[`apply_transition!`](@ref) 
 """
 function finish_init!(sim;
-               distribute = mpi.size > 1,
-               partition = Dict{AgentID, ProcessID}())
+               partition = Dict{AgentID, ProcessID}(),
+               return_idmapping = false)
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
-    idmapping = if distribute 
-        @assert mpi.size > 1
+    idmapping = if mpi.size > 1
         # we are creating an own partition only when no partition is given
         if length(partition) == 0 && mpi.isroot
             @info "Partitioning the Simulation"
@@ -230,8 +244,15 @@ function finish_init!(sim;
 
     sim.initialized = true
 
-    idmapping
+    return_idmapping ? idmapping : nothing
 end 
+
+# this function is not exported and should be only used for unit tests
+function updateids(idmap, oldids)
+    map(oldids) do id
+        idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
+    end
+end
 
 
 ######################################## Transition

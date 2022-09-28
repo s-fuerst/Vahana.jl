@@ -83,6 +83,17 @@ function check(ET)
     end
 end
 
+# we distribute Agent 1 and 2 to rank 0, and Agent 3 to rank 1
+function reverse_edge_direction(ET)
+    (state, id, sim) -> begin
+        edge = edges_to(sim, id, ET) |> first
+        
+    end
+end    
+
+
+
+
 function testforedgetype(ET)
     sim = new_simulation(model, nothing, nothing)
 
@@ -127,7 +138,7 @@ function testforedgetype(ET)
     num_edges_per_PE = Vahana.has_trait(sim, ET, :SingleAgentType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
-    finish_init!(sim; partition = part)
+    newidsmap = finish_init!(sim; partition = part)
 
 
     # apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 

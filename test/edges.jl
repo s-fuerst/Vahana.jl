@@ -58,11 +58,13 @@ model_edges = ModelTypes() |>
 
 hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
 
+
 function runedgestest()
     @testset "Edges" begin
         sim = new_simulation(model_edges, nothing, nothing)
         
         (a1id, a2id, a3id) = add_agents!(sim, Agent(1), Agent(2), Agent(3))
+
 
         # Lets add some edges for each of the different trait combinations
         # For each combination we will have

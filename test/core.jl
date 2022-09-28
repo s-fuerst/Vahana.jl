@@ -22,15 +22,17 @@ struct ESDict  foo::Int64 end
 struct ESLDict1 end
 struct ESLDict2 end
 
-model = ModelTypes() |>
-    register_agenttype!(ADict) |>
-    register_agenttype!(AVec, :Immortal) |>
-    register_agenttype!(AVecFixed, :Immortal; size = 10) |>
-    register_agenttype!(ASLDict) |>
-    register_edgetype!(ESDict) |>
-    register_edgetype!(ESLDict1) |> 
-    register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |> # to = AVec 
-    construct_model("Test Core")
+begin
+    model = ModelTypes() |>
+        register_agenttype!(ADict) |>
+        register_agenttype!(AVec, :Immortal) |>
+        register_agenttype!(AVecFixed, :Immortal; size = 10) |>
+        register_agenttype!(ASLDict) |>
+        register_edgetype!(ESDict) |>
+        register_edgetype!(ESLDict1) |> 
+        register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |>
+        construct_model("Test Core")
+end
 
 function add_example_network!(sim)
     # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
@@ -45,10 +47,10 @@ function add_example_network!(sim)
     add_edge!(sim, a3id, a1id, ESDict(2))
     add_edge!(sim, avids[1], a1id, ESDict(3))
     add_edge!(sim, avfids[10], a1id, ESDict(4))
-    # we construct the following network for ESLVec:
+    # we construct the following network for ESLDict1:
     # avids -> a1
     add_edges!(sim, a1id, [ Edge(avids[i], ESLDict1()) for i in 1:10 ])
-    # we construct the following network for ESLVecFixed:
+    # we construct the following network for ESLDict2:
     # avfids[i] -> avids[i]
     for i in 1:10
         add_edge!(sim, avfids[i], avids[i], ESLDict2())
@@ -74,21 +76,18 @@ function nothing_transition(agent, id, sim)
     nothing
 end
 
+import Vahana.updateids
 
 @testset "Core" begin
     sim = new_simulation(model, nothing, nothing)
 
     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
     
-    idmap = finish_init!(sim)
+    idmap = finish_init!(sim; return_idmapping = true)
 
-    newids(ids) = map(ids) do id
-        idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
-    end
-    
-    a1id, a2id, a3id = newids(a1id), newids(a2id), newids(a3id)
-    avids, avfids = newids(avids), newids(avfids)
-
+    a1id, a2id, a3id =
+        updateids(idmap, a1id), updateids(idmap, a2id), updateids(idmap, a3id)
+    avids, avfids = updateids(idmap, avids), updateids(idmap, avfids)
     
     @testset "agentstate" begin
         create_mpi_wins(sim)
@@ -100,7 +99,7 @@ end
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AVecFixed) == AVecFixed(1)
         @onrankof avids[10] @test agentstate(sim, avids[10], AVec) == AVec(10)
         @onrankof avfids[10] @test agentstate(sim, avfids[10], AVecFixed) == AVecFixed(10)
-    #     # calling agentstate with the wrong typ should throw an AssertionError
+        #     # calling agentstate with the wrong typ should throw an AssertionError
         @test_throws AssertionError agentstate(sim, a2id, AVec)
         @test_throws AssertionError agentstate(sim, avids[1], ADict)
         free_mpi_wins(sim)
@@ -142,7 +141,7 @@ end
         copy = deepcopy(sim)
         add_edge!(copy, a2id, a1id, ESDict(20))
         add_edge!(copy, a2id, avids[1], ESLDict2())
-        @test_throws AssertionError add_edge!(copy, a2id, avfids[1], ESLDict2())
+        @onrankof avfids[1] @test_throws AssertionError add_edge!(copy, a2id, avfids[1], ESLDict2())
         @onrankof a1id @test size(edges_to(sim, a1id, ESDict), 1) == 4
         @onrankof a1id @test size(edges_to(copy, a1id, ESDict), 1) == 5
         @onrankof avids[1] @test size(neighborids(sim, avids[1], ESLDict2), 1) == 1
@@ -242,9 +241,9 @@ end
 #     sim = new_simulation(model, nothing, nothing; name = "Aggregate")
 
 #     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
-    
+
 #     finish_init!(sim)
-    
+
 #     @test aggregate(sim, a -> a.foo, +, ADict) == 6
 #     @test aggregate(sim, a -> a.foo, +, AVec) == sum(1:10)
 #     @test aggregate(sim, e -> e.foo, +, ESDict) == 10

@@ -122,6 +122,7 @@ include("ModelTypes.jl")
 
 include("EdgeFieldFactory.jl")
 include("AgentFieldFactory.jl")
+include("MPItransition.jl")
 
 include("Simulation.jl")
 include("Global.jl")

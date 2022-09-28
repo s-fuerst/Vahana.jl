@@ -105,6 +105,12 @@ macro read(T)
 end
 read(sim, T) =getproperty(sim, Symbol(T, "_read"))
 
+macro storage(T)
+    field = Symbol(T, "_storage")
+    :( sim.$(field) ) |> esc
+end
+storage(sim, T) =getproperty(sim, Symbol(T, "_storage"))
+
 
 # we use this tests are for the distributed version, in this case
 # the tests should be only run on the rank that the id is currently

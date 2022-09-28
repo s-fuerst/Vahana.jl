@@ -295,16 +295,27 @@ by calling suppress_warnings(true) after importing Vahana.
     #### The exported functions
     #- add_edge!
     if stateless && ignorefrom && !singleedge
-        @eval function add_edge!(sim::$simsymbol, to::AgentID, ::Edge{$MT})
-            nr = _to2idx(to, $T)
-            field = sim.$(writefield(T))
-            @inbounds field[nr] = _get_agent_container!(sim, to, $T, field) + 1
+        @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
+            if process_nr(to) != mpi.rank
+                push!(@storage($T)[mpi.rank + 1], (to, edge))
+            else
+                nr = _to2idx(to, $T)
+                field = sim.$(writefield(T))
+                @inbounds field[nr] = _get_agent_container!(sim, to, $T,
+                                                            field) + 1
+            end
         end
 
-        @eval function add_edge!(sim::$simsymbol, ::AgentID, to::AgentID, ::$MT)
-            nr = _to2idx(to, $T)
-            field = sim.$(writefield(T))
-            @inbounds field[nr] = _get_agent_container!(sim, to, $T, field) + 1
+        @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
+                          state::$MT)
+            if process_nr(to) != mpi.rank
+                push!(@storage($T)[mpi.rank + 1], (to, Edge(from, state)))
+            else
+                nr = _to2idx(to, $T)
+                field = sim.$(writefield(T))
+                @inbounds field[nr] = _get_agent_container!(sim, to, $T,
+                                                            field) + 1
+            end
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
@@ -312,10 +323,14 @@ by calling suppress_warnings(true) after importing Vahana.
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
-            nr = _to2idx(to, $T)
-            field = sim.$(writefield(T))
-            _check_size!(field, nr, $T)
-            @inbounds field[nr] = _valuetostore(edge)
+            if process_nr(to) != mpi.rank
+                push!(@storage($T)[mpi.rank + 1], (to, edge))
+            else
+                nr = _to2idx(to, $T)
+                field = sim.$(writefield(T))
+                _check_size!(field, nr, $T)
+                @inbounds field[nr] = _valuetostore(edge)
+            end
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
@@ -323,21 +338,33 @@ by calling suppress_warnings(true) after importing Vahana.
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
-            nr = _to2idx(to, $T)
-            field = sim.$(writefield(T))
-            _check_size!(field, nr, $T)
-            @inbounds field[nr] = _valuetostore(from, edgestate)
+            if process_nr(to) != mpi.rank
+                push!(@storage($T)[mpi.rank + 1], (to, Edge(from, edgestate)))
+            else
+                nr = _to2idx(to, $T)
+                field = sim.$(writefield(T))
+                _check_size!(field, nr, $T)
+                @inbounds field[nr] = _valuetostore(from, edgestate)
+            end
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
-                  _valuetostore(edge))
+            if process_nr(to) != mpi.rank
+                push!(@storage($T)[mpi.rank + 1], (to, edge))
+            else
+                push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
+                      _valuetostore(edge))
+            end
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
                           edgestate::$MT)
-            push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
-                  _valuetostore(from, edgestate))
+            if process_nr(to) != mpi.rank
+                push!(@storage($T)[mpi.rank + 1], (to, Edge(from, edgestate)))
+            else
+                push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
+                      _valuetostore(from, edgestate))
+            end
         end
     end
 
