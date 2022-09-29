@@ -199,15 +199,25 @@ function runedgestest()
                 @test_throws AssertionError aggregate(sim, t, a -> a.foo, +)
             end
         end
-        # @testset "neighbor_states" begin
-        #     for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
-        #         e = neighborids(sim, a3id, t)
-        #         @test e[1] == a2id
-        #         @test e[2] == a1id
-        #         e = neighborids(sim, a2id, t)
-        #         @test e == Vector()
-        #     end
-        # end
+
+        @testset "neighbor_states" begin
+            for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
+                e = neighborids(sim, a3id, t)
+                @test e[1] == a2id
+                @test e[2] == a1id
+                e = neighborids(sim, a2id, t)
+                @test e === nothing
+            end
+        end
+
+        @testset "check Vahana state" begin
+            for t in statelessEdgeTypes
+                @test_throws AssertionError add_edge!(sim, AgentID(0), AgentID(0), t())
+            end
+            for t in statefulEdgeTypes
+                @test_throws AssertionError add_edge!(sim, AgentID(0), AgentID(0), t(0))
+            end
+        end
     end
 
     @testset "num_edges" begin
@@ -215,21 +225,20 @@ function runedgestest()
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             @test num_edges(sim, t) == 0
+            @test num_edges(sim, t; write = true) == 0
         end
 
         @test num_agents(sim, Agent) == 0
-
-        finish_init!(sim)
-        
-        for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-            @test num_edges(sim, t) == 0
-        end
+        @test num_agents(sim, Agent; write = true) == 0
 
         # We need a gap
         id1 = add_agent!(sim, Agent(0))
         id2 = add_agent!(sim, Agent(0))
         id3 = add_agent!(sim, Agent(0))
 
+        @test num_agents(sim, Agent) == 0
+        @test num_agents(sim, Agent; write = true) == 3
+        
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             if fieldcount(t) > 0
                 add_edge!(sim, id1, id1, t(0))
@@ -240,6 +249,11 @@ function runedgestest()
             end
         end
 
+        for t in [ statefulEdgeTypes; statelessEdgeTypes ]
+            @test num_edges(sim, t; write = true) == 2
+            @test num_edges(sim, t) == 0
+        end
+        
         finish_init!(sim)
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]

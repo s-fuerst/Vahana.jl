@@ -3,11 +3,12 @@ import Vahana.@onrankof
 
 # A for Agent, one type per difference container type
 struct ADict     foo::Int64 end
-struct AVec      foo::Int64 end
-struct AVecFixed foo::Int64 end
-struct ASLDict end
+struct AImm      foo::Int64 end
+struct AImmFixed foo::Int64 end
+struct ADefault  foo::Int64 end
 
-allagenttypes = [ ADict, AVec, AVecFixed, ASLDict ]
+allagenttypes = [ ADict, AImm, AImmFixed ]
+
 
 function create_mpi_wins(sim)
     foreach(T -> Vahana.prepare_mpi!(sim, T), allagenttypes)
@@ -25,21 +26,21 @@ struct ESLDict2 end
 begin
     model = ModelTypes() |>
         register_agenttype!(ADict) |>
-        register_agenttype!(AVec, :Immortal) |>
-        register_agenttype!(AVecFixed, :Immortal; size = 10) |>
-        register_agenttype!(ASLDict) |>
+        register_agenttype!(AImm, :Immortal) |>
+        register_agenttype!(AImmFixed, :Immortal; size = 10) |>
+        register_agenttype!(ADefault) |>
         register_edgetype!(ESDict) |>
         register_edgetype!(ESLDict1) |> 
-        register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AVec) |>
+        register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AImm) |>
         construct_model("Test Core")
 end
 
 function add_example_network!(sim)
-    # construct 3 ADict agents, 10 AVec agents and 10 AVecFixed
+    # construct 3 ADict agents, 10 AImm agents and 10 AImmFixed
     a1id = add_agent!(sim, ADict(1))
     a2id, a3id = add_agents!(sim, ADict(2), ADict(3))
-    avids = add_agents!(sim, [ AVec(i) for i in 1:10])
-    avfids = add_agents!(sim, [ AVecFixed(i) for i in 1:10])
+    avids = add_agents!(sim, [ AImm(i) for i in 1:10])
+    avfids = add_agents!(sim, [ AImmFixed(i) for i in 1:10])
 
     # we construct the following network for ESDict:
     # a2 & a3 & avids[1] & avfids[10] -> a1
@@ -88,19 +89,19 @@ import Vahana.updateids
     a1id, a2id, a3id =
         updateids(idmap, a1id), updateids(idmap, a2id), updateids(idmap, a3id)
     avids, avfids = updateids(idmap, avids), updateids(idmap, avfids)
-    
+
     @testset "agentstate" begin
         create_mpi_wins(sim)
         @onrankof a1id @test agentstate(sim, a1id, ADict) == ADict(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == ADict(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == ADict(1)
         @onrankof a2id @test agentstate(sim, a2id, ADict) == ADict(2)
-        @onrankof avids[1] @test agentstate(sim, avids[1], AVec) == AVec(1)
-        @onrankof avfids[1] @test agentstate(sim, avfids[1], AVecFixed) == AVecFixed(1)
-        @onrankof avids[10] @test agentstate(sim, avids[10], AVec) == AVec(10)
-        @onrankof avfids[10] @test agentstate(sim, avfids[10], AVecFixed) == AVecFixed(10)
+        @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(1)
+        @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) == AImmFixed(1)
+        @onrankof avids[10] @test agentstate(sim, avids[10], AImm) == AImm(10)
+        @onrankof avfids[10] @test agentstate(sim, avfids[10], AImmFixed) == AImmFixed(10)
         #     # calling agentstate with the wrong typ should throw an AssertionError
-        @test_throws AssertionError agentstate(sim, a2id, AVec)
+        @test_throws AssertionError agentstate(sim, a2id, AImm)
         @test_throws AssertionError agentstate(sim, avids[1], ADict)
         free_mpi_wins(sim)
     end
@@ -128,8 +129,8 @@ import Vahana.updateids
 
     @testset "neighborstates" begin
         create_mpi_wins(sim)
-        @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AVec)[1] ==
-            AVec(1)
+        @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AImm)[1] ==
+            AImm(1)
         @onrankof a1id @test neighborstates_flexible(sim, a1id, ESDict)[2] ==
             ADict(3)
         free_mpi_wins(sim)
@@ -139,9 +140,11 @@ import Vahana.updateids
     # original state
     @testset "deepcopy" begin
         copy = deepcopy(sim)
-        add_edge!(copy, a2id, a1id, ESDict(20))
-        add_edge!(copy, a2id, avids[1], ESLDict2())
-        @onrankof avfids[1] @test_throws AssertionError add_edge!(copy, a2id, avfids[1], ESLDict2())
+        # normally it's not allowed to call add_edge! between transition
+        # function, but because of the @onrankof this hack works here
+        enable_asserts(false)
+        @onrankof a1id add_edge!(copy, a2id, a1id, ESDict(20))
+        @onrankof avids[1] add_edge!(copy, a2id, avids[1], ESLDict2())
         @onrankof a1id @test size(edges_to(sim, a1id, ESDict), 1) == 4
         @onrankof a1id @test size(edges_to(copy, a1id, ESDict), 1) == 5
         @onrankof avids[1] @test size(neighborids(sim, avids[1], ESLDict2), 1) == 1
@@ -151,15 +154,19 @@ import Vahana.updateids
     @testset "transition" begin
         # we need this for each node factory
         copy = deepcopy(sim)
+
+        # normally it's not allowed to call add_edge! between transition
+        # function, but because of the @onrankof this hack works here
+        enable_asserts(false)
         # we want to check two iterations with the sum_state_neighbors,
         # so we just add an edge loop for the agents where we check the sum
-        add_edge!(copy, a1id, a1id, ESLDict1())
-        add_edge!(copy, avids[1], avids[1], ESLDict2())
-        add_edge!(copy, avfids[1], avfids[1], ESLDict1())
+        @onrankof a1id add_edge!(copy, a1id, a1id, ESLDict1())
+        @onrankof avids[1] add_edge!(copy, avids[1], avids[1], ESLDict2())
+        @onrankof avfids[1] add_edge!(copy, avfids[1], avfids[1], ESLDict1())
         # for avfids[1] we need a second edge
-        add_edge!(copy, avfids[2], avfids[1], ESLDict1())
+        @onrankof avfids[1] add_edge!(copy, avfids[2], avfids[1], ESLDict1())
         # and also avfids[2] should keep its value
-        add_edge!(copy, avfids[2], avfids[2], ESLDict1())
+        @onrankof avfids[2] add_edge!(copy, avfids[2], avfids[2], ESLDict1())
 
         # now check apply_transtition! for the different nodefieldfactories
         copydict = deepcopy(copy)
@@ -179,43 +186,43 @@ import Vahana.updateids
 
         copyvec = deepcopy(copy)
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-                          [ AVec ], allagenttypes, [])
+                          [ AImm ], allagenttypes, [])
         create_mpi_wins(copyvec)
-        @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(2)
+        @onrankof avids[1] @test agentstate(copyvec, avids[1], AImm) == AImm(2)
         free_mpi_wins(copyvec)
 
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-                          [ AVec ], allagenttypes, [])
+                          [ AImm ], allagenttypes, [])
         create_mpi_wins(copyvec)
-        @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(3)
+        @onrankof avids[1] @test agentstate(copyvec, avids[1], AImm) == AImm(3)
         free_mpi_wins(copyvec)
 
         apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-                          [ AVec ], allagenttypes, [])
+                          [ AImm ], allagenttypes, [])
         create_mpi_wins(copyvec)
-        @onrankof avids[1] @test agentstate(copyvec, avids[1], AVec) == AVec(4)
+        @onrankof avids[1] @test agentstate(copyvec, avids[1], AImm) == AImm(4)
         free_mpi_wins(copyvec)
 
         copyvecfix = deepcopy(copy)
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-                          [ AVecFixed ], allagenttypes, [])
+                          [ AImmFixed ], allagenttypes, [])
         create_mpi_wins(copyvecfix)
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) ==
-            AVecFixed(3)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AImmFixed) ==
+            AImmFixed(3)
         free_mpi_wins(copyvecfix)
 
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-                          [ AVecFixed ], allagenttypes, [])
+                          [ AImmFixed ], allagenttypes, [])
         create_mpi_wins(copyvecfix)
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) ==
-            AVecFixed(5)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AImmFixed) ==
+            AImmFixed(5)
         free_mpi_wins(copyvecfix)
 
         apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-                          [ AVecFixed ], allagenttypes, [])
+                          [ AImmFixed ], allagenttypes, [])
         create_mpi_wins(copyvecfix)
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AVecFixed) ==
-            AVecFixed(7)
+        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AImmFixed) ==
+            AImmFixed(7)
         free_mpi_wins(copyvecfix)
 
         # TODO check return nothing (currently only supported by Dicts)
@@ -224,6 +231,7 @@ import Vahana.updateids
     end
 
     @testset "num_neighbors" begin
+        enable_asserts(true)
         @onrankof a1id @test num_neighbors(sim, a1id, ESDict) == 4
         @onrankof a2id @test num_neighbors(sim, a2id, ESDict) == 0
         @test_throws AssertionError num_neighbors(sim, a2id, ESLDict2)
@@ -245,7 +253,7 @@ end
 #     finish_init!(sim)
 
 #     @test aggregate(sim, a -> a.foo, +, ADict) == 6
-#     @test aggregate(sim, a -> a.foo, +, AVec) == sum(1:10)
+#     @test aggregate(sim, a -> a.foo, +, AImm) == sum(1:10)
 #     @test aggregate(sim, e -> e.foo, +, ESDict) == 10
 # end
 

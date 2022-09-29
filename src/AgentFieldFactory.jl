@@ -1,5 +1,6 @@
 # The died/reuseable stuff is a little bit tricky: We need the died
 # vector to easy check that an agent is still living in agentstate or
+using Base: _sizeof_uv_prepare, _sizeof_uv_fs
 # the transition functions.  But when we want to reuse a row, we do
 # not want to iterate over the died vector until we found a true
 # value.  As people that are dying, are dead at step t+1 and not at
@@ -247,15 +248,29 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
         end
     end
-    
+
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
         # finish the last epoch
         @readstate($T) = @writestate($T)
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
         foreach(nr -> @died($T)[nr] = true,  @writereuseable($T)) 
+        empty!(@writereuseable($T))
     end
 
-    @eval function prepare_mpi!(sim, ::Type{$T})
+    @eval function finish_distribute!(sim::$simsymbol, ::Type{$T})
+        nagents = @nextid($T) - 1
+        if $fixedsize
+            for i in (nagents+1):$_size
+                @died($T)[i] = true
+            end
+        else
+            resize!(@readstate($T), nagents)
+            resize!(@died($T), nagents)
+            resize!(@reuse($T), nagents)
+        end
+    end
+    
+    @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
         # TODO AGENT: Add infokeys to create
         @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
         win_died = MPI.Win_create(died(sim, $T), MPI.COMM_WORLD)
@@ -271,7 +286,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         sim.typeinfos.nodes_attr[$T][:mpi_prepared] = true
     end 
 
-    @eval function finish_mpi!(sim, ::Type{$T})
+    @eval function finish_mpi!(sim::$simsymbol, ::Type{$T})
         win = sim.typeinfos.nodes_attr[$T][:window_died]
         MPI.free(win)
         delete!(sim.typeinfos.nodes_attr[$T], :window_died)
@@ -288,4 +303,4 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     # @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
     #     mapreduce(f, op, sim.$(readfield(T)); kwargs...)
     # end
- end
+end

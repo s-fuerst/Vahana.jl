@@ -92,7 +92,7 @@ function edges_to(::__MODEL__, id::AgentID, edgetype::Type) end
     neighborids(sim, id::AgentID, ::Type{E}) 
 
 Returns the ID of the agent on the source side of the edge of type `E`
-with agent `id` as target if `E` has the property :SingleEdge, or otherwise
+with agent `id` as target if `E` has the trait :SingleEdge, or otherwise
 a vector of the IDs of the agents on the source side of those edges.
 
 If there is no edge with agent `id` as target, `neighborids` returns `nothing`.
@@ -109,7 +109,7 @@ function neighborids(::__MODEL__, id::AgentID, edgetype::Type) end
     edgestates(sim, id::AgentID, ::Type{E}) 
 
 Returns the state of the edge of type `E` with agent `id` as target if `E` has
-property :SingleEdge, or a vector of these states otherwise.
+the trait :SingleEdge, or a vector of these states otherwise.
 
 If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 

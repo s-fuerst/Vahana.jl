@@ -239,6 +239,7 @@ function finish_init!(sim;
         idmapping
     end
 
+    # TODO: There is already a finiwh_write! in distribute!, maybe we can remove this?
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 

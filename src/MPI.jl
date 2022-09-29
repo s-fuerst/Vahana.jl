@@ -58,6 +58,8 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
 
     foreach(finish_write!(sim), [ node_types; edge_types ])
 
+    foreach(T -> finish_distribute!(sim, T), node_types)
+
     MPI.Barrier(MPI.COMM_WORLD)
     
     foreach(T -> finish_mpi!(sim, T), node_types)
@@ -86,7 +88,6 @@ function create_structured_send_map(sim, sendmap::Dict{AgentID, ProcessID})
     ssm
 end
 
-# TODO AGENTS: send also the died fields
 # Distribute agents of agenttype T to the different PEs. 
 function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     # ST is the transmitted datatype. Beside the state itself (T) we
@@ -130,14 +131,14 @@ end
 # | (Vector){AgentID}  | x       |        | neighborids   | [(toid, fromid)]   |
 # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
 # | Int64              | x       | x      | num_neighbors | num_neighbors      |
-function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataType)
-    # get the updated id of an agent with the old id `id`, whereby the
-    # reuse bits of `id` are set to zero (as this is also the case for
-    # the keys of idmapping)
-    updateid(id::AgentID) = idmapping[id] |> AgentID
 
-    CE = sim.typeinfos.edges_attr[T][:containerelement]
-    ST = Vector{Tuple{AgentID, CE}}
+
+containertype(sim, T::DataType) =
+    Vector{Tuple{AgentID, sim.typeinfos.edges_attr[T][:containerelement]}}
+
+
+function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataType)
+    ST = containertype(sim, T)
     # We construct for each PE a vector with all the edges (incl. toid) that
     # should be transmit to the PE
     perPE = [ ST() for _ in 1:mpi.size ]
@@ -186,6 +187,19 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
         end
     end
 
+    # get the updated id of an agent with the old id `id`, whereby the
+    # reuse bits of `id` are set to zero (as this is also the case for
+    # the keys of idmapping)
+    updateid(id::AgentID) = idmapping[id] |> AgentID
+    
+    edges_alltoall!(sim, perPE, T, updateid)
+end
+
+# updateid is a func that update the ids of the agents, for the case
+# that the ids have changed in the distribution process.
+function edges_alltoall!(sim, perPE, T::DataType, updateid = identity)
+    CE = sim.typeinfos.edges_attr[T][:containerelement]
+    ST = Vector{Tuple{AgentID, CE}}
     # for sending them via AllToAll we flatten the perPE structure 
     longvec = reduce(vcat, perPE)
     sendbuf = if length(longvec) > 0
@@ -218,7 +232,12 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
                 updateid(to)
             end
             Vahana._check_size!(container, up, T)
-            container[up] = numedges
+            if has_trait(sim, T, :SingleEdge)
+                container[up] = true
+            else
+                # TODO: this must be an addition
+                container[up] = numedges
+            end
         end
         # Else iterate of the received edges and add them via add_edge!    
     elseif has_trait(sim, T, :Stateless)

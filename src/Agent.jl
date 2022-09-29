@@ -58,23 +58,25 @@ const AgentID = UInt64
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
     BITS_PROCESS + BITS_REUSE + BITS_AGENTNR 
 
-const shift_type = BITS_PROCESS + BITS_REUSE + BITS_AGENTNR
+const SHIFT_TYPE = BITS_PROCESS + BITS_REUSE + BITS_AGENTNR
+const SHIFT_RANK = BITS_REUSE + BITS_AGENTNR
+const SHIFT_REUSE = BITS_AGENTNR
 
 function agent_id(typeID::TypeID, reuse::Reuse, agent_nr::AgentNr)::AgentID
     @mayassert typeID <= 2 ^ BITS_TYPE
     @mayassert reuse <= 2 ^ BITS_REUSE
     @mayassert agent_nr <= 2 ^ BITS_AGENTNR
-    AgentID(typeID) << shift_type +
-        mpi.rank << (BITS_REUSE + BITS_AGENTNR) +
-        Int64(reuse) << BITS_AGENTNR + 
+    AgentID(typeID) << SHIFT_TYPE +
+        mpi.rank << SHIFT_RANK +
+        Int64(reuse) << SHIFT_REUSE + 
         agent_nr
 end
 
 function immortal_agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
     @mayassert typeID <= 2 ^ BITS_TYPE
     @mayassert agent_nr <= 2 ^ BITS_AGENTNR
-    AgentID(typeID) << shift_type +
-        mpi.rank << (BITS_REUSE + BITS_AGENTNR) +
+    AgentID(typeID) << SHIFT_TYPE +
+        mpi.rank << SHIFT_RANK +
         agent_nr
 end
 
@@ -95,7 +97,7 @@ end
 # via the construct_agent_functions
 
 function type_nr(id::AgentID)::TypeID
-    id >> (BITS_PROCESS + BITS_REUSE + BITS_AGENTNR)
+    id >> SHIFT_TYPE
 end
 
 function type_of(sim, id::AgentID)
@@ -103,11 +105,11 @@ function type_of(sim, id::AgentID)
 end
 
 function process_nr(id::AgentID)::ProcessID
-    (id >> (BITS_REUSE + BITS_AGENTNR)) & (2 ^ BITS_PROCESS - 1)
+    (id >> SHIFT_RANK) & (2 ^ BITS_PROCESS - 1)
 end
 
 function reuse_nr(id::AgentID)::ProcessID
-    (id >> (BITS_AGENTNR)) & (2 ^ BITS_REUSE - 1)
+    (id >> SHIFT_REUSE) & (2 ^ BITS_REUSE - 1)
 end
 
 function agent_nr(id::AgentID)::AgentNr

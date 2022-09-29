@@ -296,8 +296,13 @@ by calling suppress_warnings(true) after importing Vahana.
     #- add_edge!
     if stateless && ignorefrom && !singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
+            @mayassert sim.initialized == false || sim.transition """
+            You can call add_edge! only in the initialization phase (until
+            `finish_init!` is called) or within a transition function called by
+            `apply_transition`.
+            """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[mpi.rank + 1], (to, edge))
+                push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
                 nr = _to2idx(to, $T)
                 field = sim.$(writefield(T))
@@ -308,8 +313,13 @@ by calling suppress_warnings(true) after importing Vahana.
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
                           state::$MT)
+            @mayassert sim.initialized == false || sim.transition """
+            You can call add_edge! only in the initialization phase (until
+            `finish_init!` is called) or within a transition function called by
+            `apply_transition`.
+            """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[mpi.rank + 1], (to, Edge(from, state)))
+                push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
                 nr = _to2idx(to, $T)
                 field = sim.$(writefield(T))
@@ -324,7 +334,7 @@ by calling suppress_warnings(true) after importing Vahana.
             edgetype traits containing the :SingleEdge trait).
             """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[mpi.rank + 1], (to, edge))
+                push!(@storage($T)[process_nr(to) + 1], (to, _valuetostore(edge)))
             else
                 nr = _to2idx(to, $T)
                 field = sim.$(writefield(T))
@@ -333,13 +343,22 @@ by calling suppress_warnings(true) after importing Vahana.
             end
         end
 
-        @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID, edgestate::$MT)
-            @mayassert _can_add(sim.$(writefield(T)), to, _valuetostore(from, edgestate), $T) """
+        @eval function add_edge!(sim::$simsymbol, from::AgentID,
+                          to::AgentID, edgestate::$MT)
+            # TODO: test the assertion in edgetypes.jl
+            @mayassert sim.initialized == false || sim.transition """
+            You can call add_edge! only in the initialization phase (until
+            `finish_init!` is called) or within a transition function called by
+            `apply_transition`.
+            """
+            @mayassert _can_add(sim.$(writefield(T)), to,
+                                _valuetostore(from, edgestate), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[mpi.rank + 1], (to, Edge(from, edgestate)))
+                push!(@storage($T)[process_nr(to) + 1],
+                      (to, _valuetostore(from, edgestate)))
             else
                 nr = _to2idx(to, $T)
                 field = sim.$(writefield(T))
@@ -349,8 +368,14 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
+            @mayassert sim.initialized == false || sim.transition """
+            You can call add_edge! only in the initialization phase (until
+            `finish_init!` is called) or within a transition function called by
+            `apply_transition`.
+            """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[mpi.rank + 1], (to, edge))
+                push!(@storage($T)[process_nr(to) + 1],
+                      (to, _valuetostore(edge)))
             else
                 push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
                       _valuetostore(edge))
@@ -359,8 +384,14 @@ by calling suppress_warnings(true) after importing Vahana.
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
                           edgestate::$MT)
+            @mayassert sim.initialized == false || sim.transition """
+            You can call add_edge! only in the initialization phase (until
+            `finish_init!` is called) or within a transition function called by
+            `apply_transition`.
+            """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[mpi.rank + 1], (to, Edge(from, edgestate)))
+                push!(@storage($T)[process_nr(to) + 1],
+                      (to, _valuetostore(from, edgestate)))
             else
                 push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
                       _valuetostore(from, edgestate))

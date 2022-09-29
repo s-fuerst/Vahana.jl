@@ -2,6 +2,8 @@ using Test
 
 using Vahana
 
+import Vahana.has_trait
+
 using MPI
 
 using Logging
@@ -10,7 +12,7 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-Logging.disable_logging(Logging.Info)
+# Logging.disable_logging(Logging.Info)
 
 #MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
 
@@ -20,11 +22,11 @@ Logging.disable_logging(Logging.Info)
 We need as minimum 2 PEs and also an even number of PEs"""
 
 struct AgentState1
-    id::Int64
+    idx::Int64
 end
 
 struct AgentState2
-    id::Int64
+    idx::Int64
     something::Bool
 end
 
@@ -83,16 +85,35 @@ function check(ET)
     end
 end
 
-# we distribute Agent 1 and 2 to rank 0, and Agent 3 to rank 1
+# we change the direction of the cycle, after the first call
+# the edges are going from id to id-1 (mod mpi.size)
+# as we use a hack that allows us to test also :IgnoreFrom edges,
+# a second reverse does not result in the original state 
 function reverse_edge_direction(ET)
     (state, id, sim) -> begin
-        edge = edges_to(sim, id, ET) |> first
-        
+        # In the :SingleEdge case there are no edges to AgentState2
+        if has_trait(sim, ET, :SingleAgentType) && typeof(state) == AgentState2
+            return
+        end
+        # we are know how the edges are constructed and how ids are given
+        # so we use this information to create the needed ids even
+        # for the :IgnoreFrom case
+        target_rank = mod(state.idx - 2, mpi.size)
+        target_id = AgentID(1 << Vahana.SHIFT_TYPE +
+            target_rank << Vahana.SHIFT_RANK + 1)
+
+        if has_trait(sim, ET, :Stateless)
+            add_edge!(sim, id, target_id, ET())
+        else
+            if has_trait(sim, ET, :SingleEdge)
+                nstate = edgestates(sim, id, ET) 
+            else 
+                nstate = edgestates(sim, id, ET) |> first
+            end
+            add_edge!(sim, id, target_id, nstate)
+        end
     end
-end    
-
-
-
+end
 
 function testforedgetype(ET)
     sim = new_simulation(model, nothing, nothing)
@@ -104,18 +125,18 @@ function testforedgetype(ET)
         agentids2 = add_agents!(sim, [ AgentState2(i, true) for i in 1:mpi.size ])
 
         for i in 1:mpi.size
-            # the edges construct a directed cycle
+            # the edges construct a directed cycle, going from id-1 to id
             fromid = agentids[mod1(i-1, mpi.size)]
             toid = agentids[i]
             toid2 = agentids2[i]
-            if fieldcount(ET) > 0
+            if ! has_trait(sim, ET, :Stateless)
                 add_edge!(sim, fromid, toid, ET(fromid, toid))
-                if ! Vahana.has_trait(sim, ET, :SingleAgentType)
+                if ! has_trait(sim, ET, :SingleAgentType)
                     add_edge!(sim, fromid, toid2, ET(fromid, toid))
                 end
             else
                 add_edge!(sim, fromid, toid, ET())
-                if ! Vahana.has_trait(sim, ET, :SingleAgentType)
+                if ! has_trait(sim, ET, :SingleAgentType)
                     add_edge!(sim, fromid, toid2, ET())
                 end
             end
@@ -135,44 +156,62 @@ function testforedgetype(ET)
     @test num_agents(sim, AgentState1; write = true) == (mpi.isroot ? mpi.size : 0)
     @test num_agents(sim, AgentState2; write = true) == (mpi.isroot ? mpi.size : 0)
 
-    num_edges_per_PE = Vahana.has_trait(sim, ET, :SingleAgentType) ? 1 : 2
+    num_edges_per_PE = has_trait(sim, ET, :SingleAgentType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
-    newidsmap = finish_init!(sim; partition = part)
-
-
-    # apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true) 
+    newidsmap = finish_init!(sim; partition = part, return_idmapping = true)
     
-    # Vahana.distribute!(sim, part)
-
     apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
-
     
     @test num_agents(sim, AgentState1) == 1
     @test num_agents(sim, AgentState2) == (mpi.rank < 2 ? mpi.size / 2 : 0)
 
     
-    if Vahana.has_trait(sim, ET, :SingleAgentType)
+    if has_trait(sim, ET, :SingleAgentType)
         @test num_edges(sim, ET) == num_agents(sim, AgentState1) 
     else
         @test num_edges(sim, ET) ==
             num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
     end
 
+    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
+
+    # we are testing now that new edges in the transition functions are
+    # send to the correct ranks
+    apply_transition!(sim, reverse_edge_direction(ET),
+                      [ AgentState1, AgentState2 ], [], [ ET ]; invariant_compute = true)
+    Vahana.edges_alltoall!(sim, Vahana.storage(sim, ET), ET)
+    
+    if has_trait(sim, ET, :SingleAgentType)
+        @test num_edges(sim, ET) == num_agents(sim, AgentState1) 
+    else
+        @test num_edges(sim, ET) ==
+            num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
+    end
+    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
+    
     # we check now the partitioning via Metis
     finish_init!(simautopar)
-    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
+
+    if has_trait(sim, ET, :SingleAgentType)
+        @test num_edges(sim, ET) == num_agents(sim, AgentState1) 
+    else
+        @test num_edges(sim, ET) ==
+            num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
+    end
+
+    
+    
 end
 
 @testset "EdgeTypes" begin
-    CurrentEdgeType = Nothing
+    CurrentEdgeType = MPIEdgeD
 
     if CurrentEdgeType === Nothing
         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
             testforedgetype(ET)
         end
     else
-        testforedgetype(MPIEdgeSTI)
         testforedgetype(CurrentEdgeType)
     end
     # this hack should help that the output is not scrambled
