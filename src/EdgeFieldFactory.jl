@@ -82,6 +82,22 @@ edgefield_type(T, info) = Meta.parse(construct_types(T, info)[1])
 
 edgefield_constructor(T, info) = Meta.parse(construct_types(T, info)[1] * "()")
 
+# storage is used for the edges that must be send to a different rank
+# as in the edge we do not store the to-id, we use the Tuple to attach this
+# information
+function edgestorage_type(T, info) 
+    type_strings = construct_types(T, info)
+    CE = Meta.parse(type_strings[3]) |> eval
+    Vector{Vector{Tuple{AgentID, CE}}}
+end
+
+function edgestorage_constructor(T, info)
+    type_strings = construct_types(T, info)
+    CE = Meta.parse(type_strings[3]) |> eval
+    Vector{Vector{Tuple{AgentID, CE}}}()
+end
+
+
 # We have some functions that are do only something when some edge traits
 # are set and are in this case specialized for the edgetype. Here we define
 # the "fallback" functions for the case that no specialized versions are needed.
@@ -251,8 +267,8 @@ by calling suppress_warnings(true) after importing Vahana.
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-            The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
-            But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
+The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
+But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
             _check_size!(field, nr, $T)
@@ -270,8 +286,8 @@ by calling suppress_warnings(true) after importing Vahana.
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-            The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
-            But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
+The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
+But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
             _check_size!(field, nr, $T)
@@ -329,12 +345,14 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            @mayassert _can_add(sim.$(writefield(T)), to, _valuetostore(edge), $T) """
+            @mayassert _can_add(sim.$(writefield(T)), to,
+                                _valuetostore(edge), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
             if process_nr(to) != mpi.rank
-                push!(@storage($T)[process_nr(to) + 1], (to, _valuetostore(edge)))
+                push!(@storage($T)[process_nr(to) + 1],
+                      (to, _valuetostore(edge)))
             else
                 nr = _to2idx(to, $T)
                 field = sim.$(writefield(T))
@@ -409,6 +427,19 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
+    @eval function init_storage!(sim::$simsymbol, ::Type{$MT})
+        @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
+    end
+    
+    #- prepare_mpi! 
+    @eval function prepare_mpi!(sim::$simsymbol, ::Type{$MT})
+        edges_alltoall!(sim, @storage($T), $T)
+        @storage($T) = Vector{$CT}()
+    end
+
+    @eval function finish_mpi!(_::$simsymbol, ::Type{$MT})
+    end
+    
     #- finish_write!
     @eval function finish_write!(sim::$simsymbol, ::Type{$MT})
         sim.$(readfield(T)) = sim.$(writefield(T))
@@ -547,25 +578,7 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
-    #- _vectorized_container
-    # if !singleedge
-    #     @eval function _vectorized_container_read(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         _get_agent_container(sim, to, $T, sim.$(readfield(T))) 
-    #     end
-    #     @eval function _vectorized_container_write(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         _get_agent_container(sim, to, $T, sim.$(writefield(T))) 
-    #     end
-    # else
-    #     @eval function _vectorized_container_read(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         [ _get_agent_container(sim, to, $T, sim.$(readfield(T))) ]
-    #     end
-    #     @eval function _vectorized_container_write(sim::$simsymbol, to::AgentID, ::Type{$MT})
-    #         [ _get_agent_container(sim, to, $T, sim.$(writefield(T))) ]
-    #     end
-    # end
-
     #- aggregate incl. helper functions
-
     if singletype
         @eval _removeundef(::Type{$MT}) = edges -> 
             [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
@@ -622,6 +635,8 @@ by calling suppress_warnings(true) after importing Vahana.
         end
         if singleedge
             @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT} ; kwargs...)
+                # TODO maybe rename prepare_mpi!
+                prepare_mpi!(sim, t)
                 estates = sim.$(readfield(T)) |>
                     values |>
                     _removeundef(t) |>
@@ -631,6 +646,7 @@ by calling suppress_warnings(true) after importing Vahana.
             end
         else
             @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
+                prepare_mpi!(sim, t)
                 estates = sim.$(readfield(T)) |>
                     values |>
                     _removeundef(t) |>

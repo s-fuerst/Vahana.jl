@@ -32,7 +32,8 @@ function construct_model(typeinfos::ModelTypes, name::String)
     edgefields = [
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(edgefield_type(T, typeinfos.edges_attr[T]))),
+                 :($(Symbol(T, RW))::
+                     $(edgefield_type(T, typeinfos.edges_attr[T]))),
                  :($(edgefield_constructor(T, typeinfos.edges_attr[T]))))
         end 
         for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
@@ -98,7 +99,6 @@ function construct_model(typeinfos::ModelTypes, name::String)
     # Construct all type specific functions for the edge typeinfos
     for T in typeinfos.edges_types
         construct_edge_functions(T, typeinfos.edges_attr[T], simsymbol)
-        construct_sendedge_functions(T, typeinfos.edges_attr[T], simsymbol)
     end
 
     # Construct all type specific functions for the agent typeinfos
@@ -332,14 +332,17 @@ function apply_transition!(sim,
                     invariant_compute = false,
                     add_existing = Vector{DataType}())
     @assert sim.initialized "You must call finish_init! before apply_transition!"
-    
     writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
-    foreach(prepare_write!(sim, [add_existing; compute]), writeable)
-
-    foreach(T -> prepare_mpi!(sim, T), accessible)
-
+    # must be set to true before prepare_mpi! (as this calls add_edge!)
     sim.transition = true
+    
+    # before we call prepare_write! we must ensure that all edges
+    # in the storage that are accessible are distributed to the correct
+    # ranks.
+    foreach(T -> prepare_mpi!(sim, T), accessible)
+    
+    foreach(prepare_write!(sim, [add_existing; compute]), writeable)
     
     MPI.Barrier(MPI.COMM_WORLD)
     

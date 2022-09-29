@@ -180,7 +180,9 @@ function testforedgetype(ET)
     # send to the correct ranks
     apply_transition!(sim, reverse_edge_direction(ET),
                       [ AgentState1, AgentState2 ], [], [ ET ]; invariant_compute = true)
-    Vahana.edges_alltoall!(sim, Vahana.storage(sim, ET), ET)
+
+    # the edges are not send to other ranks before they are 
+    apply_transition!(sim, check(ET), [ AgentState1 ], [ ET ], []; invariant_compute = true)
     
     if has_trait(sim, ET, :SingleAgentType)
         @test num_edges(sim, ET) == num_agents(sim, AgentState1) 
@@ -188,7 +190,6 @@ function testforedgetype(ET)
         @test num_edges(sim, ET) ==
             num_agents(sim, AgentState1) + num_agents(sim, AgentState2)
     end
-    apply_transition!(sim, check(ET), [ AgentState1 ], [], []; invariant_compute = true)
     
     # we check now the partitioning via Metis
     finish_init!(simautopar)
@@ -205,7 +206,7 @@ function testforedgetype(ET)
 end
 
 @testset "EdgeTypes" begin
-    CurrentEdgeType = MPIEdgeD
+    CurrentEdgeType = Nothing
 
     if CurrentEdgeType === Nothing
         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
