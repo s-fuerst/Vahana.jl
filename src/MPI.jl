@@ -235,8 +235,11 @@ function edges_alltoall!(sim, perPE, T::DataType, updateid = identity)
             if has_trait(sim, T, :SingleEdge)
                 container[up] = true
             else
-                # TODO: this must be an addition
-                container[up] = numedges
+                if has_trait(sim, T, :SingleAgentType) || haskey(container, up)
+                    container[up] = container[up] + numedges
+                else
+                    container[up] = numedges
+                end
             end
         end
         # Else iterate of the received edges and add them via add_edge!    

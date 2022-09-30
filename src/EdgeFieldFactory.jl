@@ -311,7 +311,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     #### The exported functions
     #- add_edge!
     if stateless && ignorefrom && !singleedge
-        @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
+        @eval function add_edge!(sim::$simsymbol, to::AgentID, _::Edge{$MT})
             @mayassert sim.initialized == false || sim.transition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -327,8 +327,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             end
         end
 
-        @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
-                          state::$MT)
+        @eval function add_edge!(sim::$simsymbol, _::AgentID, to::AgentID, _::$MT)
             @mayassert sim.initialized == false || sim.transition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -434,7 +433,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     #- prepare_mpi! 
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$MT})
         edges_alltoall!(sim, @storage($T), $T)
-        @storage($T) = Vector{$CT}()
+        init_storage!(sim, $T)
     end
 
     @eval function finish_mpi!(_::$simsymbol, ::Type{$MT})
