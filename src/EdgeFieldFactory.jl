@@ -434,7 +434,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     
     #- prepare_mpi! 
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$MT})
-        @time edges_alltoall!(sim, @storage($T), $T)
+        edges_alltoall!(sim, @storage($T), $T)
         init_storage!(sim, $T)
     end
 

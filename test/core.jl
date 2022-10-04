@@ -1,13 +1,16 @@
 import Vahana.@onrankof
+import Vahana.@rootonly
 
 
-# A for Agent, one type per difference container type
-struct ADict     foo::Int64 end
-struct AImm      foo::Int64 end
-struct AImmFixed foo::Int64 end
-struct ADefault  foo::Int64 end
+# A for Agent, Imm for Immortal
+struct AMortal           foo::Int64 end
+struct AMortalFixed      foo::Int64 end
+struct AImm              foo::Int64 end
+struct AImmFixed         foo::Int64 end
+struct AImmFixedOversize foo::Int64 end
+struct ADefault          foo::Int64 end
 
-allagenttypes = [ ADict, AImm, AImmFixed ]
+allagenttypes = [ AMortal, AImm, AImmFixed ]
 
 
 function create_mpi_wins(sim)
@@ -25,9 +28,11 @@ struct ESLDict2 end
 
 begin
     model = ModelTypes() |>
-        register_agenttype!(ADict) |>
+        register_agenttype!(AMortal) |>
+        register_agenttype!(AMortalFixed; size = 10) |>
         register_agenttype!(AImm, :Immortal) |>
         register_agenttype!(AImmFixed, :Immortal; size = 10) |>
+        register_agenttype!(AImmFixedOversize, :Immortal; size = 20) |>
         register_agenttype!(ADefault) |>
         register_edgetype!(ESDict) |>
         register_edgetype!(ESLDict1) |> 
@@ -36,12 +41,17 @@ begin
 end
 
 function add_example_network!(sim)
-    # construct 3 ADict agents, 10 AImm agents and 10 AImmFixed
-    a1id = add_agent!(sim, ADict(1))
-    a2id, a3id = add_agents!(sim, ADict(2), ADict(3))
-    avids = add_agents!(sim, [ AImm(i) for i in 1:10])
-    avfids = add_agents!(sim, [ AImmFixed(i) for i in 1:10])
+    # construct 3 AMortal agents, 10 AImm agents and 10 AImmFixed
+    a1id = add_agent!(sim, AMortal(1))
+    a2id, a3id = add_agents!(sim, AMortal(2), AMortal(3))
+    avids  = add_agents!(sim, [ AImm(i)      for i in 1:10 ])
+    avfids = add_agents!(sim, [ AImmFixed(i) for i in 1:10 ])
 
+    # agent with edges, used for aggregate
+    add_agents!(sim, [ AImmFixedOversize(i) for i in 1:10 ])
+    add_agents!(sim, [ AMortalFixed(i)      for i in 1:10 ])
+    add_agents!(sim, [ ADefault(i)          for i in 1:10 ])
+    
     # we construct the following network for ESDict:
     # a2 & a3 & avids[1] & avfids[10] -> a1
     add_edge!(sim, a2id, a1id, ESDict(1))
@@ -79,6 +89,51 @@ end
 
 import Vahana.updateids
 
+@testset "Aggregate" begin
+    sim = new_simulation(model, nothing, nothing; name = "Aggregate")
+
+    (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
+
+    finish_init!(sim)
+
+    #    @info "where" mpi.rank sim.AImm_read.state
+    #    @test aggregate(sim, a -> a.foo, +, AMortal) == 6
+    @test aggregate(sim, a -> a.foo, +, AMortalFixed) == sum(1:10)
+    @test aggregate(sim, a -> a.foo, +, AImmFixed) == sum(1:10)
+    @test aggregate(sim, a -> a.foo, +, AImmFixedOversize) == sum(1:10)
+    @test aggregate(sim, a -> a.foo, +, ADefault) == sum(1:10)
+    #    @test aggregate(sim, e -> e.foo, +, ESDict) == 10
+
+
+    @info sim.AMortalFixed_died mpi.rank
+    @info sim.AMortalFixed_read.state mpi.rank
+    
+    # we are testing that there aggregate also works when on a rank
+    # no agent of this type is existing
+    apply_transition!(sim, [ADefault, AMortalFixed], [], []) do state, id, sim
+        mpi.isroot ? state : nothing
+    end
+
+    agg = aggregate(sim, a -> a.foo, +, ADefault)
+    @rootonly @test agg  == mapreduce(a -> a.foo, +,
+                                      Vahana.agentsonthisrank(sim, ADefault))
+
+    agg = aggregate(sim, a -> a.foo, +, AMortalFixed)
+
+    @info sim.AMortalFixed_died mpi.rank
+    @info sim.AMortalFixed_read.state mpi.rank
+    @info Vahana.agentsonthisrank(sim, AMortalFixed)
+
+    if length(Vahana.agentsonthisrank(sim, AMortalFixed)) > 0
+        @rootonly @test agg == mapreduce(a -> a.foo, +,
+                                          Vahana.agentsonthisrank(sim, AMortalFixed))
+    else
+        @rootonly @test agg == 0
+    end
+end
+
+
+
 @testset "Core" begin
     sim = new_simulation(model, nothing, nothing)
 
@@ -90,19 +145,20 @@ import Vahana.updateids
         updateids(idmap, a1id), updateids(idmap, a2id), updateids(idmap, a3id)
     avids, avfids = updateids(idmap, avids), updateids(idmap, avfids)
 
+    
     @testset "agentstate" begin
         create_mpi_wins(sim)
-        @onrankof a1id @test agentstate(sim, a1id, ADict) == ADict(1)
-        @onrankof a1id @test agentstate_flexible(sim, a1id) == ADict(1)
-        @onrankof a1id @test agentstate_flexible(sim, a1id) == ADict(1)
-        @onrankof a2id @test agentstate(sim, a2id, ADict) == ADict(2)
+        @onrankof a1id @test agentstate(sim, a1id, AMortal) == AMortal(1)
+        @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
+        @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
+        @onrankof a2id @test agentstate(sim, a2id, AMortal) == AMortal(2)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(1)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) == AImmFixed(1)
         @onrankof avids[10] @test agentstate(sim, avids[10], AImm) == AImm(10)
         @onrankof avfids[10] @test agentstate(sim, avfids[10], AImmFixed) == AImmFixed(10)
         #     # calling agentstate with the wrong typ should throw an AssertionError
         @test_throws AssertionError agentstate(sim, a2id, AImm)
-        @test_throws AssertionError agentstate(sim, avids[1], ADict)
+        @test_throws AssertionError agentstate(sim, avids[1], AMortal)
         free_mpi_wins(sim)
     end
 
@@ -132,7 +188,7 @@ import Vahana.updateids
         @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AImm)[1] ==
             AImm(1)
         @onrankof a1id @test neighborstates_flexible(sim, a1id, ESDict)[2] ==
-            ADict(3)
+            AMortal(3)
         free_mpi_wins(sim)
     end
 
@@ -171,17 +227,17 @@ import Vahana.updateids
         # now check apply_transtition! for the different nodefieldfactories
         copydict = deepcopy(copy)
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
-                          [ ADict ], allagenttypes, [])
+                          [ AMortal ], allagenttypes, [])
         create_mpi_wins(copydict)
-        @onrankof a1id @test agentstate(copydict, a1id, ADict) ==
-            ADict(sum(1:10) + 1)
+        @onrankof a1id @test agentstate(copydict, a1id, AMortal) ==
+            AMortal(sum(1:10) + 1)
         free_mpi_wins(copydict)
         
         apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
-                          [ ADict ], allagenttypes, [])
+                          [ AMortal ], allagenttypes, [])
         create_mpi_wins(copydict)
-        @onrankof a1id @test agentstate(copydict, a1id, ADict) ==
-            ADict(2 * sum(1:10) + 1)
+        @onrankof a1id @test agentstate(copydict, a1id, AMortal) ==
+            AMortal(2 * sum(1:10) + 1)
         free_mpi_wins(copydict)
 
         copyvec = deepcopy(copy)
@@ -226,7 +282,7 @@ import Vahana.updateids
         free_mpi_wins(copyvecfix)
 
         # TODO check return nothing (currently only supported by Dicts)
-        # apply_transition!(copydict, nothing_transition, [ ADict ], [], [])
+        # apply_transition!(copydict, nothing_transition, [ AMortal ], [], [])
         # @test_throws KeyError agentstate_flexible(copydict, a1id)
     end
 
@@ -244,16 +300,4 @@ import Vahana.updateids
     # TODO transition with add_agent! and add_edge!
 end
 
-
-# @testset "Aggregate" begin
-#     sim = new_simulation(model, nothing, nothing; name = "Aggregate")
-
-#     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
-
-#     finish_init!(sim)
-
-#     @test aggregate(sim, a -> a.foo, +, ADict) == 6
-#     @test aggregate(sim, a -> a.foo, +, AImm) == sum(1:10)
-#     @test aggregate(sim, e -> e.foo, +, ESDict) == 10
-# end
 

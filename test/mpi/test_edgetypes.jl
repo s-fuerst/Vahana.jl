@@ -12,7 +12,7 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-# Logging.disable_logging(Logging.Info)
+Logging.disable_logging(Logging.Info)
 
 #MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
 
@@ -239,7 +239,6 @@ function testforedgetype(ET)
     @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
     finish_init!(sim; partition = part)
-
     
     apply_transition!(sim, check_state(ET), [ AgentState1 ],
                       [ AgentState1, ET ], []; invariant_compute = true)

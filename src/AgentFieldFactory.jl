@@ -50,7 +50,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 resize!(@died($T), $_size)
                 # Strictly speaking they did not die, but they were
                 # also never born
-                fill(@died($T), $_size, true)
+                fill!(@died($T), true)
             end
         end
         nothing
@@ -95,6 +95,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if nr > length(@writestate($T))
                 resize!(@writestate($T), nr)
             end
+        elseif $checkliving
+            @died($T)[nr] = false
         end
         (0, nr)
     end
@@ -300,7 +302,44 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         sim.typeinfos.nodes_attr[$T][:mpi_prepared] = false
     end
 
-    # @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
-    #     mapreduce(f, op, sim.$(readfield(T)); kwargs...)
-    # end
+    @eval function agentsonthisrank(sim::$simsymbol, ::Type{$T}, write = false)
+        @info $checkliving
+        if ! $checkliving
+            states = @readstate($T)
+        else
+            if write
+                states = [ @writestate($T)[i] for i in 1:length(@writestate($T))
+                              if ! @died($T)[i] ]
+            else
+                states = [ @readstate($T)[i] for i in 1:length(@readstate($T))
+                              if ! @died($T)[i] ]
+            end
+        end
+    end        
+
+    @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
+        MT = get(kwargs, :datatype, Int)
+        
+        # for MPI.reduce we must ensure that each rank has a value
+        emptyval = get(kwargs, :init) do
+            if (op == +) zero(MT)
+            elseif (op == *) one(MT)
+            elseif (op == max) -Inf
+            elseif (op == min) Inf
+            elseif (op == &) true
+            elseif (op == |) false
+            else nothing
+            end
+        end
+
+        @assert emptyval !== nothing """ 
+            Can not derive the init value for the operator. You must add this
+            information via the `init` keyword.
+        """
+
+        reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
+        @info "reduced" mpi.rank reduced $T
+        mpiop = get(kwargs, :mpiop, op)
+        MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+    end
 end

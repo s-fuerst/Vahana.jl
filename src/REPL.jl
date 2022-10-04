@@ -259,11 +259,7 @@ end
 TODO DOC 
 """
 num_agents(sim, ::Type{T}; write = false) where T =
-    #TODO AGENT: we can now implement a method with correct values for
-    #fixed sizes
-     write ?
-        length(writestate(sim, T)) - length(readreuseable(sim, T)) :
-        length(readstate(sim, T)) - length(readreuseable(sim, T))
+    agentsonthisrank(sim, T, write) |> length
 
 """
 TODO DOC 
