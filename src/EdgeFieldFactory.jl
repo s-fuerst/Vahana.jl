@@ -126,6 +126,8 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     # we need this when we send the edges via MPI
     attr[:containerelement] = CE
     MT = startswith(string(T), "Main") ? T : @eval Main.$(Symbol(T))
+
+    construct_mpi_edge_functions(T, attr, simsymbol, CE)
     
     #### Functions that helps to write generic versions of the edge functions
     #
@@ -432,7 +434,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     
     #- prepare_mpi! 
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$MT})
-        edges_alltoall!(sim, @storage($T), $T)
+        @time edges_alltoall!(sim, @storage($T), $T)
         init_storage!(sim, $T)
     end
 

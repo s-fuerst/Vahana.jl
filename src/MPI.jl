@@ -131,14 +131,8 @@ end
 # | (Vector){AgentID}  | x       |        | neighborids   | [(toid, fromid)]   |
 # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
 # | Int64              | x       | x      | num_neighbors | num_neighbors      |
-
-
-containertype(sim, T::DataType) =
-    Vector{Tuple{AgentID, sim.typeinfos.edges_attr[T][:containerelement]}}
-
-
 function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataType)
-    ST = containertype(sim, T)
+    ST = Vector{Tuple{AgentID, sim.typeinfos.edges_attr[T][:containerelement]}}
     # We construct for each PE a vector with all the edges (incl. toid) that
     # should be transmit to the PE
     perPE = [ ST() for _ in 1:mpi.size ]
@@ -195,66 +189,71 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     edges_alltoall!(sim, perPE, T, updateid)
 end
 
-# updateid is a func that update the ids of the agents, for the case
-# that the ids have changed in the distribution process.
-function edges_alltoall!(sim, perPE, T::DataType, updateid = identity)
-    CE = sim.typeinfos.edges_attr[T][:containerelement]
+function construct_mpi_edge_functions(T::DataType, attr, simsymbol, CE)
+    ignorefrom = :IgnoreFrom in attr[:traits]
+    singleedge = :SingleEdge in attr[:traits]
+    singletype = :SingleAgentType in attr[:traits]
+    stateless = :Stateless in attr[:traits]
+
     ST = Vector{Tuple{AgentID, CE}}
-    # for sending them via AllToAll we flatten the perPE structure 
-    longvec = reduce(vcat, perPE)
-    sendbuf = if length(longvec) > 0
-        VBuffer(longvec, [ length(perPE[i]) for i in 1:mpi.size ])
-    else
-        VBuffer(ST(), [ 0 for _ in 1:mpi.size ])
-    end
 
-    # transmit the number of edges the current PE want to send to the
-    # other PEs
-    sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
-    recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
-    # with this information we can prepare the receive buffer
-    recvbuf = MPI.VBuffer(ST(undef, sum(recvNumElems)),
-                          recvNumElems)
+    # updateid is a func that update the ids of the agents, for the case
+    # that the ids have changed in the distribution process.
+    @eval function edges_alltoall!(sim::$simsymbol, perPE, ::Type{$T}, updateid = identity)
+        # for sending them via AllToAll we flatten the perPE structure 
+        longvec = reduce(vcat, perPE)
+        sendbuf = if length(longvec) > 0
+            VBuffer(longvec, [ length(perPE[i]) for i in 1:mpi.size ])
+        else
+            VBuffer($ST(), [ 0 for _ in 1:mpi.size ])
+        end
 
-    # transmit the edges itself
-    MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+        # transmit the number of edges the current PE want to send to the
+        # other PEs
+        sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
+        recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+        # with this information we can prepare the receive buffer
+        recvbuf = MPI.VBuffer($ST(undef, sum(recvNumElems)),
+                              recvNumElems)
 
-    # In the case that the edgetype count only the number of edges, write
-    # this number directly into the edges container of the receiving PE
-    if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
-        container = write(sim, T)
+        # transmit the edges itself
+        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
-        for (to, numedges) in recvbuf.data
-            @assert numedges > 0
-            up = if has_trait(sim, T, :SingleAgentType)
-                updateid(to) |> agent_nr
-            else
-                updateid(to)
-            end
-            Vahana._check_size!(container, up, T)
-            if has_trait(sim, T, :SingleEdge)
-                container[up] = true
-            else
-                if has_trait(sim, T, :SingleAgentType) || haskey(container, up)
-                    container[up] = container[up] + numedges
+        # In the case that the edgetype count only the number of edges, write
+        # this number directly into the edges container of the receiving PE
+        if $stateless && $ignorefrom
+            for (to, numedges) in recvbuf.data
+                @assert numedges > 0
+                up = if $singletype
+                    updateid(to) |> agent_nr
                 else
-                    container[up] = numedges
+                    updateid(to)
+                end
+                _check_size!(@write($T), up, $T)
+                if $singleedge
+                    @write($T)[up] = true
+                else
+                    if $singletype || haskey(@write($T), up)
+                        @write($T)[up] = @write($T)[up] + numedges
+                    else
+                        @write($T)[up] = numedges
+                    end
                 end
             end
-        end
-        # Else iterate of the received edges and add them via add_edge!    
-    elseif has_trait(sim, T, :Stateless)
-        for (to, from) in recvbuf.data
-            add_edge!(sim, updateid(from), updateid(to), T())
-        end
-    elseif has_trait(sim, T, :IgnoreFrom)
-        for (to, edgestate) in recvbuf.data
-            # fromid will be ignored, so we use an dummy id
-            add_edge!(sim, AgentID(0), updateid(to), edgestate)
-        end
-    else
-        for (to, edge) in recvbuf.data
-            add_edge!(sim, updateid(to), Edge(updateid(edge.from), edge.state))
+            # Else iterate of the received edges and add them via add_edge!    
+        elseif $stateless
+            for (to, from) in recvbuf.data
+                add_edge!(sim, updateid(from), updateid(to), $T())
+            end
+        elseif $ignorefrom
+            for (to, edgestate) in recvbuf.data
+                # fromid will be ignored, so we use an dummy id
+                add_edge!(sim, AgentID(0), updateid(to), edgestate)
+            end
+        else
+            for (to, edge) in recvbuf.data
+                add_edge!(sim, updateid(to), Edge(updateid(edge.from), edge.state))
+            end
         end
     end
 end
