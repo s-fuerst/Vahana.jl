@@ -303,7 +303,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function agentsonthisrank(sim::$simsymbol, ::Type{$T}, write = false)
-        @info $checkliving
         if ! $checkliving
             states = @readstate($T)
         else
@@ -322,13 +321,20 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         
         # for MPI.reduce we must ensure that each rank has a value
         emptyval = get(kwargs, :init) do
-            if (op == +) zero(MT)
-            elseif (op == *) one(MT)
-            elseif (op == max) -Inf
-            elseif (op == min) Inf
-            elseif (op == &) true
-            elseif (op == |) false
-            else nothing
+            if op == +
+                zero(MT)
+            elseif op == *
+                one(MT)
+            elseif op == max
+                -typemax(MT)
+            elseif op == min 
+                typemax(MT)
+            elseif op == &
+                true
+            elseif op == |
+                false
+            else
+                nothing
             end
         end
 
@@ -338,7 +344,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         """
 
         reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
-        @info "reduced" mpi.rank reduced $T
         mpiop = get(kwargs, :mpiop, op)
         MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
     end

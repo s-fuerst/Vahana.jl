@@ -8,7 +8,10 @@ struct AMortalFixed      foo::Int64 end
 struct AImm              foo::Int64 end
 struct AImmFixed         foo::Int64 end
 struct AImmFixedOversize foo::Int64 end
-struct ADefault          foo::Int64 end
+struct ADefault
+    foo::Int64
+    bool::Bool
+end
 
 allagenttypes = [ AMortal, AImm, AImmFixed ]
 
@@ -50,7 +53,7 @@ function add_example_network!(sim)
     # agent with edges, used for aggregate
     add_agents!(sim, [ AImmFixedOversize(i) for i in 1:10 ])
     add_agents!(sim, [ AMortalFixed(i)      for i in 1:10 ])
-    add_agents!(sim, [ ADefault(i)          for i in 1:10 ])
+    add_agents!(sim, [ ADefault(i, true)          for i in 1:10 ])
     
     # we construct the following network for ESDict:
     # a2 & a3 & avids[1] & avfids[10] -> a1
@@ -89,6 +92,35 @@ end
 
 import Vahana.updateids
 
+function test_aggregate(sim, T::DataType)
+    @test aggregate(sim, a -> a.foo, +, T) == reduce(+, 1:10)
+    @test aggregate(sim, a -> a.foo, *, T) == reduce(*, 1:10)
+    @test aggregate(sim, a -> a.foo, &, T) == reduce(&, 1:10)
+    @test aggregate(sim, a -> a.foo, |, T) == reduce(|, 1:10)
+    @test aggregate(sim, a -> a.foo, max, T) == reduce(max, 1:10)
+    @test aggregate(sim, a -> a.foo, min, T) == reduce(min, 1:10)
+end    
+
+function test_aggregate_mortal(sim, T::DataType)
+    test_aggregate(sim, T)
+    
+    # we are testing that there aggregate also works when on a rank
+    # no agent of this type is existing
+    apply_transition!(sim, [ T ], [], []) do state, id, sim
+        mpi.isroot ? state : nothing
+    end
+
+    agg = aggregate(sim, a -> a.foo, +, T)
+
+    if length(Vahana.agentsonthisrank(sim, T)) > 0
+        @rootonly @test agg == mapreduce(a -> a.foo, +,
+                                          Vahana.agentsonthisrank(sim, T))
+    else
+        @rootonly @test agg == 0
+    end
+end    
+
+
 @testset "Aggregate" begin
     sim = new_simulation(model, nothing, nothing; name = "Aggregate")
 
@@ -96,40 +128,32 @@ import Vahana.updateids
 
     finish_init!(sim)
 
-    #    @info "where" mpi.rank sim.AImm_read.state
-    #    @test aggregate(sim, a -> a.foo, +, AMortal) == 6
-    @test aggregate(sim, a -> a.foo, +, AMortalFixed) == sum(1:10)
-    @test aggregate(sim, a -> a.foo, +, AImmFixed) == sum(1:10)
-    @test aggregate(sim, a -> a.foo, +, AImmFixedOversize) == sum(1:10)
-    @test aggregate(sim, a -> a.foo, +, ADefault) == sum(1:10)
-    #    @test aggregate(sim, e -> e.foo, +, ESDict) == 10
-
-
-    @info sim.AMortalFixed_died mpi.rank
-    @info sim.AMortalFixed_read.state mpi.rank
-    
-    # we are testing that there aggregate also works when on a rank
-    # no agent of this type is existing
-    apply_transition!(sim, [ADefault, AMortalFixed], [], []) do state, id, sim
-        mpi.isroot ? state : nothing
+    for T in [ AImmFixed, AImmFixedOversize ]
+        test_aggregate(sim, T)
     end
 
-    agg = aggregate(sim, a -> a.foo, +, ADefault)
-    @rootonly @test agg  == mapreduce(a -> a.foo, +,
-                                      Vahana.agentsonthisrank(sim, ADefault))
-
-    agg = aggregate(sim, a -> a.foo, +, AMortalFixed)
-
-    @info sim.AMortalFixed_died mpi.rank
-    @info sim.AMortalFixed_read.state mpi.rank
-    @info Vahana.agentsonthisrank(sim, AMortalFixed)
-
-    if length(Vahana.agentsonthisrank(sim, AMortalFixed)) > 0
-        @rootonly @test agg == mapreduce(a -> a.foo, +,
-                                          Vahana.agentsonthisrank(sim, AMortalFixed))
-    else
-        @rootonly @test agg == 0
+    for T in [ AMortalFixed, ADefault ]
+        test_aggregate_mortal(sim, T)
     end
+
+    #  testing the & and | for boolean 
+    # currenty all bool of ADefault are true
+    @test aggregate(sim, a -> a.bool, &, ADefault) == true
+    @test aggregate(sim, a -> a.bool, |, ADefault) == true
+
+    # set all bool to false
+    apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
+        ADefault(state.foo, false)
+    end
+    @test aggregate(sim, a -> a.bool, &, ADefault) == false
+    @test aggregate(sim, a -> a.bool, |, ADefault) == false
+
+    # every second will be true, so that && is false and || is true
+    apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
+        ADefault(state.foo, mod(id, 2) == 1)
+    end
+    @test aggregate(sim, a -> a.bool, &, ADefault) == false
+    @test aggregate(sim, a -> a.bool, |, ADefault) == true
 end
 
 
