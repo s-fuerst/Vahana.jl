@@ -127,6 +127,11 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     attr[:containerelement] = CE
     MT = startswith(string(T), "Main") ? T : @eval Main.$(Symbol(T))
 
+    # for the singletype case we can access the type of the agent via AT
+    if singletype
+        AT = attr[:to_agenttype]
+    end
+
     construct_mpi_edge_functions(T, attr, simsymbol, CE)
     
     #### Functions that helps to write generic versions of the edge functions
@@ -180,7 +185,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     # the size if necessary (for other cases it's again a noop).
     if singletype
         if isbitstype(CT)
-        #for bitstype we must initialize the new memory
+            #for bitstype we must initialize the new memory
             if singletype_size == 0
                 @eval function _check_size!(field, nr::AgentNr, ::Type{$T})
                     s = length(field)
@@ -188,13 +193,13 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                         resize!(field, nr)
                         Base.securezero!(view(field, s+1:nr))
                         # TODO: compare performance with memset
-                       # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
+                        # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
                         #       pointer(field, s+1), Int8(0), (nr-s) * sizeof($CT))
                     end
                 end
             else
                 @eval function init_field!(sim::$simsymbol, ::Type{$MT})
-#                    field = sim.$(writefield(T))
+                    #                    field = sim.$(writefield(T))
                     resize!(@write($T), $singletype_size)
                     Base.securezero!(@write($T))
                     # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
@@ -581,10 +586,14 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
 
     #- aggregate incl. helper functions
     if singletype
-        @eval _removeundef(::Type{$MT}) = edges -> 
-            [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
+        @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> begin
+            @info "before remove" mpi.rank $AT @died($AT)
+            e = [ @inbounds edges[i] for i=1:length(edges) if ! @died($AT)[i] ]
+            @info "in remove" mpi.rank e
+            e
+        end
     else
-        @eval _removeundef(::Type{$MT}) = edges -> edges
+        @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> edges
     end
 
     if ignorefrom && stateless
@@ -599,7 +608,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
             field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
             # TODO: performance improvement with _countundef?
-            length(_removeundef(t)(field))
+            length(_removeundef(sim, t)(field))
         end
     else
         if !singletype
@@ -627,41 +636,31 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end 
     end
 
-    #- aggregate
-    if !stateless
-        if ignorefrom
-            @eval _edgestates(::Type{$MT}) = edges -> edges
-        else
-            @eval _edgestates(::Type{$MT}) = edges -> map(e -> e.state, edges)
-        end
-        if singleedge
-            @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT} ; kwargs...)
-                # TODO maybe rename prepare_mpi!
-                prepare_mpi!(sim, t)
-                estates = sim.$(readfield(T)) |>
-                    values |>
-                    _removeundef(t) |>
-                    collect |>
-                    _edgestates(t)
-                mapreduce(f, op, estates; kwargs...)
-            end
-        else
-            @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
-                prepare_mpi!(sim, t)
-                estates = sim.$(readfield(T)) |>
-                    values |>
-                    _removeundef(t) |>
-                    Iterators.flatten |>
-                    collect  |>
-                    _edgestates(t)
-                mapreduce(f, op, estates; kwargs...)
-            end
-        end
+#- aggregate
+if !stateless
+    if ignorefrom
+        @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2], edges)
     else
-        @eval function aggregate(::$simsymbol, t::Type{$MT}, f, op; kwargs...)
-            @assert false """
+        @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2].state, edges)
+    end
+    @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
+        emptyval = val4empty(op; kwargs)
+        
+        prepare_mpi!(sim, t)
+        estates = edges_iterator(sim, $MT) |> 
+            collect  |>
+            _edgestates(t)
+
+        reduced = mapreduce(f, op, estates; init = emptyval)
+        
+        mpiop = get(kwargs, :mpiop, op)
+        MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+    end
+else
+    @eval function aggregate(::$simsymbol, f, op, t::Type{$MT}; kwargs...)
+        @assert false """
             aggregate is not defined for the trait combination of $t
             """
-        end
     end
-end   
+end
+end

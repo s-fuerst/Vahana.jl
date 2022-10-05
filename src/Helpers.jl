@@ -39,6 +39,37 @@ end
 
 ######################################## internal
 
+# this is for the reduce operations, and tries to determine
+# the default value for ranks without any agent/edge
+function val4empty(op; kwargs...)
+    MT = get(kwargs, :datatype, Int)
+    
+    # for MPI.reduce we must ensure that each rank has a value
+    emptyval = get(kwargs, :init) do
+        if op == +
+            zero(MT)
+        elseif op == *
+            one(MT)
+        elseif op == max
+            -typemax(MT)
+        elseif op == min 
+            typemax(MT)
+        elseif op == &
+            true
+        elseif op == |
+            false
+        else
+            nothing
+        end
+    end
+
+    @assert emptyval !== nothing """ 
+            Can not derive the init value for the operator. You must add this
+            information via the `init` keyword.
+        """
+    emptyval
+end
+
 #################### field symbols
 # create symbol for the different fields of an agent/edgetype
 

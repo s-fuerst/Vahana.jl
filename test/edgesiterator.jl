@@ -28,14 +28,41 @@
         @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length == expected
 
         finish_init!(eisim)
-            
+        
         @test Vahana.edges_iterator(eisim, ET) |> length == expected
         @test Vahana.edges_iterator(eisim, ET) |> collect |> length == expected
     end
 
     for ET in [ statelessEdgeTypes; statefulEdgeTypes ]
         if ! (hastrait(ET, "S") & hastrait(ET, "I"))
-             runedgesitertest(ET)
+            runedgesitertest(ET)
         end
+    end
+end
+
+@testset "Edges Agg" begin
+    function runedgesaggregatetest(ET::DataType)
+        sim = new_simulation(model_edges, nothing, nothing)
+
+        @test aggregate(sim, e -> e.foo, +, ET) == 0
+        
+        aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
+        for id in aids
+            add_edge!(sim, aids[1], id, ET(Vahana.agent_nr(id)))
+        end
+
+        finish_init!(sim)
+
+        @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
+
+        apply_transition!(sim, [ Agent ], [], []) do state, id, sim
+            nothing
+        end
+
+        @test aggregate(sim, e -> e.foo, +, ET) == 0
+    end
+
+    for ET in statefulEdgeTypes
+        runedgesaggregatetest(ET)
     end
 end

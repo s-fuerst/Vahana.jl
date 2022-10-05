@@ -66,8 +66,6 @@ function iterate(iw::IterEdgesWrapper)
     iterate(iw, IterEdgesState(agentiter, currentagentid, 1))
 end
 
-
-
 function iterate(iw::IterEdgesWrapper, is::IterEdgesState)
     field = iw.field
     # innerisvec is false, if the edgetype has the trait :SingleEdge
