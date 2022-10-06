@@ -1,6 +1,5 @@
 # The died/reuseable stuff is a little bit tricky: We need the died
 # vector to easy check that an agent is still living in agentstate or
-using Base: _sizeof_uv_prepare, _sizeof_uv_fs
 # the transition functions.  But when we want to reuse a row, we do
 # not want to iterate over the died vector until we found a true
 # value.  As people that are dying, are dead at step t+1 and not at
@@ -322,5 +321,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
         mpiop = get(kwargs, :mpiop, op)
         MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+    end
+
+    @eval function isliving(sim::$simsymbol, id::AgentID, ::Type{$T})
+        ! @died($T)[agent_nr(id)]
+    end
+    @eval function isliving(sim::$simsymbol, id, ::Type{$T})
+        ! @died($T)[id]
     end
 end

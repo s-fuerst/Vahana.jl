@@ -133,7 +133,7 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
     end
 
     construct_mpi_edge_functions(T, attr, simsymbol, CE)
-    
+    construct_edges_iter_functions(T, attr, simsymbol)
     #### Functions that helps to write generic versions of the edge functions
     #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
