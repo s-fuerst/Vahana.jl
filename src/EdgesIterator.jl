@@ -16,7 +16,6 @@ struct IterEdgesWrapper{SIM, T}
     sim::SIM
     read::Bool
     field
-    singleedge::Bool # the inner container is not a vector
 end
 
 function length(iw::IterEdgesWrapper{SIM, T}) where {SIM, T}
@@ -39,11 +38,11 @@ function construct_edges_iter_functions(T::DataType, attr, simsymbol)
 
         field = r ? @read($T) : @write($T)
         if length(field) == 0
-            # for empty field, we can not detect singleedge, but this is also not
-            # necessary as the iteratore will return nothing immediately
-            IterEdgesWrapper{$simsymbol, $T}(sim, r, field, false)
+            # we can not return nothing, but an empty vector will return nothing when
+            # iterate is called on it
+            []
         else
-            IterEdgesWrapper{$simsymbol, $T}(sim, r, field, $singleedge)
+            IterEdgesWrapper{$simsymbol, $T}(sim, r, field)
         end
     end
 
@@ -57,9 +56,7 @@ function construct_edges_iter_functions(T::DataType, attr, simsymbol)
         # if hasmethod(isassigned, (typeof(field), Int64))
         @info "before" ks
         if $singletype
-            ks = filter(i -> isassigned(field, i) && isliving(iw.sim, i, $AT), ks)
-        else
-            ks = filter(i -> isliving(iw.sim, i), ks)
+            ks = filter(i -> isassigned(field, i), ks)
         end
         @info "after" ks length(ks)
         # in the case that no key is left, we also return immediately

@@ -116,16 +116,9 @@ function agent_nr(id::AgentID)::AgentNr
     id & (2 ^ BITS_AGENTNR - 1)
 end
 
-# for "flexible" calls (as from iterate) this is redicted to the implementation
-# in AgentFieldFactory
-function isliving(sim, id::AgentID)
-    isliving(sim, id::AgentID, type_of(sim, id))
-end
-
 @assert agent_id(3, 2, 1) |> type_nr == 3
 @assert agent_id(3, 2, 1) |> reuse_nr == 2
 @assert agent_id(3, 2, 1) |> agent_nr == 1
-    
 
 """
     add_agent!(sim, agent::T)::AgentID

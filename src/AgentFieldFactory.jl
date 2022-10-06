@@ -254,6 +254,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         # finish the last epoch
         @readstate($T) = @writestate($T)
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
+        # manage "died" agents, set died flag and remove edges to this
+        # agent. these needs an seperate function, as there is a dependency
+        # to finish_write! for edges.
+        CONTINUE HERE
         foreach(nr -> @died($T)[nr] = true,  @writereuseable($T)) 
         empty!(@writereuseable($T))
     end
@@ -321,12 +325,5 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
         mpiop = get(kwargs, :mpiop, op)
         MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
-    end
-
-    @eval function isliving(sim::$simsymbol, id::AgentID, ::Type{$T})
-        ! @died($T)[agent_nr(id)]
-    end
-    @eval function isliving(sim::$simsymbol, id, ::Type{$T})
-        ! @died($T)[id]
     end
 end
