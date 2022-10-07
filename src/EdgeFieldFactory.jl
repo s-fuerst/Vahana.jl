@@ -49,7 +49,6 @@ function construct_types(T, attr::Dict{Symbol, Any})
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
     stateless = :Stateless in attr[:traits]
-
     
     A = if singletype
         "Vector{"
@@ -423,7 +422,38 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
     end
 
-    #- prepare_write! 
+    @eval function _remove_edge_from!(sim::$simsymbol, from::AgentID, ::Type{$MT})
+        # when we don't know where there edges are come from, we can not
+        # remove them
+        if $ignorefrom
+            return nothing
+        end
+
+        @inline function __is_from(from::AgentID, edgeorid)
+            if $stateless
+                from == edgeorid
+            else
+                from == edgeorid.from
+            end
+        end
+
+        for to in keys(@write($T))
+            # ac for agent container
+            ac = @write($T)[to]
+            if $singleedge
+                if __is_from(from, ac)
+                    if $singletype
+                        @write($T)[to] = zero($CT)
+                    else
+                        delete!(@write($T), to)
+                    end
+                end
+            else
+                deleteat!(ac, findall(e -> __is_from(from, e), ac))
+            end
+        end        
+    end
+    
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, t::Type{$MT})
         if add_existing
             sim.$(writefield(T)) = deepcopy(sim.$(readfield(T)))
@@ -437,7 +467,6 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
     end
     
-    #- prepare_mpi! 
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$MT})
         edges_alltoall!(sim, @storage($T), $T)
         init_storage!(sim, $T)
@@ -584,76 +613,75 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
     end
 
-    #- _remove_edges (called from Vahana itself to remove the edges of
-    #- died agents)
-    if singletype
-        @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            if type_of(sim, to) == $AT
-                nr = agent_nr(to)
-                if length(@write($MT)) >= nr
-                    @write($MT)[nr] = zero($CT)
-                end
-            end 
-        end
-    else
-        @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            if haskey(@write($MT), to)
-                delete!(@write($MT), to)
+#- _remove_edges (called from Vahana itself to remove the edges of
+#- died agents)
+if singletype
+    @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        if type_of(sim, to) == $AT
+            nr = agent_nr(to)
+            if length(@write($MT)) >= nr
+                @write($MT)[nr] = zero($CT)
             end
+        end 
+    end
+else
+    @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        if haskey(@write($MT), to)
+            delete!(@write($MT), to)
         end
     end
-    
-    #- aggregate incl. helper functions
-    if singletype
-        @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> begin
-            [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
-        end
-    else
-        @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> edges
-    end
+end
 
-    if ignorefrom && stateless
+#- aggregate incl. helper functions
+if singletype
+    @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> begin
+        [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
+    end
+else
+    @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> edges
+end
+
+if ignorefrom && stateless
+    @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
+        field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+        if length(field) == 0
+            return 0
+        end
+        mapreduce(id -> field[id], +, keys(field))
+    end
+elseif singleedge
+    @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
+        field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+        # TODO: performance improvement with _countundef?
+        length(_removeundef(sim, t)(field))
+    end
+else
+    if !singletype
         @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
             field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
             if length(field) == 0
                 return 0
             end
-            mapreduce(id -> field[id], +, keys(field))
-        end
-    elseif singleedge
-        @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
-            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
-            # TODO: performance improvement with _countundef?
-            length(_removeundef(sim, t)(field))
+            mapreduce(id -> length(field[id]), +, keys(field))
         end
     else
-        if !singletype
-            @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
-                field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
-                if length(field) == 0
-                    return 0
-                end
-                mapreduce(id -> length(field[id]), +, keys(field))
+        @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
+            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            if length(field) == 0
+                return 0
             end
-        else
-            @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
-                field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
-                if length(field) == 0
-                    return 0
+            n = 0
+            for i in 1:length(field)
+                if isassigned(field, i)
+                    n += length(field[i])
                 end
-                n = 0
-                for i in 1:length(field)
-                    if isassigned(field, i)
-                        n += length(field[i])
-                    end
-                end
-                n
             end
-        end 
-    end
+            n
+        end
+    end 
+end
 
-#- aggregate (for whatever reason the code-formatter indent this
-#- incorrect, we are still in constrct_edge_functions)
+#- aggregate
 if !stateless
     if ignorefrom
         @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2], edges)

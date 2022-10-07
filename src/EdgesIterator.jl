@@ -53,7 +53,6 @@ function construct_edges_iter_functions(T::DataType, attr, simsymbol)
         field = iw.field
         ks = keys(field)
         # If the agent container is a vector, remove all #undefs
-        # if hasmethod(isassigned, (typeof(field), Int64))
         if $singletype
             ks = filter(i -> isassigned(field, i), ks)
         end
