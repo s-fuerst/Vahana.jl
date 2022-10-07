@@ -584,13 +584,29 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
     end
 
+    #- _remove_edges (called from Vahana itself to remove the edges of
+    #- died agents)
+    if singletype
+        @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            if type_of(sim, to) == $AT
+                nr = agent_nr(to)
+                if length(@write($MT)) >= nr
+                    @write($MT)[nr] = zero($CT)
+                end
+            end 
+        end
+    else
+        @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            if haskey(@write($MT), to)
+                delete!(@write($MT), to)
+            end
+        end
+    end
+    
     #- aggregate incl. helper functions
     if singletype
         @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> begin
-            @info "before remove" mpi.rank $AT @died($AT)
-            e = [ @inbounds edges[i] for i=1:length(edges) if ! @died($AT)[i] ]
-            @info "in remove" mpi.rank e
-            e
+            [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
         end
     else
         @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> edges
@@ -636,7 +652,8 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end 
     end
 
-#- aggregate
+#- aggregate (for whatever reason the code-formatter indent this
+#- incorrect, we are still in constrct_edge_functions)
 if !stateless
     if ignorefrom
         @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2], edges)
@@ -663,4 +680,5 @@ else
             """
     end
 end
+
 end

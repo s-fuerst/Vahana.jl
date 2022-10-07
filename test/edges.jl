@@ -7,7 +7,7 @@
 # so EdgeET means an Edge(State) with the SingleEdge and SingleAgentType traits
 
 struct Agent foo::Int64 end
-
+struct AgentB foo::Int64 end # this is used to test the removal of "dead" edges (in edgesiterator)
 struct EdgeD foo::Int64 end # D for default (no trait is set)
 struct EdgeS end
 struct EdgeE foo::Int64 end
@@ -35,6 +35,7 @@ statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI, EdgeTs, EdgeTs
 
 model_edges = ModelTypes() |>
     register_agenttype!(Agent) |>
+    register_agenttype!(AgentB) |>
     register_edgetype!(EdgeD) |>
     register_edgetype!(EdgeS, :Stateless) |>
     register_edgetype!(EdgeE, :SingleEdge) |>

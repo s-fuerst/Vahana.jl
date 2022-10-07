@@ -358,8 +358,15 @@ function apply_transition!(sim,
     MPI.Barrier(MPI.COMM_WORLD)
 
     foreach(T -> finish_mpi!(sim, T), accessible)
-    
-    foreach(finish_write!(sim), writeable)
+
+    # we must first call finish_write! for the agents, as this will
+    # remove the edges where are died agents are involved (and modifies
+    # EdgeType_write).
+    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, writeable)
+    foreach(finish_write!(sim), writeableAT)
+
+    writeableET = filter(w -> w in sim.typeinfos.edges_types, writeable)
+    foreach(finish_write!(sim), writeableET)
 
     sim.transition = false
     sim.num_transitions = sim.num_transitions + 1

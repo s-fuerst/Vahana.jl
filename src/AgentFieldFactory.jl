@@ -12,6 +12,9 @@
 # died not seperated for read and write, as died is only used 
 # in the read actions and updated in finish_write!
 
+# We must also remove edges with agents that died:
+# For the agents at the target position this is done in finish_write!
+
 function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
     # in the case that the AgentType is stateless, we only check
@@ -254,11 +257,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         # finish the last epoch
         @readstate($T) = @writestate($T)
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
-        # manage "died" agents, set died flag and remove edges to this
-        # agent. these needs an seperate function, as there is a dependency
-        # to finish_write! for edges.
-        CONTINUE HERE
-        foreach(nr -> @died($T)[nr] = true,  @writereuseable($T)) 
+
+        for nr in @writereuseable($T)
+            @died($T)[nr] = true
+            for ET in sim.typeinfos.edges_types
+                _remove_edges(sim, agent_id(sim, nr, $T), ET)
+            end
+        end
+
         empty!(@writereuseable($T))
     end
 

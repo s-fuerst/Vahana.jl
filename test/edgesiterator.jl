@@ -55,14 +55,38 @@ end
 
         @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
 
+        # first we test that edges to the agents are removed
         apply_transition!(sim, [ Agent ], [], []) do state, id, sim
             nothing
         end
 
         @test aggregate(sim, e -> e.foo, +, ET) == 0
+
+        # we now create edges from type AgentB to Agent and remove all
+        # agents of type AgentB. This should also remove the edges.
+        sim = new_simulation(model_edges, nothing, nothing)
+
+        aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
+        bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
+        for i in 1:10
+            add_edge!(sim, bids[i], aids[i], ET(i))
+        end
+
+        finish_init!(sim)
+
+        @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
+
+        # first we test that edges to the agents are removed
+        apply_transition!(sim, [ AgentB ], [], []) do state, id, sim
+            nothing
+        end
+
+        @test aggregate(sim, e -> e.foo, +, ET) == 0
+
     end
 
     for ET in statefulEdgeTypes
+        @info "runtestfor" ET
         runedgesaggregatetest(ET)
     end
 end

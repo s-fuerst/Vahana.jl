@@ -54,17 +54,13 @@ function construct_edges_iter_functions(T::DataType, attr, simsymbol)
         ks = keys(field)
         # If the agent container is a vector, remove all #undefs
         # if hasmethod(isassigned, (typeof(field), Int64))
-        @info "before" ks
         if $singletype
             ks = filter(i -> isassigned(field, i), ks)
         end
-        @info "after" ks length(ks)
         # in the case that no key is left, we also return immediately
         if length(ks) == 0
-            @info "return nothing"
             return nothing
         end
-        @info "behind nothing"
         # create an stateful iterator for the keys (the agentids), which
         # is added the the state of the outer iterator 
         agentiter = Iterators.Stateful(ks)
