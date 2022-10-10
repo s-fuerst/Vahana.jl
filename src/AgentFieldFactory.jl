@@ -258,13 +258,32 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         @readstate($T) = @writestate($T)
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
 
-        for nr in @writereuseable($T)
-            @died($T)[nr] = true
-            for ET in sim.typeinfos.edges_types
-                _remove_edges(sim, agent_id(sim, nr, $T), ET)
+        if ! $immortal
+            aids = map(nr -> agent_id(sim, nr, $T), @writereuseable($T))
+
+            # first we remove all the edges, where the agent is in the
+            # target position. As those edges are stored on the same
+            # rank as the agent, we can do this locally.
+            for id in aids
+                @died($T)[agent_nr(id)] = true
+                for ET in sim.typeinfos.edges_types
+                    _remove_edges_agent_traget!(sim, id, ET)
+                end
+            end
+
+            # for the edges where the agent is in the source position,
+            # the situation is worse, as they don't have the
+            # information on the agents rank, to which other agents
+            # edges are targeted. So we create a join of all the ids of
+            # all ranks, and then go locally to all the edges of the rank.
+            alldied = join(aids)
+            if ! isempty(alldied)
+                for ET in sim.typeinfos.edges_types
+                    _remove_edges_agent_source!(sim, alldied, ET)
+                end
             end
         end
-
+        
         empty!(@writereuseable($T))
     end
 

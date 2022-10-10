@@ -1,43 +1,46 @@
 # the edge types and some other stuff is defined in edges.jl
 
-import Vahana: has_trait
+import Vahana: has_trait, @onrankof
 
-@testset "Edges Iter" begin
-    function runedgesitertest(ET)
-        eisim = new_simulation(model_edges, nothing, nothing)
+# this test does not work with MPI, as it assumes that all edges are on one rank
+if mpi.size == 1
+    @testset "Edges Iter" begin
+        function runedgesitertest(ET)
+            eisim = new_simulation(model_edges, nothing, nothing)
 
-        @test Vahana.edges_iterator(eisim, ET) |> length == 0
-        @test Vahana.edges_iterator(eisim, ET) |> collect |> length == 0
-        
-        aids = add_agents!(eisim, [ Agent(i) for i in 1:10 ])
-        for id in aids
-            if fieldcount(ET) > 0
-                add_edge!(eisim, aids[1], id, ET(id))
-                if ! hastrait(ET, "E")
-                    add_edge!(eisim, id, aids[1], ET(id))
-                end
-            else
-                add_edge!(eisim, aids[1], id, ET())
-                if ! hastrait(ET, "E")
-                    add_edge!(eisim, id, aids[1], ET())
+            @test Vahana.edges_iterator(eisim, ET) |> length == 0
+            @test Vahana.edges_iterator(eisim, ET) |> collect |> length == 0
+            
+            aids = add_agents!(eisim, [ Agent(i) for i in 1:10 ])
+            for id in aids
+                if fieldcount(ET) > 0
+                    add_edge!(eisim, aids[1], id, ET(id))
+                    if ! hastrait(ET, "E")
+                        add_edge!(eisim, id, aids[1], ET(id))
+                    end
+                else
+                    add_edge!(eisim, aids[1], id, ET())
+                    if ! hastrait(ET, "E")
+                        add_edge!(eisim, id, aids[1], ET())
+                    end
                 end
             end
+
+            expected = hastrait(ET, "E") ? 10 : 20
+            
+            @test Vahana.edges_iterator(eisim, ET, false) |> length == expected
+            @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length == expected
+
+            finish_init!(eisim)
+            
+            @test Vahana.edges_iterator(eisim, ET) |> length == expected
+            @test Vahana.edges_iterator(eisim, ET) |> collect |> length == expected
         end
 
-        expected = hastrait(ET, "E") ? 10 : 20
-        
-        @test Vahana.edges_iterator(eisim, ET, false) |> length == expected
-        @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length == expected
-
-        finish_init!(eisim)
-        
-        @test Vahana.edges_iterator(eisim, ET) |> length == expected
-        @test Vahana.edges_iterator(eisim, ET) |> collect |> length == expected
-    end
-
-    for ET in [ statelessEdgeTypes; statefulEdgeTypes ]
-        if ! (hastrait(ET, "S") & hastrait(ET, "I"))
-            runedgesitertest(ET)
+        for ET in [ statelessEdgeTypes; statefulEdgeTypes ]
+            if ! (hastrait(ET, "S") & hastrait(ET, "I"))
+                runedgesitertest(ET)
+            end
         end
     end
 end
@@ -84,7 +87,6 @@ end
         end
 
         @test aggregate(sim, e -> e.foo, +, ET) == 0
-        
     end
 
     for ET in statefulEdgeTypes
@@ -98,8 +100,6 @@ end
     # but this does not work for distributed runs
     function runremoveedgestest(ET::DataType)
         sim = new_simulation(model_edges, nothing, nothing)
-
-        @info "run remove test for" ET
 
         # we create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
@@ -117,7 +117,7 @@ end
 
         finish_init!(sim)
 
-        @test num_edges(sim, ET) == 10  
+        @test Vahana.join([ num_edges(sim, ET) ]) |> sum == 10    
 
         # first we test that edges to the agents are removed
         apply_transition!(sim, [ Agent ], [], []) do state, id, sim
@@ -143,11 +143,12 @@ end
             end 
         end
 
-        Vahana._remove_edge_from!(sim, bids[1], ET)
+        @onrankof aids[1] Vahana._remove_edges_agent_traget!(sim, aids[1], ET)
+        @onrankof bids[2] Vahana._remove_edges_agent_source!(sim, [ bids[2] ], ET)
 
         finish_init!(sim)
 
-        @test num_edges(sim, ET) == 9
+        @test Vahana.join([ num_edges(sim, ET) ]) |> sum == 8
 
         # # first we test that edges to the agents are removed
         # apply_transition!(sim, [ AgentB ], [], []) do state, id, sim
@@ -159,6 +160,6 @@ end
     end
 
     for ET in [ statefulEdgeTypes; statelessEdgeTypes ]
-            runremoveedgestest(ET)
+        runremoveedgestest(ET)
     end
 end

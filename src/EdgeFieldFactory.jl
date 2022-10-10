@@ -422,26 +422,30 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
     end
 
-    @eval function _remove_edge_from!(sim::$simsymbol, from::AgentID, ::Type{$MT})
+    # iterate over all edge containers for the agents on the rank,
+    # search for edges where on of the agents in the from vector is in
+    # the source position, and remove those edges.
+    @eval function _remove_edges_agent_source!(sim::$simsymbol, from::Vector{AgentID}, ::Type{$MT})
         # when we don't know where there edges are come from, we can not
         # remove them
         if $ignorefrom
             return nothing
         end
 
-        @inline function __is_from(from::AgentID, edgeorid)
+        # when the edge is stateless, the edge is already the agent id.
+        @inline function __is_from(edgeorid)
             if $stateless
-                from == edgeorid
+                edgeorid in from
             else
-                from == edgeorid.from
+                edgeorid.from in from
             end
         end
 
-        for to in keys(@write($T))
+        for to in keys(_removeundef(sim, $T)(@write($T)))
             # ac for agent container
             ac = @write($T)[to]
             if $singleedge
-                if __is_from(from, ac)
+                if __is_from(ac)
                     if $singletype
                         @write($T)[to] = zero($CT)
                     else
@@ -449,7 +453,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                     end
                 end
             else
-                deleteat!(ac, findall(e -> __is_from(from, e), ac))
+                deleteat!(ac, findall(__is_from, ac))
             end
         end        
     end
@@ -616,7 +620,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
 #- _remove_edges (called from Vahana itself to remove the edges of
 #- died agents)
 if singletype
-    @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
+    @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$MT})
         if type_of(sim, to) == $AT
             nr = agent_nr(to)
             if length(@write($MT)) >= nr
@@ -625,7 +629,7 @@ if singletype
         end 
     end
 else
-    @eval function _remove_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
+    @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$MT})
         if haskey(@write($MT), to)
             delete!(@write($MT), to)
         end
