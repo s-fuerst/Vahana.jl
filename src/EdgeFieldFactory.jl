@@ -686,7 +686,7 @@ else
 end
 
 #- aggregate
-if !stateless
+if ! stateless
     if ignorefrom
         @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2], edges)
     else

@@ -112,7 +112,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             T = $T
             sim.typeinfos.nodes_attr[$T][:mpi_prepared]
         end """
-          $T must be in the `accessible` parameter of the transition function.
+          $T must be in the `accessible` argument of the transition function.
         """
 
         r = process_nr(id)

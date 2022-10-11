@@ -197,7 +197,7 @@ function runedgestest()
             end
             for t in  [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
                      EdgeSTs, EdgeSTsI, EdgeSETsI  ]
-                @test_throws AssertionError aggregate(sim, t, a -> a.foo, +)
+                @test_throws AssertionError aggregate(sim, a -> a.foo, +, t)
             end
         end
 

@@ -1,4 +1,4 @@
- import LinearAlgebra
+import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
 export calc_raster, calc_rasterstate, move_to!
@@ -155,8 +155,11 @@ cellular automaton):
 
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim, raster::Symbol, f) 
-    map(f, sim.rasters[raster])
+function calc_raster(sim, raster::Symbol, f, accessible)
+    foreach(T -> prepare_mpi!(sim, T), accessible)
+    rs = map(f, sim.rasters[raster])
+    foreach(T -> finish_mpi!(sim, T), accessible)
+    rs
 end
 
 calc_raster(f, sim, raster::Symbol) = calc_raster(sim, raster, f)
@@ -189,7 +192,10 @@ it also possible to just write
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_rasterstate(sim, raster::Symbol, f, t::Type{T}) where T
-    map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
+    prepare_mpi!(sim, T)
+    rs = map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
+    finish_mpi!(sim, T)
+    rs
 end
 
 """

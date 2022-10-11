@@ -55,9 +55,15 @@ function val4empty(op; kwargs...)
         elseif op == min 
             typemax(MT)
         elseif op == &
-            true
+            @assert typemax(MT) isa Int || typemax(MT) isa Bool """
+            The & operator is only supported for integer and boolean types
+            """
+            typemax(MT)
         elseif op == |
-            false
+            @assert typemax(MT) isa Int || typemax(MT) isa Bool """
+            The & operator is only supported for integer and boolean types
+            """
+            typemax(MT) isa Int ? 0 : true
         else
             nothing
         end

@@ -51,12 +51,17 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, GridA) == 1
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 9
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 25
 
     raster = calc_rasterstate(sim, :grid, c -> c.active, GridA)
+    @test raster[1,3] == false
+    @test raster[1,1] == true
+    @test raster[4,4] == false
+
+    raster = calc_raster(sim, :grid, id -> agentstate(sim, id, GridA).active, [ GridA ])
     @test raster[1,3] == false
     @test raster[1,1] == true
     @test raster[4,4] == false
@@ -75,14 +80,14 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, GridA) == 1
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 9
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 25
     # @test aggregate(sim, GridA, a -> a.active, +) == 1
-    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 9
-    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 25
 
     sim = new_simulation(raster_model, nothing, nothing)
@@ -99,14 +104,14 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, GridA) == 1
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 9
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 25
     # @test aggregate(sim, GridA, a -> a.active, +) == 1
-    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 9
-    # apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    # apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 25
 
     sim = new_simulation(raster_model, nothing, nothing)
@@ -123,9 +128,9 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, GridA) == 1
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 9
-    apply_transition!(sim, diffuse, [GridA], [GridE], [])
+    apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 25
 
     ### 3D 
@@ -148,9 +153,9 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 5*5*5
     
     ### non-periodic 
@@ -171,9 +176,9 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 2*2*2
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3
 
     ### distance 2 
@@ -195,9 +200,9 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 5*5*5
 
     ### euclidean
@@ -218,7 +223,7 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3-8
 
     ### manhatten
@@ -239,7 +244,7 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 7
 
 
@@ -261,15 +266,20 @@ raster_model = ModelTypes() |>
     finish_init!(sim)
 
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
-    apply_transition!(sim, diffuse3D, [Grid3D], [GridE], [])
+    apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 10
     
     
 end
 
 @testset "Raster_NodeID" begin
+    # we have a raster with nodes of type Position and agents of type
+    # MovingAgent that are connected to this raster via edges of
+    # type OnPosition
+
+    # sum the value of all agents that are on the cell position
     function sum_on_pos(cell::Position, id, sim)
-        nstates =neighborstates_flexible(sim, id, OnPosition)
+        nstates = neighborstates_flexible(sim, id, OnPosition)
         if !isnothing(nstates)
             Position(mapreduce(c -> c.value, +, nstates))
         else
@@ -277,8 +287,12 @@ end
         end
     end
 
+    # this transition function moves the agent to the new pos, wherby the new
+    # pos is determined by the state of the current pos
     function value_on_pos(a::MovingAgent, id, sim)
+        # sum is not a sum operator, but a field of the agentstate of Position
         value = first(neighborstates_flexible(sim, id, OnPosition)).sum
+        @info value
         move_to!(sim, :raster, id, (value, value), OnPosition(), OnPosition())
         MovingAgent(value)
     end
@@ -304,7 +318,7 @@ end
     
     finish_init!(sim)
 
-    apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
+    apply_transition!(sim, sum_on_pos, [ Position ], [ MovingAgent, OnPosition ], [])
     raster = calc_rasterstate(sim, :raster, c -> c.sum, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
@@ -314,9 +328,9 @@ end
     apply_transition!(sim,
                       value_on_pos,
                       [ MovingAgent ],
-                      [ OnPosition ],
+                      [ Position, OnPosition ],
                       [ OnPosition ])
-    apply_transition!(sim, sum_on_pos, [ Position ], [ OnPosition ], [])
+    apply_transition!(sim, sum_on_pos, [ Position ], [ MovingAgent, OnPosition ], [])
     raster = calc_rasterstate(sim, :raster, c -> c.sum, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
