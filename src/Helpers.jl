@@ -92,11 +92,17 @@ macro reuse(T)
 end
 reuse(sim, T) = getproperty(sim, Symbol(T, "_reuse"))
 
-macro died(T)
-    field = Symbol(T, "_died")
-    :( sim.$(field) ) |> esc
+macro readdied(T)
+    field = Symbol(T, "_read")
+    :( sim.$(field).died ) |> esc
 end
-died(sim, T) = getproperty(sim, Symbol(T, "_died"))
+readdied(sim, T) = getproperty(sim, Symbol(T, "_read")).died
+
+macro writedied(T)
+    field = Symbol(T, "_write")
+    :( sim.$(field).died ) |> esc
+end
+writedied(sim, T) = getproperty(sim, Symbol(T, "_write")).died
 
 macro readstate(T)
     field = Symbol(T, "_read")

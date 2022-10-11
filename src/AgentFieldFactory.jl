@@ -1,20 +1,3 @@
-# The died/reuseable stuff is a little bit tricky: We need the died
-# vector to easy check that an agent is still living in agentstate or
-# the transition functions.  But when we want to reuse a row, we do
-# not want to iterate over the died vector until we found a true
-# value.  As people that are dying, are dead at step t+1 and not at
-# step t, we can not set the died flag for step t. Instead we add this
-# information to write.reuseable, which starts in an interation always
-# empty and only contains the rows of agents that died at step t.  In
-# finish_write! we then merge read.reuseable and write.reusable to
-# read.reuseable and set all the died flags to true for the
-# write.reusable entries. This (hopefully) also expains, why we have
-# died not seperated for read and write, as died is only used 
-# in the read actions and updated in finish_write!
-
-# We must also remove edges with agents that died:
-# For the agents at the target position this is done in finish_write!
-
 function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
     # in the case that the AgentType is stateless, we only check
@@ -38,10 +21,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     # TODO?: better name would be init_agentcontainer! 
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
-        @read($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
-        @write($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
+        @read($T) = AgentFields($T)
+        @write($T) = AgentFields($T)
         @nextid($T) = AgentNr(1)
-        @died($T) = Vector{Bool}()
         @reuse($T) = Vector{Reuse}()
         if $fixedsize
             resize!(@readstate($T), $_size)
@@ -49,10 +31,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             resize!(@reuse($T), $_size)
             fill!(@reuse($T), 0)
             if $checkliving
-                resize!(@died($T), $_size)
+                resize!(@readdied($T), $_size)
+                resize!(@writedied($T), $_size)
                 # Strictly speaking they did not die, but they were
                 # also never born
-                fill!(@died($T), true)
+                fill!(@readdied($T), true)
+                fill!(@writedied($T), true)
             end
         end
         nothing
@@ -61,48 +45,48 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     typeid = typeinfos.nodes_type2id[T]
 
     @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
-        if ! $immortal
-            if length(@readreuseable($T)) > 0
-                nr = pop!(@readreuseable($T))
-                # TODO AGENT: remove the assertion when we know that
-                # this is working
-                @assert @died($T)[nr]
-                # We cast to UInt64 to ensure that the +1 does not overflow
-                reuse = @reuse($T)[nr] |> UInt64
-                reuse = reuse + 1
-                # TODO AGENT: write a test that check this
-                if reuse < 2 ^ BITS_REUSE
-                    @died($T)[nr] = false
-                    # cast it back to the correct type
-                    reuse = Reuse(reuse)
-                    @reuse($T)[nr] = reuse
-                    return (reuse, nr)
-                else
-                    _get_next_id(sim, $T)
+        if ! $immortal && length(@readreuseable($T)) > 0
+            nr = pop!(@readreuseable($T))
+            # We cast to UInt64 to ensure that the +1 does not overflow
+            reuse = @reuse($T)[nr] |> UInt64
+            reuse = reuse + 1
+            # TODO AGENT: write a test that check this
+            if reuse < 2 ^ BITS_REUSE
+                @writedied($T)[nr] = false
+                # cast it back to the correct type
+                reuse = Reuse(reuse)
+                @reuse($T)[nr] = reuse
+                (reuse, nr)
+            else
+                # this index can not be used anymore, but also
+                # removed from the reuse vector. So we can recursively
+                # call _get_next_id again.
+                _get_next_id(sim, $T)
+            end
+        else   # immortal or no reusable row was found, use the next row
+            nr = @nextid($T)
+            # TODO AGENT: add an assterions that we have ids left
+            @nextid($T) = nr + 1
+            if ! $fixedsize
+                if nr > length(@reuse($T))
+                    resize!(@reuse($T), nr)
+                    @reuse($T)[nr] = 0
+                end
+                if nr > length(@writestate($T))
+                    resize!(@writestate($T), nr)
+                    # the length of writestate and writedied is always
+                    # the same, so we don't need a seperate if
+                    if $checkliving
+                        resize!(@writedied($T), nr)
+                    end
                 end
             end
-        end
-        # immortal or no reusable row was found, use the next row
-        nr = @nextid($T)
-        # TODO AGENT: add an assterions that we have ids left
-        @nextid($T) = nr + 1
-        if ! $fixedsize
-            if nr > length(@reuse($T))
-                resize!(@reuse($T), nr)
-                @reuse($T)[nr] = 0
-                if $checkliving
-                    resize!(@died($T), nr)
-                end
+            if $checkliving
+                @writedied($T)[nr] = false
             end
-            if nr > length(@writestate($T))
-                resize!(@writestate($T), nr)
-            end
-        elseif $checkliving
-            @died($T)[nr] = false
-        end
-        (0, nr)
-    end
-    
+            (0, nr)
+        end       
+    end    
     @eval function add_agent!(sim::$simsymbol, agent::$T)
         @mayassert sim.initialized == false || sim.transition """
         You can call add_agent! only in the initialization phase (until
@@ -110,6 +94,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         `apply_transition`.
         """
         (reuse, nr) = _get_next_id(sim, $T)
+        # @info "reuse" reuse nr
         @inbounds @writestate($T)[nr] = agent
         if $immortal
             immortal_agent_id($typeid, nr)
@@ -136,8 +121,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if $checkliving
                 nr = agent_nr(id)
                 # TODO AGENT: increase reuse in finish_write,
-                # then we can remove the died memory access here
-                if @died($T)[nr] || @reuse($T)[nr] > reuse_nr(id)
+                # then we can remove the died vector access here
+                if @readdied($T)[nr] || @reuse($T)[nr] > reuse_nr(id)
                     return nothing
                 end
             end
@@ -158,11 +143,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if $checkliving
                 win_died = sim.typeinfos.nodes_attr[$T][:window_died]
                 nr = agent_nr(id)
-                as = Vector{Bool}(undef, 1)
+                died = Vector{Bool}(undef, 1)
                 MPI.Win_lock(win_died; rank = r, type = :shared, nocheck = true)
-                MPI.Get!(as, r, nr - 1, win_died)
+                MPI.Get!(died, r, nr - 1, win_died)
                 MPI.Win_unlock(win_died; rank = r)
-                if as[1]
+                if died[1]
                     return nothing
                 end
             end
@@ -190,8 +175,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
             # jump over died agents
-            if ! $immortal
-                if @died($T)[idx]
+            if $checkliving
+                if @readdied($T)[idx]
                     continue
                 end
             end
@@ -204,6 +189,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             else
                 if isnothing(newstate)
                     push!(@writereuseable($T), idx)
+                    if $checkliving 
+                        @writedied($T)[idx] = true
+                    end
                 else
                     @writestate($T)[idx] = newstate
                 end
@@ -216,8 +204,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         idx = AgentNr(0)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
-            if ! $immortal
-                if @died($T)[idx]
+            if $checkliving
+                if @readdied($T)[idx]
                     continue
                 end
             end
@@ -235,13 +223,19 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 end "You cannot rebuild $T because it has the trait :Immortal."
             end
         else
-            @write($T) = AgentFields{$T}(Vector{$T}(), Vector{AgentNr}())
+            @write($T) = AgentFields($T)
         end
         if add_existing
             @writestate($T) = deepcopy(@readstate($T))
+            if $checkliving
+                @writedied($T) = deepcopy(@readdied($T))
+            end
         else
             if $fixedsize
                 resize!(@writestate($T), $_size)
+                if $checkliving 
+                    resize!(@writedied($T), $_size)
+                end
             end
             # We restart counting from 1 (but of course reuse will be used)
             @nextid($T) = 1
@@ -254,10 +248,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
-        # finish the last epoch
-        @readstate($T) = @writestate($T)
-        @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
-
         if ! $immortal
             aids = map(nr -> agent_id(sim, nr, $T), @writereuseable($T))
 
@@ -265,7 +255,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             # target position. As those edges are stored on the same
             # rank as the agent, we can do this locally.
             for id in aids
-                @died($T)[agent_nr(id)] = true
                 for ET in sim.typeinfos.edges_types
                     _remove_edges_agent_traget!(sim, id, ET)
                 end
@@ -283,27 +272,39 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 end
             end
         end
-        
+
+        @readstate($T) = @writestate($T)
+        if $checkliving
+            @readdied($T) = @writedied($T)
+        end
+        # for the reusable vector, we merge the new reuseable indices
+        # (from agent died in this transition) with the unused indicies that
+        # are still in readreuseable.
+        @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
         empty!(@writereuseable($T))
     end
 
+    # this is called after the agents where distributed to the different PEs.
+    # In the process add_agent! is called.
+    # TODO: check the necessary of this function
     @eval function finish_distribute!(sim::$simsymbol, ::Type{$T})
         nagents = @nextid($T) - 1
-        if $fixedsize
+        if $fixedsize && $checkliving
             for i in (nagents+1):$_size
-                @died($T)[i] = true
+                @readdied($T)[i] = true
+                @writedied($T)[i] = true
             end
         else
-            resize!(@readstate($T), nagents)
-            resize!(@died($T), nagents)
-            resize!(@reuse($T), nagents)
+            # resize!(@readstate($T), nagents)
+            # resize!(@died($T), nagents)
+            # resize!(@reuse($T), nagents)
         end
     end
     
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
         # TODO AGENT: Add infokeys to create
         @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
-        win_died = MPI.Win_create(died(sim, $T), MPI.COMM_WORLD)
+        win_died = MPI.Win_create(@readdied($T), MPI.COMM_WORLD)
         sim.typeinfos.nodes_attr[$T][:window_died] = win_died
 
         if ! $stateless
@@ -336,10 +337,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         else
             if write
                 states = [ @writestate($T)[i] for i in 1:length(@writestate($T))
-                              if ! @died($T)[i] ]
+                              if ! @writedied($T)[i] ]
             else
                 states = [ @readstate($T)[i] for i in 1:length(@readstate($T))
-                              if ! @died($T)[i] ]
+                              if ! @readdied($T)[i] ]
             end
         end
     end        

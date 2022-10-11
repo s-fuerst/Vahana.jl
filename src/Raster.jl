@@ -135,8 +135,7 @@ cell ID of the cells constructed by the `add_raster!` function.
 
 If the results of `calc_raster` depend only on the state of the cells
 (as in the following example) and all cells have the same type,
-[`calc_rasterstate`](@ref) and [`calc_rasterstate_flexible`](@ref) can
-be used as concise alternatives.
+[`calc_rasterstate`](@ref) can be used as concise alternatives.
 
 Returns a n-dimensional array (with the same dimensions as `raster`)
 with those values.
@@ -192,14 +191,6 @@ See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 function calc_rasterstate(sim, raster::Symbol, f, t::Type{T}) where T
     map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
 end
-
-# """
-#     calc_rasterstateflexible(sim, raster::Symbol, f, t::Type{T})
-# """
-# function calc_rasterstate_flexible(sim, raster::Symbol, f)
-#     map(id -> agentstate_flexible(sim, id) |> f, sim.rasters[raster])
-# end
-
 
 """
     cellid(sim, name::Symbol, pos)

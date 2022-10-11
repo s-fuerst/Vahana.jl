@@ -1,7 +1,7 @@
 # for whatever reason there is a pipline error when MPI.Init() is called before
 # run(`mpiexec ...`), so first the mpi versions of the tests are called, before
 # the single threaded versions. 
-#include("mpi.jl")
+# include("mpi.jl")
 
 using Vahana
 
@@ -11,11 +11,11 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-# include("core.jl")
+include("core.jl")
 
-# include("addexisting.jl")
+include("addexisting.jl")
 
-# include("reuse.jl")
+include("reuse.jl")
 
 include("edges.jl")
 # runedgestest()
@@ -26,6 +26,6 @@ include("edgesiterator.jl")
 # depends on core
 # include("globals.jl")
 
-#include("raster.jl")
+include("raster.jl")
 
 # include("graphs.jl")

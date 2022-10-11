@@ -111,7 +111,7 @@ function vahanasimplegraph(sim;
     nv = 0
     for t in agenttypes
         for id in 1:length(readstate(sim, t))
-            if length(died(sim, t)) == 0 || died(sim, t)[id] == false
+            if length(readdied(sim, t)) == 0 || readdied(sim, t)[id] == false
                 nv += 1
                 aid = agent_id(sim, AgentNr(id), t)
                 push!(g2v, aid)
@@ -216,7 +216,7 @@ function vahanagraph(sim;
     nv = 0
     for T in agenttypes
         for id in 1:length(readstate(sim, T))
-            if length(died(sim, T)) == 0 || died(sim, T)[id] == false
+            if length(readdied(sim, T)) == 0 || readdied(sim, T)[id] == false
                 nv += 1
                 aid = agent_id(sim, AgentNr(id), T)
                 push!(g2v, aid)

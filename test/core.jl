@@ -54,7 +54,7 @@ function add_example_network!(sim)
     add_agents!(sim, [ AImmFixedOversize(i) for i in 1:10 ])
     add_agents!(sim, [ AMortalFixed(i)      for i in 1:10 ])
     add_agents!(sim, [ ADefault(i, true)          for i in 1:10 ])
-    
+
     # we construct the following network for ESDict:
     # a2 & a3 & avids[1] & avfids[10] -> a1
     add_edge!(sim, a2id, a1id, ESDict(1))
@@ -114,48 +114,11 @@ function test_aggregate_mortal(sim, T::DataType)
 
     if length(Vahana.agentsonthisrank(sim, T)) > 0
         @rootonly @test agg == mapreduce(a -> a.foo, +,
-                                          Vahana.agentsonthisrank(sim, T))
+                                         Vahana.agentsonthisrank(sim, T))
     else
         @rootonly @test agg == 0
     end
 end    
-
-
-@testset "Aggregate" begin
-    sim = new_simulation(model, nothing, nothing; name = "Aggregate")
-
-    (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
-
-    finish_init!(sim)
-
-    for T in [ AImmFixed, AImmFixedOversize ]
-        test_aggregate(sim, T)
-    end
-
-    for T in [ AMortalFixed, ADefault ]
-        test_aggregate_mortal(sim, T)
-    end
-
-    #  testing the & and | for boolean 
-    # currenty all bool of ADefault are true
-    @test aggregate(sim, a -> a.bool, &, ADefault) == true
-    @test aggregate(sim, a -> a.bool, |, ADefault) == true
-
-    # set all bool to false
-    apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
-        ADefault(state.foo, false)
-    end
-    @test aggregate(sim, a -> a.bool, &, ADefault) == false
-    @test aggregate(sim, a -> a.bool, |, ADefault) == false
-
-    # every second will be true, so that && is false and || is true
-    apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
-        ADefault(state.foo, mod(id, 2) == 1)
-    end
-    @test aggregate(sim, a -> a.bool, &, ADefault) == false
-    @test aggregate(sim, a -> a.bool, |, ADefault) == true
-end
-
 
 
 @testset "Core" begin
@@ -322,6 +285,40 @@ end
     sleep(mpi.rank * 0.05)
     
     # TODO transition with add_agent! and add_edge!
+    @testset "Aggregate" begin
+        sim = new_simulation(model, nothing, nothing; name = "Aggregate")
+
+        (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
+
+        finish_init!(sim)
+
+        for T in [ AImmFixed, AImmFixedOversize ]
+            test_aggregate(sim, T)
+        end
+
+        for T in [ AMortalFixed, ADefault ]
+            test_aggregate_mortal(sim, T)
+        end
+
+        #  testing the & and | for boolean 
+        # currenty all bool of ADefault are true
+        @test aggregate(sim, a -> a.bool, &, ADefault) == true
+        @test aggregate(sim, a -> a.bool, |, ADefault) == true
+
+        # set all bool to false
+        apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
+            ADefault(state.foo, false)
+        end
+        @test aggregate(sim, a -> a.bool, &, ADefault) == false
+        @test aggregate(sim, a -> a.bool, |, ADefault) == false
+
+        # every second will be true, so that && is false and || is true
+        apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
+            ADefault(state.foo, mod(id, 2) == 1)
+        end
+        @test aggregate(sim, a -> a.bool, &, ADefault) == false
+        @test aggregate(sim, a -> a.bool, |, ADefault) == true
+    end
 end
 
 

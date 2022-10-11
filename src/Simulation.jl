@@ -12,6 +12,12 @@ mutable struct AgentFields{T}
     # next agents. It is redudant to died: died[e in reuseable] == true
     # Also this field is for immortal agents always just an empty vector
     reuseable::Vector{AgentNr}
+    # This field is for immortal agents always just an empty vector
+    died::Vector{Bool}
+end
+
+function AgentFields(T::DataType) 
+    AgentFields{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}())
 end
 
 """
@@ -42,7 +48,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
         map(["_read", "_write"]) do RW
             Expr(Symbol("="),
                  :($(Symbol(T, RW))::$(AgentFields{T})),
-                 :($(AgentFields{T}(Vector{T}(), Vector{AgentNr}()))))
+                 :($(AgentFields(T))))
         end 
         for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
 
@@ -52,12 +58,6 @@ function construct_model(typeinfos::ModelTypes, name::String)
              :(AgentNr(1)))
         for T in typeinfos.nodes_types ]
 
-    nodedied = [
-        Expr(Symbol("="),
-             :($(Symbol(T, "_died"))::Vector{Bool}),
-             :(Vector{Bool}()))
-        for T in typeinfos.nodes_types ]
-    
     nodereuse = [
         Expr(Symbol("="),
              :($(Symbol(T, "_reuse"))::Vector{Reuse}),
@@ -85,7 +85,6 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   edgestorage...,
                   nodefields...,
                   nodeids...,
-                  nodedied...,
                   nodereuse...)
     
     # the true in the second arg makes the struct mutable
