@@ -247,7 +247,7 @@ function finish_init!(sim;
 end 
 
 # this function is not exported and should be only used for unit tests
-function updateids(idmap, oldids)
+function updateids(idmap, oldids...)
     map(oldids) do id
         idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
     end

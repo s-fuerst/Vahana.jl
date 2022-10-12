@@ -1,3 +1,5 @@
+import Vahana.@onrankof
+
 struct GridA 
     pos::Tuple{Int64, Int64}
     active::Bool
@@ -357,11 +359,12 @@ end
     move_to!(sim, :raster, p3, (4,4), OnPosition(), nothing;
              distance = 2.5, metric = :euclidean)
 
-    finish_init!(sim)
-
-    @test num_neighbors(sim, p1, OnPosition) == 25
-    @test num_neighbors(sim, p2, OnPosition) == 13
-    @test num_neighbors(sim, p3, OnPosition) == 21
+    idmapping = finish_init!(sim, return_idmapping = true)
+    p1, p2, p3 = Vahana.updateids(idmapping, p1, p2, p3)
+    
+    @onrankof p1 @test num_neighbors(sim, p1, OnPosition) == 25
+    @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 13
+    @onrankof p3 @test num_neighbors(sim, p3, OnPosition) == 21
 
     ######################################## 4D
     
@@ -381,10 +384,11 @@ end
     move_to!(sim, :raster, p2, (4,4,4,4), OnPosition(), nothing;
              distance = 1, metric = :manhatten)
 
-    finish_init!(sim)
+    idmapping = finish_init!(sim, return_idmapping = true)
+    p1, p2 = Vahana.updateids(idmapping, p1, p2)
 
-    @test num_neighbors(sim, p1, OnPosition) == 3*3*3*3
-    @test num_neighbors(sim, p2, OnPosition) == 1+4*2
+    @onrankof p1 @test num_neighbors(sim, p1, OnPosition) == 3*3*3*3
+    @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 1+4*2
     
 end
 

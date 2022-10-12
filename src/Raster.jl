@@ -50,11 +50,10 @@ end
 # while distributing the Agents to the different PEs, the AgentIDs are
 # changed, so the ids of the grid most be updated
 function broadcastids(sim, raster, idmapping::Dict)
-    grid = sim.rasters[raster]
     if mpi.isroot
-        grid = map(id -> idmapping[id], grid)
+        sim.rasters[raster] = map(id -> idmapping[id], sim.rasters[raster])
     end
-    MPI.Bcast!(grid, MPI.COMM_WORLD)
+    MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
 end
 
 function _stencil_core(metric, n::Int64, distance, d::Int64)
@@ -216,7 +215,7 @@ function calc_rasterstate(sim, raster::Symbol, f, t::Type{T}) where T
     calc_rasterstate can be only called after finish_init!"""
 
     @info sim.GridA_read mpi.rank
-    @info sim.rasters[raster] mpi.rank
+    @info sim.rasters[raster] sim.rasters[raster][1,1] mpi.rank
     prepare_mpi!(sim, T)
     rs = map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
     finish_mpi!(sim, T)
