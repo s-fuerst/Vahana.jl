@@ -421,5 +421,7 @@ reduce (aggregate) the values returned by `f`.
 aggregate is based on mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
+
+TODO DOC: additional kwargs
 """
 function aggregate(::__MODEL__, f, op, ::Type; kwargs...) end

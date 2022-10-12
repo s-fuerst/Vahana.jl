@@ -1,5 +1,12 @@
 # Change Log
 
+## v0.6
+
+### breaking changes:
+- New trait names for AgentTypes (Immortal instead of Vector)
+- apply_transition! arguments 
+- calc_raster needs information about the return type of f
+
 ## v0.4
 #### new features:
 - Huge performance improvement, thanks in part to Agent and Edge

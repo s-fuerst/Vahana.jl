@@ -344,7 +344,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end        
 
     @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
-        emptyval = val4empty(op; kwargs)
+        emptyval = val4empty(op; kwargs...)
         
         reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
         mpiop = get(kwargs, :mpiop, op)
