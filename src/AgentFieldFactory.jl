@@ -19,7 +19,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         0
     end
 
-    # TODO?: better name would be init_agentcontainer! 
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
         @read($T) = AgentFields($T)
         @write($T) = AgentFields($T)
@@ -94,7 +93,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         `apply_transition`.
         """
         (reuse, nr) = _get_next_id(sim, $T)
-        # @info "reuse" reuse nr
         @inbounds @writestate($T)[nr] = agent
         if $immortal
             immortal_agent_id($typeid, nr)

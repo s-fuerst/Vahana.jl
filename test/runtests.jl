@@ -11,21 +11,21 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-# include("core.jl")
+include("core.jl")
 
-# include("addexisting.jl")
+include("addexisting.jl")
 
-# include("reuse.jl")
+include("reuse.jl")
 
 include("edges.jl")
-# runedgestest()
+runedgestest()
 
 #edgesiterator depends on edges.jl
-# include("edgesiterator.jl")
+include("edgesiterator.jl")
 
 # depends on core
-# include("globals.jl")
+include("globals.jl")
 
 include("raster.jl")
 
-# include("graphs.jl")
+include("graphs.jl")

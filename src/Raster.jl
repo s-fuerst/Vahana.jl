@@ -142,10 +142,19 @@ function connect_raster_neighbors!(sim,
 end
 
 """
-    calc_raster(sim, raster::Symbol, f)
+    calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible)
 
 Calculate values for the raster `raster` by applying `f` to each
 cell ID of the cells constructed by the `add_raster!` function.
+
+`f_returns` must be the type returned by the function f. There must be an
+implementation of the zero function for this type, and zero(returntype) | f(id)
+must be equal to f(id).
+
+`accessible` is a vector of Agent and/or Edge types. This vector must
+list all types that are accessed directly (e.g. via
+[`agentstate`](@ref) or indirectly (e.g. via [`neighborstates`](@ref)
+in the transition function.
 
 If the results of `calc_raster` depend only on the state of the cells
 (as in the following example) and all cells have the same type,
@@ -171,24 +180,35 @@ Can be only called after [`finish_init!`](@ref).
 
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim, raster::Symbol, f, accessible)
+function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible)
     @assert sim.initialized "calc_raster can be only called after finish_init!"
     foreach(T -> prepare_mpi!(sim, T), accessible)
     rs = map(f, sim.rasters[raster])
+    rs = map(sim.rasters[raster]) do id
+        if process_nr(id) == mpi.rank
+            f(id)
+        else
+            zero(f_returns)
+        end
+    end
     foreach(T -> finish_mpi!(sim, T), accessible)
-    rs
+    MPI.Allreduce(rs, |, MPI.COMM_WORLD)
 end
 
 calc_raster(f, sim, raster::Symbol) = calc_raster(sim, raster, f)
 
 
 """
-    calc_rasterstate(sim, raster::Symbol, f, t::Type{T})
+    calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T})
 
 Combined calc_raster with agentstate for the cells of the raster.
 
 Calculate values for the raster `raster` by applying `f` to the state of each
 cell.
+
+`f_returns` must be the type returned by the function f. There must be an
+implementation of the zero function for this type, and zero(returntype) | f(state)
+must be equal to f(state).
 
 Returns a n-dimensional array (with the same dimensions as `raster`)
 with those values.
@@ -210,16 +230,24 @@ Can be only called after [`finish_init!`](@ref).
     
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_rasterstate(sim, raster::Symbol, f, t::Type{T}) where T
+function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}) where T
     @assert sim.initialized """
     calc_rasterstate can be only called after finish_init!"""
 
-    @info sim.GridA_read mpi.rank
-    @info sim.rasters[raster] sim.rasters[raster][1,1] mpi.rank
-    prepare_mpi!(sim, T)
-    rs = map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
-    finish_mpi!(sim, T)
-    rs
+    # normally, agentstate can be only called inside a prepare_mpi/finish_mpi
+    # block. But we ensure, that we only access the agentstate on the own rank,
+    # so to avoid overhead, we set only the mpi_prepared flag (which is checked
+    # in an mayassert inside of agentstate).
+    sim.typeinfos.nodes_attr[T][:mpi_prepared] = true
+    rs = map(sim.rasters[raster]) do id
+        if process_nr(id) == mpi.rank
+            agentstate(sim, id, T) |> f
+        else
+            zero(f_returns)
+        end
+    end
+    sim.typeinfos.nodes_attr[T][:mpi_prepared] = false
+    MPI.Allreduce(rs, |, MPI.COMM_WORLD)
 end
 
 """

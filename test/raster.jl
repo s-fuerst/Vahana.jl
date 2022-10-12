@@ -57,12 +57,12 @@ raster_model = ModelTypes() |>
     apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     @test aggregate(sim, a -> a.active, +, GridA) == 25
 
-    raster = calc_rasterstate(sim, :grid, c -> c.active, GridA)
+    raster = calc_rasterstate(sim, :grid, c -> c.active, Bool, GridA)
     @test raster[1,3] == false
     @test raster[1,1] == true
     @test raster[4,4] == false
 
-    raster = calc_raster(sim, :grid, id -> agentstate(sim, id, GridA).active, [ GridA ])
+    raster = calc_raster(sim, :grid, id -> agentstate(sim, id, GridA).active, Bool, [ GridA ])
     @test raster[1,3] == false
     @test raster[1,1] == true
     @test raster[4,4] == false
@@ -293,7 +293,6 @@ end
     function value_on_pos(a::MovingAgent, id, sim)
         # sum is not a sum operator, but a field of the agentstate of Position
         value = first(neighborstates_flexible(sim, id, OnPosition)).sum
-        @info value
         move_to!(sim, :raster, id, (value, value), OnPosition(), OnPosition())
         MovingAgent(value)
     end
@@ -320,7 +319,7 @@ end
     finish_init!(sim)
 
     apply_transition!(sim, sum_on_pos, [ Position ], [ MovingAgent, OnPosition ], [])
-    raster = calc_rasterstate(sim, :raster, c -> c.sum, Position)
+    raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
@@ -332,7 +331,7 @@ end
                       [ Position, OnPosition ],
                       [ OnPosition ])
     apply_transition!(sim, sum_on_pos, [ Position ], [ MovingAgent, OnPosition ], [])
-    raster = calc_rasterstate(sim, :raster, c -> c.sum, Position)
+    raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 0
@@ -360,8 +359,10 @@ end
              distance = 2.5, metric = :euclidean)
 
     idmapping = finish_init!(sim, return_idmapping = true)
-    p1, p2, p3 = Vahana.updateids(idmapping, p1, p2, p3)
-    
+
+    p1 = Vahana.updateids(idmapping, p1)
+    p2 = Vahana.updateids(idmapping, p2)
+    p3 = Vahana.updateids(idmapping, p3)
     @onrankof p1 @test num_neighbors(sim, p1, OnPosition) == 25
     @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 13
     @onrankof p3 @test num_neighbors(sim, p3, OnPosition) == 21
@@ -385,7 +386,8 @@ end
              distance = 1, metric = :manhatten)
 
     idmapping = finish_init!(sim, return_idmapping = true)
-    p1, p2 = Vahana.updateids(idmapping, p1, p2)
+    p1 = Vahana.updateids(idmapping, p1)
+    p2 = Vahana.updateids(idmapping, p2)
 
     @onrankof p1 @test num_neighbors(sim, p1, OnPosition) == 3*3*3*3
     @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 1+4*2

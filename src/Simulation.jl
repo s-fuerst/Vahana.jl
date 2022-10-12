@@ -247,7 +247,7 @@ function finish_init!(sim;
 end 
 
 # this function is not exported and should be only used for unit tests
-function updateids(idmap, oldids...)
+function updateids(idmap, oldids)
     map(oldids) do id
         idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
     end
@@ -288,7 +288,8 @@ finish_write!(sim) = t -> finish_write!(sim, t)
 
 
 """
-    apply_transition!(sim, func, compute, accessible, rebuild; invariant_compute = false, add_existing = Vector{DataType}())
+    apply_transition!(sim, func, compute, accessible, rebuild; 
+                      invariant_compute = false, add_existing = Vector{DataType}())
 
 Apply the transition function `func` to the simulation state. 
 
@@ -306,8 +307,8 @@ returned value of the transition function will be ignored.
 with a type that is listed in `compute`, so a method for each of this types
 must be implemented.
 
-`accessible` is a vector of Agent types. This vector must list all
-Agent types whose state is accessed directly (e.g. via
+`accessible` is a vector of Agent and/or Edge types. This vector must
+list all types that are accessed directly (e.g. via
 [`agentstate`](@ref) or indirectly (e.g. via [`neighborstates`](@ref)
 in the transition function.
 
