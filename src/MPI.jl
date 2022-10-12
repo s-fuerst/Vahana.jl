@@ -56,14 +56,16 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
         sendedges!(sim, sendmap, idmapping, T)
     end
 
+    # we must also update and broadcast the ids for each raster. As we
+    # don't need the edges for that, we must not synchronize the PEs
+    # before.
+    foreach(grid -> broadcastids(sim, grid, idmapping),  keys(sim.rasters))
+
+    # finish everything and return the idmapping
     foreach(finish_write!(sim), [ node_types; edge_types ])
-
     foreach(T -> finish_distribute!(sim, T), node_types)
-
     MPI.Barrier(MPI.COMM_WORLD)
-    
     foreach(T -> finish_mpi!(sim, T), node_types)
-    
     idmapping
 end
 

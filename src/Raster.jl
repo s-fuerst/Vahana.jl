@@ -20,6 +20,8 @@ already registered via [`register_agenttype!`](@ref).
 
 Returns a vector with the IDs of the created agents.
 
+Can be only called before [`finish_init!`](@ref).
+
 See also [`calc_raster`](@ref) [`connect_raster_neighbors!`](@ref) and
 [`move_to!`](@ref).
 """
@@ -27,23 +29,33 @@ function add_raster!(sim,
               name::Symbol,
               dims::NTuple{N, Int},
               agent_constructor) where N
-
-    positions = CartesianIndices(dims)
-    nodeids = add_agents!(sim, [ agent_constructor(pos) for pos in positions ]) 
+    @assert ! sim.initialized "add_raster! can be only called before finish_init!"
 
     grid = Array{AgentID, N}(undef, dims)
-    for (id, pos) in zip(nodeids, positions)
-        grid[pos] = id
+
+    # rasters are always created on the root only, and send broadcasted
+    # in finish_init! after updated the ids.
+    if mpi.isroot
+        positions = CartesianIndices(dims)
+        nodeids = add_agents!(sim, [ agent_constructor(pos) for pos in positions ]) 
+        
+        for (id, pos) in zip(nodeids, positions)
+            grid[pos] = id
+        end
     end
 
     sim.rasters[name] = grid
 end
 
-# add_raster!(agent_constructor, sim, name::Symbol, dims::NTuple) =
-#     add_raster!(sim, name, dims, agent_constructor)
-
-
-
+# while distributing the Agents to the different PEs, the AgentIDs are
+# changed, so the ids of the grid most be updated
+function broadcastids(sim, raster, idmapping::Dict)
+    grid = sim.rasters[raster]
+    if mpi.isroot
+        grid = map(id -> idmapping[id], grid)
+    end
+    MPI.Bcast!(grid, MPI.COMM_WORLD)
+end
 
 function _stencil_core(metric, n::Int64, distance, d::Int64)
     @assert metric in [ :chebyshev, :euclidean, :manhatten ]
@@ -111,17 +123,20 @@ function connect_raster_neighbors!(sim,
                             distance = 1,
                             metric::Symbol = :chebyshev,
                             periodic = true)
+    # before a simulation is initialized, the raster existing
+    # only on the root 
+    if mpi.isroot || sim.initialized
+        raster = sim.rasters[name]
+        dims = size(raster)
+        st = stencil(metric, ndims(raster), distance)
 
-    raster = sim.rasters[name]
-    dims = size(raster)
-    st = stencil(metric, ndims(raster), distance)
-
-    for org in keys(raster)
-        for s in st
-            shifted = _checkpos(org + s, dims, periodic)
-            if ! isnothing(shifted)
-                add_edge!(sim, raster[org], raster[shifted],
-                          edge_constructor(org, shifted))
+        for org in keys(raster)
+            for s in st
+                shifted = _checkpos(org + s, dims, periodic)
+                if ! isnothing(shifted)
+                    add_edge!(sim, raster[org], raster[shifted],
+                              edge_constructor(org, shifted))
+                end
             end
         end
     end
@@ -153,9 +168,12 @@ cellular automaton):
     end
 ```
 
+Can be only called after [`finish_init!`](@ref).
+
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_raster(sim, raster::Symbol, f, accessible)
+    @assert sim.initialized "calc_raster can be only called after finish_init!"
     foreach(T -> prepare_mpi!(sim, T), accessible)
     rs = map(f, sim.rasters[raster])
     foreach(T -> finish_mpi!(sim, T), accessible)
@@ -188,10 +206,17 @@ it also possible to just write
 ```@example
     calc_rasterstate(sim, :raster, s -> s.active, Cell)
 ```
+
+Can be only called after [`finish_init!`](@ref).
     
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_rasterstate(sim, raster::Symbol, f, t::Type{T}) where T
+    @assert sim.initialized """
+    calc_rasterstate can be only called after finish_init!"""
+
+    @info sim.GridA_read mpi.rank
+    @info sim.rasters[raster] mpi.rank
     prepare_mpi!(sim, T)
     rs = map(id -> agentstate(sim, id, t) |> f, sim.rasters[raster])
     finish_mpi!(sim, T)
@@ -206,8 +231,12 @@ position `pos`. `pos` must be of type CartesianIndex or a Dims{N}.
 
 See also [`add_raster!`](@ref), [`move_to!`](@ref),
 [`add_edge!`](@ref) and [`agentstate`](@ref)
+
+Can be only called after [`finish_init!`](@ref).
+
 """
 function cellid(sim, name::Symbol, pos)
+    @assert sim.initialized "cellid can be only called after finish_init!"
     sim.rasters[name][CartesianIndex(pos)]
 end
 
@@ -246,27 +275,31 @@ function move_to!(sim,
            distance = 0,
            metric::Symbol = :chebyshev,
            periodic = true)
-    raster = sim.rasters[name]
-    dims = size(raster)
-    st = stencil(metric, ndims(raster), distance)
-    pos = CartesianIndex(pos)
+    # before a simulation is initialized, the raster existing
+    # only on the root 
+    if mpi.isroot || sim.initialized
+        raster = sim.rasters[name]
+        dims = size(raster)
+        st = stencil(metric, ndims(raster), distance)
+        pos = CartesianIndex(pos)
 
-    if ! isnothing(edge_from_raster)
-        add_edge!(sim, raster[pos], id, edge_from_raster)
-    end
-    if ! isnothing(edge_to_raster)
-        add_edge!(sim, id, raster[pos], edge_to_raster)
-    end
-    
-    if distance >= 1 
-        for s in st
-            shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)
-            if ! isnothing(shifted)
-                if ! isnothing(edge_from_raster)
-                    add_edge!(sim, raster[shifted], id, edge_from_raster)
-                end
-                if ! isnothing(edge_to_raster)
-                    add_edge!(sim, id, raster[shifted], edge_to_raster)
+        if ! isnothing(edge_from_raster)
+            add_edge!(sim, raster[pos], id, edge_from_raster)
+        end
+        if ! isnothing(edge_to_raster)
+            add_edge!(sim, id, raster[pos], edge_to_raster)
+        end
+        
+        if distance >= 1 
+            for s in st
+                shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)
+                if ! isnothing(shifted)
+                    if ! isnothing(edge_from_raster)
+                        add_edge!(sim, raster[shifted], id, edge_from_raster)
+                    end
+                    if ! isnothing(edge_to_raster)
+                        add_edge!(sim, id, raster[shifted], edge_to_raster)
+                    end
                 end
             end
         end

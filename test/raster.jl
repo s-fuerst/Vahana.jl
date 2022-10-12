@@ -29,7 +29,6 @@ raster_model = ModelTypes() |>
     register_edgetype!(OnPosition) |>
     construct_model("Raster_Test")
 
-
 @testset "Raster" begin
     # calculate the sum of all ids
     function diffuse(a, id, sim)
