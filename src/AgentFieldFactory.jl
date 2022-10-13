@@ -101,6 +101,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         end
     end
 
+    asref = Ref{T}()
+    asdt = MPI.Datatype(T)
+    
     @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
         @mayassert begin
             $type_nr(id) == sim.typeinfos.nodes_type2id[$T]
@@ -156,11 +159,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 nr = agent_nr(id)
             end
             win_state = sim.typeinfos.nodes_attr[$T][:window_state]
-            as = Vector{$T}(undef, 1)
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
-            MPI.Get!(as, r, nr - 1, win_state)
+            ccall((:MPI_Get, MPI.libmpi), Cint,
+                  (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
+                   Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
+                  $asref, MPI.Cint(1), $asdt, r,
+                  Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
             MPI.Win_unlock(win_state; rank = r)
-            @inbounds as[1]
+            $asref[]
         end
     end
 
