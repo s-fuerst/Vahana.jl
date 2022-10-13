@@ -306,15 +306,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
     
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
-        # TODO AGENT: Add infokeys to create
         @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
-        win_died = MPI.Win_create(@readdied($T), MPI.COMM_WORLD)
+        win_died = MPI.Win_create(@readdied($T), MPI.COMM_WORLD; same_size = true, same_disp_unit = true)
         sim.typeinfos.nodes_attr[$T][:window_died] = win_died
 
         if ! $stateless
             @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_state)
 
-            win_state = MPI.Win_create(readstate(sim, $T), MPI.COMM_WORLD)
+            win_state = MPI.Win_create(readstate(sim, $T), MPI.COMM_WORLD, same_size = true, same_disp_unit = true)
             sim.typeinfos.nodes_attr[$T][:window_state] = win_state
         end
 
