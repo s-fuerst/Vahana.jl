@@ -19,6 +19,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         0
     end
 
+    nompi = ! mpi.active
+    
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
         @read($T) = AgentFields($T)
         @write($T) = AgentFields($T)
@@ -111,13 +113,13 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
         @mayassert begin
             T = $T
-            sim.typeinfos.nodes_attr[$T][:mpi_prepared]
+            sim.typeinfos.nodes_attr[$T][:mpi_prepared] 
         end """
           $T must be in the `accessible` argument of the transition function.
         """
 
         r = process_nr(id)
-        if r == mpi.rank
+        if $nompi || r == mpi.rank
             # highest priority: does the agent is still living
             if $checkliving
                 nr = agent_nr(id)
@@ -160,11 +162,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
             win_state = sim.typeinfos.nodes_attr[$T][:window_state]
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
-            ccall((:MPI_Get, MPI.libmpi), Cint,
-                  (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
-                   Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
-                  $asref, MPI.Cint(1), $asdt, r,
-                  Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
+            MPI.Get!($asref, r, nr - 1, win_state)
+            # ccall((:MPI_Get, MPI.libmpi), Cint,
+            #       (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
+            #        Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
+            #       $asref, MPI.Cint(1), $asdt, r,
+            #       Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
             MPI.Win_unlock(win_state; rank = r)
             $asref[]
         end
@@ -269,7 +272,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             # information on the agents rank, to which other agents
             # edges are targeted. So we create a join of all the ids of
             # all ranks, and then go locally to all the edges of the rank.
-            alldied = join(aids)
+            alldied = $nompi ? aids : join(aids)
             if ! isempty(alldied)
                 for ET in sim.typeinfos.edges_types
                     _remove_edges_agent_source!(sim, alldied, ET)
@@ -287,10 +290,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
         empty!(@writereuseable($T))
     end
-
+    
+    
     # this is called after the agents where distributed to the different PEs.
     # In the process add_agent! is called.
-    # TODO: check the necessary of this function
     @eval function finish_distribute!(sim::$simsymbol, ::Type{$T})
         nagents = @nextid($T) - 1
         if $fixedsize && $checkliving
@@ -298,40 +301,49 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 @readdied($T)[i] = true
                 @writedied($T)[i] = true
             end
-        else
-            # resize!(@readstate($T), nagents)
-            # resize!(@died($T), nagents)
-            # resize!(@reuse($T), nagents)
         end
     end
-    
+
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
-        @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
-        win_died = MPI.Win_create(@readdied($T), MPI.COMM_WORLD; same_size = true, same_disp_unit = true)
-        sim.typeinfos.nodes_attr[$T][:window_died] = win_died
-
-        if ! $stateless
-            @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_state)
-
-            win_state = MPI.Win_create(readstate(sim, $T), MPI.COMM_WORLD, same_size = true, same_disp_unit = true)
-            sim.typeinfos.nodes_attr[$T][:window_state] = win_state
-        end
-
+        # we use this as a check that the types are in the accessible
+        # vector, and this check should also done in an nompi run
         sim.typeinfos.nodes_attr[$T][:mpi_prepared] = true
+
+        if ! $nompi
+            @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
+            win_died = MPI.Win_create(@readdied($T),
+                                      MPI.COMM_WORLD;
+                                      same_disp_unit = true)
+            sim.typeinfos.nodes_attr[$T][:window_died] = win_died
+
+            if ! $stateless
+                @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_state)
+
+                win_state = MPI.Win_create(@readstate($T),
+                                           MPI.COMM_WORLD,
+                                           same_disp_unit = true)
+                sim.typeinfos.nodes_attr[$T][:window_state] = win_state
+            end
+        end
     end 
 
+
     @eval function finish_mpi!(sim::$simsymbol, ::Type{$T})
-        win = sim.typeinfos.nodes_attr[$T][:window_died]
-        MPI.free(win)
-        delete!(sim.typeinfos.nodes_attr[$T], :window_died)
-
-        if ! $stateless
-            win = sim.typeinfos.nodes_attr[$T][:window_state]
-            MPI.free(win)
-            delete!(sim.typeinfos.nodes_attr[$T], :window_state)
-        end
-
+        # we use this as a check that the types are in the accessible
+        # vector, and this check should also done in an nompi run
         sim.typeinfos.nodes_attr[$T][:mpi_prepared] = false
+
+        if ! $nompi
+            win = sim.typeinfos.nodes_attr[$T][:window_died]
+            MPI.free(win)
+            delete!(sim.typeinfos.nodes_attr[$T], :window_died)
+
+            if ! $stateless
+                win = sim.typeinfos.nodes_attr[$T][:window_state]
+                MPI.free(win)
+                delete!(sim.typeinfos.nodes_attr[$T], :window_state)
+            end
+        end
     end
 
     @eval function agentsonthisrank(sim::$simsymbol, ::Type{$T}, write = false)
@@ -352,7 +364,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         emptyval = val4empty(op; kwargs...)
         
         reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
-        mpiop = get(kwargs, :mpiop, op)
-        MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+        if $nompi
+            reduced
+        else
+            mpiop = get(kwargs, :mpiop, op)
+            MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+        end
     end
 end

@@ -63,8 +63,8 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
 
     # finish everything and return the idmapping
     foreach(finish_write!(sim), [ node_types; edge_types ])
-    foreach(T -> finish_distribute!(sim, T), node_types)
     MPI.Barrier(MPI.COMM_WORLD)
+    foreach(T -> finish_distribute!(sim, T), node_types)
     foreach(T -> finish_mpi!(sim, T), node_types)
     idmapping
 end
