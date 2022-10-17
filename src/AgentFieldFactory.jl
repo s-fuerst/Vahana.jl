@@ -229,15 +229,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                     add_existing == true
                 end "You cannot rebuild $T because it has the trait :Immortal."
             end
-        else
-            @write($T) = AgentFields($T)
         end
-        if add_existing
-            @writestate($T) = deepcopy(@readstate($T))
-            if $checkliving
-                @writedied($T) = deepcopy(@readdied($T))
-            end
-        else
+        if ! add_existing
+            @write($T) = AgentFields($T)
             if $fixedsize
                 resize!(@writestate($T), $_size)
                 if $checkliving 
@@ -280,9 +274,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
         end
 
-        @readstate($T) = @writestate($T)
+        @readstate($T) = deepcopy(@writestate($T))
         if $checkliving
-            @readdied($T) = @writedied($T)
+            @readdied($T) = deepcopy(@writedied($T))
         end
         # for the reusable vector, we merge the new reuseable indices
         # (from agent died in this transition) with the unused indicies that
