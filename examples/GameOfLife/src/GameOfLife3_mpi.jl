@@ -50,7 +50,7 @@ function transition(c::Cell, id, sim)
 end
 
 const model = ModelTypes() |>    
-    register_agenttype!(Cell, :Vector; size = 40000) |> 
+    register_agenttype!(Cell, :Immortal; size = 40000) |> 
     register_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=40000) |>
     register_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=40000) |>
     construct_model("GameOfLife")
