@@ -104,7 +104,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     asref = Ref{T}()
-    # asdt = MPI.Datatype(T)
+    asdt = MPI.Datatype(T)
     
     @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
         @mayassert begin
@@ -144,7 +144,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         else
             # same procedure as above, but with RMA
             if $checkliving
-                win_died = @windows($T).died
+                win_died = @windows($T).nodedied
                 nr = agent_nr(id)
                 died = Vector{Bool}(undef, 1)
                 MPI.Win_lock(win_died; rank = r, type = :shared, nocheck = true)
@@ -160,14 +160,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $checkliving
                 nr = agent_nr(id)
             end
-            win_state = @windows($T).state
+            win_state = @windows($T).nodestate
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
-            MPI.Get!($asref, r, nr - 1, win_state)
-            # ccall((:MPI_Get, MPI.libmpi), Cint,
-            #       (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
-            #        Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
-            #       $asref, MPI.Cint(1), $asdt, r,
-            #       Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
+            # MPI.Get!($asref, r, nr - 1, win_state)
+            ccall((:MPI_Get, MPI.libmpi), Cint,
+                  (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
+                   Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
+                  $asref, MPI.Cint(1), $asdt, r,
+                  Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
             MPI.Win_unlock(win_state; rank = r)
             $asref[]
         end
@@ -329,12 +329,12 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         @windows($T).prepared = false
 
         if ! $nompi
-            MPI.free(@windows($T).died)
-            @windows($T).died = nothing
+            MPI.free(@windows($T).nodedied)
+            @windows($T).nodedied = nothing
 
             if ! $stateless
-                MPI.free(@windows($T).state)
-                @windows($T).state = nothing
+                MPI.free(@windows($T).nodestate)
+                @windows($T).nodestate = nothing
             end
         end
     end
