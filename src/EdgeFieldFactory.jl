@@ -131,6 +131,8 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         AT = attr[:to_agenttype]
     end
 
+    mpiactive = mpi.active
+    
     construct_mpi_edge_functions(T, attr, simsymbol, CE)
     construct_edges_iter_functions(T, attr, simsymbol)
     #### Functions that helps to write generic versions of the edge functions
@@ -323,7 +325,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
-            if process_nr(to) != mpi.rank
+            if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
                 nr = _to2idx(to, $T)
@@ -339,7 +341,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
-            if process_nr(to) != mpi.rank
+            if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
                 nr = _to2idx(to, $T)
@@ -355,7 +357,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
-            if process_nr(to) != mpi.rank
+            if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(edge)))
             else
@@ -379,7 +381,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
-            if process_nr(to) != mpi.rank
+            if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(from, edgestate)))
             else
@@ -396,7 +398,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
-            if process_nr(to) != mpi.rank
+            if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(edge)))
             else
@@ -412,7 +414,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
-            if process_nr(to) != mpi.rank
+            if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(from, edgestate)))
             else
