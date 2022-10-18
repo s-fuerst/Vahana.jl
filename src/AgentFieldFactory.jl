@@ -221,6 +221,15 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, ::Type{$T})
+        # first we decouple the read and write arrys (in finish_write
+        # we set read = write)
+        (@windows($T).shmstate, sarr) = 
+            MPI.Win_allocate_shared(Array{$T},
+                                    length(@readstate($T)),
+                                    mpi.shmcomm)
+
+        # @readstate($T) = sarr
+        
         if $immortal 
             # while distributing the initial graph we also kill immortal agents
             if sim.initialized == true
@@ -249,6 +258,13 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
+        # we can release the read shared memory now but after
+        # initialization we call finish_write! without prepare_write!,
+        # so shmstate can be nothing
+        if ! isnothing(@windows($T).shmstate)
+            MPI.free(@windows($T).shmstate)
+        end
+        
         if ! $immortal
             aids = map(nr -> agent_id(sim, nr, $T), @writereuseable($T))
 
@@ -274,9 +290,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
         end
 
-        @readstate($T) = deepcopy(@writestate($T))
+        # we create a copy in prepare_write! TODO SHM remove deepcopy
+        @readstate($T) = @writestate($T) |> deepcopy
         if $checkliving
-            @readdied($T) = deepcopy(@writedied($T))
+            @readdied($T) = @writedied($T) |> deepcopy
         end
         # for the reusable vector, we merge the new reuseable indices
         # (from agent died in this transition) with the unused indicies that
@@ -298,6 +315,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         end
     end
 
+    # some mpi parts are in prepare_write, as we always use the shared_memory
+    # mpi calls, even in single process runs.
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
@@ -319,10 +338,17 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                                            same_disp_unit = true)
                 @windows($T).nodestate = win_state
             end
+
+            # sim.$T.shmstate =
+            @agent($T).shmstate = 
+                [ MPI.Win_shared_query(Array{$T},
+                                       @windows($T).shmstate;
+                                       rank = i - 1) for i in 1:mpi.shmsize ]
         end
     end 
 
-
+    # some mpi parts are in prepare_write, as we always use the shared_memory
+    # mpi calls, even in single process runs.
     @eval function finish_mpi!(sim::$simsymbol, ::Type{$T})
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run

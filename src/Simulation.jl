@@ -35,6 +35,8 @@ MPIWindows() = MPIWindows(nothing, nothing, nothing, nothing, false)
 mutable struct AgentFields{T}
     read::AgentReadWrite{T}
     write::AgentReadWrite{T}
+    shmstate::Vector{Vector{T}}
+    shmdied::Vector{Vector{Bool}}
     reuse::Vector{Reuse}
     nextid::AgentNr
     mpiwindows::MPIWindows
@@ -43,6 +45,8 @@ end
 AgentFields(T::DataType) =
     AgentFields(AgentReadWrite(T),
                 AgentReadWrite(T),
+                [ Vector{T}() for _ in 1:mpi.shmsize ],
+                [ Vector{Bool}() for _ in 1:mpi.shmsize ],
                 Vector{Reuse}(),
                 AgentNr(1),
                 MPIWindows())

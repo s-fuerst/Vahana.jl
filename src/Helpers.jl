@@ -98,6 +98,11 @@ macro reuse(T)
 end
 reuse(sim, T) = getproperty(sim, Symbol(T)).reuse
 
+macro agent(T)
+    field = Symbol(T)
+    :( sim.$(field) ) |> esc
+end
+
 macro windows(T)
     field = Symbol(T)
     :( sim.$(field).mpiwindows ) |> esc
