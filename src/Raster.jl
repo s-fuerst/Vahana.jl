@@ -142,7 +142,7 @@ function connect_raster_neighbors!(sim,
 end
 
 """
-    calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible)
+    calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
 
 Calculate values for the raster `raster` by applying `f` to each
 cell ID of the cells constructed by the `add_raster!` function.
@@ -180,7 +180,7 @@ Can be only called after [`finish_init!`](@ref).
 
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible)
+function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
     @assert sim.initialized "calc_raster can be only called after finish_init!"
     foreach(T -> prepare_mpi!(sim, T), accessible)
     rs = map(f, sim.rasters[raster])
@@ -195,7 +195,10 @@ function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible)
     MPI.Allreduce(rs, |, MPI.COMM_WORLD)
 end
 
-calc_raster(f, sim, raster::Symbol) = calc_raster(sim, raster, f)
+
+calc_raster(f, sim, raster::Symbol, f_returns::DataType,
+            accessible::Vector{DataType}) =
+                calc_raster(sim, raster, f, f_returns, accessible)
 
 
 """
