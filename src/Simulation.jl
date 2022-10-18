@@ -6,7 +6,7 @@ export param
 export aggregate
 
 # this is mutable, as we assign write -> read in finish_write!
-mutable struct AgentFields{T}
+mutable struct AgentReadWrite{T}
     state::Vector{T}
     # This is a Vector of rows (AgentNr) that can be reused for the
     # next agents. It is redudant to died: died[e in reuseable] == true
@@ -16,10 +16,37 @@ mutable struct AgentFields{T}
     died::Vector{Bool}
 end
 
-function AgentFields(T::DataType) 
-    AgentFields{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}())
+AgentReadWrite(T::DataType) =
+    AgentReadWrite{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}())
+
+mutable struct MPIWindows
+    # Access via shared memory
+    shmstate::Union{MPI.Win, Nothing}
+    shmdied::Union{MPI.Win, Nothing}
+    # Access to other nodes via MPI.Get
+    nodestate::Union{MPI.Win, Nothing}
+    nodedied::Union{MPI.Win, Nothing}
+    # we are between prepare_mpi! and finished_mpi!
+    prepared::Bool
 end
 
+MPIWindows() = MPIWindows(nothing, nothing, nothing, nothing, false)
+
+mutable struct AgentFields{T}
+    read::AgentReadWrite{T}
+    write::AgentReadWrite{T}
+    reuse::Vector{Reuse}
+    nextid::AgentNr
+    mpiwindows::MPIWindows
+end
+
+AgentFields(T::DataType) =
+    AgentFields(AgentReadWrite(T),
+                AgentReadWrite(T),
+                Vector{Reuse}(),
+                AgentNr(1),
+                MPIWindows())
+                
 """
     construct_model(types::ModelTypes, name::String)
 
@@ -44,25 +71,31 @@ function construct_model(typeinfos::ModelTypes, name::String)
         end 
         for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
 
+    # nodefields = [
+    #     map(["_read", "_write"]) do RW
+    #         Expr(Symbol("="),
+    #              :($(Symbol(T, RW))::$(AgentReadWrite{T})),
+    #              :($(AgentReadWrite(T))))
+    #     end 
+    #     for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
+
     nodefields = [
-        map(["_read", "_write"]) do RW
-            Expr(Symbol("="),
-                 :($(Symbol(T, RW))::$(AgentFields{T})),
-                 :($(AgentFields(T))))
-        end 
-        for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
-
-    nodeids = [
         Expr(Symbol("="),
-             :($(Symbol(T, "_nextid"))::AgentNr),
-             :(AgentNr(1)))
+             :($(Symbol(T))::AgentFields{$T}),
+             :(AgentFields($T)))
         for T in typeinfos.nodes_types ]
 
-    nodereuse = [
-        Expr(Symbol("="),
-             :($(Symbol(T, "_reuse"))::Vector{Reuse}),
-             :(Vector{Reuse}()))
-        for T in typeinfos.nodes_types ]
+    # nodeids = [
+    #     Expr(Symbol("="),
+    #          :($(Symbol(T, "_nextid"))::AgentNr),
+    #          :(AgentNr(1)))
+    #     for T in typeinfos.nodes_types ]
+
+    # nodereuse = [
+    #     Expr(Symbol("="),
+    #          :($(Symbol(T, "_reuse"))::Vector{Reuse}),
+    #          :(Vector{Reuse}()))
+    #     for T in typeinfos.nodes_types ]
 
 
     edgestorage = [
@@ -83,9 +116,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(num_transitions::Int64),
                   edgefields...,
                   edgestorage...,
-                  nodefields...,
-                  nodeids...,
-                  nodereuse...)
+                  nodefields...)
     
     # the true in the second arg makes the struct mutable
     strukt = Expr(:struct, true, :($simsymbol{P, G}), fields)

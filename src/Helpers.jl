@@ -87,72 +87,86 @@ readfield(T) = Symbol(T, "_read")
 # nextidfield(T) = Symbol(T, "_nextid")
 
 macro nextid(T)
-    field = Symbol(T, "_nextid")
-    :( sim.$(field) ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).nextid ) |> esc
 end 
-nextid(sim, T) = getproperty(sim, Symbol(T, "_nextid"))
+nextid(sim, T) = getproperty(sim, Symbol(T)).nextid
 
 macro reuse(T)
-    field = Symbol(T, "_reuse")
-    :( sim.$(field) ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).reuse ) |> esc
 end
-reuse(sim, T) = getproperty(sim, Symbol(T, "_reuse"))
+reuse(sim, T) = getproperty(sim, Symbol(T)).reuse
+
+macro windows(T)
+    field = Symbol(T)
+    :( sim.$(field).mpiwindows ) |> esc
+end
+windows(sim, T) = getproperty(sim, Symbol(T)).mpiwindows
 
 macro readdied(T)
-    field = Symbol(T, "_read")
-    :( sim.$(field).died ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).read.died ) |> esc
 end
-readdied(sim, T) = getproperty(sim, Symbol(T, "_read")).died
+readdied(sim, T) = getproperty(sim, Symbol(T)).read.died
 
 macro writedied(T)
-    field = Symbol(T, "_write")
-    :( sim.$(field).died ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).write.died ) |> esc
 end
-writedied(sim, T) = getproperty(sim, Symbol(T, "_write")).died
+writedied(sim, T) = getproperty(sim, Symbol(T)).write.died
 
 macro readstate(T)
-    field = Symbol(T, "_read")
-    :( sim.$(field).state ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).read.state ) |> esc
 end
-readstate(sim, T) = getproperty(sim, Symbol(T, "_read")).state
+readstate(sim, T) = getproperty(sim, Symbol(T)).read.state
 
 macro writestate(T)
-    field = Symbol(T, "_write")
-    :( sim.$(field).state ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).write.state ) |> esc
 end
-writestate(sim, T) = getproperty(sim, Symbol(T, "_write")).state
+writestate(sim, T) = getproperty(sim, Symbol(T)).write.state
 
 macro readreuseable(T)
-    field = Symbol(T, "_read")
-    :( sim.$(field).reuseable ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).read.reuseable ) |> esc
 end
-readreuseable(sim, T) = getproperty(sim, Symbol(T, "_read")).reuseable
+readreuseable(sim, T) = getproperty(sim, Symbol(T)).read.reuseable
 
 macro writereuseable(T)
-    field = Symbol(T, "_write")
-    :( sim.$(field).reuseable ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).write.reuseable ) |> esc
 end
-writereuseable(sim, T) = getproperty(sim, Symbol(T, "_write")).reuseable
+writereuseable(sim, T) = getproperty(sim, Symbol(T)).write.reuseable
 
+macro agentwrite(T)
+    field = Symbol(T)
+    :( sim.$(field).write ) |> esc
+end
+
+macro agentread(T)
+    field = Symbol(T)
+    :( sim.$(field).read ) |> esc
+end
 
 macro write(T)
     field = Symbol(T, "_write")
     :( sim.$(field) ) |> esc
 end
-write(sim, T) =getproperty(sim, Symbol(T, "_write"))
-
+write(sim, T) = getproperty(sim, Symbol(T, "_write"))
 
 macro read(T)
     field = Symbol(T, "_read")
     :( sim.$(field) ) |> esc
 end
-read(sim, T) =getproperty(sim, Symbol(T, "_read"))
+read(sim, T) = getproperty(sim, Symbol(T, "_read"))
 
 macro storage(T)
     field = Symbol(T, "_storage")
     :( sim.$(field) ) |> esc
 end
-storage(sim, T) =getproperty(sim, Symbol(T, "_storage"))
+storage(sim, T) = getproperty(sim, Symbol(T, "_storage"))
 
 
 # we use this tests are for the distributed version, in this case

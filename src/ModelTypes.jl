@@ -103,8 +103,6 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
         types.nodes_attr[T][:size] = size
     end
 
-    types.nodes_attr[T][:mpi_prepared] = false
-    
     types
 end
 

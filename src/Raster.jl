@@ -241,7 +241,7 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     # block. But we ensure, that we only access the agentstate on the own rank,
     # so to avoid overhead, we set only the mpi_prepared flag (which is checked
     # in an mayassert inside of agentstate).
-    sim.typeinfos.nodes_attr[T][:mpi_prepared] = true
+    windows(sim, T).prepared = true
     rs = map(sim.rasters[raster]) do id
         if process_nr(id) == mpi.rank
             agentstate(sim, id, T) |> f
@@ -249,7 +249,7 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
             zero(f_returns)
         end
     end
-    sim.typeinfos.nodes_attr[T][:mpi_prepared] = false
+    windows(sim, T).prepared = false
     MPI.Allreduce(rs, |, MPI.COMM_WORLD)
 end
 

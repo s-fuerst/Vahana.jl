@@ -22,8 +22,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     nompi = ! mpi.active
     
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
-        @read($T) = AgentFields($T)
-        @write($T) = AgentFields($T)
+        @agentread($T) = AgentReadWrite($T)
+        @agentwrite($T) = AgentReadWrite($T)
         @nextid($T) = AgentNr(1)
         @reuse($T) = Vector{Reuse}()
         if $fixedsize
@@ -104,7 +104,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     asref = Ref{T}()
-    asdt = MPI.Datatype(T)
+    # asdt = MPI.Datatype(T)
     
     @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
         @mayassert begin
@@ -113,7 +113,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
         @mayassert begin
             T = $T
-            sim.typeinfos.nodes_attr[$T][:mpi_prepared] 
+            @windows($T).prepared
         end """
           $T must be in the `accessible` argument of the transition function.
         """
@@ -144,7 +144,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         else
             # same procedure as above, but with RMA
             if $checkliving
-                win_died = sim.typeinfos.nodes_attr[$T][:window_died]
+                win_died = @windows($T).died
                 nr = agent_nr(id)
                 died = Vector{Bool}(undef, 1)
                 MPI.Win_lock(win_died; rank = r, type = :shared, nocheck = true)
@@ -160,7 +160,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             if ! $checkliving
                 nr = agent_nr(id)
             end
-            win_state = sim.typeinfos.nodes_attr[$T][:window_state]
+            win_state = @windows($T).state
             MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
             MPI.Get!($asref, r, nr - 1, win_state)
             # ccall((:MPI_Get, MPI.libmpi), Cint,
@@ -231,7 +231,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
         end
         if ! add_existing
-            @write($T) = AgentFields($T)
+            @agentwrite($T) = AgentReadWrite($T)
             if $fixedsize
                 resize!(@writestate($T), $_size)
                 if $checkliving 
@@ -301,22 +301,23 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
-        sim.typeinfos.nodes_attr[$T][:mpi_prepared] = true
+        @windows($T).prepared = true
 
         if ! $nompi
-            @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_died)
+            @assert isnothing(@windows($T).nodedied)
+
             win_died = MPI.Win_create(@readdied($T),
                                       MPI.COMM_WORLD;
                                       same_disp_unit = true)
-            sim.typeinfos.nodes_attr[$T][:window_died] = win_died
+            @windows($T).nodedied = win_died
 
             if ! $stateless
-                @assert ! haskey(sim.typeinfos.nodes_attr[$T], :window_state)
+                @assert isnothing(@windows($T).nodestate)
 
                 win_state = MPI.Win_create(@readstate($T),
                                            MPI.COMM_WORLD,
                                            same_disp_unit = true)
-                sim.typeinfos.nodes_attr[$T][:window_state] = win_state
+                @windows($T).nodestate = win_state
             end
         end
     end 
@@ -325,17 +326,15 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     @eval function finish_mpi!(sim::$simsymbol, ::Type{$T})
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
-        sim.typeinfos.nodes_attr[$T][:mpi_prepared] = false
+        @windows($T).prepared = false
 
         if ! $nompi
-            win = sim.typeinfos.nodes_attr[$T][:window_died]
-            MPI.free(win)
-            delete!(sim.typeinfos.nodes_attr[$T], :window_died)
+            MPI.free(@windows($T).died)
+            @windows($T).died = nothing
 
             if ! $stateless
-                win = sim.typeinfos.nodes_attr[$T][:window_state]
-                MPI.free(win)
-                delete!(sim.typeinfos.nodes_attr[$T], :window_state)
+                MPI.free(@windows($T).state)
+                @windows($T).state = nothing
             end
         end
     end
