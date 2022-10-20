@@ -54,8 +54,8 @@ function addgrid!(sim)
 end 
 
 model = ModelTypes() |>
-    register_agenttype!(Cell) |>
-    register_edgetype!(Neighbor) |>
+    register_agenttype!(Cell, :Immortal) |>
+    register_edgetype!(Neighbor, :Stateless) |>
     construct_model("Game of Life")
 
 
@@ -78,15 +78,21 @@ end
 
 function step!(sim)
     apply_transition!(sim, transition, [Cell], [Cell, Neighbor], [])
-    countactive!(sim)
-    addgrid!(sim)
-    getglobal(sim, :grid) |> last
+ #    countactive!(sim)
+#     addgrid!(sim)
+#     getglobal(sim, :grid) |> last
 end
 
 sim = init(Params(rules = (2,3,3,3),
-                  dims = (200,200)))
+                  dims = (1000,1000)))
 
-@btime step!(sim)
+step!(sim)
+
+@time for _ in 1:10
+    step!(sim)
+end
+
+finish_simulation!(sim)
 
 # this produces a nice view of the current state in the REPL
-getglobal(sim, :grid) |> last
+#getglobal(sim, :grid) |> last

@@ -12,7 +12,7 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-Logging.disable_logging(Logging.Info)
+# Logging.disable_logging(Logging.Info)
 
 #MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
 
@@ -257,6 +257,8 @@ function testforedgetype(ET)
 
     apply_transition!(sim, check_state_rev2(ET), [ AgentState2 ],
                       [ ET ], []; invariant_compute = true)
+
+    finish_simulation!(sim)
 end
 
 @testset "EdgeTypes" begin
@@ -264,6 +266,7 @@ end
 
     if CurrentEdgeType === Nothing
         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
+            @info "test" ET
             testforedgetype(ET)
         end
     else

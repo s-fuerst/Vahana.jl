@@ -32,6 +32,8 @@ function mpiinit()
     mpi.shmrank = MPI.Comm_rank(mpi.shmcomm)
     mpi.shmsize = MPI.Comm_size(mpi.shmcomm)
 
-    mpi.node = floor(mpi.rank / mpi.shmsize) |> Int64
+    (mpi.node, rank) = fldmod(mpi.rank, mpi.shmsize)
+    # check that the ranks are really distributed as expected 
+    @assert mpi.shmrank == rank
 end
 

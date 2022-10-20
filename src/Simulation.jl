@@ -1,5 +1,5 @@
 export construct_model
-export new_simulation
+export new_simulation, finish_simulation!
 export finish_init!
 export apply_transition, apply_transition!
 export param
@@ -50,7 +50,7 @@ AgentFields(T::DataType) =
                 Vector{Reuse}(),
                 AgentNr(1),
                 MPIWindows())
-                
+
 """
     construct_model(types::ModelTypes, name::String)
 
@@ -200,7 +200,7 @@ function new_simulation(model::Model,
     for T in sim.typeinfos.nodes_types
         init_field!(sim, T)
         # TODO AGENT: replace this
- #       nffs[C].register_atexit(sim, T)
+        #       nffs[C].register_atexit(sim, T)
     end
 
     sim
@@ -212,7 +212,7 @@ construct_model(name::String) = types -> construct_model(types, name)
 new_simulation(params::P = nothing,
                globals::G = nothing;
                kwargs...) where {P, G} =
-    model -> new_simulation(model, params, globals; kwargs...)
+                   model -> new_simulation(model, params, globals; kwargs...)
 
 """
     finish_init!(sim::Simulation; distribute::Bool, 
@@ -289,6 +289,22 @@ function updateids(idmap, oldids)
 end
 
 
+
+# TODO SHM write finish_simulation! . free shm stuff, remove references.
+# sim should be after finish_simulation! in the same state as new_simulation.
+function finish_simulation!(sim)
+    for T in sim.typeinfos.nodes_types
+        shmstatewin = getproperty(sim, Symbol(T)).mpiwindows.shmstate
+        if ! isnothing(shmstatewin)
+            MPI.free(shmstatewin)
+        end
+        shmdiedwin = getproperty(sim, Symbol(T)).mpiwindows.shmdied
+        if ! isnothing(shmdiedwin)
+            MPI.free(shmdiedwin)
+        end
+        # TODO release all references
+    end       
+end
 ######################################## Transition
 
 

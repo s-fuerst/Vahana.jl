@@ -29,12 +29,16 @@ if mpi.size == 1
             expected = hastrait(ET, "E") ? 10 : 20
             
             @test Vahana.edges_iterator(eisim, ET, false) |> length == expected
-            @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length == expected
+            @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length ==
+                expected
 
             finish_init!(eisim)
             
             @test Vahana.edges_iterator(eisim, ET) |> length == expected
-            @test Vahana.edges_iterator(eisim, ET) |> collect |> length == expected
+            @test Vahana.edges_iterator(eisim, ET) |> collect |> length ==
+                expected
+
+            finish_simulation!(eisim)
         end
 
         for ET in [ statelessEdgeTypes; statefulEdgeTypes ]
@@ -67,6 +71,7 @@ end
 
         @test aggregate(sim, e -> e.foo, +, ET) == 0
 
+        finish_simulation!(sim)
         # we now create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
         sim = new_simulation(model_edges, nothing, nothing)
@@ -87,6 +92,8 @@ end
         end
 
         @test aggregate(sim, e -> e.foo, +, ET) == 0
+
+        finish_simulation!(sim)
     end
 
     for ET in statefulEdgeTypes
@@ -99,8 +106,6 @@ end
     # use num_edges instead of aggregate to test this for all types.
     # but this does not work for distributed runs
     function runremoveedgestest(ET::DataType)
-        sim = new_simulation(model_edges, nothing, nothing)
-
         # we create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
         sim = new_simulation(model_edges, nothing, nothing)
@@ -129,6 +134,8 @@ end
         if has_trait(sim, ET, :IgnoreFrom)
             return
         end
+
+        finish_simulation!(sim)
         # we create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
         sim = new_simulation(model_edges, nothing, nothing)
@@ -156,7 +163,7 @@ end
         # end
 
         # @test num_edges(sim, ET) == 0  
-
+        finish_simulation!(sim)
     end
 
     for ET in [ statefulEdgeTypes; statelessEdgeTypes ]

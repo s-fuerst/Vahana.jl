@@ -171,11 +171,10 @@ end
     end
 
     @testset "neighborstates" begin
+        @info mpi.rank sim
         create_mpi_wins(sim)
-        @onrankof a1id @test neighborstates(sim, a1id, ESLDict1, AImm)[1] ==
-            AImm(1)
-        @onrankof a1id @test neighborstates_flexible(sim, a1id, ESDict)[2] ==
-            AMortal(3)
+        @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
+        @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
         free_mpi_wins(sim)
     end
 

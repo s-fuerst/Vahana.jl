@@ -20,6 +20,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     nompi = ! mpi.active
+    shmonly = mpi.size == mpi.shmsize
     
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
         @agentread($T) = AgentReadWrite($T)
@@ -118,8 +119,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
           $T must be in the `accessible` argument of the transition function.
         """
 
-        r = process_nr(id)
-        if $nompi || r == mpi.rank
+        idrank = process_nr(id)
+        if $nompi || idrank == mpi.rank
             # highest priority: does the agent is still living
             if $checkliving
                 nr = agent_nr(id)
@@ -141,15 +142,44 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 nr = agent_nr(id)
             end
             @inbounds @readstate($T)[nr]
+        elseif $shmonly || fld(idrank, mpi.shmsize) == mpi.node
+            sr = mod(idrank, mpi.shmsize)
+            # same procedure as above, but with access to shared memory
+            if $checkliving
+                nr = agent_nr(id)
+                if @agent($T).shmdied[sr + 1][nr]
+                    return nothing
+                end
+            end
+            # if it's living, but has no state, we can return directly
+            if $stateless
+                return $T()
+            end
+            # we haven't calculate nr in the !checkliving case
+            # but need it now (maybe the compiler is clever enough
+            # to remove a second agent_nr(id) call, then this if could
+            # be remove
+            if ! $checkliving
+                nr = agent_nr(id)
+            end
+            # @info "shm" sr nr id mpi.rank length(@agent($T).shmstate[sr + 1])
+            # what = "readstate"
+            # @info @readstate($T) mpi.rank what
+            # # what = "shmstate"
+            # # @info @agent($T).shmstate[sr] mpi.rank what
+            # what = "shmstate +1"
+            # @info @agent($T).shmstate[sr + 1] mpi.rank what
+            @agent($T).shmstate[sr + 1][nr]
+            # @inbounds @agent($T).shmstate[sr][nr]
         else
             # same procedure as above, but with RMA
             if $checkliving
                 win_died = @windows($T).nodedied
                 nr = agent_nr(id)
                 died = Vector{Bool}(undef, 1)
-                MPI.Win_lock(win_died; rank = r, type = :shared, nocheck = true)
-                MPI.Get!(died, r, nr - 1, win_died)
-                MPI.Win_unlock(win_died; rank = r)
+                MPI.Win_lock(win_died; rank = idrank, type = :shared, nocheck = true)
+                MPI.Get!(died, idrank, nr - 1, win_died)
+                MPI.Win_unlock(win_died; rank = idrank)
                 if died[1]
                     return nothing
                 end
@@ -161,14 +191,14 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 nr = agent_nr(id)
             end
             win_state = @windows($T).nodestate
-            MPI.Win_lock(win_state; rank = r, type = :shared, nocheck = true)
+            MPI.Win_lock(win_state; rank = idrank, type = :shared, nocheck = true)
             # MPI.Get!($asref, r, nr - 1, win_state)
             ccall((:MPI_Get, MPI.libmpi), Cint,
                   (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
                    Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
-                  $asref, MPI.Cint(1), $asdt, r,
+                  $asref, MPI.Cint(1), $asdt, idrank,
                   Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
-            MPI.Win_unlock(win_state; rank = r)
+            MPI.Win_unlock(win_state; rank = idrank)
             $asref[]
         end
     end
@@ -221,18 +251,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, ::Type{$T})
-        # first we decouple the read and write arrys (in finish_write
-        # we set read = write)
-        (@windows($T).shmstate, sarr) = 
-            MPI.Win_allocate_shared(Array{$T},
-                                    length(@readstate($T)),
-                                    mpi.shmcomm)
-
-        # @readstate($T) = sarr
-        
         if $immortal 
-            # while distributing the initial graph we also kill immortal agents
-            if sim.initialized == true
+            # while distributing the initial graph will also kill immortal agents
+            if sim.initialized
                 @assert begin
                     T = $T
                     add_existing == true
@@ -258,13 +279,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
-        # we can release the read shared memory now but after
-        # initialization we call finish_write! without prepare_write!,
-        # so shmstate can be nothing
-        if ! isnothing(@windows($T).shmstate)
-            MPI.free(@windows($T).shmstate)
-        end
-        
         if ! $immortal
             aids = map(nr -> agent_id(sim, nr, $T), @writereuseable($T))
 
@@ -290,10 +304,55 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
         end
 
-        # we create a copy in prepare_write! TODO SHM remove deepcopy
-        @readstate($T) = @writestate($T) |> deepcopy
-        if $checkliving
-            @readdied($T) = @writedied($T) |> deepcopy
+        if ! $stateless
+            if ! isnothing(@windows($T).shmstate)
+                MPI.free(@windows($T).shmstate)
+            end
+            (@windows($T).shmstate, sarr) = 
+                MPI.Win_allocate_shared(Array{$T},
+                                        length(@writestate($T)),
+                                        mpi.shmcomm)
+            # alloc_shared_noncontig = true)
+
+            # TODO SHM: use memcpy
+            for (i, e) in enumerate(@writestate($T))
+                sarr[i] = e
+            end
+            MPI.Win_fence(0, @windows($T).shmstate)
+            @readstate($T) = sarr
+            
+        end
+        if $checkliving 
+            if ! isnothing(@windows($T).shmdied)
+                MPI.free(@windows($T).shmdied)
+            end
+            (@windows($T).shmdied, sarr) = 
+                MPI.Win_allocate_shared(Array{Bool},
+                                        length(@writedied($T)),
+                                        mpi.shmcomm)
+            # alloc_shared_noncontig = true)
+
+            # TODO SHM: use memcpy
+            for (i, e) in enumerate(@writedied($T))
+                sarr[i] = e
+            end
+            MPI.Win_fence(0, @windows($T).shmdied)
+            @readdied($T) = sarr
+        end
+        
+        if ! $nompi
+            if ! $stateless
+                @agent($T).shmstate = 
+                    [ MPI.Win_shared_query(Array{$T},
+                                           @windows($T).shmstate;
+                                           rank = i - 1) for i in 1:mpi.shmsize ]
+            end
+            if $checkliving
+                @agent($T).shmdied = 
+                    [ MPI.Win_shared_query(Array{Bool},
+                                           @windows($T).shmdied;
+                                           rank = i - 1) for i in 1:mpi.shmsize ]
+            end
         end
         # for the reusable vector, we merge the new reuseable indices
         # (from agent died in this transition) with the unused indicies that
@@ -339,11 +398,9 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 @windows($T).nodestate = win_state
             end
 
-            # sim.$T.shmstate =
-            @agent($T).shmstate = 
-                [ MPI.Win_shared_query(Array{$T},
-                                       @windows($T).shmstate;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+            # @info @agent($T).shmstate[mpi.shmrank + 1] mpi.shmrank
+            # @info @readstate($T) mpi.shmrank
+            # @info @readdied($T) mpi.shmrank
         end
     end 
 
