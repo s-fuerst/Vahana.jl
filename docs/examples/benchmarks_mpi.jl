@@ -142,13 +142,13 @@ end
 
 ######################################## create edge table
 
-# println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
+println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 
-# for t in allEdgeTypes
-#     mt = prepare(t)
-#     run_benchmark(mt, t)
-#     GC.gc()
-# end
+for t in allEdgeTypes
+    mt = prepare(t)
+    run_benchmark(mt, t)
+    GC.gc()
+end
 
 
 
@@ -179,12 +179,12 @@ mt = ModelTypes() |>
 run_benchmark_agents(mt);
 
 mt = ModelTypes() |>
-    register_agenttype!(AgentWithState, :Vector) |>
+    register_agenttype!(AgentWithState, :Immortal) |>
     construct_model("Immortal");
 run_benchmark_agents(mt);
 
 mt = ModelTypes() |>
-    register_agenttype!(AgentWithState, :Vector; size = 10000000) |>
+    register_agenttype!(AgentWithState, :Immortal; size = 20000000) |>
     construct_model("Immortal fixed");
 run_benchmark_agents(mt);
 

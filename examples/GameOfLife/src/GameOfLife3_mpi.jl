@@ -49,10 +49,13 @@ function transition(c::Cell, id, sim)
     Cell(false)
 end
 
+dim = (2000, 2000)
+size = dim[1] * dim[2]
+
 const model = ModelTypes() |>    
-    register_agenttype!(Cell, :Immortal; size = 40000) |> 
-    register_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=40000) |>
-    register_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=40000) |>
+    register_agenttype!(Cell, :Immortal; size = size) |> 
+    register_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=size) |>
+    register_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=size) |>
     construct_model("GameOfLife")
 
 
@@ -79,7 +82,7 @@ end
 
 const sim = new_simulation(model,
                            Params(rules = SA[2,3,3,3],
-                                  dims = (200,200)),
+                                  dims = dim),
                            nothing)
 
 init!(sim)
