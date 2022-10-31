@@ -175,8 +175,8 @@ function plot_opinion(sim)
     f
 end;
 
-# Since the complete graph is very unclear and the facebook dataset is
-# too large, we construct a clique graph for it using Graphs.jl.
+# Since the full graph is very cluttered and the Facebook dataset is
+# too large, we construct a Clique graph using Graphs.jl.
 
 const cysim = new_simulation(hkmodel, HKParams(0.25), nothing);
 const cyids = add_graph!(cysim,

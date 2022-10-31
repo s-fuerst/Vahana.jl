@@ -6,7 +6,7 @@
 # In this version the transition function reads the state of the surrounding
 # Cells to determine how many of them are active.
 
-using Vahana, Random, SparseArrays
+using Vahana, Random, SparseArrays, BenchmarkTools
 
 import Graphs
 
@@ -79,14 +79,14 @@ end
 function step!(sim)
     apply_transition!(sim, transition, [Cell], [Neighbor], [])
     countactive!(sim)
-    addgrid!(sim)
-    getglobal(sim, :grid) |> last
+    # addgrid!(sim)
+    # getglobal(sim, :grid) |> last
 end
 
 sim = init(Params(rules = (2,3,3,3),
                   dims = (200,200)))
 
-step!(sim)
+@btime step!(sim)
 
 # this produces a nice view of the current state in the REPL
-getglobal(sim, :grid) |> last
+# getglobal(sim, :grid) |> last

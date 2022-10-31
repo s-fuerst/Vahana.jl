@@ -26,6 +26,15 @@ allEdgeTypes = vcat(statefulEdgeTypes, statelessEdgeTypes)
 
 hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
 
+function pt(b)
+    if b === nothing
+        "-"
+    else
+        (round(minimum(b.times), digits=1) |> string) * "/" * (Int32(round(mean(b.times))) |> string)
+    end
+end
+
+
 function prepare(name)
     traits = []
     
@@ -128,60 +137,90 @@ function run_benchmark(mt, name)
 
     x(f) = f ? "x" : " "
 
-    function pt(b)
-        if b === nothing
-            "-"
-        else
-            (round(minimum(b.times), digits=1) |> string) * "/" * (Int32(round(mean(b.times))) |> string)
-        end
-    end
-
-    
     println("| $(x(stateless)) | $(x(singleedge)) | $(x(singletype))  | $(x(ignorefrom)) | $(x(fixedsize)) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) | $(pt(agg)) |")
 end
 
 ######################################## create edge table
 
-println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
+# println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 
-for t in allEdgeTypes
-    mt = prepare(t)
-    run_benchmark(mt, t)
-    GC.gc()
-end
+# for t in allEdgeTypes
+#     mt = prepare(t)
+#     run_benchmark(mt, t)
+#     GC.gc()
+# end
+
+
+
+######################################## Agent functions
+
+struct AgentWithState state::Int64 end
+
+println("| traits | size | add_agent | agentstate | agentstate_flexible | aggregate |")
+
+function run_benchmark_agents(mt)
+    sim = new_simulation(mt, nothing, nothing)
+
+    ids = add_agents!(sim, [ AgentWithState(i) for i in 1:10 ])
+
+    finish_init!(sim)
     
-######################################## raster move_to!
+    raggregate = @benchmark aggregate($sim, a -> a.state, +, AgentWithState)
+    raddagent = @benchmark add_agent!($sim, AgentWithState(1))
+    ragentstate = @benchmark agentstate($sim, $(ids[1]), AgentWithState)
+    ragentstateflex = @benchmark agentstate_flexible($sim, $(ids[1]))
 
-struct GridNode end
+    println("| $(mt.name) | $(pt(raddagent))| $(pt(ragentstate)) | $(pt(ragentstateflex)) | $(pt(raggregate)) | ")
+end
 
-struct GridEdge end
+mt = ModelTypes() |>
+    register_agenttype!(AgentWithState) |>
+    construct_model("Mortal");
+run_benchmark_agents(mt);
 
-struct MovingAgent end
+mt = ModelTypes() |>
+    register_agenttype!(AgentWithState, :Vector) |>
+    construct_model("Immortal");
+run_benchmark_agents(mt);
 
-struct OnPosition  end
-
-struct AgentsOnPoint end
-
-
-const sim = ModelTypes() |>
-    register_agenttype!(GridNode) |>
-    register_agenttype!(MovingAgent) |>
-    register_edgetype!(GridEdge) |>
-    register_edgetype!(OnPosition, :SingleEdge, :SingleAgentType; to_agenttype = GridNode) |>
-    register_edgetype!(AgentsOnPoint, :SingleAgentType; to_agenttype = MovingAgent) |>
-    construct_model("Raster_Test") |>
-    new_simulation(nothing, nothing)
-
-add_raster!(sim,
-            :grid,
-            (20, 12),
-            _ -> GridNode())
-
-id = add_agent!(sim, MovingAgent())
+mt = ModelTypes() |>
+    register_agenttype!(AgentWithState, :Vector; size = 10000000) |>
+    construct_model("Immortal fixed");
+run_benchmark_agents(mt);
 
 
-@benchmark move_to!(sim, :grid, id, (4, 3), nothing, nothing)
+# ######################################## raster move_to!
 
-# @benchmark add_agent!(sim, MovingAgent())
+# struct GridNode end
 
-sim.rasters[:grid][1,3]
+# struct GridEdge end
+
+# struct MovingAgent end
+
+# struct OnPosition  end
+
+# struct AgentsOnPoint end
+
+
+# const sim = ModelTypes() |>
+#     register_agenttype!(GridNode) |>
+#     register_agenttype!(MovingAgent) |>
+#     register_edgetype!(GridEdge) |>
+#     register_edgetype!(OnPosition, :SingleEdge, :SingleAgentType; to_agenttype = GridNode) |>
+#     register_edgetype!(AgentsOnPoint, :SingleAgentType; to_agenttype = MovingAgent) |>
+#     construct_model("Raster_Test") |>
+#     new_simulation(nothing, nothing)
+
+# add_raster!(sim,
+#             :grid,
+#             (20, 12),
+#             _ -> GridNode())
+
+# id = add_agent!(sim, MovingAgent())
+
+
+# @benchmark move_to!(sim, :grid, id, (4, 3), nothing, nothing)
+
+# # @benchmark add_agent!(sim, MovingAgent())
+
+# sim.rasters[:grid][1,3]
