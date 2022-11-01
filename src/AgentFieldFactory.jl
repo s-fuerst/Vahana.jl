@@ -3,8 +3,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     # in the case that the AgentType is stateless, we only check
     # in mpi calls the value of the died entry
     stateless = fieldcount(T) == 0
-    immortal = :Immortal in attr[:traits]
-    checkliving = ! (:Unsecure in attr[:traits])
+    immortal = :Immortal in attr[:traits] || :ConstantSize in attr[:traits]
+    checkliving = ! (:ConstantSize in attr[:traits])
     fixedsize = haskey(attr, :size)
     
     # in this case we don't have an active died vector, and
@@ -194,17 +194,17 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     @eval function transition!(sim::$simsymbol, func, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
-        id = agent_id(sim, AgentNr(1), $T) - AgentID(1)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
-            id += 1
             # jump over died agents
             if $checkliving
                 if @readdied($T)[idx]
                     continue
                 end
             end
-            newstate = func(state, id, sim)
+            # TODO in the immortal case we don't have reuse, and therefore
+            # it is not necessary to call agent_id for each idx
+            newstate = func(state, agent_id(sim, idx, $T), sim)
             if $immortal
                 @mayassert begin
                     newstate !== nothing
@@ -233,6 +233,8 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
+            # TODO in the immortal case we don't have reuse, and therefore
+            # it is not necessary to call agent_id for each idx
             func(state, agent_id(sim, idx, $T), sim)
         end 
     end

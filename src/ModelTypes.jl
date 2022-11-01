@@ -56,7 +56,7 @@ and other bits types.
     to ignore this for now.
 
 
-TODO DOC traits
+TODO DOC traits. ConstantSize => Immortal
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
@@ -75,24 +75,23 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
 
     traits = Set{Symbol}(traits)
     for trait in traits
-        @assert trait in [:Immortal, :Unsecure] """
+        @assert trait in [:Immortal, :ConstantSize] """
 
         The agent type trait $trait is unknown for type $T. The following traits are
         supported: 
             :Immortal
-            :Unsecure
+            :ConstantSize
 
         A fixed (maximal) number of agents can be given via the optional size keyword.
 
         """
     end
 
-    if :Immortal in traits && :Unsecure in traits && size == 0
+    if :ConstantSize in traits && size == 0
         printstyled("""
 
-        The simultaneous use of the :Immortal and :Unsecure traits
-        is only possible if the maximum number of agents is also
-        specified via the size keyword.
+        The :ConstantSize trait can be only used if the maximum number
+        of agents is also specified via the size keyword.
 
         """; color = :red)
     end
