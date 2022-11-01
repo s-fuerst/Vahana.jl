@@ -151,26 +151,13 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                     return nothing
                 end
             end
-            # if it's living, but has no state, we can return directly
             if $stateless
                 return $T()
             end
-            # we haven't calculate nr in the !checkliving case
-            # but need it now (maybe the compiler is clever enough
-            # to remove a second agent_nr(id) call, then this if could
-            # be remove
             if ! $checkliving
                 nr = agent_nr(id)
             end
-            # @info "shm" sr nr id mpi.rank length(@agent($T).shmstate[sr + 1])
-            # what = "readstate"
-            # @info @readstate($T) mpi.rank what
-            # # what = "shmstate"
-            # # @info @agent($T).shmstate[sr] mpi.rank what
-            # what = "shmstate +1"
-            # @info @agent($T).shmstate[sr + 1] mpi.rank what
-            @agent($T).shmstate[sr + 1][nr]
-            # @inbounds @agent($T).shmstate[sr][nr]
+            @inbounds @agent($T).shmstate[sr + 1][nr]
         else
             # same procedure as above, but with RMA
             if $checkliving
@@ -320,7 +307,13 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             end
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
-            
+        else
+            # for stateless T this is a fast operation (25 ns), and
+            # we need this to detect the number of agents in the
+            # case that they are immortal (in this case we could use
+            # the died array, but to avoid code complexity, we always
+            # ensure that readstate is available
+            @readstate($T) = fill($T(), length(@writestate($T)))
         end
         if $checkliving 
             if ! isnothing(@windows($T).shmdied)
@@ -424,13 +417,17 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     @eval function agentsonthisrank(sim::$simsymbol, ::Type{$T}, write = false)
         if ! $checkliving
-            states = @readstate($T)
+            if write
+                @writestate($T)
+            else
+                @readstate($T)
+            end
         else
             if write
-                states = [ @writestate($T)[i] for i in 1:length(@writestate($T))
+                [ @writestate($T)[i] for i in 1:length(@writestate($T))
                               if ! @writedied($T)[i] ]
             else
-                states = [ @readstate($T)[i] for i in 1:length(@readstate($T))
+                [ @readstate($T)[i] for i in 1:length(@readstate($T))
                               if ! @readdied($T)[i] ]
             end
         end
