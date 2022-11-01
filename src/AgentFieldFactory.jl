@@ -124,9 +124,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             # highest priority: does the agent is still living
             if $checkliving
                 nr = agent_nr(id)
-                # TODO AGENT: increase reuse in finish_write,
-                # then we can remove the died vector access here
-                if @readdied($T)[nr] || @reuse($T)[nr] > reuse_nr(id)
+                if @readdied($T)[nr] 
                     return nothing
                 end
             end
@@ -196,15 +194,17 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
     @eval function transition!(sim::$simsymbol, func, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
+        id = agent_id(sim, AgentNr(1), $T) - AgentID(1)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
+            id += 1
             # jump over died agents
             if $checkliving
                 if @readdied($T)[idx]
                     continue
                 end
             end
-            newstate = func(state, agent_id(sim, idx, $T), sim)
+            newstate = func(state, id, sim)
             if $immortal
                 @mayassert begin
                     newstate !== nothing
