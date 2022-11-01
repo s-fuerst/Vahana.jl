@@ -46,6 +46,8 @@ function test_model(model)
     @test num_agents(sim, ConstructedAgent) == 1
     @test num_agents(sim, ComputeAgent) == 1
     @test num_edges(sim, Connection) == 1
+
+    finish_simulation!(sim)
 end
 
 function test_assertion(model)
@@ -64,6 +66,7 @@ function test_assertion(model)
                                                     Connection ]) do state, _, _
         state
     end
+    finish_simulation!(sim)
 end
 
 

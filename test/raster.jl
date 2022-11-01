@@ -66,7 +66,8 @@ raster_model = ModelTypes() |>
     @test raster[1,3] == false
     @test raster[1,1] == true
     @test raster[4,4] == false
-    
+
+    finish_simulation!(sim)
     sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
@@ -91,6 +92,7 @@ raster_model = ModelTypes() |>
     # apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 25
 
+    finish_simulation!(sim)
     sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
@@ -114,6 +116,8 @@ raster_model = ModelTypes() |>
     # @test aggregate(sim, GridA, a -> a.active, +) == 9
     # apply_transition!(sim, diffuse, [GridA], [GridA, GridE], [])
     # @test aggregate(sim, GridA, a -> a.active, +) == 25
+
+    finish_simulation!(sim)
 
     sim = new_simulation(raster_model, nothing, nothing)
 
@@ -139,6 +143,9 @@ raster_model = ModelTypes() |>
         Grid3D(a.pos, a.active ||
             mapreduce(a -> a.active, |, neighborstates(sim, id, GridE, Grid3D)))
     end
+
+    finish_simulation!(sim)
+
     sim = new_simulation(raster_model, nothing, nothing)
 
     add_raster!(sim,
@@ -160,6 +167,7 @@ raster_model = ModelTypes() |>
     @test aggregate(sim, a -> a.active, +, Grid3D) == 5*5*5
     
     ### non-periodic 
+    finish_simulation!(sim)
 
     sim = new_simulation(raster_model, nothing, nothing)
 
@@ -167,7 +175,7 @@ raster_model = ModelTypes() |>
                 :grid,
                 (6,7,6),
                 p -> (p[1] == 1 && p[2] == 1 && p[3] == 1) ?
-                Grid3D(p, true) : Grid3D(p, false))
+                    Grid3D(p, true) : Grid3D(p, false))
 
     connect_raster_neighbors!(sim,
                               :grid,
@@ -183,6 +191,7 @@ raster_model = ModelTypes() |>
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3
 
     ### distance 2 
+    finish_simulation!(sim)
 
     sim = new_simulation(raster_model, nothing, nothing)
 
@@ -190,7 +199,7 @@ raster_model = ModelTypes() |>
                 :grid,
                 (6,7,6),
                 p -> (p[1] == 1 && p[2] == 1 && p[3] == 1) ?
-                Grid3D(p, true) : Grid3D(p, false))
+                    Grid3D(p, true) : Grid3D(p, false))
 
     connect_raster_neighbors!(sim,
                               :grid,
@@ -205,6 +214,7 @@ raster_model = ModelTypes() |>
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3
     apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 5*5*5
+    finish_simulation!(sim)
 
     ### euclidean
     sim = new_simulation(raster_model, nothing, nothing)
@@ -213,7 +223,7 @@ raster_model = ModelTypes() |>
                 :grid,
                 (6,7,6),
                 p -> (p[1] == 1 && p[2] == 1 && p[3] == 1) ?
-                Grid3D(p, true) : Grid3D(p, false))
+                    Grid3D(p, true) : Grid3D(p, false))
 
     connect_raster_neighbors!(sim,
                               :grid,
@@ -226,6 +236,7 @@ raster_model = ModelTypes() |>
     @test aggregate(sim, a -> a.active, +, Grid3D) == 1
     apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 3*3*3-8
+    finish_simulation!(sim)
 
     ### manhatten
     sim = new_simulation(raster_model, nothing, nothing)
@@ -234,7 +245,7 @@ raster_model = ModelTypes() |>
                 :grid,
                 (6,7,6),
                 p -> (p[1] == 1 && p[2] == 1 && p[3] == 1) ?
-                Grid3D(p, true) : Grid3D(p, false))
+                    Grid3D(p, true) : Grid3D(p, false))
 
     connect_raster_neighbors!(sim,
                               :grid,
@@ -248,6 +259,7 @@ raster_model = ModelTypes() |>
     apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 7
 
+    finish_simulation!(sim)
 
     sim = new_simulation(raster_model, nothing, nothing)
 
@@ -255,7 +267,7 @@ raster_model = ModelTypes() |>
                 :grid,
                 (6,7,6),
                 p -> (p[1] == 1 && p[2] == 1 && p[3] == 1) ?
-                Grid3D(p, true) : Grid3D(p, false))
+                    Grid3D(p, true) : Grid3D(p, false))
 
     connect_raster_neighbors!(sim,
                               :grid,
@@ -270,7 +282,7 @@ raster_model = ModelTypes() |>
     apply_transition!(sim, diffuse3D, [Grid3D], [Grid3D, GridE], [])
     @test aggregate(sim, a -> a.active, +, Grid3D) == 10
     
-    
+    finish_simulation!(sim)
 end
 
 @testset "Raster_NodeID" begin
@@ -336,6 +348,7 @@ end
     @test raster[1,2] == 0
     @test raster[2,2] == 0
     @test raster[5,5] == 10
+    finish_simulation!(sim)
 end
 
 @testset "MoveTo_Dist" begin
@@ -366,6 +379,7 @@ end
     @onrankof p1 @test num_neighbors(sim, p1, OnPosition) == 25
     @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 13
     @onrankof p3 @test num_neighbors(sim, p3, OnPosition) == 21
+    finish_simulation!(sim)
 
     ######################################## 4D
     
@@ -391,6 +405,7 @@ end
 
     @onrankof p1 @test num_neighbors(sim, p1, OnPosition) == 3*3*3*3
     @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 1+4*2
+    finish_simulation!(sim)
     
 end
 

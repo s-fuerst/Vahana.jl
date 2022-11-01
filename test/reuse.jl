@@ -55,3 +55,5 @@ end
     # end        
         
 end
+
+finish_simulation!(sim)

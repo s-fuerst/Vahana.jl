@@ -16,14 +16,6 @@ end
 allagenttypes = [ AMortal, AImm, AImmFixed ]
 
 
-function create_mpi_wins(sim)
-    foreach(T -> Vahana.prepare_mpi!(sim, T), allagenttypes)
-end
-
-function free_mpi_wins(sim)
-    foreach(T -> Vahana.finish_mpi!(sim, T), allagenttypes)
-end
-
 # ES = EdgeState and ESL = EdgeStateless
 struct ESDict  foo::Int64 end
 struct ESLDict1 end
@@ -120,8 +112,7 @@ function test_aggregate_mortal(sim, T::DataType)
     end
 end    
 
-
-@testset "Core" begin
+function createsim()
     sim = new_simulation(model, nothing, nothing)
 
     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
@@ -132,9 +123,17 @@ end
         updateids(idmap, a1id), updateids(idmap, a2id), updateids(idmap, a3id)
     avids, avfids = updateids(idmap, avids), updateids(idmap, avfids)
 
+    (sim, a1id, a2id, a3id, avids, avfids)
+end
+    
+
+@testset "Core" begin
+    (sim, a1id, a2id, a3id, avids, avfids) = createsim()
     
     @testset "agentstate" begin
-        create_mpi_wins(sim)
+        @test_throws AssertionError agentstate(sim, a2id, AImm)
+        @test_throws AssertionError agentstate(sim, avids[1], AMortal)
+        enable_asserts(false)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) == AMortal(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
@@ -144,9 +143,7 @@ end
         @onrankof avids[10] @test agentstate(sim, avids[10], AImm) == AImm(10)
         @onrankof avfids[10] @test agentstate(sim, avfids[10], AImmFixed) == AImmFixed(10)
         #     # calling agentstate with the wrong typ should throw an AssertionError
-        @test_throws AssertionError agentstate(sim, a2id, AImm)
-        @test_throws AssertionError agentstate(sim, avids[1], AMortal)
-        free_mpi_wins(sim)
+        enable_asserts(true)
     end
 
     @testset "edges_to" begin
@@ -171,105 +168,10 @@ end
     end
 
     @testset "neighborstates" begin
-        @info mpi.rank sim
-        create_mpi_wins(sim)
+        enable_asserts(false)
         @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
         @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
-        free_mpi_wins(sim)
-    end
-
-    # working on a deepcopy should be possible and not change the
-    # original state
-    @testset "deepcopy" begin
-        copy = deepcopy(sim)
-        # normally it's not allowed to call add_edge! between transition
-        # function, but because of the @onrankof this hack works here
-        enable_asserts(false)
-        @onrankof a1id add_edge!(copy, a2id, a1id, ESDict(20))
-        @onrankof avids[1] add_edge!(copy, a2id, avids[1], ESLDict2())
-        @onrankof a1id @test size(edges_to(sim, a1id, ESDict), 1) == 4
-        @onrankof a1id @test size(edges_to(copy, a1id, ESDict), 1) == 5
-        @onrankof avids[1] @test size(neighborids(sim, avids[1], ESLDict2), 1) == 1
-        @onrankof avids[1] @test size(neighborids(copy, avids[1], ESLDict2), 1) == 2
-    end
-    
-    @testset "transition" begin
-        # we need this for each node factory
-        copy = deepcopy(sim)
-
-        # normally it's not allowed to call add_edge! between transition
-        # function, but because of the @onrankof this hack works here
-        enable_asserts(false)
-        # we want to check two iterations with the sum_state_neighbors,
-        # so we just add an edge loop for the agents where we check the sum
-        @onrankof a1id add_edge!(copy, a1id, a1id, ESLDict1())
-        @onrankof avids[1] add_edge!(copy, avids[1], avids[1], ESLDict2())
-        @onrankof avfids[1] add_edge!(copy, avfids[1], avfids[1], ESLDict1())
-        # for avfids[1] we need a second edge
-        @onrankof avfids[1] add_edge!(copy, avfids[2], avfids[1], ESLDict1())
-        # and also avfids[2] should keep its value
-        @onrankof avfids[2] add_edge!(copy, avfids[2], avfids[2], ESLDict1())
-
-        # now check apply_transtition! for the different nodefieldfactories
-        copydict = deepcopy(copy)
-        apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
-                          [ AMortal ], allagenttypes, [])
-        create_mpi_wins(copydict)
-        @onrankof a1id @test agentstate(copydict, a1id, AMortal) ==
-            AMortal(sum(1:10) + 1)
-        free_mpi_wins(copydict)
-        
-        apply_transition!(copydict, create_sum_state_neighbors(ESLDict1),
-                          [ AMortal ], allagenttypes, [])
-        create_mpi_wins(copydict)
-        @onrankof a1id @test agentstate(copydict, a1id, AMortal) ==
-            AMortal(2 * sum(1:10) + 1)
-        free_mpi_wins(copydict)
-
-        copyvec = deepcopy(copy)
-        apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-                          [ AImm ], allagenttypes, [])
-        create_mpi_wins(copyvec)
-        @onrankof avids[1] @test agentstate(copyvec, avids[1], AImm) == AImm(2)
-        free_mpi_wins(copyvec)
-
-        apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-                          [ AImm ], allagenttypes, [])
-        create_mpi_wins(copyvec)
-        @onrankof avids[1] @test agentstate(copyvec, avids[1], AImm) == AImm(3)
-        free_mpi_wins(copyvec)
-
-        apply_transition!(copyvec, create_sum_state_neighbors(ESLDict2),
-                          [ AImm ], allagenttypes, [])
-        create_mpi_wins(copyvec)
-        @onrankof avids[1] @test agentstate(copyvec, avids[1], AImm) == AImm(4)
-        free_mpi_wins(copyvec)
-
-        copyvecfix = deepcopy(copy)
-        apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-                          [ AImmFixed ], allagenttypes, [])
-        create_mpi_wins(copyvecfix)
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AImmFixed) ==
-            AImmFixed(3)
-        free_mpi_wins(copyvecfix)
-
-        apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-                          [ AImmFixed ], allagenttypes, [])
-        create_mpi_wins(copyvecfix)
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AImmFixed) ==
-            AImmFixed(5)
-        free_mpi_wins(copyvecfix)
-
-        apply_transition!(copyvecfix, create_sum_state_neighbors(ESLDict1),
-                          [ AImmFixed ], allagenttypes, [])
-        create_mpi_wins(copyvecfix)
-        @onrankof avfids[1] @test agentstate(copyvecfix, avfids[1], AImmFixed) ==
-            AImmFixed(7)
-        free_mpi_wins(copyvecfix)
-
-        # TODO check return nothing (currently only supported by Dicts)
-        # apply_transition!(copydict, nothing_transition, [ AMortal ], [], [])
-        # @test_throws KeyError agentstate_flexible(copydict, a1id)
+        enable_asserts(true)
     end
 
     @testset "num_neighbors" begin
@@ -278,10 +180,96 @@ end
         @onrankof a2id @test num_neighbors(sim, a2id, ESDict) == 0
         @test_throws AssertionError num_neighbors(sim, a2id, ESLDict2)
         @onrankof avids[1] @test num_neighbors(sim, avids[1], ESLDict2) == 1
+        enable_asserts(true)
     end
 
-    # this hack should help that the output is not scrambled
-    sleep(mpi.rank * 0.05)
+    finish_simulation!(sim)
+        
+    @testset "transition" begin
+
+        # normally it's not allowed to call add_edge! between transition
+        # function, but because of the @onrankof this hack works here
+        enable_asserts(false)
+        # we want to check two iterations with the sum_state_neighbors,
+        # so we just add an edge loop for the agents where we check the sum
+        (sim, a1id, a2id, a3id, avids, avfids) = createsim()
+        @onrankof a1id add_edge!(sim, a1id, a1id, ESLDict1())
+        @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
+        @onrankof avfids[1] add_edge!(sim, avfids[1], avfids[1], ESLDict1())
+        # for avfids[1] we need a second edge
+        @onrankof avfids[1] add_edge!(sim, avfids[2], avfids[1], ESLDict1())
+        # and also avfids[2] should keep its value
+        @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
+
+        # now check apply_transtition! for the different nodefieldfactories
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+                          [ AMortal ], allagenttypes, [])
+        @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
+            AMortal(sum(1:10) + 1)
+        
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+                          [ AMortal ], allagenttypes, [])
+        @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
+            AMortal(2 * sum(1:10) + 1)
+        finish_simulation!(sim)
+
+        finish_simulation!(sim)
+        # copyvec = deepcopy(copy)
+        (sim, a1id, a2id, a3id, avids, avfids) = createsim()
+        # @onrankof a1id add_edge!(sim, a1id, a1id, ESLDict1())
+        @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
+        # @onrankof avfids[1] add_edge!(sim, avfids[1], avfids[1], ESLDict1())
+        # # for avfids[1] we need a second edge
+        # @onrankof avfids[1] add_edge!(sim, avfids[2], avfids[1], ESLDict1())
+        # # and also avfids[2] should keep its value
+        # @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
+
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
+                          [ AImm ], allagenttypes, [])
+        @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(2)
+
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
+                          [ AImm ], allagenttypes, [])
+        @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(3)
+
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
+                          [ AImm ], allagenttypes, [])
+        @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(4)
+
+        finish_simulation!(sim)
+        # copyvec = deepcopy(copy)
+        (sim, a1id, a2id, a3id, avids, avfids) = createsim()
+        # @onrankof a1id add_edge!(sim, a1id, a1id, ESLDict1())
+        # @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
+        @onrankof avfids[1] add_edge!(sim, avfids[1], avfids[1], ESLDict1())
+        # for avfids[1] we need a second edge
+        @onrankof avfids[1] add_edge!(sim, avfids[2], avfids[1], ESLDict1())
+        # and also avfids[2] should keep its value
+        @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
+
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+                          [ AImmFixed ], allagenttypes, [])
+        @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
+            AImmFixed(3)
+
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+                          [ AImmFixed ], allagenttypes, [])
+        @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
+            AImmFixed(5)
+
+        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+                          [ AImmFixed ], allagenttypes, [])
+        @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
+            AImmFixed(7)
+
+        # TODO check return nothing (currently only supported by Dicts)
+        # apply_transition!(copydict, nothing_transition, [ AMortal ], [], [])
+        # @test_throws KeyError agentstate_flexible(copydict, a1id)
+        enable_asserts(true)
+    end
+
+
+    finish_simulation!(sim)
     
     # TODO transition with add_agent! and add_edge!
     @testset "Aggregate" begin
@@ -317,7 +305,11 @@ end
         end
         @test aggregate(sim, a -> a.bool, &, ADefault) == false
         @test aggregate(sim, a -> a.bool, |, ADefault) == true
+
+        finish_simulation!(sim)
     end
 end
 
+# this hack should help that the output is not scrambled
+sleep(mpi.rank * 0.05)
 

@@ -12,4 +12,6 @@
 
     @test getglobal(sim, :foo) == 1.1
     @test getglobal(sim, :bar) == [1, 2]
+
+    finish_simulation!(sim)
 end

@@ -219,6 +219,8 @@ function runedgestest()
                 @test_throws AssertionError add_edge!(sim, AgentID(0), AgentID(0), t(0))
             end
         end
+
+        finish_simulation!(sim)
     end
 
     @testset "num_edges" begin
@@ -260,5 +262,7 @@ function runedgestest()
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             @test num_edges(sim, t) == 2
         end
+
+        finish_simulation!(sim)
     end    
 end

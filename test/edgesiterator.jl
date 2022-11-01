@@ -74,6 +74,7 @@ end
         finish_simulation!(sim)
         # we now create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
+
         sim = new_simulation(model_edges, nothing, nothing)
 
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])

@@ -40,4 +40,6 @@ model_graph = ModelTypes() |>
     # so in overall we have the nagents-1 times the sum of all ids
     @test aggregate(sim, a -> a.sum, +, GraphA) ==
         sum(1:nagents) * (nagents - 1)
+
+    finish_simulation!(sim)
 end

@@ -1,7 +1,7 @@
 # for whatever reason there is a pipline error when MPI.Init() is called before
 # run(`mpiexec ...`), so first the mpi versions of the tests are called, before
 # the single threaded versions. 
-# include("mpi.jl")
+#include("mpi.jl")
 
 using Vahana
 
