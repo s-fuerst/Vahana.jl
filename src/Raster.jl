@@ -183,12 +183,12 @@ See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
     @assert sim.initialized "calc_raster can be only called after finish_init!"
     foreach(T -> prepare_mpi!(sim, T), accessible)
-    rs = map(f, sim.rasters[raster])
+    z = zero(f_returns)
     rs = map(sim.rasters[raster]) do id
         if process_nr(id) == mpi.rank
             f(id)
         else
-            zero(f_returns)
+            z
         end
     end
     foreach(T -> finish_mpi!(sim, T), accessible)
@@ -242,11 +242,12 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     # so to avoid overhead, we set only the mpi_prepared flag (which is checked
     # in an mayassert inside of agentstate).
     windows(sim, T).prepared = true
+    z = zero(f_returns)
     rs = map(sim.rasters[raster]) do id
         if process_nr(id) == mpi.rank
-            agentstate(sim, id, T) |> f
+            f(agentstate(sim, id, T))
         else
-            zero(f_returns)
+            z
         end
     end
     windows(sim, T).prepared = false
