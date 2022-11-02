@@ -77,7 +77,7 @@ end
 function step!(sim)
     apply_transition!(sim, transition,
                       [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
-    calc_raster(sim, :raster, c -> c.active, Cell)
+    calc_rasterstate(sim, :raster, c -> c.active, Bool, Cell)
 end
 
 const sim = new_simulation(model,
@@ -87,11 +87,14 @@ const sim = new_simulation(model,
 
 init!(sim)
 
-# step!(sim)
 
 #@benchmark
+step!(sim)
 
-@btime apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+# @btime apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
 
-
-#@profilehtml for i in 1:20 step!(sim) end
+if mpi.isroot
+    @time for i in 1:200 step!(sim) end
+else
+    @time for i in 1:200 step!(sim) end
+end    
