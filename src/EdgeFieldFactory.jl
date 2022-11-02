@@ -193,18 +193,12 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
                     if (s < nr)
                         resize!(field, nr)
                         Base.securezero!(view(field, s+1:nr))
-                        # TODO: compare performance with memset
-                        # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
-                        #       pointer(field, s+1), Int8(0), (nr-s) * sizeof($CT))
                     end
                 end
             else
                 @eval function init_field!(sim::$simsymbol, ::Type{$MT})
-                    #                    field = sim.$(writefield(T))
                     resize!(@write($T), $singletype_size)
                     Base.securezero!(@write($T))
-                    # ccall(:memset, Nothing, (Ptr{Int64}, Int8, Int64),
-                    #       pointer(field), 0, $singletype_size * sizeof($CT))
                 end
                 @eval function _check_size!(_, ::AgentNr, ::Type{$T})
                 end

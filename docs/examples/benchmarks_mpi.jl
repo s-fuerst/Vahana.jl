@@ -63,41 +63,46 @@ function prepare(name)
     construct_model(mt, name)
 end
 
-
-function run_benchmark(mt, name)
+function createsim(foragg, mt, name)
     sim = new_simulation(mt, nothing, nothing)
 
     a1 = add_agent!(sim, AgentState())
     a2 = add_agent!(sim, AgentState())
     a3 = add_agent!(sim, AgentState())
 
+    add_edge!(sim, a1, a2, EdgeState(0.1))
+    add_edge!(sim, a2, a3, EdgeState(0.2))
+    add_edge!(sim, a3, a1, EdgeState(0.3))
+
+    if ! foragg
+        for i=1:9
+            add_edge!(sim, a1, a3, EdgeState(i))
+        end
+    end
+
+    finish_init!(sim)
+    
+    (sim, a1, a2, a3)
+end
+
+function run_benchmark(mt, name)
     stateless = hastrait(name, "S")
     singleedge = hastrait(name, "E")
     singletype = hastrait(name, "T")
     ignorefrom = hastrait(name, "I")
     fixedsize = hastrait(name, "F")
 
-    add_edge!(sim, a1, a2, EdgeState(0.1))
-    add_edge!(sim, a2, a3, EdgeState(0.2))
-    add_edge!(sim, a3, a1, EdgeState(0.3))
-
-    sim_agg = deepcopy(sim)
-
-    
-    for i=1:9
-        add_edge!(sim, a1, a3, EdgeState(i))
-    end
-
-    finish_init!(sim)
-    finish_init!(sim_agg)
+    (sim, a1, a2, a3) = createsim(false, mt, name)
 
     edge = Edge(a2, EdgeState(2.0))
 
-    sim_add = deepcopy(sim)
-    addedge = @benchmark add_edge!($sim_add, $a1, $edge)
+    addedge = @benchmark add_edge!($sim, $a1, $edge)
 
+    finish_simulation!(sim)
 
-    if !stateless && !ignorefrom 
+    (sim, a1, a2, a3) = createsim(false, mt, name)
+
+    if !stateless && !ignorefrom
         edgeto = @benchmark edges_to($sim, $a3, EdgeState)
     else
         edgeto = nothing
@@ -115,14 +120,6 @@ function run_benchmark(mt, name)
         estates = @benchmark edgestates($sim, $a3, EdgeState)
     end
 
-
-    if stateless 
-        agg = nothing
-    else
-        agg = @benchmark aggregate($sim_agg, s -> s.v, +, EdgeState)
-    end
-    
-
     if ignorefrom && stateless || !singleedge || !singletype
         hasn = @benchmark has_neighbor($sim, $a3, EdgeState)
     else
@@ -135,6 +132,19 @@ function run_benchmark(mt, name)
         numn = @benchmark num_neighbors($sim, $a3, EdgeState)
     end
 
+    finish_simulation!(sim)
+
+    (sim, a1, a2, a3) = createsim(true, mt, name)
+
+    if stateless 
+        agg = nothing
+    else
+        agg = nothing
+#        agg = @benchmark aggregate($sim, s -> s.v, +, EdgeState)
+    end
+
+    finish_simulation!(sim)
+    
     x(f) = f ? "x" : " "
 
     println("| $(x(stateless)) | $(x(singleedge)) | $(x(singletype))  | $(x(ignorefrom)) | $(x(fixedsize)) | $(pt(addedge)) | $(pt(edgeto)) |  $(pt(hasn)) | $(pt(numn)) | $(pt(nids)) | $(pt(estates)) | $(pt(agg)) |")
@@ -188,6 +198,10 @@ mt = ModelTypes() |>
     construct_model("Immortal fixed");
 run_benchmark_agents(mt);
 
+mt = ModelTypes() |>
+    register_agenttype!(AgentWithState, :ConstantSize; size = 20000000) |>
+    construct_model("ConstantSize");
+run_benchmark_agents(mt);
 
 # ######################################## raster move_to!
 

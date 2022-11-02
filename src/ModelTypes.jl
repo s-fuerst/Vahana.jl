@@ -126,10 +126,12 @@ and other bits types.
 The internal data structures used to store the graph in memory can be modified by 
 the traits parameters:
 
-- `:IgnoreFrom`: The ID of the source node is not stored. 
-- `:Stateless`: Store only the ID of the source node. 
-- `:SingleAgentType`: All target nodes have the same type.
-- `:SingleEdge`: Each agent can be the target node for max. one edge.
+- `:IgnoreFrom`: The ID of the source agent is not stored. This
+  implies that the state of the agents on the source of the edge is
+  not accessible via the [`neighborstates`](@ref) function.
+- `:Stateless`: Store only the ID of the source agent. 
+- `:SingleAgentType`: All target agents have the same type.
+- `:SingleEdge`: Each agent can be the target for max. one edge.
 - `:NumEdgesOnly`: Combines `:IgnoreFrom` and `:Stateless`
 - `:HasEdgeOnly`: Combines `:IgnoreFrom`, `:Stateless` and `:SingleEdge`
 
