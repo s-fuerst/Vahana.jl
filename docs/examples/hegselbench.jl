@@ -45,30 +45,27 @@ const hkmodel = ModelTypes() |>
 const sim = new_simulation(hkmodel, HKParams(0.2), nothing);
 
 
-# # ## SNAPDataset.jl
 
-# # The SNAPDataset.jl package deliver Graphs.jl formatted datasets from
-# # the [Stanford Large Network Dataset
-# # Collection](https://snap.stanford.edu/data/index.html).
+# using SNAPDatasets
+# const agentids = add_graph!(sim,
+#                            loadsnap(:facebook_combined),
+#                            _ -> HKAgent(rand()),
+#                            _ -> Knows());
 
-using SNAPDatasets
 
-# # With this package we can use the `loadsnap` function to create the graph
-# # that is then added to the Vahana graph, e.g. in our example the
-# # facebook dataset.
+import Graphs.SimpleGraphs
+g = SimpleGraphs.complete_graph(1000)
+const agentids = add_graph!(sim,
+                            g,
+                            _ -> HKAgent(rand()),
+                            _ -> Knows());
 
-const snapids = add_graph!(sim,
-                           loadsnap(:facebook_combined),
-                           _ -> HKAgent(rand()),
-                           _ -> Knows());
 
-# Each agent also adds its own opinion to the calculation. We can use
-# the ids returned by the [`add_graph!`](@ref) functions for this.
-
-foreach(id -> add_edge!(sim, id, id, Knows()), snapids) 
+foreach(id -> add_edge!(sim, id, id, Knows()), agentids) 
 
 finish_init!(sim)
 
+@info mpi.rank sim
 # ## Transition Function
 
 
@@ -95,5 +92,8 @@ end;
 
 # We can now apply the transition function to the complete graph simulation
 
-@btime apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+
+@time for _ in 1:100 apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], []) end
+
 

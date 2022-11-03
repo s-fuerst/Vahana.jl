@@ -117,7 +117,11 @@ function show_agent(sim,
         end
         id = rand(agents)
     end
-        
+
+    # we want to access the agentstate outside of a transition function,
+    # assuming the the id is existing on the node 
+    assert_state = asserting()
+    enable_asserts(false)
     
     typeid = sim.typeinfos.nodes_type2id[T]
     # id can be always the local nr, so we first ensure that id
@@ -129,7 +133,8 @@ function show_agent(sim,
     printstyled("Id / Local Nr: "; color = :cyan)
     _printid(id, false)
     print(" / $(agent_nr(id))")
-    as = agentstate(sim, id, t)
+    # the assert modification has a newer world age
+    as = Base.invokelatest(agentstate, sim, id, t)
     if nfields(as) > 0
         printstyled("\nState:"; color = :cyan)
         fnames = as |> typeof |> fieldnames
@@ -245,6 +250,10 @@ function show_agent(sim,
         end
     end
     println()
+
+    # set this back to the state at the beginning of the function
+    enable_asserts(assert_state)
+    
     id
 end
 
