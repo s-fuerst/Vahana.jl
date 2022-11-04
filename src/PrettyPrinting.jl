@@ -136,12 +136,15 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
         if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:traits]
             agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
             aid = agent_id(sim, agent_nr(e.from), agentT)
-            print(" $(agentstate(sim, aid, agentT))")
+            # We disable assertions to call agentstate from the REPL
+            # but this is only done temporary and in a newer world age
+            print(" $(Base.invokelatest(agentstate, sim, aid, agentT))")
         else
-            print(" $(agentstate_flexible(sim, e.from))")
+            print(" $(Base.invokelatest(agentstate_flexible, sim, e.from))")
         end
     end
 end
+
 
 ######################################## 
 
