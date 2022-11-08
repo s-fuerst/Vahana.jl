@@ -247,6 +247,11 @@ function finish_init!(sim;
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
+    # TODO: make this optional
+    if mpi.rank > 0
+        partition = Dict{AgentID, ProcessID}()
+    end
+    
     idmapping = if mpi.size > 1
         # we are creating an own partition only when no partition is given
         if length(partition) == 0 && mpi.isroot

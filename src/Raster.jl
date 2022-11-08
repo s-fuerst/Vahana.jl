@@ -33,16 +33,13 @@ function add_raster!(sim,
 
     grid = Array{AgentID, N}(undef, dims)
 
-    # rasters are always created on the root only, and send broadcasted
-    # in finish_init! after updated the ids.
-    if mpi.isroot
-        positions = CartesianIndices(dims)
-        nodeids = add_agents!(sim, [ agent_constructor(pos) for pos in positions ]) 
-        
-        for (id, pos) in zip(nodeids, positions)
-            grid[pos] = id
-        end
+    positions = CartesianIndices(dims)
+    nodeids = add_agents!(sim, [ agent_constructor(pos) for pos in positions ]) 
+    
+    for (id, pos) in zip(nodeids, positions)
+        grid[pos] = id
     end
+
 
     sim.rasters[name] = grid
 end
@@ -117,11 +114,11 @@ already registered via [`register_agenttype!`](@ref).
 See also [`add_raster!`](@ref)
 """
 function connect_raster_neighbors!(sim,
-                            name::Symbol,
-                            edge_constructor;
-                            distance = 1,
-                            metric::Symbol = :chebyshev,
-                            periodic = true)
+                                   name::Symbol,
+                                   edge_constructor;
+                                   distance = 1,
+                                   metric::Symbol = :chebyshev,
+                                   periodic = true)
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized
@@ -298,14 +295,14 @@ keyword `periodic` determines whether all dimensions are cyclic.
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
 function move_to!(sim,
-           name::Symbol,
-           id::AgentID,
-           pos,
-           edge_from_raster,
-           edge_to_raster;
-           distance = 0,
-           metric::Symbol = :chebyshev,
-           periodic = true)
+                  name::Symbol,
+                  id::AgentID,
+                  pos,
+                  edge_from_raster,
+                  edge_to_raster;
+                  distance = 0,
+                  metric::Symbol = :chebyshev,
+                  periodic = true)
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized
