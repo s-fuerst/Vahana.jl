@@ -1,4 +1,4 @@
-export checked
+export checked, @rootonly, @roottime
 
 """
     checked(f, g, itr; kwargs...)
@@ -196,6 +196,16 @@ end
 macro rootonly(ex)
     quote
         if 0 == mpi.rank
+            $(esc(ex))
+        end
+    end
+end
+
+macro roottime(ex)
+    quote
+        if 0 == mpi.rank
+            @time $(esc(ex))
+        else
             $(esc(ex))
         end
     end

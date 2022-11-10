@@ -94,7 +94,8 @@ function agent_id(typeID::Int64, reuse::Int64, agent_nr::Int64)::AgentID
 end
 
 # there are other agent_id functions specialized for each AgentType constructed
-# via the construct_agent_functions
+# via the construct_agent_functions with the signature
+# agent_id(sim::$simsymbol, agent_nr, ::Type{$T})
 
 function type_nr(id::AgentID)::TypeID
     id >> SHIFT_TYPE

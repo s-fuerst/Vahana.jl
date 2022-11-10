@@ -214,6 +214,14 @@ new_simulation(params::P = nothing,
                kwargs...) where {P, G} =
                    model -> new_simulation(model, params, globals; kwargs...)
 
+function _create_equal_partition(d, ids)
+    l = length(ids)
+    ids_per_rank = Int64(ceil(l / mpi.size)) + 1
+    ranks = foreach(1:l) do idx
+        d[ids[idx]] = div(idx, ids_per_rank) + 1
+    end
+end
+
 """
     finish_init!(sim::Simulation; distribute::Bool, 
                  partition::Dict{AgentID, ProcessID})
@@ -243,7 +251,7 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
-               return_idmapping = false)
+               return_idmapping = false, partition_algo = :Metis)
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
@@ -255,11 +263,20 @@ function finish_init!(sim;
     idmapping = if mpi.size > 1
         # we are creating an own partition only when no partition is given
         if length(partition) == 0 && mpi.isroot
-            @info "Partitioning the Simulation"
-            vsg = vahanasimplegraph(sim; show_ignorefrom_warning = false)
-            part = Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
-            for (i, p) in enumerate(part)
-                partition[vsg.g2v[i]] = p
+            if partition_algo == :Metis
+                @info "Partitioning the Simulation with Metis"
+                vsg = vahanasimplegraph(sim; show_ignorefrom_warning = false)
+                part = Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+                for (i, p) in enumerate(part)
+                    partition[vsg.g2v[i]] = p
+                end
+            else
+                @info "Partitioning the Simulation / equal number of nodes per type"
+                for T in sim.typeinfos.nodes_types
+                    @info "T" T
+                    ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
+                    _create_equal_partition(partition, ids)
+                end
             end
         end
         if mpi.isroot
