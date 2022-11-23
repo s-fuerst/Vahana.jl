@@ -394,6 +394,14 @@ removed and must be added again inside of `func`.
 edges for some types, these types must be listed in the `add_existing`
 vector.
 
+TODO DOC: add_existing
+
+TODO: in accessible currently only the agent types are needed? Do we need
+also the edgetypes? If yes, check that in the edge_functions
+
+TODO: rebuild and add_existing is a confusing combination, rebuild = write
+would be nicer?
+
 See also [`apply_transition`](@ref)
 """
 function apply_transition!(sim,
@@ -415,7 +423,7 @@ function apply_transition!(sim,
     foreach(T -> prepare_mpi!(sim, T), accessible)
     
     foreach(prepare_write!(sim, [add_existing; compute]), writeable)
-    
+
     MPI.Barrier(MPI.COMM_WORLD)
     
     if invariant_compute

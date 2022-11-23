@@ -167,44 +167,40 @@ function show_agent(sim,
             # be the index, and for dict types, the AgentID
             aid = agent_id(sim, agent_nr(id), T)
             nid = :SingleAgentType in edgetypetraits ? agent_nr(id) : aid
-            # check that this agent has some edges
-            if nid in filter(id -> type_nr(AgentID(id)) == typeid,
-                           keys(read_container))
-                # for vector types we can have #undef entries. to only something
-                # for the agent when it is assigned to the vector 
-                if (!(:SingleAgentType in edgetypetraits &&
-                    !isassigned(read_container, nid)))
+            # for vector types we can have #undef entries. to only something
+            # for the agent when it is assigned to the vector 
+            if (!(:SingleAgentType in edgetypetraits &&
+                !isassigned(read_container, nid)))
 
-                    # output the network name and derive some information
-                    printstyled("\n    $edgeT"; color = :yellow)
-                    edgeTheadershown = true
-                    d = read_container[nid]
+                # output the network name and derive some information
+                printstyled("\n    $edgeT"; color = :yellow)
+                edgeTheadershown = true
+                d = read_container[nid]
 
-                    if justcount
-                        if :SingleEdge in edgetypetraits
-                            printstyled("\n\thas_neighbor:  "; color = :green)
-                            print("$(has_neighbor(sim, aid, edgeT))")
-                        else
-                            printstyled("\n\tnum_neighbors: "; color = :green)
-                            print("$(num_neighbors(sim, aid, edgeT))")
-                        end
+                if justcount
+                    if :SingleEdge in edgetypetraits
+                        printstyled("\n\thas_neighbor:  "; color = :green)
+                        print("$(has_neighbor(sim, aid, edgeT))")
                     else
-                        # write the header for this edgetype, 
-                        printstyled("\n\tfrom:              "; color = :green)
-                        if stateof == :Edge || :IgnoreFrom in edgetypetraits
-                            printstyled("edge.state:"; color = :green)
-                        else
-                            printstyled("state of edge.from:"; color = :green)
+                        printstyled("\n\tnum_neighbors: "; color = :green)
+                        print("$(num_neighbors(sim, aid, edgeT))")
+                    end
+                else
+                    # write the header for this edgetype, 
+                    printstyled("\n\tfrom:              "; color = :green)
+                    if stateof == :Edge || :IgnoreFrom in edgetypetraits
+                        printstyled("edge.state:"; color = :green)
+                    else
+                        printstyled("state of edge.from:"; color = :green)
+                    end
+                    if :SingleEdge in edgetypetraits
+                        _show_edge(sim, d, edgetypetraits, stateof, edgeT)
+                    else
+                        for e in first(d, max)
+                            _show_edge(sim, e, edgetypetraits, stateof, edgeT)
                         end
-                        if :SingleEdge in edgetypetraits
-                            _show_edge(sim, d, edgetypetraits, stateof, edgeT)
-                        else
-                            for e in first(d, max)
-                                _show_edge(sim, e, edgetypetraits, stateof, edgeT)
-                            end
-                            if length(d) > max
-                                println("\n\t... ($(length(d)-max) not shown)")
-                            end
+                        if length(d) > max
+                            println("\n\t... ($(length(d)-max) not shown)")
                         end
                     end
                 end
@@ -212,7 +208,7 @@ function show_agent(sim,
         end
 
         if ! source continue end
-            
+        
         if :IgnoreFrom in edgetypetraits
             if !justcount
                 printstyled("\n\tFor edgetypes with the :IgnoreFrom trait " *
@@ -220,7 +216,7 @@ function show_agent(sim,
             end
             continue
         end
-    # collect the outgoing edges and overwrite the from id
+        # collect the outgoing edges and overwrite the from id
         # with the to id
         edges_agents = Vector{Edge}()
         for (eid, e) in edges_iterator(sim, edgeT)
