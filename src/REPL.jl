@@ -167,10 +167,13 @@ function show_agent(sim,
             # be the index, and for dict types, the AgentID
             aid = agent_id(sim, agent_nr(id), T)
             nid = :SingleAgentType in edgetypetraits ? agent_nr(id) : aid
-            # for vector types we can have #undef entries. to only something
-            # for the agent when it is assigned to the vector 
+            # this rather complex statement checks that the agent has
+            # edges of this type towards him. In the :SingleAgentType case we
+            # check the vector for #undef entries, in the other case we use haskey
             if (!(:SingleAgentType in edgetypetraits &&
-                !isassigned(read_container, nid)))
+                !isassigned(read_container, nid)) &&
+                (:SingleAgentType in edgetypetraits ||
+                haskey(read_container, nid)))
 
                 # output the network name and derive some information
                 printstyled("\n    $edgeT"; color = :yellow)
