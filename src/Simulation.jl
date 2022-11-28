@@ -273,7 +273,6 @@ function finish_init!(sim;
             else
                 @info "Partitioning the Simulation / equal number of nodes per type"
                 for T in sim.typeinfos.nodes_types
-                    @info "T" T
                     ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
                     _create_equal_partition(partition, ids)
                 end

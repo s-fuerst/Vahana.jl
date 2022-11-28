@@ -117,7 +117,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         """
 
         idrank = process_nr(id)
-        if $nompi || idrank == mpi.rank
+        if $nompi 
             # highest priority: does the agent is still living
             if $checkliving
                 nr = agent_nr(id)
@@ -137,47 +137,49 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 nr = agent_nr(id)
             end
             @inbounds @readstate($T)[nr]
-        elseif $shmonly || fld(idrank, mpi.shmsize) == mpi.node
-            sr = mod(idrank, mpi.shmsize)
-            # same procedure as above, but with access to shared memory
-            if $checkliving
-                nr = agent_nr(id)
-                if @agent($T).shmdied[sr + 1][nr]
-                    return nothing
-                end
-            end
-            if $stateless
-                return $T()
-            end
-            if ! $checkliving
-                nr = agent_nr(id)
-            end
-            @inbounds @agent($T).shmstate[sr + 1][nr]
         else
-            # same procedure as above, but with RMA
-            if $checkliving
-                win_died = @windows($T).nodedied
-                nr = agent_nr(id)
-                died = Vector{Bool}(undef, 1)
-                MPI.Win_lock(win_died; rank = idrank, type = :shared, nocheck = true)
-                MPI.Get!(died, idrank, nr - 1, win_died)
-                MPI.Win_unlock(win_died; rank = idrank)
-                if died[1]
-                    return nothing
+            (node, sr) = fldmod(idrank, mpi.shmsize)
+            if $shmonly || node == mpi.node
+                # same procedure as above, but with access to shared memory
+                if $checkliving
+                    nr = agent_nr(id)
+                    if @agent($T).shmdied[sr + 1][nr]
+                        return nothing
+                    end
                 end
+                if $stateless
+                    return $T()
+                end
+                if ! $checkliving
+                    nr = agent_nr(id)
+                end
+                @inbounds @agent($T).shmstate[sr + 1][nr]
+            else
+                # same procedure as above, but with RMA
+                if $checkliving
+                    win_died = @windows($T).nodedied
+                    nr = agent_nr(id)
+                    died = Vector{Bool}(undef, 1)
+                    MPI.Win_lock(win_died; rank = idrank, type = :shared, nocheck = true)
+                    MPI.Get!(died, idrank, nr - 1, win_died)
+                    MPI.Win_unlock(win_died; rank = idrank)
+                    if died[1]
+                        return nothing
+                    end
+                end
+                if $stateless
+                    return T()
+                end
+                if ! $checkliving
+                    nr = agent_nr(id)
+                end
+                win_state = @windows($T).nodestate
+                MPI.Win_lock(win_state; rank = idrank, type = :shared)
+                state = Ref{$T}()
+                MPI.Get!(state, idrank, nr - 1, win_state)
+                MPI.Win_unlock(win_state; rank = idrank)
+                state[]
             end
-            if $stateless
-                return T()
-            end
-            if ! $checkliving
-                nr = agent_nr(id)
-            end
-            win_state = @windows($T).nodestate
-            MPI.Win_lock(win_state; rank = idrank, type = :shared)
-            state = Ref{$T}()
-            MPI.Get!(state, idrank, nr - 1, win_state)
-            MPI.Win_unlock(win_state; rank = idrank)
-            state[]
         end
     end
 
@@ -324,19 +326,17 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
             @readdied($T) = sarr
         end
         
-        if ! $nompi
-            if ! $stateless
-                @agent($T).shmstate = 
-                    [ MPI.Win_shared_query(Array{$T},
-                                           @windows($T).shmstate;
-                                           rank = i - 1) for i in 1:mpi.shmsize ]
-            end
-            if $checkliving
-                @agent($T).shmdied = 
-                    [ MPI.Win_shared_query(Array{Bool},
-                                           @windows($T).shmdied;
-                                           rank = i - 1) for i in 1:mpi.shmsize ]
-            end
+        if ! $stateless
+            @agent($T).shmstate = 
+                [ MPI.Win_shared_query(Array{$T},
+                                       @windows($T).shmstate;
+                                       rank = i - 1) for i in 1:mpi.shmsize ]
+        end
+        if $checkliving
+            @agent($T).shmdied = 
+                [ MPI.Win_shared_query(Array{Bool},
+                                       @windows($T).shmdied;
+                                       rank = i - 1) for i in 1:mpi.shmsize ]
         end
         # for the reusable vector, we merge the new reuseable indices
         # (from agent died in this transition) with the unused indicies that
