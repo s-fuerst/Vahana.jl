@@ -104,9 +104,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         end
     end
 
-    asref = Ref{T}()
-    asdt = MPI.Datatype(T)
-    
     @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
         @mayassert begin
             $type_nr(id) == sim.typeinfos.nodes_type2id[$T]
@@ -176,15 +173,11 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 nr = agent_nr(id)
             end
             win_state = @windows($T).nodestate
-            MPI.Win_lock(win_state; rank = idrank, type = :shared, nocheck = true)
-            # MPI.Get!($asref, r, nr - 1, win_state)
-            ccall((:MPI_Get, MPI.libmpi), Cint,
-                  (MPI.MPIPtr, Cint, MPI.MPI_Datatype, Cint,
-                   Cptrdiff_t, Cint, MPI.MPI_Datatype, MPI.MPI_Win),
-                  $asref, MPI.Cint(1), $asdt, idrank,
-                  Cptrdiff_t(nr - 1), MPI.Cint(1), $asdt, win_state)
+            MPI.Win_lock(win_state; rank = idrank, type = :shared)
+            state = Ref{$T}()
+            MPI.Get!(state, idrank, nr - 1, win_state)
             MPI.Win_unlock(win_state; rank = idrank)
-            $asref[]
+            state[]
         end
     end
 
@@ -301,12 +294,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 MPI.Win_allocate_shared(Array{$T},
                                         length(@writestate($T)),
                                         mpi.shmcomm)
-            # alloc_shared_noncontig = true)
 
-            # TODO SHM: use memcpy
-            for (i, e) in enumerate(@writestate($T))
-                sarr[i] = e
-            end
+            Base._memcpy!(sarr, @writestate($T),
+                          length(@writestate($T)) * sizeof($T))
+            
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
         else
@@ -325,12 +316,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                 MPI.Win_allocate_shared(Array{Bool},
                                         length(@writedied($T)),
                                         mpi.shmcomm)
-            # alloc_shared_noncontig = true)
 
-            # TODO SHM: use memcpy
-            for (i, e) in enumerate(@writedied($T))
-                sarr[i] = e
-            end
+            Base._memcpy!(sarr, @writedied($T),
+                          length(@writedied($T)) * sizeof(Bool))
+
             MPI.Win_fence(0, @windows($T).shmdied)
             @readdied($T) = sarr
         end
@@ -392,10 +381,6 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
                                            same_disp_unit = true)
                 @windows($T).nodestate = win_state
             end
-
-            # @info @agent($T).shmstate[mpi.shmrank + 1] mpi.shmrank
-            # @info @readstate($T) mpi.shmrank
-            # @info @readdied($T) mpi.shmrank
         end
     end 
 
@@ -427,10 +412,10 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
         else
             if write
                 [ @writestate($T)[i] for i in 1:length(@writestate($T))
-                              if ! @writedied($T)[i] ]
+                     if ! @writedied($T)[i] ]
             else
                 [ @readstate($T)[i] for i in 1:length(@readstate($T))
-                              if ! @readdied($T)[i] ]
+                     if ! @readdied($T)[i] ]
             end
         end
     end        
