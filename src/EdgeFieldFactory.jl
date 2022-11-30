@@ -228,9 +228,12 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
         @eval function _can_add(field, to::AgentID, value, ::Type{$T})
             if haskey(field, to)
                 if field[to] === value
-                    if ! config.quiet && show_second_edge_warning
-                        global show_second_edge_warning = false
-                        printstyled("""
+                    @mayassert begin
+                        if ! config.quiet && show_second_edge_warning
+                            global show_second_edge_warning = false
+                        end
+                        ! config.quiet && show_second_edge_warning
+                    end """
     
 An edge with agent $to as target was added the second time. Since the value of
 the edge (after applying traits like :IgnoreFrom) is identical to that of
@@ -239,8 +242,7 @@ the first edge, this can be indented and is allowed.
 This warning is only shown once is a Julia session and can be disabled
 by calling suppress_warnings(true) after importing Vahana.
 
-                    """; color = :red)
-                    end
+                    """
                     true
                 else
                     false

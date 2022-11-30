@@ -49,7 +49,7 @@ function construct_prettyprinting_functions(simsymbol)
             if length(s.rasters) >= 1 
                 printstyled(io, "\nRaster(s):"; color = :cyan)
                 for (k,v) in sim.rasters
-#                    print(io, "\n\t $k: $(getfield(s, k))")
+                    #                    print(io, "\n\t $k: $(getfield(s, k))")
                     print(io, "\n\t :$k with dimension $(size(v))")
                 end
             end
@@ -62,7 +62,11 @@ function construct_prettyprinting_functions(simsymbol)
                 for k in typeof(s) |> fieldnames
                     f = getfield(s, k)
                     if typeof(f) <: Array
-                         print(io, "\n\t :$k |> last: $(last(f)) (length: $(length(f)))")
+                        if length(f) == 0
+                            print(io, "\n\t :$k (empty)")
+                        else
+                            print(io, "\n\t :$k |> last: $(last(f)) (length: $(length(f)))")
+                        end
                         printstyled(io, " "; color = :yellow)
                     else
                         print(io, "\n\t :$k : $f")

@@ -339,7 +339,7 @@ end;
 
 # So for our transition functions we have
 
-sim2 = apply_transition(sim, calc_demand, [ Buyer ], [ KnownSellers ], [ Bought ])
+sim2 = apply_transition(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers ], [ Bought ])
 
 # and
 
@@ -393,7 +393,7 @@ calc_average_price(sim3)
 # And now we have all elements to run the simulation, e.g. for 10 steps:
 
 for _ in 1:10
-    apply_transition!(sim, calc_demand, [ Buyer ], [ KnownSellers], [ Bought ])
+    apply_transition!(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers], [ Bought ])
     pushglobal!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Bought))
     apply_transition!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
     pushglobal!(sim, :p, calc_average_price(sim))

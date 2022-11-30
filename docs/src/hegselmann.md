@@ -178,13 +178,13 @@ nothing #hide
 We can now apply the transition function to the complete graph simulation
 
 ````@example hegselmann
-apply_transition!(cgsim, step, [ HKAgent ], [ Knows ], [])
+apply_transition!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
 ````
 
 Or to our facebook dataset
 
 ````@example hegselmann
-apply_transition!(snapsim, step, [ HKAgent ], [ Knows ], [])
+apply_transition!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
 ````
 
 # Plot
@@ -217,8 +217,8 @@ end;
 nothing #hide
 ````
 
-Since the complete graph is very unclear and the facebook dataset is
-too large, we construct a clique graph for it using Graphs.jl.
+Since the full graph is very cluttered and the Facebook dataset is
+too large, we construct a Clique graph using Graphs.jl.
 
 ````@example hegselmann
 const cysim = new_simulation(hkmodel, HKParams(0.25), nothing);
@@ -244,7 +244,7 @@ And then the state after 500 iterations
 
 ````@example hegselmann
 for _ in 1:500
-    apply_transition!(cysim, step, [ HKAgent ], [ Knows ], [])
+    apply_transition!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [])
 end
 
 plot_opinion(cysim)

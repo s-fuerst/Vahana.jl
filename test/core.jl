@@ -262,7 +262,6 @@ end
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(7)
 
-        # TODO check return nothing (currently only supported by Dicts)
         # apply_transition!(copydict, nothing_transition, [ AMortal ], [], [])
         # @test_throws KeyError agentstate_flexible(copydict, a1id)
         enable_asserts(true)

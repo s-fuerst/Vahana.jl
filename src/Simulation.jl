@@ -1,5 +1,6 @@
 export construct_model
 export new_simulation, finish_simulation!
+using Base: nothing_sentinel
 export finish_init!
 export apply_transition, apply_transition!
 export param
@@ -199,10 +200,10 @@ function new_simulation(model::Model,
 
     for T in sim.typeinfos.nodes_types
         init_field!(sim, T)
-        # TODO AGENT: replace this
-        #       nffs[C].register_atexit(sim, T)
     end
 
+    global show_second_edge_warning = true
+    
     sim
 end
 
@@ -242,8 +243,8 @@ the rank on which the agent "lives" after `finish_init`.
     to the different ranks. Which means that it's allowed to run the
     initialization phase on all ranks (there is no need for a
     mpi.isroot check), but then all added agents and edges on other
-    ranks then 0 will be discarded. If this is not intended, a
-    `partition` must be given, or `distribute` must be set to false.
+    ranks then 0 will be discarded. If this is not intended
+    `distribute` must be set to false.
 
 
 See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
@@ -251,13 +252,17 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
-               return_idmapping = false, partition_algo = :Metis)
+               return_idmapping = false, partition_algo = :Metis, distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
             
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
-    # TODO: make this optional
+    if ! distribute
+        sim.initialized = true
+        return nothing
+    end
+
     if mpi.rank > 0
         partition = Dict{AgentID, ProcessID}()
     end

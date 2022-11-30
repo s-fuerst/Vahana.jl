@@ -90,8 +90,6 @@ suppress_warnings = (suppress::Bool) -> config.quiet = suppress
 
 ####################
 
-detect_stateless = false
-
 """
     detect_stateless_trait(detect::Bool)
 
@@ -107,6 +105,8 @@ detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 
 ######################################## include all other files
 
+# TODO DOC
+disable_transition_checks = false
 
 include("Helpers.jl")
 
