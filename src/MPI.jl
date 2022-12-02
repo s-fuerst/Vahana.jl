@@ -193,7 +193,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     edges_alltoall!(sim, perPE, T, updateid)
 end
 
-function construct_mpi_edge_functions(T::DataType, attr, simsymbol, CE)
+function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
