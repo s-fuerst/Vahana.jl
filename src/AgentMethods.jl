@@ -185,52 +185,68 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     @eval agent_id(sim::$simsymbol, agent_nr, ::Type{$T}) =
         agent_id($typeid, @reuse($T)[agent_nr], agent_nr)
+
+
+    @inline @eval function transition_with_write!(sim, idx, newstate, ::Type{$T})
+        if $immortal
+            @mayassert begin
+                newstate !== nothing
+            end "You can not return `nothing` for immortal agents" 
+            @inbounds @writestate($T)[idx] = newstate
+        else
+            if isnothing(newstate)
+                push!(@writereuseable($T), idx)
+                if $checkliving 
+                    @inbounds @writedied($T)[idx] = true
+                end
+            else
+                @inbounds @writestate($T)[idx] = newstate
+            end
+        end
+    end
+
+    @inline @eval function transition_without_write!(sim, idx, newstate, ::Type{$T})
+        @mayassert begin
+            T = $T
+            typeof(newstate) != $T
+        end """
+        The transition function returned an agent of type $T,  
+        but $T is not in the `write` vector.
+        """
+    end
     
-    @eval function transition!(sim::$simsymbol, func, ::Type{$T})
+    @eval function transition_with_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
             # jump over died agents
             if $checkliving
-                if @readdied($T)[idx]
+                @inbounds if @readdied($T)[idx]
                     continue
                 end
             end
             # TODO in the immortal case we don't have reuse, and therefore
             # it is not necessary to call agent_id for each idx
-            newstate = func(state, agent_id(sim, idx, $T), sim)
-            if $immortal
-                @mayassert begin
-                    newstate !== nothing
-                end "You can not return `nothing` for immortal agents" 
-                @writestate($T)[idx] = newstate
-            else
-                if isnothing(newstate)
-                    push!(@writereuseable($T), idx)
-                    if $checkliving 
-                        @writedied($T)[idx] = true
-                    end
-                else
-                    @writestate($T)[idx] = newstate
-                end
-            end
+            newstate = tfunc(state, agent_id(sim, idx, $T), sim)
+            wfunc(sim, idx, newstate, $T)
         end 
     end
 
-    @eval function transition_invariant_compute!(sim::$simsymbol, func, ::Type{$T})
+    @eval function transition_without_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
-        for state::$T in @readstate($T)
+        for _ in 1:length(@readstate($T))
             idx += AgentNr(1)
             if $checkliving
-                if @readdied($T)[idx]
+                @inbounds if @readdied($T)[idx]
                     continue
                 end
             end
             # TODO in the immortal case we don't have reuse, and therefore
             # it is not necessary to call agent_id for each idx
-            func(state, agent_id(sim, idx, $T), sim)
+            r = tfunc(agent_id(sim, idx, $T), sim)
+            wfunc(sim, idx, r, $T)
         end 
     end
 

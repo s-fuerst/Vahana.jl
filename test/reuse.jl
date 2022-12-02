@@ -11,7 +11,7 @@ finish_init!(sim)
 
 expected_reuse = 0
 
-function add_new_remove_me(_, id, sim)
+function add_new_remove_me(id, sim)
     global expected_reuse
     @test Vahana.reuse_nr(id) == expected_reuse
     add_agent!(sim, ReuseAgent())
@@ -23,13 +23,13 @@ end
 
     # index 2 is added, index 1 is set to died
     # the function is receiving reuse 0 index 1
-    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [])
+    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [ ReuseAgent ])
     @test num_agents(sim, ReuseAgent) == 1
     @test sim.ReuseAgent.read.died[1] == true
     @test length(sim.ReuseAgent.read.reuseable) == 1
 
     # the function is receiving reuse 0 index 2
-    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [])
+    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [ ReuseAgent ])
     @test num_agents(sim, ReuseAgent) == 1
     # the agent should be reused now
     @test sim.ReuseAgent.read.died[1] == false
@@ -39,12 +39,12 @@ end
     # the function is receiving reuse 1 index 1
     expected_reuse = 1
 
-    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [])
+    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [ ReuseAgent ])
     @test sim.ReuseAgent.read.died[1] == true
     @test sim.ReuseAgent.read.died[2] == false
 
     # the function is receiving reuse 1 index 2
-    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [])
+    apply_transition!(sim, add_new_remove_me, [ ReuseAgent ], [], [ ReuseAgent ])
     @test sim.ReuseAgent.read.died[1] == false
     @test sim.ReuseAgent.read.died[2] == true
 

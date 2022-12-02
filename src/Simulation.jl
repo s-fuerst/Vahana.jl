@@ -1,6 +1,6 @@
 export construct_model
 export new_simulation, finish_simulation!
-using Base: nothing_sentinel
+using Base: nothing_sentinel, call_composed
 export finish_init!
 export apply_transition, apply_transition!
 export param
@@ -233,7 +233,7 @@ function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
                return_idmapping = false, partition_algo = :Metis, distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
-            
+    
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
@@ -391,13 +391,11 @@ See also [`apply_transition`](@ref)
 """
 function apply_transition!(sim,
                     func::Function,
-                    compute::Vector,
-                    accessible::Vector,
-                    rebuild::Vector;
-                    invariant_compute = false,
+                    call::Vector,
+                    read::Vector,
+                    write::Vector;
                     add_existing = Vector{DataType}())
     @assert sim.initialized "You must call finish_init! before apply_transition!"
-    writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
     # must be set to true before prepare_read! (as this calls add_edge!)
     sim.transition = true
@@ -405,33 +403,29 @@ function apply_transition!(sim,
     # before we call prepare_write! we must ensure that all edges
     # in the storage that are accessible are distributed to the correct
     # ranks.
-    foreach(T -> prepare_read!(sim, T), accessible)
+    foreach(T -> prepare_read!(sim, T), read)
     
-    foreach(prepare_write!(sim, [add_existing; compute]), writeable)
+    foreach(prepare_write!(sim, [call; add_existing]), write)
 
     MPI.Barrier(MPI.COMM_WORLD)
     
-    if invariant_compute
-        for C in compute
-            transition_invariant_compute!(sim, func, C)
-        end
-    else
-        for C in compute
-            transition!(sim, func, C)
-        end
+    for C in call
+        rfunc = C in read ? transition_with_read! : transition_without_read!
+        wfunc = C in write ? transition_with_write! : transition_without_write!
+        rfunc(wfunc, sim, func, C)
     end
-
+    
     MPI.Barrier(MPI.COMM_WORLD)
 
-    foreach(T -> finish_read!(sim, T), accessible)
+    foreach(T -> finish_read!(sim, T), read)
 
     # we must first call finish_write! for the agents, as this will
     # remove the edges where are died agents are involved (and modifies
     # EdgeType_write).
-    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, writeable)
+    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
     foreach(finish_write!(sim), writeableAT)
 
-    writeableET = filter(w -> w in sim.typeinfos.edges_types, writeable)
+    writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
     foreach(finish_write!(sim), writeableET)
 
     sim.transition = false

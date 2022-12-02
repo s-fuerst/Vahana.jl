@@ -14,9 +14,11 @@ function test_model(model)
     # add_existing is empty and we have added ConstructedAgent and
     # Connection to rebuild, so after the transition function only the
     # ComputeAgent exists anymore
-    apply_transition!(sim, [ ComputeAgent ], [], [ ConstructedAgent, Connection ]) do state, id, sim
-        state
-    end
+    apply_transition!(sim,
+                      [ ComputeAgent ],
+                      [],
+                      [ ConstructedAgent, Connection ]) do id, sim
+                      end
 
     @test num_agents(sim, ComputeAgent) == 1
     @test num_agents(sim, ConstructedAgent) == 0
@@ -24,10 +26,9 @@ function test_model(model)
 
     
     # this time we readd the second agent and the edge
-    apply_transition!(sim, [ ComputeAgent ], [], [ ConstructedAgent, Connection ]) do state, id, sim
+    apply_transition!(sim, [ ComputeAgent ], [], [ ConstructedAgent, Connection ]) do id, sim
         constructedid = add_agent!(sim, ConstructedAgent())
         add_edge!(sim, constructedid, computeid, Connection())
-        state
     end
 
     @test num_agents(sim, ComputeAgent) == 1
@@ -37,10 +38,9 @@ function test_model(model)
     # and as we add now ConstructedAgent and Connection to add_existing, we should
     # still have them even with this "do nothing" transition function. And thanks to
     # invariant_compute, we also must not return the ComputeAgent 
-    apply_transition!(sim, [ ComputeAgent ], [], [ ConstructedAgent, Connection ];
-                      add_existing = [ ConstructedAgent, Connection ],
-                      invariant_compute = true) do state, id, sim
-                          nothing
+    apply_transition!(sim,
+                      [ ComputeAgent ], [], [ ConstructedAgent, Connection ];
+                      add_existing = [ ConstructedAgent, Connection ]) do id, sim
                       end
 
     @test num_agents(sim, ConstructedAgent) == 1
@@ -64,8 +64,8 @@ function test_assertion(model)
                                                   [],
                                                   [ ConstructedAgent,
                                                     Connection ]) do state, _, _
-        state
-    end
+                                                        state
+                                                    end
     finish_simulation!(sim)
 end
 

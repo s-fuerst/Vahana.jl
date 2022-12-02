@@ -98,7 +98,7 @@ function test_aggregate_mortal(sim, T::DataType)
     
     # we are testing that there aggregate also works when on a rank
     # no agent of this type is existing
-    apply_transition!(sim, [ T ], [], []) do state, id, sim
+    apply_transition!(sim, [ T ], [ T ], [ T ]) do state, id, sim
         mpi.isroot ? state : nothing
     end
 
@@ -201,14 +201,14 @@ end
         # and also avfids[2] should keep its value
         @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
 
-        # now check apply_transtition! for the different nodefieldfactories
+        # now check apply_transition! for the different nodefieldfactories
         apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
-                          [ AMortal ], allagenttypes, [])
+                          [ AMortal ], allagenttypes, [ AMortal ])
         @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
             AMortal(sum(1:10) + 1)
         
         apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
-                          [ AMortal ], allagenttypes, [])
+                          [ AMortal ], allagenttypes, [ AMortal ])
         @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
             AMortal(2 * sum(1:10) + 1)
         finish_simulation!(sim)
@@ -225,15 +225,15 @@ end
         # @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
 
         apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
-                          [ AImm ], allagenttypes, [])
+                          [ AImm ], allagenttypes, [ AImm ])
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(2)
 
         apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
-                          [ AImm ], allagenttypes, [])
+                          [ AImm ], allagenttypes, [ AImm ])
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(3)
 
         apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
-                          [ AImm ], allagenttypes, [])
+                          [ AImm ], allagenttypes, [ AImm ])
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(4)
 
         finish_simulation!(sim)
@@ -248,17 +248,17 @@ end
         @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
 
         apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
-                          [ AImmFixed ], allagenttypes, [])
+                          [ AImmFixed ], allagenttypes, [ AImmFixed ])
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(3)
 
         apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
-                          [ AImmFixed ], allagenttypes, [])
+                          [ AImmFixed ], allagenttypes, [ AImmFixed ])
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(5)
 
         apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
-                          [ AImmFixed ], allagenttypes, [])
+                          [ AImmFixed ], allagenttypes, [ AImmFixed ])
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(7)
 
@@ -292,14 +292,14 @@ end
         @test aggregate(sim, a -> a.bool, |, ADefault) == true
 
         # set all bool to false
-        apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
+        apply_transition!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
             ADefault(state.foo, false)
         end
         @test aggregate(sim, a -> a.bool, &, ADefault) == false
         @test aggregate(sim, a -> a.bool, |, ADefault) == false
 
         # every second will be true, so that && is false and || is true
-        apply_transition!(sim, [ ADefault ], [], []) do state, id, sim
+        apply_transition!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
             ADefault(state.foo, mod(id, 2) == 1)
         end
         @test aggregate(sim, a -> a.bool, &, ADefault) == false
