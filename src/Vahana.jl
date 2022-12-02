@@ -110,8 +110,8 @@ disable_transition_checks = false
 
 include("Helpers.jl")
 
+# MPIInit must be included before Agent/Edge, and Agent/Edge before MPI
 include("MPIinit.jl")
-
 
 include("Agent.jl")
 include("Edge.jl")
@@ -120,15 +120,14 @@ include("MPI.jl")
 
 include("ModelTypes.jl")
 
-include("EdgeFieldFactory.jl")
-include("AgentFieldFactory.jl")
+include("EdgeMethods.jl")
+include("AgentMethods.jl")
 
 include("Simulation.jl")
 include("Global.jl")
 
-include("EdgesIterator.jl")
+include("EdgeIterator.jl")
 
-include("PrettyPrinting.jl")
 include("REPL.jl")
 
 include("Raster.jl")

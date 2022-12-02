@@ -168,8 +168,8 @@ const ppsim = ModelTypes() |>
     register_edgetype!(PredatorView) |>
     register_edgetype!(PreyView) |>
     register_edgetype!(VisiblePrey, :SingleAgentType; to_agenttype = Predator) |>
-    register_edgetype!(Die, :HasEdgeOnly) |>
-    register_edgetype!(Eat, :HasEdgeOnly) |>
+    register_edgetype!(Die, :HasNeighborOnly) |>
+    register_edgetype!(Eat, :HasNeighborOnly) |>
     construct_model("Predator Prey") |>
     new_simulation(AllParams(), PPGlobals())
 ````
@@ -340,7 +340,7 @@ For these matches, `Die` edges are generated from the cell to the
 prey and `Eat` edges are generated from the cell to the
 predator. Since it is not important for the model at which location
 a prey animal was eaten, the `Die` and `Eat` edgetypes have the
-property `:HasEdgeOnly`.
+property `:HasNeighborOnly`.
 
 If prey on the cell has survived and the cell contains grass
 (countdown == 0), an `Eat` edge is created with one of the surviving

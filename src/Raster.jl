@@ -179,7 +179,7 @@ See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
     @assert sim.initialized "calc_raster can be only called after finish_init!"
-    foreach(T -> prepare_mpi!(sim, T), accessible)
+    foreach(T -> prepare_read!(sim, T), accessible)
     z = zero(f_returns)
     rs = map(sim.rasters[raster]) do id
         if process_nr(id) == mpi.rank
@@ -188,7 +188,7 @@ function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Ve
             z
         end
     end
-    foreach(T -> finish_mpi!(sim, T), accessible)
+    foreach(T -> finish_read!(sim, T), accessible)
     MPI.Allreduce(rs, |, MPI.COMM_WORLD)
 end
 

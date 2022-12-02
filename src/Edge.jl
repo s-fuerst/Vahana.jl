@@ -6,7 +6,7 @@ export neighborids
 
 # For many function declared in this file, the concrete impementation depends
 # the the traits of the edge type and the function itself is build via
-# the construct_edge_functions function. The declaration here
+# the construct_edge_methods function. The declaration here
 # are only used for the documentation, that they come with parameters
 # improves the experience with tools like LSP.
 

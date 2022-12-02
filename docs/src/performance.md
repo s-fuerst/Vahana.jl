@@ -122,12 +122,12 @@ Two property combinations can also be set in
 [`register_edgetype!`](@ref) via a single symbol that directly
 expresses the intent of the combination:
 
-- `:NumEdgesOnly`: This corresponds to the combination `:IgnoreFrom`
+- `:NumNeighborsOnly`: This corresponds to the combination `:IgnoreFrom`
   and `:Stateless`, in this case only the number of edges is counted
   and therefore only calls to [`num_neighbors`](@ref) and
   [`has_neighbor`](@ref) are possible.
 
-- `:HasEdgeOnly`: This corresponds to the combination `:IgnoreFrom`,
+- `:HasNeighborOnly`: This corresponds to the combination `:IgnoreFrom`,
   `:Stateless` and `:SingleEdge`, in this case only calls to
   [`has_neighbor`](@ref) are possible.
 

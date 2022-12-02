@@ -1,4 +1,4 @@
-function construct_agent_functions(T::DataType, typeinfos, simsymbol)
+function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
     # in the case that the AgentType is stateless, we only check
     # in mpi calls the value of the died entry
@@ -360,7 +360,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     # some mpi parts are in prepare_write, as we always use the shared_memory
     # mpi calls, even in single process runs.
-    @eval function prepare_mpi!(sim::$simsymbol, ::Type{$T})
+    @eval function prepare_read!(sim::$simsymbol, ::Type{$T})
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = true
@@ -386,7 +386,7 @@ function construct_agent_functions(T::DataType, typeinfos, simsymbol)
 
     # some mpi parts are in prepare_write, as we always use the shared_memory
     # mpi calls, even in single process runs.
-    @eval function finish_mpi!(sim::$simsymbol, ::Type{$T})
+    @eval function finish_read!(sim::$simsymbol, ::Type{$T})
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = false

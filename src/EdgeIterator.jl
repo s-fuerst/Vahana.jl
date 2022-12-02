@@ -22,7 +22,7 @@ function length(iw::IterEdgesWrapper{SIM, T}) where {SIM, T}
     _num_edges(iw.sim, T, ! iw.read)
 end
 
-function construct_edges_iter_functions(T::DataType, attr, simsymbol)
+function construct_edges_iter_methods(T::DataType, attr, simsymbol)
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]

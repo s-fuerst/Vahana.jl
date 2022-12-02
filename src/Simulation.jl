@@ -27,7 +27,7 @@ mutable struct MPIWindows
     # Access to other nodes via MPI.Get
     nodestate::Union{MPI.Win, Nothing}
     nodedied::Union{MPI.Win, Nothing}
-    # we are between prepare_mpi! and finished_mpi!
+    # we are between prepare_read! and finished_mpi!
     prepared::Bool
 end
 
@@ -112,15 +112,15 @@ function construct_model(typeinfos::ModelTypes, name::String)
 
     # Construct all type specific functions for the edge typeinfos
     for T in typeinfos.edges_types
-        construct_edge_functions(T, typeinfos.edges_attr[T], simsymbol)
+        construct_edge_methods(T, typeinfos.edges_attr[T], simsymbol)
     end
 
     # Construct all type specific functions for the agent typeinfos
     for T in typeinfos.nodes_types
-        construct_agent_functions(T, typeinfos, simsymbol)
+        construct_agent_methods(T, typeinfos, simsymbol)
     end
 
-    construct_prettyprinting_functions(simsymbol)
+    construct_prettyprinting_methods(simsymbol)
 
     Model(typeinfos, name)
 end
@@ -399,13 +399,13 @@ function apply_transition!(sim,
     @assert sim.initialized "You must call finish_init! before apply_transition!"
     writeable = invariant_compute ? rebuild : [ compute; rebuild ]
 
-    # must be set to true before prepare_mpi! (as this calls add_edge!)
+    # must be set to true before prepare_read! (as this calls add_edge!)
     sim.transition = true
     
     # before we call prepare_write! we must ensure that all edges
     # in the storage that are accessible are distributed to the correct
     # ranks.
-    foreach(T -> prepare_mpi!(sim, T), accessible)
+    foreach(T -> prepare_read!(sim, T), accessible)
     
     foreach(prepare_write!(sim, [add_existing; compute]), writeable)
 
@@ -423,7 +423,7 @@ function apply_transition!(sim,
 
     MPI.Barrier(MPI.COMM_WORLD)
 
-    foreach(T -> finish_mpi!(sim, T), accessible)
+    foreach(T -> finish_read!(sim, T), accessible)
 
     # we must first call finish_write! for the agents, as this will
     # remove the edges where are died agents are involved (and modifies

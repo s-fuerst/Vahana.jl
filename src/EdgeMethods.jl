@@ -106,7 +106,7 @@ _can_add(_, _, _, _) = true
 
 show_second_edge_warning = true
 
-function construct_edge_functions(T::DataType, attr, simsymbol)
+function construct_edge_methods(T::DataType, attr, simsymbol)
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
@@ -133,8 +133,8 @@ function construct_edge_functions(T::DataType, attr, simsymbol)
 
     mpiactive = mpi.active
     
-    construct_mpi_edge_functions(T, attr, simsymbol, CE)
-    construct_edges_iter_functions(T, attr, simsymbol)
+    construct_mpi_edge_methods(T, attr, simsymbol, CE)
+    construct_edges_iter_methods(T, attr, simsymbol)
     #### Functions that helps to write generic versions of the edge functions
     #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
@@ -469,12 +469,12 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
     end
     
-    @eval function prepare_mpi!(sim::$simsymbol, ::Type{$MT})
+    @eval function prepare_read!(sim::$simsymbol, ::Type{$MT})
         edges_alltoall!(sim, @storage($T), $T)
         init_storage!(sim, $T)
     end
 
-    @eval function finish_mpi!(_::$simsymbol, ::Type{$MT})
+    @eval function finish_read!(_::$simsymbol, ::Type{$MT})
     end
     
     #- finish_write!
@@ -692,12 +692,13 @@ if ! stateless
     end
     @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
         emptyval = val4empty(op; kwargs...)
-        
-        prepare_mpi!(sim, t)
+
+        prepare_read!(sim, t)
         estates = edges_iterator(sim, $MT) |> 
             collect  |>
             _edgestates(t)
-
+        finish_read!(sim, t)
+        
         reduced = mapreduce(f, op, estates; init = emptyval)
         
         mpiop = get(kwargs, :mpiop, op)
