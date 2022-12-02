@@ -76,32 +76,11 @@ function construct_model(typeinfos::ModelTypes, name::String)
         end 
         for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
 
-    # nodefields = [
-    #     map(["_read", "_write"]) do RW
-    #         Expr(Symbol("="),
-    #              :($(Symbol(T, RW))::$(AgentReadWrite{T})),
-    #              :($(AgentReadWrite(T))))
-    #     end 
-    #     for T in typeinfos.nodes_types ] |> Iterators.flatten |> collect
-
     nodefields = [
         Expr(Symbol("="),
              :($(Symbol(T))::AgentFields{$T}),
              :(AgentFields($T)))
         for T in typeinfos.nodes_types ]
-
-    # nodeids = [
-    #     Expr(Symbol("="),
-    #          :($(Symbol(T, "_nextid"))::AgentNr),
-    #          :(AgentNr(1)))
-    #     for T in typeinfos.nodes_types ]
-
-    # nodereuse = [
-    #     Expr(Symbol("="),
-    #          :($(Symbol(T, "_reuse"))::Vector{Reuse}),
-    #          :(Vector{Reuse}()))
-    #     for T in typeinfos.nodes_types ]
-
 
     edgestorage = [
         Expr(Symbol("="),

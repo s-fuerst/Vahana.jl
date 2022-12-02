@@ -234,11 +234,7 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     @assert sim.initialized """
     calc_rasterstate can be only called after finish_init!"""
 
-    # normally, agentstate can be only called inside a prepare_mpi/finish_mpi
-    # block. But we ensure, that we only access the agentstate on the own rank,
-    # so to avoid overhead, we set only the mpi_prepared flag (which is checked
-    # in an mayassert inside of agentstate).
-    windows(sim, T).prepared = true
+    disable_transition_checks = true
     z = zero(f_returns)
     rs = map(sim.rasters[raster]) do id
         if process_nr(id) == mpi.rank
@@ -247,7 +243,7 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
             z
         end
     end
-    windows(sim, T).prepared = false
+    disable_transition_checks = false
     MPI.Allreduce(rs, |, MPI.COMM_WORLD)
 end
 

@@ -15,9 +15,10 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # all agent and edgetypes
     foreach(prepare_write!(sim, []), [ node_types; edge_types ])
 
-    foreach(T -> prepare_mpi!(sim, T), node_types)
+#    foreach(T -> prepare_mpi!(sim, T), node_types)
 
     MPI.Barrier(MPI.COMM_WORLD)
+    disable_transition_checks = true
     
     # we also reset the nextid count to 1 for every nodetype
     foreach(node_types) do T
@@ -62,10 +63,11 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     foreach(grid -> broadcastids(sim, grid, idmapping),  keys(sim.rasters))
 
     # finish everything and return the idmapping
+    disable_transition_checks = false
     MPI.Barrier(MPI.COMM_WORLD)
     foreach(T -> finish_distribute!(sim, T), node_types)
     foreach(finish_write!(sim), [ node_types; edge_types ])
-    foreach(T -> finish_mpi!(sim, T), node_types)
+   # foreach(T -> finish_mpi!(sim, T), node_types)
     idmapping
 end
 
