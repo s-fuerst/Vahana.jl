@@ -33,7 +33,7 @@ model_graph = ModelTypes() |>
 
     finish_init!(sim)
 
-    apply_transition!(sim, sumids, [GraphA], [GraphA, GraphE], [])
+    apply_transition!(sim, sumids, [GraphA], [GraphA, GraphE], [GraphA])
 
     # we have a complete graph, and all agents sum the
     # ids of the neighbors (but ignoring the own)

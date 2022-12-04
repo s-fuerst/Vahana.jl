@@ -151,7 +151,7 @@ end
 
 # check that nothing is going to the AS2 agents anymore
 function check_state_rev2(ET)
-    (agent::AgentState2, id, sim) -> begin
+    (id, sim) -> begin
         # for the SingleAgentType we determined that ET can only go to AS1 agents
         if ! has_trait(sim, ET, :SingleAgentType)
             @test ! has_neighbor(sim, id, ET)
@@ -241,22 +241,27 @@ function testforedgetype(ET)
     finish_init!(sim; partition = part)
     
     apply_transition!(sim, check_state(ET), [ AgentState1 ],
-                      [ AgentState1, ET ], []; invariant_compute = true)
+                      [ AgentState1, ET ], [])
     
     @test num_agents(sim, AgentState1) == 1
     @test num_agents(sim, AgentState2) == (mpi.rank < 2 ? mpi.size / 2 : 0)
 
     # we are testing now that new edges in the transition functions are
     # send to the correct ranks
-    apply_transition!(sim, reverse_edge_direction(ET), [ AgentState1, AgentState2 ],
-                      [], [ ET ]; invariant_compute = true)
+    apply_transition!(sim, reverse_edge_direction(ET),
+                      [ AgentState1, AgentState2 ],
+                      [ AgentState1, AgentState2 ],
+                      [ ET ])
 
 
-    apply_transition!(sim, check_state_rev1(ET), [ AgentState1 ],
-                      [ AgentState1, AgentState2, ET ], []; invariant_compute = true)
+    apply_transition!(sim, check_state_rev1(ET),
+                      [ AgentState1 ],
+                      [ AgentState1, AgentState2, ET ],
+                      [])
 
-    apply_transition!(sim, check_state_rev2(ET), [ AgentState2 ],
-                      [ ET ], []; invariant_compute = true)
+    apply_transition!(sim, check_state_rev2(ET),
+                      [ AgentState2 ],
+                      [ ET ], [])
 
     finish_simulation!(sim)
 end

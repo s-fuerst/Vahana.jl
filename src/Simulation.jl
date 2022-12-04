@@ -1,6 +1,5 @@
 export construct_model
 export new_simulation, finish_simulation!
-using Base: nothing_sentinel, call_composed
 export finish_init!
 export apply_transition, apply_transition!
 export param

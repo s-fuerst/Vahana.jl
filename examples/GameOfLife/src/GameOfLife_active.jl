@@ -70,13 +70,17 @@ function init!(sim)
     finish_init!(sim)
 
     apply_transition!(sim, initial_active,
-                      [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+                      [Cell],
+                      [Cell, Neighbor, ActiveNeighbor],
+                      [Cell, ActiveNeighbor])
     
 end
 
 function step!(sim)
     apply_transition!(sim, transition,
-                      [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+                      [Cell],
+                      [Cell, Neighbor, ActiveNeighbor],
+                      [Cell, ActiveNeighbor])
     calc_rasterstate(sim, :raster, c -> c.active, Bool, Cell)
 end
 

@@ -77,7 +77,7 @@ function init(params::Params)
 end
 
 function step!(sim)
-    apply_transition!(sim, transition, [Cell], [Cell, Neighbor], [])
+    apply_transition!(sim, transition, [Cell], [Cell, Neighbor], [Cell])
     countactive!(sim)
 #     addgrid!(sim)
 #     getglobal(sim, :grid) |> last
