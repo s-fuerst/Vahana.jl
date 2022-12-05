@@ -35,7 +35,9 @@ MPIWindows() = MPIWindows(nothing, nothing, nothing, nothing, false)
 mutable struct AgentFields{T}
     read::AgentReadWrite{T}
     write::AgentReadWrite{T}
+    # the state of all agents on the same node
     shmstate::Vector{Vector{T}}
+    # the died flag of all agents on the same node
     shmdied::Vector{Vector{Bool}}
     reuse::Vector{Reuse}
     nextid::AgentNr
@@ -50,6 +52,12 @@ AgentFields(T::DataType) =
                 Vector{Reuse}(),
                 AgentNr(1),
                 MPIWindows())
+
+mutable struct EdgeFields{ET, EST}
+    read::ET
+    write::ET
+    storage::EST
+end
 
 """
     construct_model(types::ModelTypes, name::String)
@@ -67,25 +75,26 @@ function construct_model(typeinfos::ModelTypes, name::String)
     simsymbol = Symbol(name)
 
     edgefields = [
-        map(["_read", "_write"]) do RW
-            Expr(Symbol("="),
-                 :($(Symbol(T, RW))::
-                     $(edgefield_type(T, typeinfos.edges_attr[T]))),
-                 :($(edgefield_constructor(T, typeinfos.edges_attr[T]))))
-        end 
-        for T in typeinfos.edges_types ] |> Iterators.flatten |> collect
+        Expr(Symbol("="),
+             :($(Symbol(T))::EdgeFields{$(edgefield_type(T, typeinfos.edges_attr[T])),
+                                        $(edgestorage_type(T, typeinfos.edges_attr[T]))}),
+             :(EdgeFields($(edgefield_constructor(T, typeinfos.edges_attr[T])),
+                          $(edgefield_constructor(T, typeinfos.edges_attr[T])),
+                          $(edgestorage_constructor(T, typeinfos.edges_attr[T])))))
+        for T in typeinfos.edges_types ] 
 
+    
     nodefields = [
         Expr(Symbol("="),
              :($(Symbol(T))::AgentFields{$T}),
              :(AgentFields($T)))
         for T in typeinfos.nodes_types ]
 
-    edgestorage = [
-        Expr(Symbol("="),
-             :($(Symbol(T, "_storage"))::$(edgestorage_type(T, typeinfos.edges_attr[T]))),
-             :($(edgestorage_constructor(T, typeinfos.edges_attr[T]))))
-        for T in typeinfos.edges_types ] 
+    # edgestorage = [
+    #     Expr(Symbol("="),
+    #          :($(Symbol(T, "_storage"))::$(edgestorage_type(T, typeinfos.edges_attr[T]))),
+    #          :($(edgestorage_constructor(T, typeinfos.edges_attr[T]))))
+    #     for T in typeinfos.edges_types ] 
 
     fields = Expr(:block,
                   :(modelname::String),
@@ -98,7 +107,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(transition::Bool),
                   :(num_transitions::Int64),
                   edgefields...,
-                  edgestorage...,
+                  # edgestorage...,
                   nodefields...)
     
     # the true in the second arg makes the struct mutable

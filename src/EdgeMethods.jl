@@ -197,8 +197,8 @@ function construct_edge_methods(T::DataType, attr, simsymbol)
                 end
             else
                 @eval function init_field!(sim::$simsymbol, ::Type{$MT})
-                    resize!(@write($T), $singletype_size)
-                    Base.securezero!(@write($T))
+                    resize!(@edgewrite($T), $singletype_size)
+                    Base.securezero!(@edgewrite($T))
                 end
                 @eval function _check_size!(_, ::AgentNr, ::Type{$T})
                 end
@@ -213,7 +213,7 @@ function construct_edge_methods(T::DataType, attr, simsymbol)
                 end
             else
                 @eval init_field!(sim::$simsymbol, ::Type{$MT}) =
-                    resize!(sim.$(writefield(T)), $singletype_size)
+                    resize!(@edgewrite($T), $singletype_size)
             end
         end
     end
@@ -325,7 +325,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
                 nr = _to2idx(to, $T)
-                field = sim.$(writefield(T))
+                field = @edgewrite($T)
                 @inbounds field[nr] = _get_agent_container!(sim, to, $T,
                                                             field) + 1
             end
@@ -341,14 +341,14 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
                 nr = _to2idx(to, $T)
-                field = sim.$(writefield(T))
+                field = @edgewrite($T)
                 @inbounds field[nr] = _get_agent_container!(sim, to, $T,
                                                             field) + 1
             end
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            @mayassert _can_add(sim.$(writefield(T)), to,
+            @mayassert _can_add(@edgewrite($T), to,
                                 _valuetostore(edge), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
@@ -358,7 +358,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                       (to, _valuetostore(edge)))
             else
                 nr = _to2idx(to, $T)
-                field = sim.$(writefield(T))
+                field = @edgewrite($T)
                 _check_size!(field, nr, $T)
                 @inbounds field[nr] = _valuetostore(edge)
             end
@@ -372,7 +372,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
-            @mayassert _can_add(sim.$(writefield(T)), to,
+            @mayassert _can_add(@edgewrite($T), to,
                                 _valuetostore(from, edgestate), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
@@ -382,7 +382,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                       (to, _valuetostore(from, edgestate)))
             else
                 nr = _to2idx(to, $T)
-                field = sim.$(writefield(T))
+                field = @edgewrite($T)
                 _check_size!(field, nr, $T)
                 @inbounds field[nr] = _valuetostore(from, edgestate)
             end
@@ -398,7 +398,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(edge)))
             else
-                push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
+                push!(_get_agent_container!(sim, to, $T, @edgewrite($T)),
                       _valuetostore(edge))
             end
         end
@@ -414,7 +414,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(from, edgestate)))
             else
-                push!(_get_agent_container!(sim, to, $T, sim.$(writefield(T))),
+                push!(_get_agent_container!(sim, to, $T, @edgewrite($T)),
                       _valuetostore(from, edgestate))
             end
         end
@@ -439,15 +439,15 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             end
         end
 
-        for to in keys(_removeundef(sim, $T)(@write($T)))
+        for to in keys(_removeundef(sim, $T)(@edgewrite($T)))
             # ac for agent container
-            ac = @write($T)[to]
+            ac = @edgewrite($T)[to]
             if $singleedge
                 if __is_from(ac)
                     if $singletype
-                        @write($T)[to] = zero($CT)
+                        @edgewrite($T)[to] = zero($CT)
                     else
-                        delete!(@write($T), to)
+                        delete!(@edgewrite($T), to)
                     end
                 end
             else
@@ -458,9 +458,9 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, t::Type{$MT})
         if add_existing
-            sim.$(writefield(T)) = deepcopy(sim.$(readfield(T)))
+            @edgewrite($T) = deepcopy(@edgeread($T))
         else
-            sim.$(writefield(T)) = $FT()
+            @edgewrite($T) = $FT()
             init_field!(sim, t)
         end
     end
@@ -479,7 +479,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     
     #- finish_write!
     @eval function finish_write!(sim::$simsymbol, ::Type{$MT})
-        sim.$(readfield(T)) = sim.$(writefield(T))
+        @edgeread($T) = @edgewrite($T)
     end
 
     # Rules for the edge functions:
@@ -490,7 +490,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     #- edges_to
     if !stateless && !ignorefrom
         @eval function edges_to(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+            _get_agent_container(sim, to, $T, @edgeread($T))
         end
     else
         @eval function edges_to(::$simsymbol, ::AgentID, t::Type{$MT})
@@ -504,17 +504,17 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     if !ignorefrom
         if stateless
             @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+                _get_agent_container(sim, to, $T, @edgeread($T))
             end
         else
             if singleedge
                 @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+                    ac = _get_agent_container(sim, to, $T, @edgeread($T))
                     isnothing(ac) ? nothing : ac.from
                 end
             else
                 @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+                    ac = _get_agent_container(sim, to, $T, @edgeread($T))
                     isnothing(ac) ? nothing : map(e -> e.from, ac)
                 end
             end
@@ -548,17 +548,17 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     if !stateless
         if ignorefrom
             @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+                _get_agent_container(sim, to, $T, @edgeread($T))
             end
         else
             if singleedge
                 @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T))) 
+                    ac = _get_agent_container(sim, to, $T, @edgeread($T)) 
                     isnothing(ac) ? nothing : ac.state
                 end
             else
                 @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $T, sim.$(readfield(T))) 
+                    ac = _get_agent_container(sim, to, $T, @edgeread($T)) 
                     isnothing(ac) ? nothing : map(e -> e.state, ac)
                 end
             end
@@ -575,12 +575,12 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     if !singleedge
         if ignorefrom && stateless
             @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                n = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+                n = _get_agent_container(sim, to, $T, @edgeread($T))
                 isnothing(n) ? 0 : n
             end
         else
             @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+                ac = _get_agent_container(sim, to, $T, @edgeread($T))
                 isnothing(ac) ? 0 : length(ac)
             end
         end
@@ -596,7 +596,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     #- has_neighbor
     if ignorefrom && stateless
         @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            ac = _get_agent_container(sim, to, $T, sim.$(readfield(T)))
+            ac = _get_agent_container(sim, to, $T, @edgeread($T))
             isnothing(ac) || ac == 0 ? false : true
         end
     elseif !singleedge 
@@ -605,7 +605,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
     elseif !singletype 
         @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            haskey(sim.$(readfield(T)), to)
+            haskey(@edgeread($T), to)
         end
     else
         @eval function has_neighbor(::$simsymbol, ::AgentID, t::Type{$MT})
@@ -621,15 +621,15 @@ if singletype
     @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$MT})
         if type_of(sim, to) == $AT
             nr = agent_nr(to)
-            if length(@write($MT)) >= nr
-                @write($MT)[nr] = zero($CT)
+            if length(@edgewrite($MT)) >= nr
+                @edgewrite($MT)[nr] = zero($CT)
             end
         end 
     end
 else
     @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$MT})
-        if haskey(@write($MT), to)
-            delete!(@write($MT), to)
+        if haskey(@edgewrite($MT), to)
+            delete!(@edgewrite($MT), to)
         end
     end
 end
@@ -645,7 +645,7 @@ end
 
 if ignorefrom && stateless
     @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
-        field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+        field = write ? @edgewrite($T) : @edgeread($T)
         if length(field) == 0
             return 0
         end
@@ -653,14 +653,14 @@ if ignorefrom && stateless
     end
 elseif singleedge
     @eval function _num_edges(sim::$simsymbol, t::Type{$MT}, write = false)
-        field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+        field = write ? @edgewrite($T) : @edgeread($T)
         # TODO: performance improvement with _countundef?
         length(_removeundef(sim, t)(field))
     end
 else
     if !singletype
         @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
-            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            field = write ? @edgewrite($T) : @edgeread($T)
             if length(field) == 0
                 return 0
             end
@@ -668,7 +668,7 @@ else
         end
     else
         @eval function _num_edges(sim::$simsymbol, ::Type{$MT}, write = false)
-            field = write ? sim.$(writefield(T)) : sim.$(readfield(T))
+            field = write ? @edgewrite($T) : @edgeread($T)
             if length(field) == 0
                 return 0
             end

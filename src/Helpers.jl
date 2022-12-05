@@ -80,9 +80,9 @@ end
 # create symbol for the different fields of an agent/edgetype
 
 # TODO: adjust edgefieldfactory to macros
-writefield(T) = Symbol(T, "_write")
+writefield(T) = Symbol(T).write
 
-readfield(T) = Symbol(T, "_read")
+readfield(T) = Symbol(T).read
 
 # nextidfield(T) = Symbol(T, "_nextid")
 
@@ -155,23 +155,23 @@ macro agentread(T)
     :( sim.$(field).read ) |> esc
 end
 
-macro write(T)
-    field = Symbol(T, "_write")
-    :( sim.$(field) ) |> esc
+macro edgewrite(T)
+    field = Symbol(T)
+    :( sim.$(field).write ) |> esc
 end
-write(sim, T) = getproperty(sim, Symbol(T, "_write"))
+edgewrite(sim, T) = getproperty(sim, Symbol(T)).write
 
-macro read(T)
-    field = Symbol(T, "_read")
-    :( sim.$(field) ) |> esc
+macro edgeread(T)
+    field = Symbol(T)
+    :( sim.$(field).read ) |> esc
 end
-read(sim, T) = getproperty(sim, Symbol(T, "_read"))
+edgeread(sim, T) = getproperty(sim, Symbol(T)).read
 
 macro storage(T)
-    field = Symbol(T, "_storage")
-    :( sim.$(field) ) |> esc
+    field = Symbol(T)
+    :( sim.$(field).storage ) |> esc
 end
-storage(sim, T) = getproperty(sim, Symbol(T, "_storage"))
+storage(sim, T) = getproperty(sim, Symbol(T)).storage
 
 
 # we use this tests are for the distributed version, in this case

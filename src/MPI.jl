@@ -143,7 +143,7 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 
     # The iterator for the edges depends on the traits of the edgetype
     if has_trait(sim, T, :Stateless) && has_trait(sim, T, :IgnoreFrom)
-        iter = read(sim, T)
+        iter = edgeread(sim, T)
         if has_trait(sim, T, :SingleAgentType)
             iter = enumerate(iter)
         end
@@ -233,14 +233,14 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
                 else
                     updateid(to)
                 end
-                _check_size!(@write($T), up, $T)
+                _check_size!(@edgewrite($T), up, $T)
                 if $singleedge
-                    @inbounds @write($T)[up] = true
+                    @inbounds @edgewrite($T)[up] = true
                 else
-                    if $singletype || haskey(@write($T), up)
-                        @inbounds @write($T)[up] += 1
+                    if $singletype || haskey(@edgewrite($T), up)
+                        @inbounds @edgewrite($T)[up] += 1
                     else
-                        @inbounds @write($T)[up] = numedges
+                        @inbounds @edgewrite($T)[up] = numedges
                     end
                 end
             end

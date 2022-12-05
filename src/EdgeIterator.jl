@@ -33,10 +33,10 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol)
         AT = attr[:to_agenttype]
     end
 
-    @eval function edges_iterator(sim::$simsymbol, t::Type{$T}, r::Bool = true)
+    @eval function edges_iterator(sim::$simsymbol, ::Type{$T}, r::Bool = true)
         @assert ! ($stateless && $ignorefrom)
 
-        field = r ? @read($T) : @write($T)
+        field = r ? @edgeread($T) : @edgewrite($T)
         if length(field) == 0
             # we can not return nothing, but an empty vector will return nothing when
             # iterate is called on it
