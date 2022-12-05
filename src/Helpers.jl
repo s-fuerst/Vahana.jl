@@ -103,6 +103,11 @@ macro agent(T)
     :( sim.$(field) ) |> esc
 end
 
+macro edge(T)
+    field = Symbol(T)
+    :( sim.$(field) ) |> esc
+end
+
 macro windows(T)
     field = Symbol(T)
     :( sim.$(field).mpiwindows ) |> esc

@@ -316,7 +316,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     #- add_edge!
     if stateless && ignorefrom && !singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, _::Edge{$MT})
-            @mayassert sim.initialized == false || sim.transition """
+            @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
@@ -332,7 +332,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
 
         @eval function add_edge!(sim::$simsymbol, _::AgentID, to::AgentID, _::$MT)
-            @mayassert sim.initialized == false || sim.transition """
+            @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
@@ -367,7 +367,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         @eval function add_edge!(sim::$simsymbol, from::AgentID,
                           to::AgentID, edgestate::$MT)
             # TODO: test the assertion in edgetypes.jl
-            @mayassert sim.initialized == false || sim.transition """
+            @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
@@ -389,7 +389,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            @mayassert sim.initialized == false || sim.transition """
+            @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
@@ -405,7 +405,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
                           edgestate::$MT)
-            @mayassert sim.initialized == false || sim.transition """
+            @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
@@ -456,22 +456,25 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
         end        
     end
     
+    @eval function init_storage!(sim::$simsymbol, ::Type{$MT})
+        @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
+    end
+    
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, t::Type{$MT})
         if add_existing
             @edgewrite($T) = deepcopy(@edgeread($T))
         else
             @edgewrite($T) = $FT()
             init_field!(sim, t)
+            init_storage!(sim, t)
         end
     end
 
-    @eval function init_storage!(sim::$simsymbol, ::Type{$MT})
-        @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
-    end
-    
     @eval function prepare_read!(sim::$simsymbol, ::Type{$MT})
-        edges_alltoall!(sim, @storage($T), $T)
-        init_storage!(sim, $T)
+        if @edge($T).last_transmit < @edge($T).last_change
+            edges_alltoall!(sim, @storage($T), $T)
+            init_storage!(sim, $T)
+        end
     end
 
     @eval function finish_read!(_::$simsymbol, ::Type{$MT})
@@ -480,6 +483,7 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     #- finish_write!
     @eval function finish_write!(sim::$simsymbol, ::Type{$MT})
         @edgeread($T) = @edgewrite($T)
+        @edge($T).last_change = sim.num_transitions
     end
 
     # Rules for the edge functions:

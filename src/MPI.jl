@@ -259,6 +259,8 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
                 add_edge!(sim, updateid(to), Edge(updateid(edge.from), edge.state))
             end
         end
+
+        @edge($T).last_transmit = sim.num_transitions
     end
 end
 

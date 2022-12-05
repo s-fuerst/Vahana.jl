@@ -1,3 +1,5 @@
+import Graphs: SimpleGraphs
+
 # We need a lot of edgetypes to test all the edge trait combinations
 # The traits are
 # (S) Stateless
@@ -264,5 +266,76 @@ function runedgestest()
         end
 
         finish_simulation!(sim)
-    end    
+    end
+end
+
+@testset "apply_transition" begin
+    for ET in statefulEdgeTypes
+
+        sim = new_simulation(model_edges)
+
+        if Vahana.has_trait(sim, ET, :SingleEdge)
+            finish_simulation!(sim)
+            continue
+        end
+
+        
+        nagents = mpi.size * 2
+        
+        add_graph!(sim,
+                   SimpleGraphs.complete_graph(nagents),
+                   i -> Agent(i),
+                   e -> ET(e.dst)
+                   )
+
+        finish_init!(sim)
+
+        apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+            @test num_neighbors(sim, id, ET) == nagents-1
+        end
+
+        # write was empty, so we should get the same results when doing
+        # the same transition again
+        apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+            @test num_neighbors(sim, id, ET) == nagents-1
+        end
+
+        # write the edges by copying them from before
+        apply_transition!(sim, [ Agent ], [], [ ET ]; add_existing = [ ET ]) do id, sim
+        end
+        apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+            @test num_neighbors(sim, id, ET) == nagents-1
+        end
+
+        if ET == EdgeD
+            # write the edges by readding them 
+            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]) do id, sim
+                add_edges!(sim, id, edges_to(sim, id, ET))
+            end
+            apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+                @test num_neighbors(sim, id, ET) == nagents-1
+            end
+
+            apply_transition!(sim, [ Agent ], [], []) do id, sim end
+
+            # write the edges by copying and readding 
+            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]; add_existing = [ ET ]) do id, sim
+                add_edges!(sim, id, edges_to(sim, id, ET))
+            end
+
+            # (we should have them twice after now)
+            apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+                @test num_neighbors(sim, id, ET) == (nagents-1) * 2
+            end
+
+            # this time no one adds the edges, so they should be gone afterwards
+            apply_transition!(sim, [ Agent ], [], [ ET ]) do id, sim
+            end
+            apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+                @test num_neighbors(sim, id, ET) == 0
+            end
+        end
+
+        finish_simulation!(sim)
+    end
 end

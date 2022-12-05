@@ -90,7 +90,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end       
     end    
     @eval function add_agent!(sim::$simsymbol, agent::$T)
-        @mayassert sim.initialized == false || sim.transition """
+        @mayassert sim.initialized == false || sim.intransition """
         You can call add_agent! only in the initialization phase (until
         `finish_init!` is called) or within a transition function called by
         `apply_transition`.
@@ -276,6 +276,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 empty!(@readreuseable($T))
             end
         end
+
+        @agentwrite($T).last_change = sim.num_transitions
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})

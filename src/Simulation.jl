@@ -14,10 +14,12 @@ mutable struct AgentReadWrite{T}
     reuseable::Vector{AgentNr}
     # This field is for immortal agents always just an empty vector
     died::Vector{Bool}
+    # The last transition when prepare_read! (oder prepare_write!) was called
+    last_change::Int64
 end
 
 AgentReadWrite(T::DataType) =
-    AgentReadWrite{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}())
+    AgentReadWrite{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}(), 0)
 
 mutable struct MPIWindows
     # Access via shared memory
@@ -57,6 +59,11 @@ mutable struct EdgeFields{ET, EST}
     read::ET
     write::ET
     storage::EST
+    # the last time (in number of transitions called) that the storage
+    # was send to the other processes (via edges_alltoall!)
+    last_transmit::Int64
+    # the last time that the edgetype was writable
+    last_change::Int64
 end
 
 """
@@ -80,7 +87,8 @@ function construct_model(typeinfos::ModelTypes, name::String)
                                         $(edgestorage_type(T, typeinfos.edges_attr[T]))}),
              :(EdgeFields($(edgefield_constructor(T, typeinfos.edges_attr[T])),
                           $(edgefield_constructor(T, typeinfos.edges_attr[T])),
-                          $(edgestorage_constructor(T, typeinfos.edges_attr[T])))))
+                          $(edgestorage_constructor(T, typeinfos.edges_attr[T])),
+                          0,0)))
         for T in typeinfos.edges_types ] 
 
     
@@ -90,12 +98,6 @@ function construct_model(typeinfos::ModelTypes, name::String)
              :(AgentFields($T)))
         for T in typeinfos.nodes_types ]
 
-    # edgestorage = [
-    #     Expr(Symbol("="),
-    #          :($(Symbol(T, "_storage"))::$(edgestorage_type(T, typeinfos.edges_attr[T]))),
-    #          :($(edgestorage_constructor(T, typeinfos.edges_attr[T]))))
-    #     for T in typeinfos.edges_types ] 
-
     fields = Expr(:block,
                   :(modelname::String),
                   :(name::String),
@@ -104,10 +106,9 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(typeinfos::ModelTypes),
                   :(rasters::Dict{Symbol, Array}),
                   :(initialized::Bool),
-                  :(transition::Bool),
+                  :(intransition::Bool),
                   :(num_transitions::Int64),
                   edgefields...,
-                  # edgestorage...,
                   nodefields...)
     
     # the true in the second arg makes the struct mutable
@@ -176,7 +177,7 @@ function new_simulation(model::Model,
         typeinfos = $(model.types),
         rasters = Dict{Symbol, Array}(),
         initialized = false,
-        transition = false,
+        intransition = false,
         num_transitions = 0,
     )
 
@@ -406,7 +407,8 @@ function apply_transition!(sim,
     @assert sim.initialized "You must call finish_init! before apply_transition!"
 
     # must be set to true before prepare_read! (as this calls add_edge!)
-    sim.transition = true
+    sim.intransition = true
+    sim.num_transitions = sim.num_transitions + 1
     
     # before we call prepare_write! we must ensure that all edges
     # in the storage that are accessible are distributed to the correct
@@ -436,19 +438,18 @@ function apply_transition!(sim,
     writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
     foreach(finish_write!(sim), writeableET)
 
-    sim.transition = false
-    sim.num_transitions = sim.num_transitions + 1
+    sim.intransition = false
     
     sim
 end
 
 function apply_transition!(func::Function,
                     sim,
-                    compute::Vector,
-                    accessible::Vector,
-                    rebuild::Vector;
+                    call::Vector,
+                    read::Vector,
+                    write::Vector;
                     kwargs ...)
-    apply_transition!(sim, func, compute, accessible, rebuild; kwargs ...)
+    apply_transition!(sim, func, call, read, write; kwargs ...)
 end
 
 
