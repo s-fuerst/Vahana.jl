@@ -65,7 +65,7 @@ end
         @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
 
         # first we test that edges to the agents are removed
-        apply_transition!(sim, [ Agent ], [], [ Agent ]) do id, sim
+        apply_transition!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
             nothing
         end
 
@@ -88,7 +88,7 @@ end
         @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
 
         # first we test that edges to the agents are removed
-        apply_transition!(sim, [ Agent ], [], [ Agent ]) do id, sim
+        apply_transition!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
             nothing
         end
 
@@ -126,7 +126,7 @@ end
         @test Vahana.join([ num_edges(sim, ET) ]) |> sum == 10    
 
         # first we test that edges to the agents are removed
-        apply_transition!(sim, [ Agent ], [], [ Agent ]) do id, sim
+        apply_transition!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
             nothing
         end
 

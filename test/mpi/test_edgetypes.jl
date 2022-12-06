@@ -151,7 +151,7 @@ end
 
 # check that nothing is going to the AS2 agents anymore
 function check_state_rev2(ET)
-    (id, sim) -> begin
+    (_, id, sim) -> begin
         # for the SingleAgentType we determined that ET can only go to AS1 agents
         if ! has_trait(sim, ET, :SingleAgentType)
             @test ! has_neighbor(sim, id, ET)
@@ -271,7 +271,6 @@ end
 
     if CurrentEdgeType === Nothing
         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
-            @info "test" ET
             testforedgetype(ET)
         end
     else

@@ -291,7 +291,7 @@ end
     # type OnPosition
 
     # sum the value of all agents that are on the cell position
-    function sum_on_pos(id, sim)
+    function sum_on_pos(_, id, sim)
         nstates = neighborstates_flexible(sim, id, OnPosition)
         if !isnothing(nstates)
             Position(mapreduce(c -> c.value, +, nstates))
@@ -302,7 +302,7 @@ end
 
     # this transition function moves the agent to the new pos, wherby the new
     # pos is determined by the state of the current pos
-    function value_on_pos(id, sim)
+    function value_on_pos(_, id, sim)
         # sum is not a sum operator, but a field of the agentstate of Position
         value = first(neighborstates_flexible(sim, id, OnPosition)).sum
         move_to!(sim, :raster, id, (value, value), OnPosition(), OnPosition())

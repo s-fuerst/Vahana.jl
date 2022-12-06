@@ -78,10 +78,6 @@ function create_sum_state_neighbors(edgetypeval)
     end
 end
 
-function nothing_transition(agent, id, sim)
-    nothing
-end
-
 import Vahana.updateids
 
 function test_aggregate(sim, T::DataType)
@@ -98,7 +94,7 @@ function test_aggregate_mortal(sim, T::DataType)
     
     # we are testing that there aggregate also works when on a rank
     # no agent of this type is existing
-    apply_transition!(sim, [ T ], [ T ], [ T ]) do state, id, sim
+    apply_transition!(sim, [ T ], [ T ], [ T ]) do state, _, _
         mpi.isroot ? state : nothing
     end
 
@@ -131,8 +127,8 @@ end
     (sim, a1id, a2id, a3id, avids, avfids) = createsim()
     
     @testset "agentstate" begin
-        @test_throws AssertionError agentstate(sim, a2id, AImm)
-        @test_throws AssertionError agentstate(sim, avids[1], AMortal)
+        @onrankof a2id @test_throws AssertionError agentstate(sim, a2id, AImm)
+        @onrankof avids[1] @test_throws AssertionError agentstate(sim, avids[1], AMortal)
         enable_asserts(false)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) == AMortal(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
@@ -147,18 +143,18 @@ end
     end
 
     @testset "edges_to" begin
-        @onrankof a1id @test size(edges_to(sim, a1id, ESDict), 1) == 4
-        @onrankof a1id @test size(edges_to(sim, a1id, ESLDict1), 1) == 10
+        @onrankof a1id @test length(edges_to(sim, a1id, ESDict)) == 4
+        @onrankof a1id @test length(edges_to(sim, a1id, ESLDict1)) == 10
         # # Check that we can call edges_to also for an empty set of neighbors
         @onrankof a2id @test edges_to(sim, a2id, ESDict) === nothing
         @onrankof a2id @test edges_to(sim, a2id, ESLDict1) === nothing
     end
 
     @testset "neighbors & edgestates" begin
+        # we must disable the neighborids checks
         @onrankof avids[1] @test length(neighborids(sim, avids[1], ESLDict2)) == 1
         @onrankof avids[10] @test length(neighborids(sim, avids[10], ESLDict2)) == 1
 
-        @test_throws AssertionError neighborids(sim, a2id, ESLDict2)
 
         edges = edges_to(sim, a1id, ESLDict1)
         @onrankof a1id @test (edges)[1].from == avids[1]
@@ -168,19 +164,20 @@ end
     end
 
     @testset "neighborstates" begin
-        enable_asserts(false)
         @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
         @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
-        enable_asserts(true)
     end
 
     @testset "num_neighbors" begin
-        enable_asserts(true)
         @onrankof a1id @test num_neighbors(sim, a1id, ESDict) == 4
         @onrankof a2id @test num_neighbors(sim, a2id, ESDict) == 0
-        @test_throws AssertionError num_neighbors(sim, a2id, ESLDict2)
         @onrankof avids[1] @test num_neighbors(sim, avids[1], ESLDict2) == 1
-        enable_asserts(true)
+    end
+
+    @testset "last_transmit" begin
+        # the apply_transition forces that the last_change counter ist higher then last_commit
+        apply_transition!(sim, [AMortal], [], [ESDict]) do _, _, _ end
+        @onrankof a1id @test_throws AssertionError edges_to(sim, a1id, ESDict)
     end
 
     finish_simulation!(sim)
@@ -262,8 +259,6 @@ end
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(7)
 
-        # apply_transition!(copydict, nothing_transition, [ AMortal ], [], [])
-        # @test_throws KeyError agentstate_flexible(copydict, a1id)
         enable_asserts(true)
     end
 

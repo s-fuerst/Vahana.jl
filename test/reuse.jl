@@ -11,7 +11,7 @@ finish_init!(sim)
 
 expected_reuse = 0
 
-function add_new_remove_me(id, sim)
+function add_new_remove_me(_, id, sim)
     global expected_reuse
     @test Vahana.reuse_nr(id) == expected_reuse
     add_agent!(sim, ReuseAgent())

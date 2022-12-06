@@ -17,7 +17,7 @@ function test_model(model)
     apply_transition!(sim,
                       [ ComputeAgent ],
                       [],
-                      [ ConstructedAgent, Connection ]) do id, sim
+                      [ ConstructedAgent, Connection ]) do _, id, sim
                       end
 
     @test num_agents(sim, ComputeAgent) == 1
@@ -26,7 +26,7 @@ function test_model(model)
 
     
     # this time we readd the second agent and the edge
-    apply_transition!(sim, [ ComputeAgent ], [], [ ConstructedAgent, Connection ]) do id, sim
+    apply_transition!(sim, [ ComputeAgent ], [], [ ConstructedAgent, Connection ]) do _, id, sim
         constructedid = add_agent!(sim, ConstructedAgent())
         add_edge!(sim, constructedid, computeid, Connection())
     end
@@ -40,7 +40,7 @@ function test_model(model)
     # invariant_compute, we also must not return the ComputeAgent 
     apply_transition!(sim,
                       [ ComputeAgent ], [], [ ConstructedAgent, Connection ];
-                      add_existing = [ ConstructedAgent, Connection ]) do id, sim
+                      add_existing = [ ConstructedAgent, Connection ]) do _, id, sim
                       end
 
     @test num_agents(sim, ConstructedAgent) == 1

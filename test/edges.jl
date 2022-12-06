@@ -35,6 +35,8 @@ statelessEdgeTypes = [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI
 
 statefulEdgeTypes = [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
 
+allEdgeTypes = [ statelessEdgeTypes; statefulEdgeTypes ]
+
 model_edges = ModelTypes() |>
     register_agenttype!(Agent) |>
     register_agenttype!(AgentB) |>
@@ -114,6 +116,9 @@ function runedgestest()
         end
 
         finish_init!(sim)
+        # # with this apply_transition we ensure
+        # apply_transition(sim, [ Agent, AgentB ], allEdgeTypes, []) do _,_,_ end
+
 
         @testset "edges_to" begin
             for t in [EdgeD, EdgeT, EdgeTs]
@@ -290,48 +295,48 @@ end
 
         finish_init!(sim)
 
-        apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+        apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
             @test num_neighbors(sim, id, ET) == nagents-1
         end
 
         # write was empty, so we should get the same results when doing
         # the same transition again
-        apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+        apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
             @test num_neighbors(sim, id, ET) == nagents-1
         end
 
         # write the edges by copying them from before
-        apply_transition!(sim, [ Agent ], [], [ ET ]; add_existing = [ ET ]) do id, sim
+        apply_transition!(sim, [ Agent ], [], [ ET ]; add_existing = [ ET ]) do _, id, sim
         end
-        apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+        apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
             @test num_neighbors(sim, id, ET) == nagents-1
         end
 
         if ET == EdgeD
             # write the edges by readding them 
-            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]) do id, sim
+            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]) do _, id, sim
                 add_edges!(sim, id, edges_to(sim, id, ET))
             end
-            apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+            apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
                 @test num_neighbors(sim, id, ET) == nagents-1
             end
 
-            apply_transition!(sim, [ Agent ], [], []) do id, sim end
+            apply_transition!(sim, [ Agent ], [], []) do _, id, sim end
 
             # write the edges by copying and readding 
-            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]; add_existing = [ ET ]) do id, sim
+            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]; add_existing = [ ET ]) do _, id, sim
                 add_edges!(sim, id, edges_to(sim, id, ET))
             end
 
             # (we should have them twice after now)
-            apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+            apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
                 @test num_neighbors(sim, id, ET) == (nagents-1) * 2
             end
 
             # this time no one adds the edges, so they should be gone afterwards
-            apply_transition!(sim, [ Agent ], [], [ ET ]) do id, sim
+            apply_transition!(sim, [ Agent ], [], [ ET ]) do _, id, sim
             end
-            apply_transition!(sim, [ Agent ], [ ET ], []) do id, sim
+            apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
                 @test num_neighbors(sim, id, ET) == 0
             end
         end

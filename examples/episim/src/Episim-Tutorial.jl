@@ -1,3 +1,5 @@
+using Revise
+
 using Vahana
 
 using DelimitedFiles
@@ -79,6 +81,8 @@ struct Report
     numQ::Int64
 end
 
+Report() = Report(0, 0, 0, 0, 0)
+
 Report(p::Person) = Report(p.health == S,
                            p.health == E,
                            p.health == I,
@@ -152,17 +156,16 @@ function handle_leave(persons, edge, sim, lid)
     end
 end 
 
-function contact_model(p::Person, id::AgentID, sim)
+function contact_model(::Val{Person}, id::AgentID, sim)
     day = getglobal(sim, :day)
     checked(foreach, edges_to(sim, id, Contact)) do edge
         if edge.state.day > day - 2
             add_edge!(sim, id, edge)
         end
     end
-    p
 end
 
-function contact_model(l::Location, id::AgentID, sim)
+function contact_model(::Val{Location}, id::AgentID, sim)
     # persons at location, entered at which time
     persons = Dict{AgentID, Int64}()
 
@@ -184,8 +187,6 @@ function contact_model(l::Location, id::AgentID, sim)
     for (pid, ptime) in persons
         add_edge!(sim, pid, id, EndOfDay(ptime))
     end
-
-    l
 end    
 
 function change_health(p::Person, newState::HealthState, sim)
@@ -260,7 +261,7 @@ function init(sim, filename)
 
     finish_init!(sim)
 
-    pushglobal!(sim, :reports, aggregate(sim, Report, +, Person))
+    pushglobal!(sim, :reports, aggregate(sim, Report, +, Person; init = Report()))
 
     sim
 end
@@ -271,26 +272,26 @@ function runstep!(sim)
     setglobal!(sim, :day, Int32(getglobal(sim, :day) + 1))
 
     apply_transition!(sim, contact_model, [ Person, Location ],
-                      [ EndOfDay, MovementEvent ],
-                      [ EndOfDay, Contact, Infection ])
+                      [ Contact, EndOfDay, MovementEvent ],
+                      [ Contact, EndOfDay, Infection ])
 
     
     apply_transition!(sim, disease_progression, [ Person ],
-                      [ Infection, Contact ],
-                      [ Inform ])
+                      [ Person, Infection, Contact ],
+                      [ Person, Inform ])
 
     apply_transition!(sim, quarantine, [ Person ],
-                      [ Inform ],
-                      [])
+                      [ Person, Inform ],
+                      [ Person ])
 
-    report = aggregate(sim, Report, +, Person)
+    report = aggregate(sim, Report, +, Person; init = Report())
     pushglobal!(sim, :reports, report)
     println(report)
     sim
 end
 
 function runsimulation(sim)
-    init(sim, "events-small.txt")
+    init(sim, "events-mini.txt")
 
     for _ in 1:20
         @time runstep!(sim)

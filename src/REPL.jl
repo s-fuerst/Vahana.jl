@@ -161,9 +161,9 @@ end
 
 function _show_num_a_with_e(sim, ::Type{T}) where T
     if !sim.initialized 
-        "$(length(read(sim, T)))/$(length(write(sim, T))) (R/W)"
+        "$(length(edgeread(sim, T)))/$(length(edgewrite(sim, T))) (R/W)"
     else
-        "$(length(read(sim, T)))"
+        "$(length(edgeread(sim, T)))"
     end
 end
 

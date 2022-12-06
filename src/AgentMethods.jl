@@ -245,7 +245,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
             # TODO in the immortal case we don't have reuse, and therefore
             # it is not necessary to call agent_id for each idx
-            r = tfunc(agent_id(sim, idx, $T), sim)
+            r = tfunc(Val($T), agent_id(sim, idx, $T), sim)
             wfunc(sim, idx, r, $T)
         end 
     end

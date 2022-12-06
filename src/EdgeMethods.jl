@@ -255,9 +255,11 @@ by calling suppress_warnings(true) after importing Vahana.
 
     #- _get_agent_container / _get_agent_container! unifies
     # the access to the field, incl. possible needed steps like
-    # resizing the underlying vector. The _get_ version return `nothing`
-    # in the case, that there is no container for this agent, the _get_or_create_
+    # resizing the underlying vector. The *container version return `nothing`
+    # in the case, that there is no container for this agent, the *container!
     # version constructs an empty container and returns this one.
+    # The last one should be only used for writing edges like in add_edge! and
+    # the first one one for read operations like edges_to
     if singletype
         @eval function _get_agent_container(sim::$simsymbol,
                                      to::AgentID,
@@ -267,12 +269,21 @@ by calling suppress_warnings(true) after importing Vahana.
 
             @mayassert begin
                 t = $T
+                @edge($T).last_transmit > @edge($T).last_change ||
+                    @edge($T).last_change == 0
+            end """
+            You try to access an edge of type $(t) but the type is not in
+            the `read` argument of the apply_transition! function.
+            """
+            @mayassert begin
+                t = $T
                 at = $(attr[:to_agenttype])
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
-But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
+            The :SingleAgentType trait is set for $t, and the agent type is 
+            specified as $(at).
+            But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
             _check_size!(field, nr, $T)
@@ -290,8 +301,9 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
             end """
-The :SingleAgentType trait is set for $t, and the agent type is specified as $(at).
-But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
+            The :SingleAgentType trait is set for $t, and the agent type is 
+            specified as $(at).
+            But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
 
             _check_size!(field, nr, $T)
@@ -301,13 +313,21 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             @inbounds field[nr]
         end
     else
-        @eval function _get_agent_container!(::$simsymbol,
+        @eval function _get_agent_container!(sim::$simsymbol,
                                       to::AgentID,
                                       ::Type{$T},
                                       field)
             get!(_construct_container_func($CT), field, to)
         end
-        @eval function _get_agent_container(::$simsymbol, to::AgentID, ::Type{$T}, field)
+        @eval function _get_agent_container(sim::$simsymbol, to::AgentID, ::Type{$T}, field)
+            @mayassert begin
+                t = $T
+                @edge($T).last_transmit > @edge($T).last_change ||
+                    @edge($T).last_change == 0
+            end """
+            You try to access an edge of type $(t) but the type is not in
+            the `read` argument of the apply_transition! function.
+            """
             get(field, to, nothing)
         end
     end
@@ -471,7 +491,8 @@ But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
     end
 
     @eval function prepare_read!(sim::$simsymbol, ::Type{$MT})
-        if @edge($T).last_transmit < @edge($T).last_change
+        # finish_init! already transmit the edges, so we check last_change > 0
+        if @edge($T).last_transmit <= @edge($T).last_change && @edge($T).last_change > 0
             edges_alltoall!(sim, @storage($T), $T)
             init_storage!(sim, $T)
         end
