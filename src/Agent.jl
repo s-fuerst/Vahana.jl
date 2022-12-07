@@ -50,7 +50,6 @@ const BITS_AGENTNR = 32
 
 const AgentID = UInt64
 
-
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE
 @assert round(log2(typemax(ProcessID))) >= BITS_PROCESS
 @assert round(log2(typemax(Reuse))) >= BITS_REUSE
@@ -107,6 +106,10 @@ end
 
 function process_nr(id::AgentID)::ProcessID
     (id >> SHIFT_RANK) & (2 ^ BITS_PROCESS - 1)
+end
+
+function node_nr(id::AgentID)
+    fld(process_nr(id), mpi.shmsize)
 end
 
 function reuse_nr(id::AgentID)::ProcessID

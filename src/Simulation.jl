@@ -23,14 +23,11 @@ mutable struct MPIWindows
     # Access via shared memory
     shmstate::Union{MPI.Win, Nothing}
     shmdied::Union{MPI.Win, Nothing}
-    # Access to other nodes via MPI.Get
-    nodestate::Union{MPI.Win, Nothing}
-    nodedied::Union{MPI.Win, Nothing}
     # we are between prepare_read! and finished_mpi!
     prepared::Bool
 end
 
-MPIWindows() = MPIWindows(nothing, nothing, nothing, nothing, false)
+MPIWindows() = MPIWindows(nothing, nothing, false)
 
 mutable struct AgentFields{T}
     read::AgentReadWrite{T}
@@ -47,9 +44,9 @@ mutable struct AgentFields{T}
     reuse::Vector{Reuse}
     nextid::AgentNr
     mpiwindows::MPIWindows
-    # the last time (in number of transitions called) that the storage
-    # was send to the other processes (via edges_alltoall!)
-    last_transmit::Int64
+    # the last time (in number of transitions called) that the agentstate
+    # was send due to the evaluation of an specific edgetype 
+    last_transmit::Dict{DataType, Int64}
     # the last time that the agenttype was writable
     last_change::Int64
 end
@@ -60,17 +57,26 @@ AgentFields(T::DataType) =
                 [ Vector{T}() for _ in 1:mpi.shmsize ], #shmstate
                 [ Vector{Bool}() for _ in 1:mpi.shmsize ], #shmdied
                 Dict{AgentID, T}(), # foreignstate
-                Dict{AgentID, Bool}(), # fpreogmdied
+                Dict{AgentID, Bool}(), # foreigndied
                 Vector{Reuse}(), # reuse
                 AgentNr(1), #nextid
                 MPIWindows(), 
-                0, #last_transmit
+                Dict{DataType, Int64}(), #last_transmit
                 0) #last_change
 
 mutable struct EdgeFields{ET, EST}
     read::ET
     write::ET
+    # when a edge is added with target-agents on a different process
+    # it is stored here
     storage::EST
+    # this tracks edges with source-agents on a different node, the
+    # outer vector is the agenttype nr, the middle vector the process
+    # index. It's possible that the sets are containing agents that
+    # are died in the meantime, as edges/fromids can not be removed
+    # from the sets, only the complete sets are resetted when the
+    # edgetype is rewritten.
+    accessible::Vector{Vector{Set{AgentID}}}
     # the last time (in number of transitions called) that the storage
     # was send to the other processes (via edges_alltoall!)
     last_transmit::Int64
@@ -99,7 +105,8 @@ function construct_model(typeinfos::ModelTypes, name::String)
                                         $(edgestorage_type(T, typeinfos.edges_attr[T]))}),
              :(EdgeFields($(edgefield_constructor(T, typeinfos.edges_attr[T])),
                           $(edgefield_constructor(T, typeinfos.edges_attr[T])),
-                          $(edgestorage_constructor(T, typeinfos.edges_attr[T])),
+                          $(edgestorage_type(T, typeinfos.edges_attr[T])()),
+                          [ [ Set{AgentID}() for _ in 1:mpi.size ] for _ in 1:MAX_TYPES ],
                           0,0)))
         for T in typeinfos.edges_types ] 
 
@@ -145,6 +152,8 @@ function construct_model(typeinfos::ModelTypes, name::String)
 
     Model(typeinfos, name)
 end
+
+num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
 
 
 """
@@ -218,7 +227,7 @@ new_simulation(params::P = nothing,
 function _create_equal_partition(d, ids)
     l = length(ids)
     ids_per_rank = Int64(ceil(l / mpi.size)) + 1
-    ranks = foreach(1:l) do idx
+    foreach(1:l) do idx
         d[ids[idx]] = div(idx, ids_per_rank) + 1
     end
 end
@@ -424,8 +433,13 @@ function apply_transition!(sim,
     
     # before we call prepare_write! we must ensure that all edges
     # in the storage that are accessible are distributed to the correct
-    # ranks.
-    foreach(T -> prepare_read!(sim, T), read)
+    # ranks. Also we must first transfer the edges, as they determine,
+    # which agentstate is available, and the agentstate of other nodes
+    # are transmitted in prepare_read! of an agenttype
+    readableET = filter(w -> w in sim.typeinfos.edges_types, read)
+    foreach(T -> prepare_read!(sim, read, T), readableET)
+    readableAT = filter(w -> w in sim.typeinfos.nodes_types, read)
+    foreach(T -> prepare_read!(sim, read, T), readableAT)
     
     foreach(prepare_write!(sim, [call; add_existing]), write)
 

@@ -15,7 +15,7 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # all agent and edgetypes
     foreach(prepare_write!(sim, []), [ node_types; edge_types ])
 
-#    foreach(T -> prepare_mpi!(sim, T), node_types)
+    #    foreach(T -> prepare_mpi!(sim, T), node_types)
 
     MPI.Barrier(MPI.COMM_WORLD)
     disable_transition_checks = true
@@ -67,7 +67,7 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     MPI.Barrier(MPI.COMM_WORLD)
     foreach(T -> finish_distribute!(sim, T), node_types)
     foreach(finish_write!(sim), [ node_types; edge_types ])
-   # foreach(T -> finish_mpi!(sim, T), node_types)
+    # foreach(T -> finish_mpi!(sim, T), node_types)
     idmapping
 end
 
@@ -194,7 +194,91 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 end
 
 function construct_mpi_agent_methods(T::DataType, attr, simsymbol)
-    @eval function transmit_agents!(sim::$simsymbol, ::Type{$T})
+    checkliving = ! (:ConstantSize in attr[:traits])
+
+    @eval function transmit_agents!(sim::$simsymbol,
+                             readableET::Vector{DataType},
+                             ::Type{$T})
+        for ET in readableET
+            # there are two reasons why we must transmit the agentstate:
+            # - the agentstates has changed since the last transmit:
+            #   last_change >= last_transmit[ET]
+            # - a readable network R has changed since the last transmit
+            #   of agents caused by this network:
+            #   @edge($ET).last_change >= last_transmit[ET]
+            if @agent($T).last_transmit[ET] <= @agent($T).last_change &&
+                @agent($T).last_transmit[ET] <= @edge($ET).last_change
+
+                perPE = @edge($T).accessible[sim.typeinfos.nodes_type2id[ET]]
+
+                ## first we transfer all the AgentIDs for which we need the state
+
+                # for sending them via AllToAll we flatten the perPE structure 
+                longvec = reduce(vcat, perPE)
+                sendbuf = if length(longvec) > 0
+                    VBuffer(longvec, [ length(perPE[i]) for i in 1:mpi.size ])
+                else
+                    VBuffer(Vector{AgentID}(), [ 0 for _ in 1:mpi.size ])
+                end
+
+                # transmit the number of edges the current PE want to
+                # send to the other PEs
+                sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
+                recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+                # with this information we can prepare the receive buffer
+                recvbuf = MPI.VBuffer(Vector{AgentID}(undef, sum(recvNumElems)),
+                                      recvNumElems)
+
+                # transmit the edges itself
+                MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+
+                
+                ## now we gather the agentstate
+                send = if $checkliving
+                    if length(recvbuf.data)
+                        map(recvbuf.data) do id
+                            (id,
+                             @readdied($T)[process_nr(id)],
+                             @readstate($T)[process_nr(id)])
+                        end
+                    else
+                        Vector{Tuple{AgentID, Bool, $T}}()
+                    end
+                else
+                    if length(recvbuf.data)
+                        map(recvbuf.data) do id
+                            (id, @readstate($T)[process_nr(id)])
+                        end
+                    else
+                        Vector{Tuple{AgentID, $T}}()
+                    end
+                end
+
+                ## and send this back
+                # recvNumElems will be now sendNumElems and vis a vis
+                sendbuf = VBuffer(send, recvNumElems)
+                recv = if $checkliving 
+                    Vector{Tuple{AgentID, Bool, $T}}(undef, sum(sendNumElems))
+                else
+                    Vector{Tuple{AgentID, $T}}(undef, sum(sendNumElems))
+                end
+                recvbuf = VBuffer(recv, sendNumElems)
+                MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+
+                ## And now fill the foreign dictonaries
+                if $checkliving 
+                    for (id, died, state) in recvbuf
+                        @agent($T).foreigndied[id] = died
+                        @agent($T).foreignstate[id] = state
+                    end
+                else
+                    for (id, state) in recvbuf
+                        @agent($T).foreignstate[id] = state
+                    end
+                end
+                @agent($T).last_transmit[ET] = sim.num_transitions
+            end
+        end
     end
 end 
 

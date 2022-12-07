@@ -21,11 +21,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     nompi = ! mpi.active
     shmonly = mpi.size == mpi.shmsize
+    multinode = mpi.size > mpi.shmsize
 
-    if ! shmonly
+    if multinode
         construct_mpi_agent_methods(T, attr, simsymbol)
     end
-    
     
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
         @agentread($T) = AgentReadWrite($T)
@@ -160,31 +160,16 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
                 @inbounds @agent($T).shmstate[sr + 1][nr]
             else
-                # same procedure as above, but with RMA
+                # same procedure as above, but with access to shared memory
                 if $checkliving
-                    win_died = @windows($T).nodedied
-                    nr = agent_nr(id)
-                    died = Vector{Bool}(undef, 1)
-                    MPI.Win_lock(win_died; rank = idrank, type = :shared, nocheck = true)
-                    MPI.Get!(died, idrank, nr - 1, win_died)
-                    MPI.Win_unlock(win_died; rank = idrank)
-                    if died[1]
+                    if @agent($T).foreigndied[id]
                         return nothing
                     end
                 end
                 if $stateless
-                    return T()
+                    return $T()
                 end
-                if ! $checkliving
-                    nr = agent_nr(id)
-                end
-                win_state = @windows($T).nodestate
-                MPI.Win_lock(win_state; rank = idrank, type = :shared)
-                state = Ref{$T}()
-                MPI.Get!(state, idrank, nr - 1, win_state)
-                MPI.Win_unlock(win_state; rank = idrank)
-                state[]
-#                nothing
+                @agent($T).foreignstate[id]
             end
         end
     end
@@ -282,8 +267,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 empty!(@readreuseable($T))
             end
         end
-
-        @agent($T).last_change = sim.num_transitions
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
@@ -367,6 +350,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         # are still in readreuseable.
         @readreuseable($T) = [ @readreuseable($T); @writereuseable($T) ]
         empty!(@writereuseable($T))
+
+        @agent($T).last_change = sim.num_transitions
     end
     
     
@@ -384,34 +369,23 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     # some mpi parts are in prepare_write, as we always use the shared_memory
     # mpi calls, even in single process runs.
-    @eval function prepare_read!(sim::$simsymbol, ::Type{$T})
-        # finish_init! already transmit the edges, so we check last_change > 0
-        if @agent($T).last_transmit <= @agent($T).last_change &&
-            @agent($T).last_change > 0
-
-            transmit_agents!(sim, $T)
+    @eval function prepare_read!(sim::$simsymbol,
+                          readable::Vector{DataType},
+                          ::Type{$T})
+        if $multinode
+            # we check in the function itself, if it's really necessary to
+            # transmit agentstate, but we need therefore all readable
+            # edgetypes without the :IgnoreFrom trait
+            readableET = filter(readable) do r
+                r in sim.typeinfos.edges_types &&
+                    ! has_trait(sim, r, :IgnoreFrom)   
+            end
+            transmit_agents!(sim, readableET, $T)
         end
+        
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = true
-
-        if ! $nompi
-            @assert isnothing(@windows($T).nodedied)
-
-            win_died = MPI.Win_create(@readdied($T),
-                                      MPI.COMM_WORLD;
-                                      same_disp_unit = true)
-            @windows($T).nodedied = win_died
-
-            if ! $stateless
-                @assert isnothing(@windows($T).nodestate)
-
-                win_state = MPI.Win_create(@readstate($T),
-                                           MPI.COMM_WORLD,
-                                           same_disp_unit = true)
-                @windows($T).nodestate = win_state
-            end
-        end
     end 
 
     # some mpi parts are in prepare_write, as we always use the shared_memory
@@ -420,16 +394,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = false
-
-        if ! $nompi
-            MPI.free(@windows($T).nodedied)
-            @windows($T).nodedied = nothing
-
-            if ! $stateless
-                MPI.free(@windows($T).nodestate)
-                @windows($T).nodestate = nothing
-            end
-        end
     end
 
     @eval function agentsonthisrank(sim::$simsymbol, ::Type{$T}, write = false)

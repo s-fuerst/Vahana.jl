@@ -90,13 +90,6 @@ function edgestorage_type(T, info)
     Vector{Vector{Tuple{AgentID, CE}}}
 end
 
-function edgestorage_constructor(T, info)
-    type_strings = construct_types(T, info)
-    CE = Meta.parse(type_strings[3]) |> eval
-    Vector{Vector{Tuple{AgentID, CE}}}()
-end
-
-
 # We have some functions that are do only something when some edge traits
 # are set and are in this case specialized for the edgetype. Here we define
 # the "fallback" functions for the case that no specialized versions are needed.
@@ -132,6 +125,7 @@ function construct_edge_methods(T::DataType, attr, simsymbol)
     end
 
     mpiactive = mpi.active
+    multinode = mpi.size > mpi.shmsize
     
     construct_mpi_edge_methods(T, attr, simsymbol, CE)
     construct_edges_iter_methods(T, attr, simsymbol)
@@ -373,6 +367,11 @@ by calling suppress_warnings(true) after importing Vahana.
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
+            if $multinode && ! $ignorefrom && node_nr(edge.from) != mpi.node
+                push!(@edge($T).
+                    accessible[type_nr(edge.from)][process_nr(edge.from) + 1],
+                      edge.from)
+            end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(edge)))
@@ -397,6 +396,10 @@ by calling suppress_warnings(true) after importing Vahana.
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
+            if $multinode && ! $ignorefrom && node_nr(from) != mpi.node
+                push!(@edge($T).
+                    accessible[type_nr(from)][process_nr(from) + 1], from)
+            end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(from, edgestate)))
@@ -414,6 +417,11 @@ by calling suppress_warnings(true) after importing Vahana.
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
+            if $multinode && ! $ignorefrom && node_nr(edge.from) != mpi.node
+                push!(@edge($T).
+                    accessible[type_nr(edge.from)][process_nr(edge.from) + 1],
+                      edge.from)
+            end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(edge)))
@@ -430,6 +438,10 @@ by calling suppress_warnings(true) after importing Vahana.
             `finish_init!` is called) or within a transition function called by
             `apply_transition`.
             """
+            if $multinode && ! $ignorefrom && node_nr(from) != mpi.node
+                push!(@edge($T).
+                    accessible[type_nr(from)][process_nr(from) + 1], from)
+            end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
                       (to, _valuetostore(from, edgestate)))
@@ -487,10 +499,15 @@ by calling suppress_warnings(true) after importing Vahana.
             @edgewrite($T) = $FT()
             init_field!(sim, t)
             init_storage!(sim, t)
+            for tnr in 1:length(sim.typeinfos.nodes_types)
+                for i in 1:mpi.size
+                    empty!(@edge($T).accessible[tnr][i])
+                end
+            end
         end
     end
 
-    @eval function prepare_read!(sim::$simsymbol, ::Type{$MT})
+    @eval function prepare_read!(sim::$simsymbol, _::Vector{DataType}, ::Type{$MT})
         # finish_init! already transmit the edges, so we check last_change > 0
         if @edge($T).last_transmit <= @edge($T).last_change &&
             @edge($T).last_change > 0
@@ -598,49 +615,49 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
-    #- num_neighbors
-    if !singleedge
-        if ignorefrom && stateless
-            @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                n = _get_agent_container(sim, to, $T, @edgeread($T))
-                isnothing(n) ? 0 : n
-            end
-        else
-            @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                ac = _get_agent_container(sim, to, $T, @edgeread($T))
-                isnothing(ac) ? 0 : length(ac)
-            end
+#- num_neighbors
+if !singleedge
+    if ignorefrom && stateless
+        @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            n = _get_agent_container(sim, to, $T, @edgeread($T))
+            isnothing(n) ? 0 : n
         end
     else
-        @eval function num_neighbors(::$simsymbol, ::AgentID, t::Type{$MT})
-            @assert false """
+        @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            ac = _get_agent_container(sim, to, $T, @edgeread($T))
+            isnothing(ac) ? 0 : length(ac)
+        end
+    end
+else
+    @eval function num_neighbors(::$simsymbol, ::AgentID, t::Type{$MT})
+        @assert false """
             num_neighbors is not defined for the trait combination of $t
             """
-        end
     end
+end
 
 
-    #- has_neighbor
-    if ignorefrom && stateless
-        @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            ac = _get_agent_container(sim, to, $T, @edgeread($T))
-            isnothing(ac) || ac == 0 ? false : true
-        end
-    elseif !singleedge 
-        @eval function has_neighbor(sim::$simsymbol, to::AgentID, t::Type{$MT})
-            num_neighbors(sim,to, t) >= 1
-        end
-    elseif !singletype 
-        @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
-            haskey(@edgeread($T), to)
-        end
-    else
-        @eval function has_neighbor(::$simsymbol, ::AgentID, t::Type{$MT})
-            @assert false """
+#- has_neighbor
+if ignorefrom && stateless
+    @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        ac = _get_agent_container(sim, to, $T, @edgeread($T))
+        isnothing(ac) || ac == 0 ? false : true
+    end
+elseif !singleedge 
+    @eval function has_neighbor(sim::$simsymbol, to::AgentID, t::Type{$MT})
+        num_neighbors(sim,to, t) >= 1
+    end
+elseif !singletype 
+    @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        haskey(@edgeread($T), to)
+    end
+else
+    @eval function has_neighbor(::$simsymbol, ::AgentID, t::Type{$MT})
+        @assert false """
             has_neighbor is not defined for the trait combination of $t
             """
-        end
     end
+end
 
 #- _remove_edges (called from Vahana itself to remove the edges of
 #- died agents)
