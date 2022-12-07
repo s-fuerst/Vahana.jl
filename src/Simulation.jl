@@ -14,12 +14,10 @@ mutable struct AgentReadWrite{T}
     reuseable::Vector{AgentNr}
     # This field is for immortal agents always just an empty vector
     died::Vector{Bool}
-    # The last transition when prepare_read! (oder prepare_write!) was called
-    last_change::Int64
 end
 
 AgentReadWrite(T::DataType) =
-    AgentReadWrite{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}(), 0)
+    AgentReadWrite{T}(Vector{T}(), Vector{AgentNr}(), Vector{Bool}())
 
 mutable struct MPIWindows
     # Access via shared memory
@@ -41,19 +39,33 @@ mutable struct AgentFields{T}
     shmstate::Vector{Vector{T}}
     # the died flag of all agents on the same node
     shmdied::Vector{Vector{Bool}}
+    # the state of agents on others nodes
+    foreignstate::Dict{AgentID, T}
+    # the died flag of agents on other nodes
+    foreigndied::Dict{AgentID, Bool}
+    
     reuse::Vector{Reuse}
     nextid::AgentNr
     mpiwindows::MPIWindows
+    # the last time (in number of transitions called) that the storage
+    # was send to the other processes (via edges_alltoall!)
+    last_transmit::Int64
+    # the last time that the agenttype was writable
+    last_change::Int64
 end
 
 AgentFields(T::DataType) =
-    AgentFields(AgentReadWrite(T),
-                AgentReadWrite(T),
-                [ Vector{T}() for _ in 1:mpi.shmsize ],
-                [ Vector{Bool}() for _ in 1:mpi.shmsize ],
-                Vector{Reuse}(),
-                AgentNr(1),
-                MPIWindows())
+    AgentFields(AgentReadWrite(T), # read
+                AgentReadWrite(T), # write
+                [ Vector{T}() for _ in 1:mpi.shmsize ], #shmstate
+                [ Vector{Bool}() for _ in 1:mpi.shmsize ], #shmdied
+                Dict{AgentID, T}(), # foreignstate
+                Dict{AgentID, Bool}(), # fpreogmdied
+                Vector{Reuse}(), # reuse
+                AgentNr(1), #nextid
+                MPIWindows(), 
+                0, #last_transmit
+                0) #last_change
 
 mutable struct EdgeFields{ET, EST}
     read::ET

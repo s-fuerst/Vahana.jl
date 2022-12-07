@@ -492,7 +492,9 @@ by calling suppress_warnings(true) after importing Vahana.
 
     @eval function prepare_read!(sim::$simsymbol, ::Type{$MT})
         # finish_init! already transmit the edges, so we check last_change > 0
-        if @edge($T).last_transmit <= @edge($T).last_change && @edge($T).last_change > 0
+        if @edge($T).last_transmit <= @edge($T).last_change &&
+            @edge($T).last_change > 0
+
             edges_alltoall!(sim, @storage($T), $T)
             init_storage!(sim, $T)
         end

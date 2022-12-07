@@ -21,6 +21,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     nompi = ! mpi.active
     shmonly = mpi.size == mpi.shmsize
+
+    if ! shmonly
+        construct_mpi_agent_methods(T, attr, simsymbol)
+    end
+    
     
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
         @agentread($T) = AgentReadWrite($T)
@@ -179,6 +184,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 MPI.Get!(state, idrank, nr - 1, win_state)
                 MPI.Win_unlock(win_state; rank = idrank)
                 state[]
+#                nothing
             end
         end
     end
@@ -277,7 +283,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
         end
 
-        @agentwrite($T).last_change = sim.num_transitions
+        @agent($T).last_change = sim.num_transitions
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
@@ -379,6 +385,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     # some mpi parts are in prepare_write, as we always use the shared_memory
     # mpi calls, even in single process runs.
     @eval function prepare_read!(sim::$simsymbol, ::Type{$T})
+        # finish_init! already transmit the edges, so we check last_change > 0
+        if @agent($T).last_transmit <= @agent($T).last_change &&
+            @agent($T).last_change > 0
+
+            transmit_agents!(sim, $T)
+        end
         # we use this as a check that the types are in the accessible
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = true
