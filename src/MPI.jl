@@ -193,30 +193,32 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
     edges_alltoall!(sim, perPE, T, updateid)
 end
 
-function construct_mpi_agent_methods(T::DataType, attr, simsymbol)
-    checkliving = ! (:ConstantSize in attr[:traits])
-
+function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
     @eval function transmit_agents!(sim::$simsymbol,
                              readableET::Vector{DataType},
                              ::Type{$T})
         for ET in readableET
+            edgefield = getproperty(sim, Symbol(ET))
             # there are two reasons why we must transmit the agentstate:
             # - the agentstates has changed since the last transmit:
             #   last_change >= last_transmit[ET]
             # - a readable network R has changed since the last transmit
             #   of agents caused by this network:
             #   @edge($ET).last_change >= last_transmit[ET]
-            if @agent($T).last_transmit[ET] <= @agent($T).last_change &&
-                @agent($T).last_transmit[ET] <= @edge($ET).last_change
+            if @agent($T).last_transmit[ET] <= @agent($T).last_change ||
+                @agent($T).last_transmit[ET] <= edgefield.last_change
 
-                perPE = @edge($T).accessible[sim.typeinfos.nodes_type2id[ET]]
+                perPE = edgefield.accessible[sim.typeinfos.nodes_type2id[$T]]
 
                 ## first we transfer all the AgentIDs for which we need the state
 
-                # for sending them via AllToAll we flatten the perPE structure 
-                longvec = reduce(vcat, perPE)
-                sendbuf = if length(longvec) > 0
-                    VBuffer(longvec, [ length(perPE[i]) for i in 1:mpi.size ])
+                # for sending them via AllToAll we flatten the perPE structure
+                asvec = map(s -> collect(s), filter(! isempty, perPE))
+                
+                sendbuf = if ! isempty(asvec)
+                    longvec = reduce(vcat, asvec)
+                    VBuffer(reduce(vcat, asvec),
+                            [ length(perPE[i]) for i in 1:mpi.size ])
                 else
                     VBuffer(Vector{AgentID}(), [ 0 for _ in 1:mpi.size ])
                 end
@@ -232,22 +234,21 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol)
                 # transmit the edges itself
                 MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
-                
                 ## now we gather the agentstate
                 send = if $checkliving
-                    if length(recvbuf.data)
+                    if ! isempty(recvbuf.data) 
                         map(recvbuf.data) do id
                             (id,
-                             @readdied($T)[process_nr(id)],
-                             @readstate($T)[process_nr(id)])
+                             @readdied($T)[agent_nr(id)],
+                             @readstate($T)[agent_nr(id)])
                         end
                     else
                         Vector{Tuple{AgentID, Bool, $T}}()
                     end
                 else
-                    if length(recvbuf.data)
+                    if ! isempty(recvbuf.data)
                         map(recvbuf.data) do id
-                            (id, @readstate($T)[process_nr(id)])
+                            (id, @readstate($T)[agent_nr(id)])
                         end
                     else
                         Vector{Tuple{AgentID, $T}}()
@@ -267,12 +268,12 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol)
 
                 ## And now fill the foreign dictonaries
                 if $checkliving 
-                    for (id, died, state) in recvbuf
+                    for (id, died, state) in recvbuf.data
                         @agent($T).foreigndied[id] = died
                         @agent($T).foreignstate[id] = state
                     end
                 else
-                    for (id, state) in recvbuf
+                    for (id, state) in recvbuf.data
                         @agent($T).foreignstate[id] = state
                     end
                 end

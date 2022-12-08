@@ -24,7 +24,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     multinode = mpi.size > mpi.shmsize
 
     if multinode
-        construct_mpi_agent_methods(T, attr, simsymbol)
+        construct_mpi_agent_methods(T, attr, simsymbol, checkliving)
     end
     
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
@@ -46,6 +46,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 fill!(@writedied($T), true)
             end
         end
+
+        for ET in sim.typeinfos.edges_types
+            @agent($T).last_transmit[ET] = 0
+        end
+        
         nothing
     end
     
