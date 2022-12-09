@@ -215,7 +215,7 @@ function new_simulation(model::Model,
     end
 
     global show_second_edge_warning = true
-    
+
     sim
 end
 
@@ -244,7 +244,7 @@ Finish the initialization phase of the simulation.
 `partition` is an option keyword and allows to specify an assignment
 of the agents to the individual MPI ranks. The dictonary must contain
 all agentids created on the rank as key, the corresponding value is
-the rank on which the agent "lives" after `finish_init`.
+the rank on which the agent "lives" after `finish_init!`.
 
 `finish_init!` must be called before applying a transition function. 
 
@@ -317,6 +317,8 @@ function finish_init!(sim;
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
     sim.initialized = true
+
+    sim.num_transitions = 1
 
     return_idmapping ? idmapping : nothing
 end 
@@ -432,7 +434,6 @@ function apply_transition!(sim,
 
     # must be set to true before prepare_read! (as this calls add_edge!)
     sim.intransition = true
-    sim.num_transitions = sim.num_transitions + 1
     
     # before we call prepare_write! we must ensure that all edges
     # in the storage that are accessible are distributed to the correct
@@ -468,6 +469,11 @@ function apply_transition!(sim,
     foreach(finish_write!(sim), writeableET)
 
     sim.intransition = false
+
+    # must be incremented after the transition, so that read only
+    # functions like aggregate tries to transfer the necessary states
+    # only once 
+    sim.num_transitions = sim.num_transitions + 1
     
     sim
 end

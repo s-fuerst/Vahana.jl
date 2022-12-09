@@ -163,7 +163,7 @@ with those values.
 Example
 
 The following code from the "Game of Life" example generates a
-Boolean matrix indicating which cells are alive (and therefore
+boolean matrix indicating which cells are alive (and therefore
 maps the internal graph structure to the usual representation of a
 cellular automaton):
 
@@ -179,7 +179,7 @@ See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
     @assert sim.initialized "calc_raster can be only called after finish_init!"
-    foreach(T -> prepare_read!(sim, T), accessible)
+    foreach(T -> prepare_read!(sim, Vector{DataType}(), T), accessible)
     z = zero(f_returns)
     rs = map(sim.rasters[raster]) do id
         if process_nr(id) == mpi.rank

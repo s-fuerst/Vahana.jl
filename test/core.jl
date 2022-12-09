@@ -84,8 +84,8 @@ import Vahana.updateids
 function test_aggregate(sim, T::DataType)
     @test aggregate(sim, a -> a.foo, +, T) == reduce(+, 1:10)
     @test aggregate(sim, a -> a.foo, *, T) == reduce(*, 1:10)
-    @test aggregate(sim, a -> a.foo, &, T) == reduce(&, 1:10)
-    @test aggregate(sim, a -> a.foo, |, T) == reduce(|, 1:10)
+    @test aggregate(sim, a -> a.foo, &, T; datatype = Int) == reduce(&, 1:10)
+    @test aggregate(sim, a -> a.foo, |, T; datatype = Int) == reduce(|, 1:10)
     @test aggregate(sim, a -> a.foo, max, T) == reduce(max, 1:10)
     @test aggregate(sim, a -> a.foo, min, T) == reduce(min, 1:10)
 end    
@@ -297,6 +297,14 @@ end
             test_aggregate_mortal(sim, T)
         end
 
+        finish_simulation!(sim)
+
+        sim = new_simulation(model, nothing, nothing; name = "Aggregate")
+
+        (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
+
+        finish_init!(sim)
+        
         #  testing the & and | for boolean 
         # currenty all bool of ADefault are true
         @test aggregate(sim, a -> a.bool, &, ADefault) == true
@@ -306,6 +314,7 @@ end
         apply_transition!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
             ADefault(state.foo, false)
         end
+
         @test aggregate(sim, a -> a.bool, &, ADefault) == false
         @test aggregate(sim, a -> a.bool, |, ADefault) == false
 

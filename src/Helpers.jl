@@ -42,7 +42,11 @@ end
 # this is for the reduce operations, and tries to determine
 # the default value for ranks without any agent/edge
 function val4empty(op; kwargs...)
-    MT = get(kwargs, :datatype, Int)
+    if (op == &) || (op == |)
+        MT = get(kwargs, :datatype, Bool)
+    else
+        MT = get(kwargs, :datatype, Int)
+    end
     
     # for MPI.reduce we must ensure that each rank has a value
     emptyval = get(kwargs, :init) do
@@ -63,7 +67,7 @@ function val4empty(op; kwargs...)
             @assert typemax(MT) isa Int || typemax(MT) isa Bool """
             The & operator is only supported for integer and boolean types
             """
-            typemax(MT) isa Int ? 0 : true
+            typemax(MT) isa Int ? 0 : false
         else
             nothing
         end

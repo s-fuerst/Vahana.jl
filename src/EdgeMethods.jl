@@ -738,7 +738,7 @@ if ! stateless
     @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
         emptyval = val4empty(op; kwargs...)
 
-        prepare_read!(sim, t)
+        prepare_read!(sim, Vector{DataType}(), t)
         estates = edges_iterator(sim, $MT) |> 
             collect  |>
             _edgestates(t)

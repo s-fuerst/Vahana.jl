@@ -423,6 +423,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         emptyval = val4empty(op; kwargs...)
         
         reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
+
         if $nompi
             reduced
         else

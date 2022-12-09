@@ -221,6 +221,7 @@ function runedgestest()
         end
 
         @testset "neighbor_states" begin
+            disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
                 e = neighborids(sim, a3id, t)
                 @test e[1] == a2id
@@ -228,6 +229,7 @@ function runedgestest()
                 e = neighborids(sim, a2id, t)
                 @test e === nothing
             end
+            disable_transition_checks(false)
         end
 
         @testset "check Vahana state" begin
@@ -286,7 +288,7 @@ function runedgestest()
     end
 end
 
-@testset "apply_transition" begin
+@testset "transition" begin
     for ET in statefulEdgeTypes
 
         sim = new_simulation(model_edges)

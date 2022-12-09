@@ -250,7 +250,7 @@ function testforedgetype(ET)
     # send to the correct ranks
     apply_transition!(sim, reverse_edge_direction(ET),
                       [ AgentState1, AgentState2 ],
-                      [ AgentState1, AgentState2 ],
+                      [ AgentState1, AgentState2, ET ],
                       [ ET ])
 
 
