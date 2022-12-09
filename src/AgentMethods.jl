@@ -402,7 +402,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function agentsonthisrank(sim::$simsymbol, ::Type{$T}, write = false)
+        max_agents = @agent($T).nextId - 1
         if ! $checkliving
+            @agent($T).nextId - 1
             if write
                 @writestate($T)
             else
@@ -410,19 +412,33 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
         else
             if write
-                [ @writestate($T)[i] for i in 1:length(@writestate($T))
+                [ @writestate($T)[i] for i in 1:min(length(@writestate($T)), max_agents)
                      if ! @writedied($T)[i] ]
             else
-                [ @readstate($T)[i] for i in 1:length(@readstate($T))
+                [ @readstate($T)[i] for i in 1:min(length(@readstate($T)), max_agents)
                      if ! @readdied($T)[i] ]
             end
         end
     end        
 
     @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
+        @mayassert ! sim.intransition """
+        You can not call aggregate inside of a transition function."""
         emptyval = val4empty(op; kwargs...)
-        
-        reduced = mapreduce(f, op, agentsonthisrank(sim, $T); init = emptyval)
+
+        if ! $checkliving
+            reduced = emptyval
+            for i in 1:(@agent($T).nextid - 1)
+                    reduced = op(f(@readstate($T)[i]), reduced)
+            end
+        else 
+            reduced = emptyval
+            for i in 1:(@agent($T).nextid - 1)
+                if ! @readdied($T)[i]
+                    reduced = op(f(@readstate($T)[i]), reduced)
+                end
+            end
+        end   
 
         if $nompi
             reduced

@@ -5,24 +5,26 @@ import Base.iterate
 # When we iterate over all edges, we have two nested iterators (the outer over
 # all the agents, and one over the edges for those agents). 
 
-struct IterEdgesState
-    agentiter # the outer agent iterator
-    currentagentid # the current agent for the inner edge iterator
+struct IterEdgesState{FT}
+    agentiter
+    # agentiter::Base.Iterators.Stateful{Base.KeySet{UInt64, FT},
+    #                                     Union{Nothing, Tuple{UInt64, Int64}}} # the outer agent iterator
+    currentagentid::AgentID # the current agent for the inner edge iterator
     nextedgeidx::Int64 # the next edge of in the inner edge iterator
+    length::Int64
 end
 
-# TODO: maybe we can also specify field
-struct IterEdgesWrapper{SIM, T} 
+struct IterEdgesWrapper{SIM, FT, T} 
     sim::SIM
     read::Bool
-    field
+    field::FT
 end
 
-function length(iw::IterEdgesWrapper{SIM, T}) where {SIM, T}
+function length(iw::IterEdgesWrapper{SIM, FT, T}) where {SIM, FT, T}
     _num_edges(iw.sim, T, ! iw.read)
 end
 
-function construct_edges_iter_methods(T::DataType, attr, simsymbol)
+function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
@@ -33,6 +35,8 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol)
         AT = attr[:to_agenttype]
     end
 
+    @info FT
+    
     @eval function edges_iterator(sim::$simsymbol, ::Type{$T}, r::Bool = true)
         @assert ! ($stateless && $ignorefrom)
 
@@ -42,11 +46,11 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol)
             # iterate is called on it
             []
         else
-            IterEdgesWrapper{$simsymbol, $T}(sim, r, field)
+            IterEdgesWrapper{$simsymbol, $FT, $T}(sim, r, field)
         end
     end
 
-    @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $T})
+    @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $FT, $T})
         if length(iw.field) == 0
             return nothing
         end
@@ -64,20 +68,26 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol)
         # is added the the state of the outer iterator 
         agentiter = Iterators.Stateful(ks)
         currentagentid = Iterators.take(agentiter, 1) |> only
-        iterate(iw, IterEdgesState(agentiter, currentagentid, 1))
+        len = $singleedge ? 1 : length(field[currentagentid])
+        iterate(iw, IterEdgesState{$FT}(agentiter, currentagentid, 1, len))
     end
 
-    @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $T}, is::IterEdgesState)
+    @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $FT, $T}, is::IterEdgesState{$FT})
         field = iw.field
-        # innerisvec is false, if the edgetype has the trait :SingleEdge
-        len = $singleedge ? 1 : length(field[is.currentagentid])
-        if is.nextedgeidx <= len 
+        # innerisvec is false, if the edgetyspe has the trait :SingleEdge
+        if is.nextedgeidx <= is.length
             if $singleedge
                 return ((is.currentagentid, field[is.currentagentid]),
-                   IterEdgesState(is.agentiter, is.currentagentid, is.nextedgeidx + 1))
+                   IterEdgesState{$FT}(is.agentiter,
+                                       is.currentagentid,
+                                       is.nextedgeidx + 1,
+                                       is.length))
             else
                 return ((is.currentagentid, field[is.currentagentid][is.nextedgeidx]),
-                   IterEdgesState(is.agentiter, is.currentagentid, is.nextedgeidx + 1))
+                   IterEdgesState{$FT}(is.agentiter,
+                                       is.currentagentid,
+                                       is.nextedgeidx + 1,
+                                       is.length))
             end
             # this code is only reached for is.nextedgeidx > len, which means
             # we move on our outer iterator to the next agent and call
@@ -86,7 +96,8 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol)
             return nothing
         end
         currentagentid = Iterators.take(is.agentiter, 1) |> only
-        iterate(iw, IterEdgesState(is.agentiter, currentagentid, 1))
+        len = $singleedge ? 1 : length(field[currentagentid])
+        iterate(iw, IterEdgesState{$FT}(is.agentiter, currentagentid, 1, len))
     end
 end
 

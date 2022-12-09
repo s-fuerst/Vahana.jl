@@ -128,7 +128,7 @@ function construct_edge_methods(T::DataType, attr, simsymbol)
     multinode = mpi.size > mpi.shmsize
     
     construct_mpi_edge_methods(T, attr, simsymbol, CE)
-    construct_edges_iter_methods(T, attr, simsymbol)
+    construct_edges_iter_methods(T, attr, simsymbol, FT)
     #### Functions that helps to write generic versions of the edge functions
     #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
@@ -730,21 +730,17 @@ end
 
 #- aggregate
 if ! stateless
-    if ignorefrom
-        @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2], edges)
-    else
-        @eval _edgestates(::Type{$MT}) = edges -> map(e -> e[2].state, edges)
-    end
     @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
         emptyval = val4empty(op; kwargs...)
 
-        prepare_read!(sim, Vector{DataType}(), t)
-        estates = edges_iterator(sim, $MT) |> 
-            collect  |>
-            _edgestates(t)
-        finish_read!(sim, t)
-        
-        reduced = mapreduce(f, op, estates; init = emptyval)
+        reduced = emptyval
+        for e in edges_iterator(sim, $MT)
+            if $ignorefrom
+                reduced = op(f(e[2]), reduced)
+            else
+                reduced = op(f(e[2].state), reduced)
+            end
+        end
         
         mpiop = get(kwargs, :mpiop, op)
         MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)

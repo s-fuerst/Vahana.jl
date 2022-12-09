@@ -1,5 +1,5 @@
 export num_edges
-export show_network, show_agents, show_agent, do_agents, do_edges
+export show_network, show_agents, show_agent, do_edges
 
 using Printf
 
@@ -90,6 +90,9 @@ function construct_prettyprinting_methods(simsymbol)
         show_raster(io, sim)
         #   print(io, "Globals: ", sim.globals)
         show_struct(io, sim.globals, "Global")
+        if ! sim.initialized
+            printstyled(io, "\nStill in initialization process!.")
+        end
     end
 end
 
@@ -168,17 +171,13 @@ function _show_num_a_with_e(sim, ::Type{T}) where T
 end
 
 function _show_num_agents(sim, t::Type{T}) where {T}
-    if !sim.initialized 
-        "$(num_agents(sim, t))/$(num_agents(sim, t; write = true)) (R/W)"
-    else
-        "$(num_agents(sim, t))"
-    end
+    "$(num_agents(sim, t))"
 end
 
 
 function _show_num_edges(sim, t::Type{T}) where {T}
     if !sim.initialized 
-        "$(num_edges(sim, t))/$(num_edges(sim, t; write = true)) (R/W)"
+        "$(num_edges(sim, t; write = true))"
     else
         "$(num_edges(sim, t))"
     end
@@ -447,16 +446,16 @@ end
 """
 TODO DOC 
 """
-num_agents(sim, ::Type{T}; write = false) where T =
-    agentsonthisrank(sim, T, write) |> length
+function num_agents(sim, ::Type{T}) where T
+    field = getproperty(sim, Symbol(T))
+    attr = sim.typeinfos.nodes_attr[T]
 
-"""
-TODO DOC 
-"""
-function do_agents(g, f, sim, ::Type{T}) where T
-    agent_ids = [ agent_id(sim, nr, T)
-                  for nr in keys(@readstate(T))]
-    f(g, agent_ids)
+    if ! (:Immortal in attr[:traits]) || :ConstantSize in attr[:traits]
+        died = sim.initialized ? readdied(sim, T) : writedied(sim, T)
+        count(i -> ! died[i], 1:field.nextid - 1)
+    else
+        field.nextid - 1
+    end 
 end
 
 """

@@ -77,23 +77,25 @@ function run_benchmark(mt, name)
     ignorefrom = hastrait(name, "I")
     fixedsize = hastrait(name, "F")
 
+    # I think that currenty deepcopy should work (only) before
+    # finish_init! withoud side effects
+    sim_agg = deepcopy(sim)
+    sim_add = deepcopy(sim)
+    
     add_edge!(sim, a1, a2, EdgeState(0.1))
     add_edge!(sim, a2, a3, EdgeState(0.2))
     add_edge!(sim, a3, a1, EdgeState(0.3))
-
-    sim_agg = deepcopy(sim)
-
     
-    for i=1:9
-        add_edge!(sim, a1, a3, EdgeState(i))
+    for i=1:19
+        add_edge!(sim_agg, a1, a3, EdgeState(i))
     end
 
     finish_init!(sim)
     finish_init!(sim_agg)
+    finish_init!(sim_add)
 
     edge = Edge(a2, EdgeState(2.0))
 
-    sim_add = deepcopy(sim)
     addedge = @benchmark add_edge!($sim_add, $a1, $edge)
 
 
@@ -142,13 +144,13 @@ end
 
 ######################################## create edge table
 
-# println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
+println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
 
-# for t in allEdgeTypes
-#     mt = prepare(t)
-#     run_benchmark(mt, t)
-#     GC.gc()
-# end
+for t in allEdgeTypes
+    mt = prepare(t)
+    run_benchmark(mt, t)
+    GC.gc()
+end
 
 
 
@@ -179,12 +181,12 @@ mt = ModelTypes() |>
 run_benchmark_agents(mt);
 
 mt = ModelTypes() |>
-    register_agenttype!(AgentWithState, :Vector) |>
+    register_agenttype!(AgentWithState, :Immortal) |>
     construct_model("Immortal");
 run_benchmark_agents(mt);
 
 mt = ModelTypes() |>
-    register_agenttype!(AgentWithState, :Vector; size = 10000000) |>
+    register_agenttype!(AgentWithState, :Immortal; size = 20000000) |>
     construct_model("Immortal fixed");
 run_benchmark_agents(mt);
 
@@ -224,3 +226,4 @@ run_benchmark_agents(mt);
 # # @benchmark add_agent!(sim, MovingAgent())
 
 # sim.rasters[:grid][1,3]
+

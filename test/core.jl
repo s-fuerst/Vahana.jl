@@ -100,13 +100,6 @@ function test_aggregate_mortal(sim, T::DataType)
     end
 
     agg = aggregate(sim, a -> a.foo, +, T)
-
-    if length(Vahana.agentsonthisrank(sim, T)) > 0
-        @rootonly @test agg == mapreduce(a -> a.foo, +,
-                                         Vahana.agentsonthisrank(sim, T))
-    else
-        @rootonly @test agg == 0
-    end
 end    
 
 function createsim()

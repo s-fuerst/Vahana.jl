@@ -249,19 +249,16 @@ function runedgestest()
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             @test num_edges(sim, t) == 0
-            @test num_edges(sim, t; write = true) == 0
         end
 
         @test num_agents(sim, Agent) == 0
-        @test num_agents(sim, Agent; write = true) == 0
 
         # We need a gap
         id1 = add_agent!(sim, Agent(0))
         id2 = add_agent!(sim, Agent(0))
         id3 = add_agent!(sim, Agent(0))
 
-        @test num_agents(sim, Agent) == 0
-        @test num_agents(sim, Agent; write = true) == 3
+        @test num_agents(sim, Agent) == 3
         
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             if fieldcount(t) > 0
