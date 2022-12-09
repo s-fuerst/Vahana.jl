@@ -82,6 +82,9 @@ mutable struct EdgeFields{ET, EST}
     last_transmit::Int64
     # the last time that the edgetype was writable
     last_change::Int64
+    # is set to true, when this field is in the read vector of a
+    # transition function
+    readable::Bool
 end
 
 """
@@ -107,7 +110,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                           $(edgefield_constructor(T, typeinfos.edges_attr[T])),
                           $(edgestorage_type(T, typeinfos.edges_attr[T])()),
                           [ [ Set{AgentID}() for _ in 1:mpi.size ] for _ in 1:MAX_TYPES ],
-                          0,0)))
+                          0,0,false)))
         for T in typeinfos.edges_types ] 
 
     

@@ -1,3 +1,5 @@
+import Vahana: disable_transition_checks
+
 import Graphs: SimpleGraphs
 
 # We need a lot of edgetypes to test all the edge trait combinations
@@ -119,8 +121,8 @@ function runedgestest()
         # # with this apply_transition we ensure
         # apply_transition(sim, [ Agent, AgentB ], allEdgeTypes, []) do _,_,_ end
 
-
         @testset "edges_to" begin
+            disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs]
                 e = edges_to(sim, a3id, t)
                 @test e[1] == Edge(a2id, t(1))
@@ -132,12 +134,15 @@ function runedgestest()
                 e = edges_to(sim, a3id, t)
                 @test e == Edge(a2id, t(1))
             end
+            disable_transition_checks(false)
+                    
             for t in  [ EdgeI, EdgeEI, EdgeTI, EdgeTsI, EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI, EdgeSTs, EdgeSTsI, EdgeSETsI  ]
                 @test_throws AssertionError edges_to(sim, a1id, t)
             end
         end
 
         @testset "neighborids" begin
+            disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
                 e = neighborids(sim, a3id, t)
                 @test e[1] == a2id
@@ -149,6 +154,7 @@ function runedgestest()
                 e = neighborids(sim, a3id, t)
                 @test e == a2id
             end
+            disable_transition_checks(false)
             for t in [EdgeI, EdgeTI, EdgeTsI, EdgeSI, EdgeSTI, EdgeSTsI,
                    EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError neighborids(sim, a1id, t)
@@ -156,6 +162,7 @@ function runedgestest()
         end
 
         @testset "edgestates" begin
+            disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeI, EdgeTI, EdgeTsI]
                 e = edgestates(sim, a3id, t)
                 @test e[1] == t(1)
@@ -167,6 +174,7 @@ function runedgestest()
                 e = edgestates(sim, a3id, t)
                 @test e == t(1)
             end
+            disable_transition_checks(false)
             for t in [EdgeS, EdgeST, EdgeSTs, EdgeSI, EdgeSTI, EdgeSTsI,
                    EdgeSE, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError edgestates(sim, a1id, t)
@@ -174,18 +182,21 @@ function runedgestest()
         end
         
         @testset "num_neighbors" begin
+            disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeI, EdgeTI, EdgeTsI,
                    EdgeS, EdgeST, EdgeSTs, EdgeST, EdgeSTI, EdgeSTsI]
                 @test num_neighbors(sim, a1id, t) == 1
                 @test num_neighbors(sim, a2id, t) == 0
                 @test num_neighbors(sim, a3id, t) == 2
             end
+            disable_transition_checks(false)
             for t in [EdgeE, EdgeEI, EdgeSE, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError num_neighbors(sim, a1id, t)
             end
         end
 
         @testset "has_neighbor" begin
+            disable_transition_checks(true)
             for t in [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
                     EdgeSTs, EdgeSTsI, EdgeSETsI, EdgeD, EdgeE, EdgeT, EdgeI,
                     EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
@@ -193,6 +204,7 @@ function runedgestest()
                 @test has_neighbor(sim, a2id, t) == false
                 @test has_neighbor(sim, a3id, t) == true
             end
+            disable_transition_checks(false)
         end
         
         @testset "aggregate" begin

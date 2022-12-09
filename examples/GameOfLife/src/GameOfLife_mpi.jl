@@ -8,6 +8,9 @@
 
 using Vahana, Random, SparseArrays, BenchmarkTools
 
+
+detect_stateless_trait(true)
+
 import Graphs
 
 struct Cell 
@@ -30,6 +33,7 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
+    @info neighborstates(sim, id, Neighbor, Cell)
     n = mapreduce(a -> a.active, +, neighborstates(sim, id, Neighbor, Cell))
     rules = param(sim, :rules)
     if c.active == true && n <= rules[4] && n >= rules[1]
@@ -86,13 +90,14 @@ end
 sim = init(Params(rules = (2,3,3,3),
                   dims = (200,200)))
 
-# step!(sim)
+step!(sim)
 
-# @time for _ in 1:10
-#     step!(sim)
-# end
+if mpi.isroot
+    @time for i in 1:200 step!(sim) end
+else
+    @time for i in 1:200 step!(sim) end
+end    
 
-@btime step!(sim)
 
 finish_simulation!(sim)
 

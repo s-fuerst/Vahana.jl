@@ -47,6 +47,7 @@ space exploration.
 
 """
 function enable_asserts(enable::Bool)
+    config.asserts_enabled = enable
     if enable 
         @eval asserting() = true
     else
@@ -75,6 +76,8 @@ end
 Base.@kwdef mutable struct VahanaConfig
     quiet = false
     detect_stateless = false
+    check_readable = true
+    asserts_enabled = true
 end
 
 const config = VahanaConfig()
@@ -106,7 +109,7 @@ detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 ######################################## include all other files
 
 # TODO DOC
-disable_transition_checks = false
+disable_transition_checks = (disable::Bool) -> config.check_readable = ! disable
 
 include("Helpers.jl")
 

@@ -121,7 +121,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
         @mayassert begin
             T = $T
-            @windows($T).prepared || ! disable_transition_checks
+            @windows($T).prepared || ! config.check_readable
         end """
           $T must be in the `accessible` argument of the transition function.
         """

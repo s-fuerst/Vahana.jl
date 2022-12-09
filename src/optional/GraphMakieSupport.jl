@@ -7,9 +7,9 @@ import Graphs, Graphs.SimpleGraphs, NetworkLayout
 function _agenttostring(ax, idx)
     vg = ax.scene.plots[2].input_args[1].val
     id = vg.g2v[idx]
-    disable_transition_checks = true
+    disable_transition_checks(true)
     as = agentstate_flexible(vg.sim, id)
-    disable_transition_checks = false
+    disable_transition_checks(false)
     str = " $(typeof(as)) (Nr: $(Vahana.agent_nr(id)))"
     if nfields(as) > 0
         fnames = as |> typeof |> fieldnames
@@ -116,8 +116,8 @@ function plot(vg::VahanaGraph)
 end
 
 function nodestate(vg::VahanaGraph, idx::Int64)
-    disable_transition_checks = true
+    disable_transition_checks(true)
     s = agentstate_flexible(vg.sim, vg.g2v[idx])
-    disable_transition_checks = false
+    disable_transition_checks(false)
     s
 end

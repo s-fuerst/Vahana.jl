@@ -263,8 +263,7 @@ by calling suppress_warnings(true) after importing Vahana.
 
             @mayassert begin
                 t = $T
-                @edge($T).last_transmit > @edge($T).last_change ||
-                    @edge($T).last_change == 0
+                @edge($T).readable || ! config.check_readable
             end """
             You try to access an edge of type $(t) but the type is not in
             the `read` argument of the apply_transition! function.
@@ -316,8 +315,7 @@ by calling suppress_warnings(true) after importing Vahana.
         @eval function _get_agent_container(sim::$simsymbol, to::AgentID, ::Type{$T}, field)
             @mayassert begin
                 t = $T
-                @edge($T).last_transmit > @edge($T).last_change ||
-                    @edge($T).last_change == 0
+                @edge($T).readable || ! config.check_readable
             end """
             You try to access an edge of type $(t) but the type is not in
             the `read` argument of the apply_transition! function.
@@ -515,9 +513,12 @@ by calling suppress_warnings(true) after importing Vahana.
             edges_alltoall!(sim, @storage($T), $T)
             init_storage!(sim, $T)
         end
+
+        @edge($T).readable = true
     end
 
-    @eval function finish_read!(_::$simsymbol, ::Type{$MT})
+    @eval function finish_read!(sim::$simsymbol, ::Type{$MT})
+        @edge($T).readable = false
     end
     
     #- finish_write!
