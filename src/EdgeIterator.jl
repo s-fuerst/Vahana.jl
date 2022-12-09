@@ -6,7 +6,6 @@ import Base.iterate
 # all the agents, and one over the edges for those agents). 
 
 struct IterEdgesState{IT}
-#    agentiter::IT
     agentiter::IT # the outer agent iterator
     currentagentid::AgentID # the current agent for the inner edge iterator
     nextedgeidx::Int64 # the next edge of in the inner edge iterator

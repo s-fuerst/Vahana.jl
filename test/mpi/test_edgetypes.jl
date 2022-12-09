@@ -232,8 +232,8 @@ function testforedgetype(ET)
     # copy the simulation, so that we can test with an manual partition
     # so that we can test that the agents/edges are moved to the expected
     # nodes and also the partitioning via Metis later
-    @test num_agents(sim, AgentState1; write = true) == (mpi.isroot ? mpi.size : 0)
-    @test num_agents(sim, AgentState2; write = true) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState1) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState2) == (mpi.isroot ? mpi.size : 0)
 
     num_edges_per_PE = has_trait(sim, ET, :SingleAgentType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
