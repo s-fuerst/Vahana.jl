@@ -5,10 +5,9 @@ import Base.iterate
 # When we iterate over all edges, we have two nested iterators (the outer over
 # all the agents, and one over the edges for those agents). 
 
-struct IterEdgesState{FT}
-    agentiter
-    # agentiter::Base.Iterators.Stateful{Base.KeySet{UInt64, FT},
-    #                                     Union{Nothing, Tuple{UInt64, Int64}}} # the outer agent iterator
+struct IterEdgesState{IT}
+#    agentiter::IT
+    agentiter::IT # the outer agent iterator
     currentagentid::AgentID # the current agent for the inner edge iterator
     nextedgeidx::Int64 # the next edge of in the inner edge iterator
     length::Int64
@@ -29,13 +28,20 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
     stateless = :Stateless in attr[:traits]
+
+    # for whatever reason, we cannot just use the field type in the
+    # :SingleType case
+    if singletype
+        IT = Base.Iterators.Stateful
+    else
+        IT = Base.Iterators.Stateful{Base.KeySet{UInt64, FT},
+                                     Union{Nothing, Tuple{UInt64, Int64}}}
+    end
     
     # for the singletype case we can access the type of the agent via AT
     if singletype
         AT = attr[:to_agenttype]
     end
-
-    @info FT
     
     @eval function edges_iterator(sim::$simsymbol, ::Type{$T}, r::Bool = true)
         @assert ! ($stateless && $ignorefrom)
@@ -69,22 +75,22 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
         agentiter = Iterators.Stateful(ks)
         currentagentid = Iterators.take(agentiter, 1) |> only
         len = $singleedge ? 1 : length(field[currentagentid])
-        iterate(iw, IterEdgesState{$FT}(agentiter, currentagentid, 1, len))
+        iterate(iw, IterEdgesState{$IT}(agentiter, currentagentid, 1, len))
     end
 
-    @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $FT, $T}, is::IterEdgesState{$FT})
+    @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $FT, $T}, is::IterEdgesState{$IT})
         field = iw.field
         # innerisvec is false, if the edgetyspe has the trait :SingleEdge
         if is.nextedgeidx <= is.length
             if $singleedge
                 return ((is.currentagentid, field[is.currentagentid]),
-                   IterEdgesState{$FT}(is.agentiter,
+                   IterEdgesState{$IT}(is.agentiter,
                                        is.currentagentid,
                                        is.nextedgeidx + 1,
                                        is.length))
             else
                 return ((is.currentagentid, field[is.currentagentid][is.nextedgeidx]),
-                   IterEdgesState{$FT}(is.agentiter,
+                   IterEdgesState{$IT}(is.agentiter,
                                        is.currentagentid,
                                        is.nextedgeidx + 1,
                                        is.length))
@@ -97,7 +103,7 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
         end
         currentagentid = Iterators.take(is.agentiter, 1) |> only
         len = $singleedge ? 1 : length(field[currentagentid])
-        iterate(iw, IterEdgesState{$FT}(is.agentiter, currentagentid, 1, len))
+        iterate(iw, IterEdgesState{$IT}(is.agentiter, currentagentid, 1, len))
     end
 end
 
