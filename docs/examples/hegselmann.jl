@@ -145,11 +145,11 @@ end;
 
 # We can now apply the transition function to the complete graph simulation
 
-apply_transition!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+apply_transition!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
 # Or to our facebook dataset
 
-apply_transition!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+apply_transition!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
 # # Plot
 
@@ -196,7 +196,7 @@ plot_opinion(cysim)
 # And then the state after 500 iterations
 
 for _ in 1:500
-    apply_transition!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+    apply_transition!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 end
 
 plot_opinion(cysim)
