@@ -194,11 +194,15 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 end
 
 function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
-    ignoresource = :IgnoreSourceState in attr[:traits]
+    stateless = :Stateless in attr[:traits]
 
     @eval function transmit_agents!(sim::$simsymbol,
                              readableET::Vector{DataType},
                              ::Type{$T})
+        if $stateless
+            return
+        end
+        
         for ET in readableET
             if :IgnoreSourceState in sim.typeinfos.edges_attr[ET][:traits]
                 continue
@@ -216,16 +220,19 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
 
                 perPE = edgefield.accessible[sim.typeinfos.nodes_type2id[$T]]
 
+                # only access the state if it isn't already in the dict
+                # (the foreign dict is cleared when $T is writeable).
+                if ! isempty(@agent($T).foreignstate)
+                    for i in 1:mpisize
+                        filter!(d -> haskey(@agent($T).foreignstate, d), perPE[i])
+                    end
+                end
+                
                 ## first we transfer all the AgentIDs for which we need the state
 
                 # for sending them via AllToAll we flatten the perPE structure
                 asvec = map(s -> collect(s), filter(! isempty, perPE))
 
-                # only access the state if it isn't already in the dict
-                # (the foreign dict is cleared when $T is writeable).
-                if ! isempty(@agent($T).foreignstate)
-                    filter!(d -> haskey(@agent($T).foreignstate, d.first), asvec)
-                end
                 
                 sendbuf = if ! isempty(asvec)
                     VBuffer(reduce(vcat, asvec),
@@ -234,7 +241,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                     VBuffer(Vector{AgentID}(), [ 0 for _ in 1:mpi.size ])
                 end
 
-                # transmit the number of edges the current PE want to
+                # transmit the number of AgentIDs the current PE want to
                 # send to the other PEs
                 sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
                 recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
@@ -242,7 +249,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 recvbuf = MPI.VBuffer(Vector{AgentID}(undef, sum(recvNumElems)),
                                       recvNumElems)
 
-                # transmit the edges itself
+                # transmit the AgentIDs itself
                 MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
                 ## now we gather the agentstate

@@ -28,10 +28,6 @@ struct EdgeState
     state::Int64
 end
 
-struct EdgeStateOnly
-    state::Int64
-end
-
 struct NewEdge
     state::Int64
 end
@@ -74,6 +70,7 @@ apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
     end
 end
 
+
 # when we access the agentstate via the NewEdge type, this will not transfer any
 # new state
 apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
@@ -109,7 +106,6 @@ finish_simulation!(sim)
 sim = ModelTypes() |>
     register_agenttype!(Agent) |>
     register_edgetype!(EdgeState, :SingleEdge) |>
-    register_edgetype!(EdgeStateOnly, :SingleEdge, :IgnoreSourceState) |>
     register_edgetype!(NewEdge, :SingleEdge) |>
     construct_model("agentstatetest-mortal") |>
     new_simulation()
@@ -118,18 +114,9 @@ ids = add_agents!(sim, [ Agent(i) for i in 1:mpi.size ])
 
 for to in 2:mpi.size
     add_edge!(sim, ids[to-1], ids[to], EdgeState(to-1))
-    add_edge!(sim, ids[to-1], ids[to], EdgeStateOnly(to-1))
 end
 
 newids = finish_init!(sim; partition_algo = :SameSize)
-
-@test_throws KeyError apply_transition!(sim, [ Agent ], [ Agent, EdgeStateOnly ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeStateOnly)
-    if ! isnothing(e)
-        a = agentstate(sim, e.from, Agent)
-        @test e.state.state == a.state
-    end
-end
 
 # first a check that we can read the state after initialization
 apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
@@ -139,6 +126,16 @@ apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
         @test e.state.state == a.state
     end
 end
+
+# call it a second time to trigger the filter of already existing keys
+apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges_to(sim, id, EdgeState)
+    if ! isnothing(e)
+        a = agentstate(sim, e.from, Agent)
+        @test e.state.state == a.state
+    end
+end
+
 
 # now we update the agentstate and check afterwards that the
 # accessible state is also updated

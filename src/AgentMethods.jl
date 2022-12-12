@@ -298,6 +298,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     _remove_edges_agent_source!(sim, alldied, ET)
                 end
             end
+
+            empty!(@agent($T).foreigndied)
         end
 
         if ! $stateless
@@ -314,6 +316,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
+
+            empty!(@agent($T).foreignstate)
         else
             # for stateless T this is a fast operation (25 ns), and
             # we need this to detect the number of agents in the
