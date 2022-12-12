@@ -85,8 +85,8 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
                 return ((is.currentagentid, field[is.currentagentid]),
                    IterEdgesState{$IT}(is.agentiter,
                                        is.currentagentid,
-                                       is.nextedgeidx + 1,
-                                       is.length))
+                                       2,
+                                       1))
             else
                 return ((is.currentagentid, field[is.currentagentid][is.nextedgeidx]),
                    IterEdgesState{$IT}(is.agentiter,

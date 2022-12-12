@@ -12,6 +12,8 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
+@assert mpi.size > mpi.shmsize "This test is only for multinode configurations"
+
 # Logging.disable_logging(Logging.Info)
 
 #MPI.set_errorhandler!(MPI.COMM_WORLD, MPI.ERRORS_RETURN)
@@ -23,6 +25,10 @@ struct Agent
 end
 
 struct EdgeState
+    state::Int64
+end
+
+struct EdgeStateOnly
     state::Int64
 end
 
@@ -103,6 +109,7 @@ finish_simulation!(sim)
 sim = ModelTypes() |>
     register_agenttype!(Agent) |>
     register_edgetype!(EdgeState, :SingleEdge) |>
+    register_edgetype!(EdgeStateOnly, :SingleEdge, :IgnoreSourceState) |>
     register_edgetype!(NewEdge, :SingleEdge) |>
     construct_model("agentstatetest-mortal") |>
     new_simulation()
@@ -111,9 +118,18 @@ ids = add_agents!(sim, [ Agent(i) for i in 1:mpi.size ])
 
 for to in 2:mpi.size
     add_edge!(sim, ids[to-1], ids[to], EdgeState(to-1))
+    add_edge!(sim, ids[to-1], ids[to], EdgeStateOnly(to-1))
 end
 
 newids = finish_init!(sim; partition_algo = :SameSize)
+
+@test_throws KeyError apply_transition!(sim, [ Agent ], [ Agent, EdgeStateOnly ], []) do _, id, sim
+    e = edges_to(sim, id, EdgeStateOnly)
+    if ! isnothing(e)
+        a = agentstate(sim, e.from, Agent)
+        @test e.state.state == a.state
+    end
+end
 
 # first a check that we can read the state after initialization
 apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim

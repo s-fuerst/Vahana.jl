@@ -132,6 +132,8 @@ the traits parameters:
 - `:Stateless`: Store only the ID of the source agent. 
 - `:SingleAgentType`: All target agents have the same type.
 - `:SingleEdge`: Each agent can be the target for max. one edge.
+- `:IgnoreSourceState`: The ID of the source agent is not used to
+  access the state of the agent with this ID.
 - `:NumNeighborsOnly`: Combines `:IgnoreFrom` and `:Stateless`
 - `:HasNeighborOnly`: Combines `:IgnoreFrom`, `:Stateless` and `:SingleEdge`
 
@@ -154,7 +156,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
     traits = Set{Symbol}(traits)
     for trait in traits
         @assert trait in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleAgentType,
-                         :NumNeighborsOnly, :HasNeighborOnly] """
+                         :NumNeighborsOnly, :HasNeighborOnly, :IgnoreSourceState] """
 
         The edge type trait $trait is unknown for type $T. The following traits are
         supported: 
@@ -164,7 +166,8 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
             :SingleAgentType  
             :NumNeighborsOnly (which is equal to :Stateless & :IgnoreFrom)
             :HasNeighborOnly (which is equal to :Stateless & :IgnoreFrom & :SingleEdge)
-
+            :IgnoreSourceState
+    
         """
     end
     if :NumNeighborsOnly in traits

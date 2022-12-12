@@ -194,10 +194,16 @@ function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, T::DataTy
 end
 
 function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
+    ignoresource = :IgnoreSourceState in attr[:traits]
+
     @eval function transmit_agents!(sim::$simsymbol,
                              readableET::Vector{DataType},
                              ::Type{$T})
         for ET in readableET
+            if :IgnoreSourceState in sim.typeinfos.edges_attr[ET][:traits]
+                continue
+            end
+            
             edgefield = getproperty(sim, Symbol(ET))
             # there are two reasons why we must transmit the agentstate:
             # - the agentstates has changed since the last transmit:
@@ -214,9 +220,14 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
 
                 # for sending them via AllToAll we flatten the perPE structure
                 asvec = map(s -> collect(s), filter(! isempty, perPE))
+
+                # only access the state if it isn't already in the dict
+                # (the foreign dict is cleared when $T is writeable).
+                if ! isempty(@agent($T).foreignstate)
+                    filter!(d -> haskey(@agent($T).foreignstate, d.first), asvec)
+                end
                 
                 sendbuf = if ! isempty(asvec)
-                    longvec = reduce(vcat, asvec)
                     VBuffer(reduce(vcat, asvec),
                             [ length(perPE[i]) for i in 1:mpi.size ])
                 else
@@ -288,7 +299,7 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
     stateless = :Stateless in attr[:traits]
-
+    
     ST = Vector{Tuple{AgentID, CE}}
 
     # updateid is a func that update the ids of the agents, for the case
