@@ -289,7 +289,7 @@ function finish_init!(sim;
                 for (i, p) in enumerate(part)
                     partition[vsg.g2v[i]] = p
                 end
-            elseif partition_algo == :EqualNumberNodes
+            elseif partition_algo == :EqualAgentNumbers
                 @info "Partitioning the Simulation / equal number of nodes per type"
                 for T in sim.typeinfos.nodes_types
                     ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
