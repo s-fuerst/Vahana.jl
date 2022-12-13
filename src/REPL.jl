@@ -91,7 +91,7 @@ function construct_prettyprinting_methods(simsymbol)
         #   print(io, "Globals: ", sim.globals)
         show_struct(io, sim.globals, "Global")
         if ! sim.initialized
-            printstyled(io, "\nStill in initialization process!.")
+            printstyled(io, "\nStill in initialization process!.", color = :red)
         end
     end
 end
@@ -326,7 +326,7 @@ function show_agent(sim,
     printstyled("\nNetwork(s):"; color = :cyan)
     for edgeT in sim.typeinfos.edges_types
         edgeTheadershown = false
-        read_container = read(sim, edgeT)
+        read_container = edgeread(sim, edgeT)
         edgetypetraits = sim.typeinfos.edges_attr[edgeT][:traits]
         justcount = :IgnoreFrom in edgetypetraits && :Stateless in edgetypetraits
         

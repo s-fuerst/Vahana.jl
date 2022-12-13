@@ -289,12 +289,14 @@ function finish_init!(sim;
                 for (i, p) in enumerate(part)
                     partition[vsg.g2v[i]] = p
                 end
-            else
+            elseif partition_algo == :EqualNumberNodes
                 @info "Partitioning the Simulation / equal number of nodes per type"
                 for T in sim.typeinfos.nodes_types
                     ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
                     _create_equal_partition(partition, ids)
                 end
+            else
+                @error "the partition_algo given is unknown"
             end
         end
         if mpi.isroot
@@ -302,14 +304,18 @@ function finish_init!(sim;
         end
         distribute!(sim, partition)
     else
-        idmapping = Dict{AgentID, AgentID}()
-        for T in sim.typeinfos.nodes_types
-            for id in keys(readstate(sim, T))
-                aid = agent_id(sim, AgentNr(id), T)
-                idmapping[remove_reuse(aid)] = aid
+        if return_idmapping
+            idmapping = Dict{AgentID, AgentID}()
+            for T in sim.typeinfos.nodes_types
+                for id in keys(readstate(sim, T))
+                    aid = agent_id(sim, AgentNr(id), T)
+                    idmapping[remove_reuse(aid)] = aid
+                end
             end
+            idmapping
+        else
+            nothing
         end
-        idmapping
     end
 
     # TODO: There is already a finiwh_write! in distribute!, maybe we can remove this?
