@@ -168,9 +168,7 @@ maps the internal graph structure to the usual representation of a
 cellular automaton):
 
 ```@example
-    calc_raster(sim, :raster) do id
-        agentstate(sim, id, Cell).active
-    end
+    calc_raster(sim, :raster, id -> agentstate(sim, id, Cell).active, Bool, [ Cell ]) 
 ```
 
 Can be only called after [`finish_init!`](@ref).
@@ -217,13 +215,11 @@ Example
 
 Instead of
 ```@example
-    calc_raster(sim, :raster) do id
-        agentstate(sim, id, Cell).active
-    end
+    calc_raster(sim, :raster, id -> agentstate(sim, id, Cell).active, Bool, [ Cell ]) 
 ```
 it also possible to just write
 ```@example
-    calc_rasterstate(sim, :raster, s -> s.active, Cell)
+    calc_rasterstate(sim, :raster, c -> c.active, Bool, Cell)
 ```
 
 Can be only called after [`finish_init!`](@ref).
