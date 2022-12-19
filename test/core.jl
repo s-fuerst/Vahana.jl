@@ -3,6 +3,9 @@ import Vahana.@rootonly
 import Vahana.disable_transition_checks
 
 # A for Agent, Imm for Immortal
+# Fixed doesn't have a real meaning anymore, in earlier versions
+# there was a size keyword that allows to give an upper bound for the size
+# of the population. 
 struct AMortal           foo::Int64 end
 struct AMortalFixed      foo::Int64 end
 struct AImm              foo::Int64 end
@@ -24,10 +27,10 @@ struct ESLDict2 end
 begin
     model = ModelTypes() |>
         register_agenttype!(AMortal) |>
-        register_agenttype!(AMortalFixed) |> # mortal with fixed is not allowed anymore
+        register_agenttype!(AMortalFixed) |> 
         register_agenttype!(AImm, :Immortal) |>
-        register_agenttype!(AImmFixed, :Immortal; size = 10) |>
-        register_agenttype!(AImmFixedOversize, :Immortal; size = 20) |>
+        register_agenttype!(AImmFixed, :Immortal) |>
+        register_agenttype!(AImmFixedOversize, :Immortal) |>
         register_agenttype!(ADefault) |>
         register_edgetype!(ESDict) |>
         register_edgetype!(ESLDict1) |> 

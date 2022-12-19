@@ -53,7 +53,7 @@ dim = (2000, 2000)
 size = dim[1] * dim[2]
 
 const model = ModelTypes() |>    
-    register_agenttype!(Cell, :ConstantSize; size = size) |> 
+    register_agenttype!(Cell, :ConstantSize) |> 
     register_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=size) |>
     register_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=size) |>
     construct_model("GameOfLife")

@@ -193,16 +193,6 @@ mt = ModelTypes() |>
     construct_model("Immortal");
 run_benchmark_agents(mt);
 
-mt = ModelTypes() |>
-    register_agenttype!(AgentWithState, :Immortal; size = 20000000) |>
-    construct_model("Immortal fixed");
-run_benchmark_agents(mt);
-
-mt = ModelTypes() |>
-    register_agenttype!(AgentWithState, :ConstantSize; size = 20000000) |>
-    construct_model("ConstantSize");
-run_benchmark_agents(mt);
-
 # ######################################## raster move_to!
 
 # struct GridNode end

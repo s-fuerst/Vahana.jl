@@ -5,13 +5,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     stateless = fieldcount(T) == 0
     immortal = :Immortal in attr[:traits]
     mortal = ! immortal
-    fixedsize = haskey(attr, :size)
-    
-    _size = if fixedsize 
-        attr[:size]
-    else
-        0
-    end
 
     nompi = ! mpi.active
     shmonly = mpi.size == mpi.shmsize
@@ -25,10 +18,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         @agentread($T) = AgentReadWrite($T)
         @agentwrite($T) = AgentReadWrite($T)
         @nextid($T) = AgentNr(1)
-        if $fixedsize
-            resize!(@readstate($T), $_size)
-            resize!(@writestate($T), $_size)
-        end
 
         for ET in sim.typeinfos.edges_types
             @agent($T).last_transmit[ET] = 0
@@ -47,14 +36,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             nr = @nextid($T)
             # TODO AGENT: add an assterions that we have ids left
             @nextid($T) = nr + 1
-            if ! $fixedsize
-                if nr > length(@writestate($T))
-                    resize!(@writestate($T), nr)
-                    # the length of writestate and writedied is always
-                    # the same, so we don't need a seperate if
-                    if $mortal
-                        resize!(@writedied($T), nr)
-                    end
+            if nr > length(@writestate($T))
+                resize!(@writestate($T), nr)
+                # the length of writestate and writedied is always
+                # the same, so we don't need a seperate if
+                if $mortal
+                    resize!(@writedied($T), nr)
                 end
             end
             if $mortal
@@ -211,9 +198,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end
         if ! add_existing
             @agentwrite($T) = AgentReadWrite($T)
-            if $fixedsize
-                resize!(@writestate($T), $_size)
-            end
             @nextid($T) = 1
             if $mortal
                 # As we start from 1, we empty the reuseable `nr`
@@ -377,7 +361,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         if $immortal
             reduced = emptyval
             for i in 1:(@agent($T).nextid - 1)
-                    reduced = op(f(@readstate($T)[i]), reduced)
+                reduced = op(f(@readstate($T)[i]), reduced)
             end
         else 
             reduced = emptyval

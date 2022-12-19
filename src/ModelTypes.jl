@@ -36,7 +36,7 @@ struct Model
 end
 
 """
-    register_agenttype!(types::ModelTypes, ::Type{T}, traits...; size) 
+    register_agenttype!(types::ModelTypes, ::Type{T}, traits...) 
 
 Register an additional agent type to `types`. 
 
@@ -50,12 +50,9 @@ simulation), by returning `nothing` in the transition function (see
 removed, the trait :Immortal can be given to improve the performance
 of the simulation. When the size of the population is constant
 
-TODO DOC traits. ConstantSize => Immortal
-
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
-function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
-                      size::Int64 = 0) where T
+function register_agenttype!(types::ModelTypes, ::Type{T}, traits...) where T
     @assert !(Symbol(T) in types.nodes_types) "Each type can be added only once"
     @assert isbitstype(T)
     type_number = length(types.nodes_type2id) + 1
@@ -74,28 +71,12 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
         The agent type trait $trait is unknown for type $T. The following traits are
         supported: 
             :Immortal
-            :ConstantSize
-
-        A fixed (maximal) number of agents can be given via the optional size keyword.
-
-        """
-    end
-
-    if size > 0
-        @assert :Immortal in traits """
-
-        The size of the population can only be specified for types with the 
-        type trait :Immortal.
 
         """
     end
 
     types.nodes_attr[T][:traits] = traits
     
-    if size > 0
-        types.nodes_attr[T][:size] = size
-    end
-
     types
 end
 
