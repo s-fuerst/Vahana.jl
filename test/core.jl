@@ -24,7 +24,7 @@ struct ESLDict2 end
 begin
     model = ModelTypes() |>
         register_agenttype!(AMortal) |>
-        register_agenttype!(AMortalFixed; size = 10) |>
+        register_agenttype!(AMortalFixed) |> # mortal with fixed is not allowed anymore
         register_agenttype!(AImm, :Immortal) |>
         register_agenttype!(AImmFixed, :Immortal; size = 10) |>
         register_agenttype!(AImmFixedOversize, :Immortal; size = 20) |>

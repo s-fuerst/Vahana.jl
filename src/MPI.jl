@@ -122,7 +122,7 @@ function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
 end
 
 
-function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
+function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
     stateless = :Stateless in attr[:traits]
 
     @eval function transmit_agents!(sim::$simsymbol,
@@ -181,7 +181,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
                 ## now we gather the agentstate
-                send = if $checkliving
+                send = if $mortal
                     if ! isempty(recvbuf.data) 
                         map(recvbuf.data) do id
                             (id,
@@ -204,7 +204,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 ## and send this back
                 # recvNumElems will be now sendNumElems and vis a vis
                 sendbuf = VBuffer(send, recvNumElems)
-                recv = if $checkliving 
+                recv = if $mortal
                     Vector{Tuple{AgentID, Bool, $T}}(undef, sum(sendNumElems))
                 else
                     Vector{Tuple{AgentID, $T}}(undef, sum(sendNumElems))
@@ -213,7 +213,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
                 ## And now fill the foreign dictonaries
-                if $checkliving 
+                if $mortal 
                     for (id, died, state) in recvbuf.data
                         @agent($T).foreigndied[id] = died
                         @agent($T).foreignstate[id] = state
