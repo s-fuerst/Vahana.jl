@@ -41,7 +41,6 @@ mutable struct AgentFields{T}
     # the died flag of agents on other nodes
     foreigndied::Dict{AgentID, Bool}
     
-    reuse::Vector{Reuse}
     nextid::AgentNr
     mpiwindows::MPIWindows
     # the last time (in number of transitions called) that the agentstate
@@ -58,7 +57,6 @@ AgentFields(T::DataType) =
                 [ Vector{Bool}() for _ in 1:mpi.shmsize ], #shmdied
                 Dict{AgentID, T}(), # foreignstate
                 Dict{AgentID, Bool}(), # foreigndied
-                Vector{Reuse}(), # reuse
                 AgentNr(1), #nextid
                 MPIWindows(), 
                 Dict{DataType, Int64}(), #last_transmit
@@ -143,7 +141,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
 
     # Construct all type specific functions for the edge typeinfos
     for T in typeinfos.edges_types
-        construct_edge_methods(T, typeinfos.edges_attr[T], simsymbol)
+        construct_edge_methods(T, typeinfos, simsymbol)
     end
 
     # Construct all type specific functions for the agent typeinfos
@@ -309,7 +307,7 @@ function finish_init!(sim;
             for T in sim.typeinfos.nodes_types
                 for id in keys(readstate(sim, T))
                     aid = agent_id(sim, AgentNr(id), T)
-                    idmapping[remove_reuse(aid)] = aid
+                    idmapping[aid] = aid
                 end
             end
             idmapping
@@ -332,7 +330,7 @@ end
 # this function is not exported and should be only used for unit tests
 function updateids(idmap, oldids)
     map(oldids) do id
-        idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
+        idmap[Vahana.remove_process(id)]
     end
 end
 

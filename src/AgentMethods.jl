@@ -31,12 +31,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         @agentread($T) = AgentReadWrite($T)
         @agentwrite($T) = AgentReadWrite($T)
         @nextid($T) = AgentNr(1)
-        @reuse($T) = Vector{Reuse}()
         if $fixedsize
             resize!(@readstate($T), $_size)
             resize!(@writestate($T), $_size)
-            resize!(@reuse($T), $_size)
-            fill!(@reuse($T), 0)
             if $checkliving
                 resize!(@readdied($T), $_size)
                 resize!(@writedied($T), $_size)
@@ -59,31 +56,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
         if ! $immortal && length(@readreuseable($T)) > 0
             nr = pop!(@readreuseable($T))
-            # We cast to UInt64 to ensure that the +1 does not overflow
-            reuse = @reuse($T)[nr] |> UInt64
-            reuse = reuse + 1
-            # TODO AGENT: write a test that check this
-            if reuse < 2 ^ BITS_REUSE
-                @writedied($T)[nr] = false
-                # cast it back to the correct type
-                reuse = Reuse(reuse)
-                @reuse($T)[nr] = reuse
-                (reuse, nr)
-            else
-                # this index can not be used anymore, but also
-                # removed from the reuse vector. So we can recursively
-                # call _get_next_id again.
-                _get_next_id(sim, $T)
-            end
+            @writedied($T)[nr] = false
         else   # immortal or no reusable row was found, use the next row
             nr = @nextid($T)
             # TODO AGENT: add an assterions that we have ids left
             @nextid($T) = nr + 1
             if ! $fixedsize
-                if nr > length(@reuse($T))
-                    resize!(@reuse($T), nr)
-                    @reuse($T)[nr] = 0
-                end
                 if nr > length(@writestate($T))
                     resize!(@writestate($T), nr)
                     # the length of writestate and writedied is always
@@ -96,7 +74,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             if $checkliving
                 @writedied($T)[nr] = false
             end
-            (0, nr)
+            nr
         end       
     end    
     @eval function add_agent!(sim::$simsymbol, agent::$T)
@@ -105,13 +83,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         `finish_init!` is called) or within a transition function called by
         `apply_transition`.
         """
-        (reuse, nr) = _get_next_id(sim, $T)
+        nr = _get_next_id(sim, $T)
         @inbounds @writestate($T)[nr] = agent
-        if $immortal
-            immortal_agent_id($typeid, nr)
-        else
-            agent_id($typeid, Reuse(reuse), nr)
-        end
+        agent_id($typeid, nr)
     end
 
     @eval function agentstate(sim::$simsymbol, id::AgentID, ::Type{$T})
@@ -179,10 +153,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end
     end
 
-    @eval agent_id(sim::$simsymbol, agent_nr, ::Type{$T}) =
-        agent_id($typeid, @reuse($T)[agent_nr], agent_nr)
-
-
+    @eval agent_id(_::$simsymbol, agent_nr, ::Type{$T}) =
+        agent_id($typeid, agent_nr)
+    
     @inline @eval function transition_with_write!(sim, idx, newstate, ::Type{$T})
         if $immortal
             @mayassert begin
@@ -222,9 +195,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
-            # TODO in the immortal case we don't have reuse, and therefore
-            # it is not necessary to call agent_id for each idx
-            newstate = tfunc(state, agent_id(sim, idx, $T), sim)
+            newstate = tfunc(state, agent_id($typeid, idx), sim)
             wfunc(sim, idx, newstate, $T)
         end 
     end
@@ -239,9 +210,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
-            # TODO in the immortal case we don't have reuse, and therefore
-            # it is not necessary to call agent_id for each idx
-            r = tfunc(Val($T), agent_id(sim, idx, $T), sim)
+            r = tfunc(Val($T), agent_id($typeid, idx), sim)
             wfunc(sim, idx, r, $T)
         end 
     end
@@ -264,7 +233,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     resize!(@writedied($T), $_size)
                 end
             end
-            # We restart counting from 1 (but of course reuse will be used)
             @nextid($T) = 1
             if ! $immortal
                 # As we start from 1, we empty the reuseable `nr`
@@ -276,7 +244,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
         if ! $immortal
-            aids = map(nr -> agent_id(sim, nr, $T), @writereuseable($T))
+            # in writereuseable we have collected all agents that died
+            # in this iteration
+            aids = map(nr -> agent_id($typeid, nr), @writereuseable($T))
 
             # first we remove all the edges, where the agent is in the
             # target position. As those edges are stored on the same

@@ -99,7 +99,9 @@ _can_add(_, _, _, _) = true
 
 show_second_edge_warning = true
 
-function construct_edge_methods(T::DataType, attr, simsymbol)
+function construct_edge_methods(T::DataType, typeinfos, simsymbol)
+    attr = typeinfos.edges_attr[T]
+    
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
@@ -127,7 +129,7 @@ function construct_edge_methods(T::DataType, attr, simsymbol)
     mpiactive = mpi.active
     multinode = mpi.size > mpi.shmsize
     
-    construct_mpi_edge_methods(T, attr, simsymbol, CE)
+    construct_mpi_edge_methods(T, typeinfos, simsymbol, CE)
     construct_edges_iter_methods(T, attr, simsymbol, FT)
     #### Functions that helps to write generic versions of the edge functions
     #
