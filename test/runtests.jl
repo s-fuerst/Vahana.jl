@@ -15,8 +15,6 @@ include("core.jl")
 
 include("addexisting.jl")
 
-include("reuse.jl")
-
 include("edges.jl")
 runedgestest()
 

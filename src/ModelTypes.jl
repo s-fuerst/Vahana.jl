@@ -36,32 +36,23 @@ struct Model
 end
 
 """
-    register_agenttype!(types::ModelTypes, ::Type, C::Symbol = :Dict; size) 
+    register_agenttype!(types::ModelTypes, ::Type{T}, traits...) 
 
 Register an additional agent type to `types`. 
 
 An agent type is an struct that define the state for agents of type `T`.
-These structs must be a subtype of `Agent`, and also bits
-types, meaning the type is immutable and contains only primitive types
-and other bits types.
+These structs must be "bits types", meaning the type is immutable and
+contains only primitive types and other bits types.
 
-!!! warning
-
-    In the current version, per default the agents are stored in a
-    dictonary. In the case, that agents of this type will be never
-    removed in a simulation, this can be changed to increase the
-    performance by setting the optional third paramter to :Vector. If
-    the size of the Vector is fixed, the size can be given as keyword
-    argument. This will change in the upcoming MPI-Version, so it's better
-    to ignore this for now.
-
-
-TODO DOC traits. ConstantSize => Immortal
+Per default it is assumed, that an agent can die (removed from the
+simulation), by returning `nothing` in the transition function (see
+[`apply_transition!`](@ref). In the case that agents are never
+removed, the trait :Immortal can be given to improve the performance
+of the simulation. When the size of the population is constant
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
-function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
-                      size::Int64 = 0) where T
+function register_agenttype!(types::ModelTypes, ::Type{T}, traits...) where T
     @assert !(Symbol(T) in types.nodes_types) "Each type can be added only once"
     @assert isbitstype(T)
     type_number = length(types.nodes_type2id) + 1
@@ -75,33 +66,17 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...;
 
     traits = Set{Symbol}(traits)
     for trait in traits
-        @assert trait in [:Immortal, :ConstantSize] """
+        @assert trait in [:Immortal] """
 
         The agent type trait $trait is unknown for type $T. The following traits are
         supported: 
             :Immortal
-            :ConstantSize
-
-        A fixed (maximal) number of agents can be given via the optional size keyword.
 
         """
     end
 
-    if :ConstantSize in traits && size == 0
-        printstyled("""
-
-        The :ConstantSize trait can be only used if the maximum number
-        of agents is also specified via the size keyword.
-
-        """; color = :red)
-    end
-
     types.nodes_attr[T][:traits] = traits
     
-    if size > 0
-        types.nodes_attr[T][:size] = size
-    end
-
     types
 end
 
@@ -118,10 +93,9 @@ show_single_edge_and_type_warning = true
 
 Register an additional edge type to `types`. 
 
-An edge type is an struct that define the state for edges of type `T`.
-These structs must be a subtype of `EdgeState`, and also bits
-types, meaning the type is immutable and contains only primitive types
-and other bits types.
+An edge type is an struct that define the state for edges of type `T`.  These
+structs must be "bits types", meaning the type is immutable and
+contains only primitive types and other bits types.
 
 The internal data structures used to store the graph in memory can be modified by 
 the traits parameters:

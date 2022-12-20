@@ -5,14 +5,6 @@
 # - The ProcessID, which in the MPI implementation is the rank on which
 #   the agent is currently managed.
 #
-# - Reuse is a counter for the AgentNr. All agentstates are stored in
-#   arrays, even for "mortal" agents, so we can have agentstates in
-#   the array of agents, that are not "living" anymore (and an
-#   additional bitarray that tracks this). This array entries can be
-#   reused, but the new agent in this entry needs a new id. Reuse will
-#   be increased in this case, so that the id will be different, even
-#   with the same result for AgentNr
-#
 # - The AgentNr which says: "This is the nth agent of type TypeID
 #   created on Process ID" (so on different processes there can be
 #   different agents with the same AgentNr)
@@ -26,9 +18,7 @@
 # performance advantage and a better memory usage).
 
 export AgentID#, AgentNr, ProcessID
-export agent_id, immortal_agent_id
-#export TypeID
-# export type_of
+export agent_id
 
 export add_agent!, add_agents!
 export agentstate, agentstate_flexible
@@ -40,38 +30,23 @@ const BITS_TYPE = 8
 const MAX_TYPES = 2 ^ BITS_TYPE
 
 const ProcessID = UInt32
-const BITS_PROCESS = 12
+const BITS_PROCESS = 18
 
-const Reuse = UInt32
-const BITS_REUSE = 12
-
-const AgentNr = UInt32
-const BITS_AGENTNR = 32
+const AgentNr = UInt64
+const BITS_AGENTNR = 38
 
 const AgentID = UInt64
 
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE
 @assert round(log2(typemax(ProcessID))) >= BITS_PROCESS
-@assert round(log2(typemax(Reuse))) >= BITS_REUSE
 @assert round(log2(typemax(AgentNr))) >= BITS_AGENTNR
 @assert round(log2(typemax(AgentID))) >= BITS_TYPE +
-    BITS_PROCESS + BITS_REUSE + BITS_AGENTNR 
+    BITS_PROCESS + BITS_AGENTNR 
 
-const SHIFT_TYPE = BITS_PROCESS + BITS_REUSE + BITS_AGENTNR
-const SHIFT_RANK = BITS_REUSE + BITS_AGENTNR
-const SHIFT_REUSE = BITS_AGENTNR
+const SHIFT_TYPE = BITS_PROCESS + BITS_AGENTNR
+const SHIFT_RANK = BITS_AGENTNR
 
-function agent_id(typeID::TypeID, reuse::Reuse, agent_nr::AgentNr)::AgentID
-    @mayassert typeID <= 2 ^ BITS_TYPE
-    @mayassert reuse <= 2 ^ BITS_REUSE
-    @mayassert agent_nr <= 2 ^ BITS_AGENTNR
-    AgentID(typeID) << SHIFT_TYPE +
-        mpi.rank << SHIFT_RANK +
-        Int64(reuse) << SHIFT_REUSE + 
-        agent_nr
-end
-
-function immortal_agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
+function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
     @mayassert typeID <= 2 ^ BITS_TYPE
     @mayassert agent_nr <= 2 ^ BITS_AGENTNR
     AgentID(typeID) << SHIFT_TYPE +
@@ -79,18 +54,8 @@ function immortal_agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
         agent_nr
 end
 
-# When we send an agent to another process, the new process can not
-# access the reuse value of the old process. 
-const reuse_mask = (2 ^ BITS_REUSE - 1) << BITS_AGENTNR
-remove_reuse(agentID::AgentID) = ~reuse_mask & agentID
-
-const process_mask = (2 ^ BITS_PROCESS - 1) << (BITS_AGENTNR + BITS_REUSE)
+const process_mask = (2 ^ BITS_PROCESS - 1) << BITS_AGENTNR 
 remove_process(agentID::AgentID) = ~process_mask & agentID
-
-
-function agent_id(typeID::Int64, reuse::Int64, agent_nr::Int64)::AgentID
-    agent_id(TypeID(typeID), Reuse(reuse), AgentNr(agent_nr))
-end
 
 # there are other agent_id functions specialized for each AgentType constructed
 # via the construct_agent_methods with the signature
@@ -112,17 +77,12 @@ function node_nr(id::AgentID)
     fld(process_nr(id), mpi.shmsize)
 end
 
-function reuse_nr(id::AgentID)::ProcessID
-    (id >> SHIFT_REUSE) & (2 ^ BITS_REUSE - 1)
-end
-
 function agent_nr(id::AgentID)::AgentNr
     id & (2 ^ BITS_AGENTNR - 1)
 end
 
-@assert agent_id(3, 2, 1) |> type_nr == 3
-@assert agent_id(3, 2, 1) |> reuse_nr == 2
-@assert agent_id(3, 2, 1) |> agent_nr == 1
+@assert agent_id(TypeID(3), AgentNr(1)) |> type_nr == 3
+@assert agent_id(TypeID(3), AgentNr(1)) |> agent_nr == 1
 
 """
     add_agent!(sim, agent::T)::AgentID

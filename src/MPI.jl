@@ -33,10 +33,6 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # First we send all agentstates and collect the idmapping, as the
     # agent gets an new id in this process. idmapping is a Dict that
     # allows to get the new id when only the old id is known.
-    # The keys in the idmapping are the original id without the
-    # "reuse" information, as this can not be reconstructed on the
-    # new PEs. When the map is used in sendeges!, "reuse" will be also
-    # ignored for the old id. 
     idmapping = Dict{AgentID, AgentID}()
     for T in node_types
         merge!(idmapping, sendagents!(sim, ssm[T], T))
@@ -117,16 +113,16 @@ function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     recvbuf = MPI.VBuffer(ST(undef, sum(recvNumElems)), recvNumElems)
     # and then transfer the {AgentID,T (AgentState)} tuples.
     MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
-    # we need oldid (without the reuse bits) as key and newid as value
+    # we need oldid as key and newid as value
     idmapping = Dict{AgentID, AgentID}() 
     foreach(recvbuf.data) do (id, agent)
-        idmapping[remove_reuse(id)] = add_agent!(sim, agent)
+        idmapping[id] = add_agent!(sim, agent)
     end
     idmapping
 end
 
 
-function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
+function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
     stateless = :Stateless in attr[:traits]
 
     @eval function transmit_agents!(sim::$simsymbol,
@@ -185,7 +181,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
                 ## now we gather the agentstate
-                send = if $checkliving
+                send = if $mortal
                     if ! isempty(recvbuf.data) 
                         map(recvbuf.data) do id
                             (id,
@@ -208,7 +204,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 ## and send this back
                 # recvNumElems will be now sendNumElems and vis a vis
                 sendbuf = VBuffer(send, recvNumElems)
-                recv = if $checkliving 
+                recv = if $mortal
                     Vector{Tuple{AgentID, Bool, $T}}(undef, sum(sendNumElems))
                 else
                     Vector{Tuple{AgentID, $T}}(undef, sum(sendNumElems))
@@ -217,7 +213,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
                 MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
 
                 ## And now fill the foreign dictonaries
-                if $checkliving 
+                if $mortal 
                     for (id, died, state) in recvbuf.data
                         @agent($T).foreigndied[id] = died
                         @agent($T).foreignstate[id] = state
@@ -233,7 +229,9 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, checkliving)
     end
 end 
 
-function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
+function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
+    attr = typeinfos.edges_attr[T]
+
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
     singletype = :SingleAgentType in attr[:traits]
@@ -241,6 +239,8 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
     
     ST = Vector{Tuple{AgentID, CE}}
 
+    # typeid = typeinfos.edges_type2id[T]
+    
     # For sending the edges we need different versions, depending on the
     # edge traits, as e.g. for the :HasEdgeOnly or :NumEdgeOnly we
     # transfer only the number of edges. In overall, when we iterate over
@@ -254,7 +254,7 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
     @eval function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, ::Type{$T})
         if $singletype
             AT = sim.typeinfos.edges_attr[$T][:to_agenttype]
-            typeID = sim.typeinfos.nodes_type2id[AT]
+            agent_typeid = sim.typeinfos.nodes_type2id[AT]
         end
 
         ST = Vector{Tuple{AgentID, sim.typeinfos.edges_attr[$T][:containerelement]}}
@@ -277,17 +277,11 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
         # target of the edge
         for (to, e) in iter
             id = if $singletype
-                # we don't know the reuse value of the agent in the
-                # :SingleAgentType case, so we call immortal_agent_id,
-                # which uses the reuse value of 0.  This is okay, as we
-                # have removed the reuse bits from the AgentID already
-                # before in sendagents!
-                immortal_agent_id(typeID, AgentNr(to))
+                agent_id(agent_typeid, AgentNr(to))
             else
-                # To be consistent with sendagents!, we must remove
-                # the reuse bits here too
-                remove_reuse(to)
+                to
             end
+
             # in the default finish_init! case with an initialization
             # that does not care about mpi.isroot, we have edges on
             # all ranks, but on the sendmap there are only the edges
@@ -302,9 +296,6 @@ function construct_mpi_edge_methods(T::DataType, attr, simsymbol, CE)
             end
         end
 
-        # get the updated id of an agent with the old id `id`, whereby the
-        # reuse bits of `id` are set to zero (as this is also the case for
-        # the keys of idmapping)
         updateid(id::AgentID) = idmapping[id] |> AgentID
         
         edges_alltoall!(sim, perPE, $T, updateid)

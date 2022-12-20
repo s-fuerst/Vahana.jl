@@ -41,7 +41,6 @@ mutable struct AgentFields{T}
     # the died flag of agents on other nodes
     foreigndied::Dict{AgentID, Bool}
     
-    reuse::Vector{Reuse}
     nextid::AgentNr
     mpiwindows::MPIWindows
     # the last time (in number of transitions called) that the agentstate
@@ -58,7 +57,6 @@ AgentFields(T::DataType) =
                 [ Vector{Bool}() for _ in 1:mpi.shmsize ], #shmdied
                 Dict{AgentID, T}(), # foreignstate
                 Dict{AgentID, Bool}(), # foreigndied
-                Vector{Reuse}(), # reuse
                 AgentNr(1), #nextid
                 MPIWindows(), 
                 Dict{DataType, Int64}(), #last_transmit
@@ -143,7 +141,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
 
     # Construct all type specific functions for the edge typeinfos
     for T in typeinfos.edges_types
-        construct_edge_methods(T, typeinfos.edges_attr[T], simsymbol)
+        construct_edge_methods(T, typeinfos, simsymbol)
     end
 
     # Construct all type specific functions for the agent typeinfos
@@ -309,7 +307,7 @@ function finish_init!(sim;
             for T in sim.typeinfos.nodes_types
                 for id in keys(readstate(sim, T))
                     aid = agent_id(sim, AgentNr(id), T)
-                    idmapping[remove_reuse(aid)] = aid
+                    idmapping[aid] = aid
                 end
             end
             idmapping
@@ -332,7 +330,7 @@ end
 # this function is not exported and should be only used for unit tests
 function updateids(idmap, oldids)
     map(oldids) do id
-        idmap[Vahana.remove_process(Vahana.remove_reuse(id))]
+        idmap[Vahana.remove_process(id)]
     end
 end
 
@@ -387,46 +385,34 @@ finish_write!(sim) = t -> finish_write!(sim, t)
 
 
 """
-    apply_transition!(sim, func, compute, accessible, rebuild; 
-                      invariant_compute = false, add_existing = Vector{DataType}())
+    apply_transition!(sim, func, call, read, write; 
+                      add_existing = Vector{DataType}())
 
 Apply the transition function `func` to the simulation state. 
 
-A transition function must have the following signature: `function(agent::T,
-id::AgentID, sim::Simulation)` and must return either an agent of type
-T or `nothing`. If `nothing` is returned, the agent will be removed
-from the simulation, otherwise the agent with id `id` will have
-(starting with the next `apply_transition!` call) the returned state.
-In the case that all agents do not change their state and only modify
-the state of the simulation by adding edges or new agents, the
-keyword argument `invariant_compute` can be set to true. In this case the
-returned value of the transition function will be ignored.
+`call` is a vector of agent types, `read` and `write` are vectors of
+agent and/or edge types. 
 
-`compute` is a vector of Agent types. `func` is called for every agent
-with a type that is listed in `compute`, so a method for each of this types
-must be implemented.
+`call` determines for which agent types the transition function `func`
+is called. Within the transition function, an agent has access to the
+state of agents (including its own state) and to edges only if
+their types are specified in the `read` vector. Accordingly, the agent
+can change its own state and/or create new agents or edges only if
+their types are specified in the `write` vector.
 
-`accessible` is a vector of Agent and/or Edge types. This vector must
-list all types that are accessed directly (e.g. via
-[`agentstate`](@ref) or indirectly (e.g. via [`neighborstates`](@ref)
-in the transition function.
+Assume that T is an agent type that is in `call` state. In case T is
+also in `read`, the transition function must have the following
+signature: `function(agent::T, id::AgentID, sim::Simulation)`. If T is
+not in `read`, it must have the signature `function(::Val{T},
+id::AgentID, sim::Simulation)`. 
 
-`rebuild` is a vector of Agent and/or Edge types. All the instances of
-agents or edges with a type in (`rebuild` - `add_existing`) will be
-removed and must be added again inside of `func`.
-[`add_agent!`](@ref), [`add_agents!`](@ref), [`add_edge!`](@ref) and
-[`add_edges!`](@ref) can be only called for types in `rebuild` or
-`compute`. In the case, that a transition function should only add additional
-edges for some types, these types must be listed in the `add_existing`
-vector.
+If T is in `write`, the transition function must return either an agent
+of type T or `nothing`. If `nothing` is returned, the agent will be
+removed from the simulation, otherwise the agent with id `id`
+(starting with the next `apply_transition!` call) will have the
+returned state. 
 
-TODO DOC: add_existing
-
-TODO: in accessible currently only the agent types are needed? Do we need
-also the edgetypes? If yes, check that in the edge_functions
-
-TODO: rebuild and add_existing is a confusing combination, rebuild = write
-would be nicer?
+TODO DOC add_existing
 
 See also [`apply_transition`](@ref)
 """

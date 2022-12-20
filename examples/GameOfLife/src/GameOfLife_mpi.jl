@@ -58,7 +58,7 @@ function addgrid!(sim)
 end 
 
 model = ModelTypes() |>
-    register_agenttype!(Cell, :ConstantSize; size = 200*200) |>
+    register_agenttype!(Cell, :ConstantSize) |>
     register_edgetype!(Neighbor; to_agenttype = Cell) |>
     construct_model("Game of Life")
 

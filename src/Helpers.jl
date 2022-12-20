@@ -96,12 +96,6 @@ macro nextid(T)
 end 
 nextid(sim, T) = getproperty(sim, Symbol(T)).nextid
 
-macro reuse(T)
-    field = Symbol(T)
-    :( sim.$(field).reuse ) |> esc
-end
-reuse(sim, T) = getproperty(sim, Symbol(T)).reuse
-
 macro agent(T)
     field = Symbol(T)
     :( sim.$(field) ) |> esc
