@@ -122,8 +122,15 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     MT = startswith(string(T), "Main") ? T : @eval Main.$(Symbol(T))
 
     # for the singletype case we can access the type of the agent via AT
-    if singletype
-        AT = attr[:to_agenttype]
+    AT = if singletype
+        attr[:to_agenttype]
+    else
+        nothing
+    end
+    ATid = if singletype
+        typeinfos.nodes_type2id[AT]
+    else
+        0
     end
 
     mpiactive = mpi.active
@@ -471,10 +478,22 @@ by calling suppress_warnings(true) after importing Vahana.
             end
         end
 
-        for to in keys(_removeundef(sim, $T)(@edgewrite($T)))
-            # ac for agent container
+        function _is_from(died) @inline edgeorid ->
+            if $stateless
+                edgeorid in died
+            else
+                edgeorid.from in died
+            end
+        end
+
+        
+        for to in keys(@edgewrite($T))
+            if $singletype && (! isassigned(@edgewrite($T), to))
+                continue
+            end
+            # ac stands for agent container
             ac = @edgewrite($T)[to]
-            if $singleedge
+            if $singleedge # the container is a single element
                 if __is_from(ac)
                     if $singletype
                         @edgewrite($T)[to] = zero($CT)
@@ -482,7 +501,7 @@ by calling suppress_warnings(true) after importing Vahana.
                         delete!(@edgewrite($T), to)
                     end
                 end
-            else
+            else  
                 deleteat!(ac, findall(__is_from, ac))
             end
         end        
@@ -590,33 +609,33 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
-    
-    #- edgestates
-    if !stateless
-        if ignorefrom
-            @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                _get_agent_container(sim, to, $T, @edgeread($T))
-            end
-        else
-            if singleedge
-                @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $T, @edgeread($T)) 
-                    isnothing(ac) ? nothing : ac.state
-                end
-            else
-                @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
-                    ac = _get_agent_container(sim, to, $T, @edgeread($T)) 
-                    isnothing(ac) ? nothing : map(e -> e.state, ac)
-                end
-            end
+
+#- edgestates
+if !stateless
+    if ignorefrom
+        @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            _get_agent_container(sim, to, $T, @edgeread($T))
         end
     else
-        @eval function edgestates(::$simsymbol, ::AgentID, t::Type{$MT})
-            @assert false """
-            edgestates is not defined for the trait combination of $t
-            """
+        if singleedge
+            @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
+                ac = _get_agent_container(sim, to, $T, @edgeread($T)) 
+                isnothing(ac) ? nothing : ac.state
+            end
+        else
+            @eval function edgestates(sim::$simsymbol, to::AgentID, ::Type{$MT})
+                ac = _get_agent_container(sim, to, $T, @edgeread($T)) 
+                isnothing(ac) ? nothing : map(e -> e.state, ac)
+            end
         end
     end
+else
+    @eval function edgestates(::$simsymbol, ::AgentID, t::Type{$MT})
+        @assert false """
+            edgestates is not defined for the trait combination of $t
+            """
+    end
+end
 
 #- num_neighbors
 if !singleedge

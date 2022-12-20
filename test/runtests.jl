@@ -11,6 +11,8 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
+include("remove_agents.jl")
+
 include("core.jl")
 
 include("addexisting.jl")
