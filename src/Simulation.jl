@@ -1,9 +1,12 @@
+import Base.deepcopy
+
 export construct_model
 export new_simulation, finish_simulation!
 export finish_init!
 export apply_transition, apply_transition!
 export param
 export aggregate
+export copy_simulation
 
 # this is mutable, as we assign write -> read in finish_write!
 mutable struct AgentReadWrite{T}
@@ -316,8 +319,7 @@ function finish_init!(sim;
         end
     end
 
-    # TODO: There is already a finiwh_write! in distribute!, maybe we can remove this?
-    foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
+    foreach(finish_write!(sim), sim.typeinfos.nodes_types)
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
     sim.initialized = true
@@ -333,6 +335,22 @@ function updateids(idmap, oldids)
         idmap[Vahana.remove_process(id)]
     end
 end
+
+
+"""
+    copy_simulation!(sim)
+
+Create an independent copy of the simulation `sim`. Since part of the
+memory is allocated via MPI, you should not use deepcopy.
+"""
+function copy_simulation(sim)
+    copy = deepcopy(sim)
+    # we copied also the MPI Windows, so that the copy points to the same
+    # memory as the original. So this must be fixed.
+    foreach(T -> copy_shm!(copy, T), sim.typeinfos.nodes_types)
+    copy
+end
+
 
 """
     finish_simulation!(sim)
@@ -493,24 +511,35 @@ end
 """
     apply_transition(sim, func, compute, networks, rebuild) -> Simulation
 
-Wraps [`apply_transition!`](@ref) with a deepcopy so that the state of
-`sim` itself is not changed.
+Call [`apply_transition!`](@ref) with a copy of the simulation so that the
+state of `sim` itself is not changed.
 
 Can be very useful during development, especially if Vahana is used in
 the REPL. However, for performance reasons, this function should not
 be used in the final code.
 
+Returns the copy of the simulation.
+
 See also [`apply_transition!`](@ref)
 """
 function apply_transition(sim,
-                   func,
-                   compute::Vector,
-                   networks::Vector,
-                   rebuild::Vector;
+                   func::Function,
+                   call::Vector,
+                   read::Vector,
+                   write::Vector;
                    kwargs ...) 
     newsim = deepcopy(sim)
-    apply_transition!(newsim, func, compute, networks, rebuild; kwargs ...)
+    apply_transition!(newsim, func, call, read, write; kwargs ...)
     newsim
+end
+
+function apply_transition(func::Function,
+                   sim,
+                   call::Vector,
+                   read::Vector,
+                   write::Vector;
+                   kwargs ...)
+    apply_transition(sim, func, call, read, write; kwargs ...)
 end
 
 ######################################## aggregate

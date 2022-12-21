@@ -298,6 +298,43 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         @agent($T).last_change = sim.num_transitions
     end
     
+
+    @eval function copy_shm!(sim, ::Type{$T})
+        if ! $stateless
+            (@windows($T).shmstate, sarr) = 
+                MPI.Win_allocate_shared(Array{$T},
+                                        length(@readstate($T)),
+                                        mpi.shmcomm)
+
+            Base._memcpy!(sarr, @readstate($T),
+                          length(@readstate($T)) * sizeof($T))
+            
+            MPI.Win_fence(0, @windows($T).shmstate)
+            @readstate($T) = sarr
+
+            @agent($T).shmstate = 
+                [ MPI.Win_shared_query(Array{$T},
+                                       @windows($T).shmstate;
+                                       rank = i - 1) for i in 1:mpi.shmsize ]
+        end
+        if $mortal
+            (@windows($T).shmdied, sarr) = 
+                MPI.Win_allocate_shared(Array{Bool},
+                                        length(@readdied($T)),
+                                        mpi.shmcomm)
+
+            Base._memcpy!(sarr, @readdied($T),
+                          length(@readdied($T)) * sizeof(Bool))
+
+            MPI.Win_fence(0, @windows($T).shmdied)
+            @readdied($T) = sarr
+
+            @agent($T).shmdied = 
+                [ MPI.Win_shared_query(Array{Bool},
+                                       @windows($T).shmdied;
+                                       rank = i - 1) for i in 1:mpi.shmsize ]
+        end
+    end
     
     # this is called after the agents where distributed to the different PEs.
     # In the process add_agent! is called.

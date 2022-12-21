@@ -41,16 +41,16 @@ model = ModelTypes() |>
         @test count_num_edges(sim, E) == (mpi.size * 4) + 1
 
         # we remove all ADefault edges, that should also remove the ESDict edges
-        apply_transition(sim,
-                         [ DAgentRemove ],
-                         [],
-                         [ DAgentRemove ]) do _,_,_
-                             nothing
-                         end
+        apply_transition!(sim,
+                          [ DAgentRemove ],
+                          [],
+                          [ DAgentRemove ]) do _,_,_
+                              nothing
+                          end
 
         @test count_num_edges(sim, E) == (mpi.size * 3) + 1
 
-        apply_transition(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
+        apply_transition!(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
             if num_neighbors(sim, id, E) == 0
                 nothing
             else

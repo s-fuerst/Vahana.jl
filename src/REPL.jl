@@ -149,7 +149,7 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
         # But here we need the original traits, so we access them directly
         if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:traits]
             agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
-            aid = agent_id(sim, agent_nr(e.from), agentT)
+            aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             # We disable assertions to call agentstate from the REPL
             # but this is only done temporary and in a newer world age
             print(" $(Base.invokelatest(agentstate, sim, aid, agentT))")
@@ -306,8 +306,8 @@ function show_agent(sim,
     typeid = sim.typeinfos.nodes_type2id[T]
     # id can be always the local nr, so we first ensure that id
     # is the complete agent_id
-    if id <= typemax(AgentNr)
-        id = agent_id(sim, UInt32(id), T)
+    if id <= 2 ^ BITS_AGENTNR
+        id = agent_id(typeid, AgentNr(id))
     end
     # first we print the id of the agent and the state of the agent
     printstyled("Id / Local Nr: "; color = :cyan)
@@ -345,7 +345,7 @@ function show_agent(sim,
             T == sim.typeinfos.edges_attr[edgeT][:to_agenttype])
             # unify the agentid. For vector (:SingleAgent) types, this must
             # be the index, and for dict types, the AgentID
-            aid = agent_id(sim, agent_nr(id), T)
+            aid = agent_id(sim.typeinfos.nodes_type2id[T], agent_nr(id))
             nid = :SingleAgentType in edgetypetraits ? agent_nr(id) : aid
             # this rather complex statement checks that the agent has
             # edges of this type towards him. In the :SingleAgentType case we
