@@ -119,7 +119,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
         for T in typeinfos.nodes_types ]
 
     fields = Expr(:block,
-                  :(modelname::String),
+                  :(model::Model),
                   :(name::String),
                   :(params::P),
                   :(globals::G),
@@ -192,7 +192,7 @@ function new_simulation(model::Model,
                  globals::G = nothing;
                  name = model.name) where {P, G}
     sim = @eval $(Symbol(model.name))(
-        modelname = $(model.name),
+        model = $model,
         name = $name,
         params = $params,
         globals = $globals,
@@ -258,7 +258,7 @@ the rank on which the agent "lives" after `finish_init!`.
 
 
 See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
-[`apply_transition!`](@ref) 
+[`apply_transition!`](@ref) and [`finish_simulation!`](@ref)
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
@@ -334,10 +334,14 @@ function updateids(idmap, oldids)
     end
 end
 
+"""
+    finish_simulation!(sim)
 
-
-# TODO SHM write finish_simulation! . free shm stuff, remove references.
-# sim should be after finish_simulation! in the same state as new_simulation.
+Remove all agents/edges and rasters from the simulation to minimize
+the memory footprint. The `parameters` and `globals` of the simulation
+are still available, the remaining state of the simulation is
+undefined.
+"""
 function finish_simulation!(sim)
     for T in sim.typeinfos.nodes_types
         shmstatewin = getproperty(sim, Symbol(T)).mpiwindows.shmstate
@@ -348,8 +352,14 @@ function finish_simulation!(sim)
         if ! isnothing(shmdiedwin)
             MPI.free(shmdiedwin)
         end
-        # TODO release all references
+        init_field!(sim, T)
     end       
+    for T in sim.typeinfos.edges_types
+        empty!(edgeread(sim, T))
+        empty!(edgewrite(sim, T))
+    end
+    empty!(sim.rasters)
+    nothing
 end
 ######################################## Transition
 

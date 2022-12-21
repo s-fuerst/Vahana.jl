@@ -80,8 +80,8 @@ function construct_prettyprinting_methods(simsymbol)
             end
         end
         
-        printstyled(io, "Model Name: ", sim.modelname; color = :magenta)
-        if sim.modelname != sim.name
+        printstyled(io, "Model Name: ", sim.model.name; color = :magenta)
+        if sim.model.name != sim.name
             printstyled(io, "\nSimulation Name: ", sim.name; color = :magenta)
         end
         show_struct(io, sim.params, "Parameter")
