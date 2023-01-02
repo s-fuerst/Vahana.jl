@@ -92,8 +92,10 @@ end;
 
 # We can now apply the transition function to the complete graph simulation
 
+copy = copy_simulation(sim)
+
 apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
-@time for _ in 1:500 apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
+#@time for _ in 1:50 apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
 
 

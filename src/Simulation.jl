@@ -1,4 +1,5 @@
 import Base.deepcopy
+import Logging.with_logger
 
 export construct_model
 export new_simulation, finish_simulation!
@@ -88,6 +89,14 @@ mutable struct EdgeFields{ET, EST}
     readable::Bool
 end
 
+
+struct Log
+    file::Union{IOStream, Nothing}
+    logger::Union{SimpleLogger, Nothing}
+    debug::Bool
+    starttime::Float64
+end
+
 """
     construct_model(types::ModelTypes, name::String)
 
@@ -131,6 +140,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(initialized::Bool),
                   :(intransition::Bool),
                   :(num_transitions::Int64),
+                  :(logging::Log),
                   edgefields...,
                   nodefields...)
     
@@ -158,7 +168,6 @@ function construct_model(typeinfos::ModelTypes, name::String)
 end
 
 num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
-
 
 """
     new_simulation(model::Model, params = nothing, globals = nothing; name)
@@ -193,7 +202,14 @@ and [`finish_init!`](@ref)
 function new_simulation(model::Model,
                  params::P = nothing,
                  globals::G = nothing;
-                 name = model.name) where {P, G}
+                 name = model.name,
+                 logging = false, debug = false) where {P, G}
+    simsymbol = Symbol(name)
+
+    logfile = logging ? open(name * "_" * string(mpi.rank) * ".log"; write = true) :
+        nothing
+    logger = logging ? SimpleLogger(logfile, debug ? Debug : Info) : nothing
+    
     sim = @eval $(Symbol(model.name))(
         model = $model,
         name = $name,
@@ -204,6 +220,7 @@ function new_simulation(model::Model,
         initialized = false,
         intransition = false,
         num_transitions = 0,
+        logging = Log($logfile, $logger, $debug, time())
     )
 
     for T in sim.typeinfos.edges_types
@@ -217,8 +234,24 @@ function new_simulation(model::Model,
 
     global show_second_edge_warning = true
 
+    _log(sim, () -> @info("Created new simulation", name, params, Dates.now()))
+    
     sim
 end
+
+
+function _log(sim, f)
+    if sim.logging.logger !== nothing
+        with_logger(f, sim.logging.logger)
+        if sim.logging.debug
+            flush(sim.logging.logfile)
+        end
+    end
+end
+
+_log_info(sim, txt) = _log(sim, () -> @info(txt, simtime(sim)))
+
+simtime(sim) = time() - sim.logging.starttime
 
 # pipeable versions 
 construct_model(name::String) = types -> construct_model(types, name)
@@ -267,6 +300,8 @@ function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
                return_idmapping = false, partition_algo = :Metis, distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
+
+    _log_info(sim, "Begin finish_init!")
     
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)

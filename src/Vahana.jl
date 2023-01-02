@@ -1,6 +1,6 @@
 module Vahana
 
-using MPI, Metis
+using MPI, Metis, Logging, Dates
 
 export enable_asserts, suppress_warnings, detect_stateless_trait
 

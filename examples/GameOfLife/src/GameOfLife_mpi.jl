@@ -33,7 +33,6 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    @info neighborstates(sim, id, Neighbor, Cell)
     n = mapreduce(a -> a.active, +, neighborstates(sim, id, Neighbor, Cell))
     rules = param(sim, :rules)
     if c.active == true && n <= rules[4] && n >= rules[1]
@@ -58,13 +57,14 @@ function addgrid!(sim)
 end 
 
 model = ModelTypes() |>
-    register_agenttype!(Cell, :ConstantSize) |>
+    register_agenttype!(Cell, :Immortal) |>
     register_edgetype!(Neighbor; to_agenttype = Cell) |>
     construct_model("Game of Life")
 
 
 function init(params::Params)
-    sim = new_simulation(model, params, Globals(Vector(), Vector()))
+    sim = new_simulation(model, params, Globals(Vector(), Vector());
+                         logging = true)
 
     add_raster!(sim,
                 :raster,
