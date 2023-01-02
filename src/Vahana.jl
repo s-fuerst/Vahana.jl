@@ -1,6 +1,6 @@
 module Vahana
 
-using MPI, Metis, Logging, Dates
+using MPI, Metis
 
 export enable_asserts, suppress_warnings, detect_stateless_trait
 
@@ -136,4 +136,6 @@ include("REPL.jl")
 include("Raster.jl")
 
 include("GraphsSupport.jl")
+
+include("Logging.jl")
 end
