@@ -27,7 +27,6 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # so that we can combine all agents of the AgentTypes etc.
     ssm = create_structured_send_map(sim, sendmap)
 
-
     # First we send all agentstates and collect the idmapping, as the
     # agent gets an new id in this process. idmapping is a Dict that
     # allows to get the new id when only the old id is known.
@@ -75,6 +74,7 @@ end
 #
 # This map is used by sendedges! 
 function create_structured_send_map(sim, sendmap::Dict{AgentID, ProcessID})
+    _log_debug(sim, "<Begin> create_structured_send_map")
     ssm = Dict{DataType, Vector{Vector{AgentID}}}()
     for T in sim.typeinfos.nodes_types
         ssm[T] = [ Vector{AgentID}() for _ in 1:mpi.size ]
@@ -82,11 +82,15 @@ function create_structured_send_map(sim, sendmap::Dict{AgentID, ProcessID})
     for (id, p) in sendmap
         push!(ssm[Vahana.type_of(sim, id)][p], id)           
     end
+    _log_debug(sim, "<End> create_structured_send_map")
     ssm
 end
 
 # Distribute agents of agenttype T to the different PEs. 
 function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
+    with_logger(sim) do
+        @debug "<Begin> sendagents!" agenttype=T
+    end
     # ST is the transmitted datatype. Beside the state itself (T) we
     # need also the AgentID to create the mappning from the old
     # AgentID to the new AgentID
@@ -115,6 +119,7 @@ function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     foreach(recvbuf.data) do (id, agent)
         idmapping[id] = add_agent!(sim, agent)
     end
+    _log_debug(sim, "<End> sendagents!")
     idmapping
 end
 
@@ -127,6 +132,10 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                              ::Type{$T})
         if $stateless
             return
+        end
+
+        with_logger(sim) do
+            @debug "<Begin> transmit_agents!" agenttype=T
         end
         
         for ET in readableET
@@ -150,7 +159,8 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                 # (the foreign dict is cleared when $T is writeable).
                 if ! isempty(@agent($T).foreignstate)
                     for i in 1:mpi.size
-                        filter!(d -> ! haskey(@agent($T).foreignstate, d), perPE[i])
+                        filter!(d -> ! haskey(@agent($T).foreignstate, d),
+                                perPE[i])
                     end
                 end
                 
@@ -175,7 +185,9 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                                       recvNumElems)
 
                 # transmit the AgentIDs itself
-                MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                _log_time(sim, "transmit_agents Alltoallv! AgentIDs", true) do
+                    MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                end
 
                 ## now we gather the agentstate
                 send = if $mortal
@@ -207,7 +219,9 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                     Vector{Tuple{AgentID, $T}}(undef, sum(sendNumElems))
                 end
                 recvbuf = VBuffer(recv, sendNumElems)
-                MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                _log_time(sim, "transmit_agents Alltoallv! state", true) do
+                    MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                end
 
                 ## And now fill the foreign dictonaries
                 if $mortal 
@@ -223,6 +237,8 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                 @agent($T).last_transmit[ET] = sim.num_transitions
             end
         end
+
+        _log_debug(sim, "<End> transmit_agents!")
     end
 end 
 
@@ -248,7 +264,12 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
     # | (Vector){AgentID}  | x       |        | neighborids   | [(toid, fromid)]   |
     # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
     # | Int64              | x       | x      | num_neighbors | num_neighbors      |
-    @eval function sendedges!(sim, sendmap::Dict{AgentID, ProcessID}, idmapping, ::Type{$T})
+    @eval function sendedges!(sim, sendmap::Dict{AgentID, ProcessID},
+                       idmapping, ::Type{$T})
+        with_logger(sim) do
+            @debug "<Begin> sendedges!" edgetype=$T
+        end
+
         if $singletype
             AT = sim.typeinfos.edges_attr[$T][:to_agenttype]
             agent_typeid = sim.typeinfos.nodes_type2id[AT]
@@ -296,11 +317,19 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         updateid(id::AgentID) = idmapping[id] |> AgentID
         
         edges_alltoall!(sim, perPE, $T, updateid)
+
+        with_logger(sim) do
+            @debug "<End> sendedges!" 
+        end
     end
 
     # updateid is a func that update the ids of the agents, for the case
     # that the ids have changed in the distribution process.
-    @eval function edges_alltoall!(sim::$simsymbol, perPE, ::Type{$T}, updateid = identity)
+    @eval function edges_alltoall!(sim::$simsymbol, perPE, ::Type{$T},
+                            updateid = identity)
+        with_logger(sim) do
+            @debug "<Begin> edges_alltoall!" edgetype=$T
+        end
         # for sending them via AllToAll we flatten the perPE structure 
         longvec = reduce(vcat, perPE)
         sendbuf = if length(longvec) > 0
@@ -353,11 +382,16 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
             end
         else
             for (to, edge) in recvbuf.data
-                add_edge!(sim, updateid(to), Edge(updateid(edge.from), edge.state))
+                add_edge!(sim, updateid(to), Edge(updateid(edge.from),
+                                                  edge.state))
             end
         end
 
         @edge($T).last_transmit = sim.num_transitions
+
+        _log_debug(sim, "<End> edges_alltoall!")
+
+        nothing
     end
 end
 
@@ -374,7 +408,8 @@ function join(vec::Vector{T}) where T
     sizes = Vector{Int32}(undef, mpi.size)
     sizes[mpi.rank + 1] = length(vec)
 
-    send = MPI.VBuffer(sizes, fill(Int32(1), mpi.size), fill(Int32(mpi.rank), mpi.size))
+    send = MPI.VBuffer(sizes, fill(Int32(1), mpi.size),
+                       fill(Int32(mpi.rank), mpi.size))
     recv = MPI.VBuffer(sizes, fill(Int32(1), mpi.size))
 
     MPI.Alltoallv!(send, recv, mpi.comm)
@@ -391,6 +426,6 @@ function join(vec::Vector{T}) where T
     recv = MPI.VBuffer(values, sizes)
 
     MPI.Alltoallv!(send, recv, mpi.comm)
-    
+
     recv.data
 end

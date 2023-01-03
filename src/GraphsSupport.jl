@@ -32,7 +32,10 @@ type via [`register_edgetype!`](@ref).
 
 Returns a vector with the IDs of the created agents.
 """
-function add_graph!(sim, graph, agent_constructor, edge_constructor) 
+function add_graph!(sim, graph, agent_constructor, edge_constructor)
+    with_logger(sim) do
+        @info "<Begin> add_graph!" graph
+    end
     agents = add_agents!(sim,
                          [ agent_constructor(v) for v in Graphs.vertices(graph) ])
 
@@ -49,6 +52,8 @@ function add_graph!(sim, graph, agent_constructor, edge_constructor)
         end
     end
 
+    _log_info(sim, "<End> add_graph!")
+    
     agents
 end
 

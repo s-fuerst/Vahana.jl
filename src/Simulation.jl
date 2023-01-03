@@ -224,7 +224,7 @@ function new_simulation(model::Model,
     global show_second_edge_warning = true
 
     with_logger(sim) do
-        @info "New simulation created" name params Dates.now()
+        @info "New simulation created" name params date=Dates.now() starttime=time()
     end
 
     sim
@@ -278,8 +278,8 @@ function finish_init!(sim;
                return_idmapping = false, partition_algo = :Metis, distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
 
-    _log_info(sim, "Begin finish_init!")
-    
+    _log_info(sim, "<Begin> finish_init!")
+
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
@@ -297,17 +297,25 @@ function finish_init!(sim;
         if length(partition) == 0 && mpi.isroot
             if partition_algo == :Metis
                 @info "Partitioning the Simulation with Metis"
-                vsg = vahanasimplegraph(sim; show_ignorefrom_warning = false)
-                part = Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+                vsg = _log_time(sim, "create simple graph", true) do 
+                    vahanasimplegraph(sim; show_ignorefrom_warning = false)
+                end
+                part = _log_time(sim, "call Metis.partition", true) do
+                    Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+                end
+                _log_debug(sim, "<Begin> remap ids")
                 for (i, p) in enumerate(part)
                     partition[vsg.g2v[i]] = p
                 end
+                _log_debug(sim, "<End> remap ids")
             elseif partition_algo == :EqualAgentNumbers
                 @info "Partitioning the Simulation / equal number of nodes per type"
+                _log_debug(sim, "<Begin> create equal partitions")
                 for T in sim.typeinfos.nodes_types
                     ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
                     _create_equal_partition(partition, ids)
                 end
+                _log_debug(sim, "<End> create equal partitions")
             else
                 @error "the partition_algo given is unknown"
             end
@@ -315,7 +323,8 @@ function finish_init!(sim;
         if mpi.isroot
             @info "Distributing the Simulation"
         end
-        distribute!(sim, partition)
+        _log_time(sim, "distribute!") do
+            distribute!(sim, partition) end
     else
         if return_idmapping
             idmapping = Dict{AgentID, AgentID}()
@@ -337,6 +346,8 @@ function finish_init!(sim;
     sim.initialized = true
 
     sim.num_transitions = 1
+
+    _log_info(sim, "<End> finish_init!")
 
     return_idmapping ? idmapping : nothing
 end 
@@ -373,6 +384,7 @@ are still available, the remaining state of the simulation is
 undefined.
 """
 function finish_simulation!(sim)
+    _log_info(sim, "<Begin> finish_simulation!")
     for T in sim.typeinfos.nodes_types
         shmstatewin = getproperty(sim, Symbol(T)).mpiwindows.shmstate
         if ! isnothing(shmstatewin)
@@ -389,6 +401,7 @@ function finish_simulation!(sim)
         empty!(edgewrite(sim, T))
     end
     empty!(sim.rasters)
+    _log_info(sim, "<End> finish_simulation!")
     nothing
 end
 ######################################## Transition
@@ -463,7 +476,10 @@ function apply_transition!(sim,
                     write::Vector;
                     add_existing = Vector{DataType}())
     @assert sim.initialized "You must call finish_init! before apply_transition!"
-
+    with_logger(sim) do
+        @info "<Begin> apply_transition!" func transition=sim.num_transitions
+    end
+    
     # must be set to true before prepare_read! (as this calls add_edge!)
     sim.intransition = true
     
@@ -480,11 +496,15 @@ function apply_transition!(sim,
     foreach(prepare_write!(sim, [call; add_existing]), write)
 
     MPI.Barrier(MPI.COMM_WORLD)
-    
+
     for C in call
+        with_logger(sim) do
+            @debug "<Begin> tf_call!" agenttype=C transition=sim.num_transitions
+        end
         rfunc = C in read ? transition_with_read! : transition_without_read!
         wfunc = C in write ? transition_with_write! : transition_without_write!
         rfunc(wfunc, sim, func, C)
+        _log_debug(sim, "<End> tf_call!")
     end
     
     MPI.Barrier(MPI.COMM_WORLD)
@@ -501,11 +521,13 @@ function apply_transition!(sim,
     foreach(finish_write!(sim), writeableET)
 
     sim.intransition = false
-
+    
     # must be incremented after the transition, so that read only
     # functions like aggregate tries to transfer the necessary states
     # only once 
     sim.num_transitions = sim.num_transitions + 1
+
+    _log_info(sim, "<End> apply_transition!")
     
     sim
 end

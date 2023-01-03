@@ -29,6 +29,10 @@ function add_raster!(sim,
               name::Symbol,
               dims::NTuple{N, Int},
               agent_constructor) where N
+    with_logger(sim) do
+        @info "<Begin> add_raster!" name dims
+    end
+
     @assert ! sim.initialized "add_raster! can be only called before finish_init!"
 
     grid = Array{AgentID, N}(undef, dims)
@@ -40,6 +44,7 @@ function add_raster!(sim,
         grid[pos] = id
     end
 
+    _log_info(sim, "<End> add_raster!")
 
     sim.rasters[name] = grid
 end
@@ -47,10 +52,16 @@ end
 # while distributing the Agents to the different PEs, the AgentIDs are
 # changed, so the ids of the grid most be updated
 function broadcastids(sim, raster, idmapping::Dict)
+    with_logger(sim) do
+        @info "<Begin> broadcastids" raster
+    end
+
     if mpi.isroot
         sim.rasters[raster] = map(id -> idmapping[id], sim.rasters[raster])
     end
     MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
+
+    _log_info(sim, "<End> broadcastids")
 end
 
 function _stencil_core(metric, n::Int64, distance, d::Int64)
@@ -77,7 +88,6 @@ function stencil(metric, n::Int64, distance::Int64)
         _stencil_core(metric, n, distance, distance)
     end
 end
-
 
 function stencil(metric, n::Int64, distance::Float64)
     d = distance |> floor |> Int
@@ -114,11 +124,14 @@ already registered via [`register_agenttype!`](@ref).
 See also [`add_raster!`](@ref)
 """
 function connect_raster_neighbors!(sim,
-                                   name::Symbol,
-                                   edge_constructor;
-                                   distance = 1,
-                                   metric::Symbol = :chebyshev,
-                                   periodic = true)
+                            name::Symbol,
+                            edge_constructor;
+                            distance = 1,
+                            metric::Symbol = :chebyshev,
+                            periodic = true)
+    with_logger(sim) do
+        @info "<Begin> connect_raster_neighbors!" name 
+    end
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized
@@ -136,6 +149,8 @@ function connect_raster_neighbors!(sim,
             end
         end
     end
+
+    _log_info(sim, "<End> connect_raster_neighbors!")
 end
 
 """
@@ -175,7 +190,12 @@ Can be only called after [`finish_init!`](@ref).
 
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
+function calc_raster(sim, raster::Symbol, f, f_returns::DataType,
+              accessible::Vector{DataType})
+    with_logger(sim) do
+        @info "<Begin> calc_raster!" raster
+    end
+
     @assert sim.initialized "calc_raster can be only called after finish_init!"
     foreach(T -> prepare_read!(sim, Vector{DataType}(), T), accessible)
     z = zero(f_returns)
@@ -187,7 +207,11 @@ function calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Ve
         end
     end
     foreach(T -> finish_read!(sim, T), accessible)
-    MPI.Allreduce(rs, |, MPI.COMM_WORLD)
+    r = MPI.Allreduce(rs, |, MPI.COMM_WORLD)
+
+    _log_info(sim, "<End> calc_raster!")
+    
+    r
 end
 
 
@@ -227,6 +251,10 @@ Can be only called after [`finish_init!`](@ref).
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}) where T
+    with_logger(sim) do
+        @info "<Begin> calc_rasterstate" raster
+    end
+
     @assert sim.initialized """
     calc_rasterstate can be only called after finish_init!"""
 
@@ -240,7 +268,9 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
         end
     end
     disable_transition_checks(false)
-    MPI.Allreduce(rs, |, MPI.COMM_WORLD)
+    r = MPI.Allreduce(rs, |, MPI.COMM_WORLD)
+    _log_info(sim, "<End> calc_rasterstate")
+    r
 end
 
 """
@@ -287,14 +317,14 @@ keyword `periodic` determines whether all dimensions are cyclic.
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
 function move_to!(sim,
-                  name::Symbol,
-                  id::AgentID,
-                  pos,
-                  edge_from_raster,
-                  edge_to_raster;
-                  distance = 0,
-                  metric::Symbol = :chebyshev,
-                  periodic = true)
+           name::Symbol,
+           id::AgentID,
+           pos,
+           edge_from_raster,
+           edge_to_raster;
+           distance = 0,
+           metric::Symbol = :chebyshev,
+           periodic = true)
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized

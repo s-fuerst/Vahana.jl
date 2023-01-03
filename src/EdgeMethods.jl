@@ -752,6 +752,9 @@ end
 #- aggregate
 if ! stateless
     @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
+        with_logger(sim) do
+            @info "<Begin> aggregate edges" f op edgetype=$T
+        end
         emptyval = val4empty(op; kwargs...)
 
         reduced = emptyval
@@ -764,7 +767,11 @@ if ! stateless
         end
         
         mpiop = get(kwargs, :mpiop, op)
-        MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+        r = MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+
+        _log_info(sim, "<End> aggregate edges")
+
+        r
     end
 else
     @eval function aggregate(::$simsymbol, f, op, t::Type{$MT}; kwargs...)

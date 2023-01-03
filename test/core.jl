@@ -106,7 +106,7 @@ function test_aggregate_mortal(sim, T::DataType)
 end    
 
 function createsim()
-    sim = new_simulation(model, nothing, nothing)
+    sim = new_simulation(model; logging = true, debug = true)
 
     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
     
@@ -279,7 +279,7 @@ end
     
     # TODO transition with add_agent! and add_edge!
     @testset "Aggregate" begin
-        sim = new_simulation(model, nothing, nothing; name = "Aggregate")
+        sim = new_simulation(model; name = "Aggregate")
 
         (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
 
@@ -295,7 +295,7 @@ end
 
         finish_simulation!(sim)
 
-        sim = new_simulation(model, nothing, nothing; name = "Aggregate")
+        sim = new_simulation(model; name = "Aggregate")
 
         (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
 

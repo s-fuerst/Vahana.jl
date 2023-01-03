@@ -64,7 +64,7 @@ model = ModelTypes() |>
 
 function init(params::Params)
     sim = new_simulation(model, params, Globals(Vector(), Vector());
-                         logging = true)
+                         logging = true, debug = true)
 
     add_raster!(sim,
                 :raster,
@@ -83,6 +83,13 @@ end
 function step!(sim)
     apply_transition!(sim, transition, [Cell], [Cell, Neighbor], [Cell])
     countactive!(sim)
+    with_logger(sim) do
+        @info "<Begin> GC"
+    end
+    GC.gc(false)
+    with_logger(sim) do
+        @info "<End> GC"
+    end
 #     addgrid!(sim)
 #     getglobal(sim, :grid) |> last
 end

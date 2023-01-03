@@ -208,6 +208,10 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     end
 
     @eval function finish_write!(sim::$simsymbol, ::Type{$T})
+        with_logger(sim) do
+            @debug("<Begin> finish_write!",
+                   agenttype=$T, transition=sim.num_transitions)
+        end
         if $mortal
             # in writereuseable we have collected all agents that died
             # in this iteration
@@ -296,9 +300,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         empty!(@writereuseable($T))
 
         @agent($T).last_change = sim.num_transitions
+
+        _log_debug(sim, "<End> finish_write!")
+        nothing
     end
     
-
+    # used in copy_simulation!
     @eval function copy_shm!(sim, ::Type{$T})
         if ! $stateless
             (@windows($T).shmstate, sarr) = 
@@ -381,16 +388,21 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
         else
             if write
-                [ @writestate($T)[i] for i in 1:min(length(@writestate($T)), max_agents)
+                [ @writestate($T)[i] for i in 1:min(length(@writestate($T)),
+                                                 max_agents)
                      if ! @writedied($T)[i] ]
             else
-                [ @readstate($T)[i] for i in 1:min(length(@readstate($T)), max_agents)
+                [ @readstate($T)[i] for i in 1:min(length(@readstate($T)),
+                                                max_agents)
                      if ! @readdied($T)[i] ]
             end
         end
     end        
 
     @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
+        with_logger(sim) do
+            @info "<Begin> aggregate agents" f op agenttype=$T
+        end
         @mayassert ! sim.intransition """
         You can not call aggregate inside of a transition function."""
         emptyval = val4empty(op; kwargs...)
@@ -409,11 +421,15 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
         end   
 
-        if $nompi
+        r = if $nompi
             reduced
         else
             mpiop = get(kwargs, :mpiop, op)
             MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
         end
+
+        _log_info(sim, "<End> aggregate agents")
+        
+        r
     end
 end
