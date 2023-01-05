@@ -285,9 +285,10 @@ function runedgestest()
     end
 end
 
-@testset "transition" begin
-    for ET in statefulEdgeTypes
 
+
+@testset "transition" begin
+    for ET in [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI ]
         sim = new_simulation(model_edges)
 
         if Vahana.has_trait(sim, ET, :SingleEdge)
