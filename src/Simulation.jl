@@ -209,7 +209,8 @@ function new_simulation(model::Model,
         initialized = false,
         intransition = false,
         num_transitions = 0,
-        logging = createLogger($name, $logging, $debug)
+        logging = createLogger($name, $logging, $debug),
+        h5file = h5open($name, "w")
     )
 
     for T in sim.typeinfos.edges_types
@@ -401,6 +402,7 @@ function finish_simulation!(sim)
         empty!(edgewrite(sim, T))
     end
     empty!(sim.rasters)
+    HDF5.close(sim.h5file)
     _log_info(sim, "<End> finish_simulation!")
     nothing
 end

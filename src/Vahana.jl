@@ -121,6 +121,8 @@ include("Edge.jl")
 
 include("MPI.jl")
 
+include("HDF5.jl")
+
 include("ModelTypes.jl")
 
 include("EdgeMethods.jl")
