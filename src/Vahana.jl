@@ -108,6 +108,8 @@ detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 
 ######################################## include all other files
 
+abstract type Simulation end
+
 # TODO DOC
 disable_transition_checks = (disable::Bool) -> config.check_readable = ! disable
 

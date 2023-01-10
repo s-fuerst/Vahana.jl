@@ -90,7 +90,7 @@ end
 """
 TODO: DOC
 """
-function with_logger(f, sim::Simulation)
+function with_logger(f::Function, sim::Simulation)
     if sim.logging.logger !== nothing
         with_logger(f, sim.logging.logger)
     end

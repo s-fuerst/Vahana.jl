@@ -89,8 +89,6 @@ mutable struct EdgeFields{ET, EST}
     readable::Bool
 end
 
-abstract type Simulation end
-
 """
     construct_model(types::ModelTypes, name::String)
 
@@ -135,6 +133,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(intransition::Bool),
                   :(num_transitions::Int64),
                   :(logging::Log),
+                  :(h5file::Union{HDF5.File, Nothing}),
                   edgefields...,
                   nodefields...)
     
@@ -199,7 +198,7 @@ function new_simulation(model::Model,
                  name = model.name,
                  logging = false, debug = false) where {P, G}
     
-    sim = @eval $(Symbol(model.name))(
+    sim::Simulation = @eval $(Symbol(model.name))(
         model = $model,
         name = $name,
         params = $params,
@@ -210,8 +209,10 @@ function new_simulation(model::Model,
         intransition = false,
         num_transitions = 0,
         logging = createLogger($name, $logging, $debug),
-        h5file = h5open($name, "w")
+        h5file = nothing # we need the sim instance to create the h5file
     )
+
+    sim.h5file = h5open(sim, name * ".h5", "w")
 
     for T in sim.typeinfos.edges_types
         init_field!(sim, T)
@@ -383,6 +384,8 @@ Remove all agents/edges and rasters from the simulation to minimize
 the memory footprint. The `parameters` and `globals` of the simulation
 are still available, the remaining state of the simulation is
 undefined.
+
+Returns the globals of the simulation.
 """
 function finish_simulation!(sim)
     _log_info(sim, "<Begin> finish_simulation!")
@@ -402,9 +405,18 @@ function finish_simulation!(sim)
         empty!(edgewrite(sim, T))
     end
     empty!(sim.rasters)
-    HDF5.close(sim.h5file)
+
+    if sim.h5file !== nothing
+        HDF5.close(sim.h5file)
+    end
+
+    if sim.logging.file !== nothing
+        close(sim.logging.file)
+    end
+        
     _log_info(sim, "<End> finish_simulation!")
-    nothing
+
+    sim.globals
 end
 ######################################## Transition
 

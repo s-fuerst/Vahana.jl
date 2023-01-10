@@ -70,7 +70,7 @@ function construct_prettyprinting_methods(simsymbol)
                         if length(f) == 0
                             print(io, "\n\t :$k (empty)")
                         else
-                            print(io, "\n\t :$k |> last: $(last(f)) (length: $(length(f)))")
+                            print(io, "\n\t :$k |> last : $(last(f)) (length: $(length(f)))")
                         end
                         printstyled(io, " "; color = :yellow)
                     else
