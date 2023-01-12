@@ -5,3 +5,4 @@
 /examples/episim/src/events-small.txt
 /docs/src/tutorial1.md
 /LocalPreferences.toml
+*.h5

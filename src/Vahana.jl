@@ -1,16 +1,16 @@
 module Vahana
 
-using MPI, Metis
+using MPI, Metis, Requires
 
 export enable_asserts, suppress_warnings, detect_stateless_trait
 
 function __init__()
-    # @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
-    #     include("optional/MakieSupport.jl")
-    # end
-    # @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" begin
-    #     include("optional/GraphMakieSupport.jl")
-    # end
+    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
+        include("optional/MakieSupport.jl")
+    end
+    @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" begin
+        include("optional/GraphMakieSupport.jl")
+    end
 
     mpiinit()
 end

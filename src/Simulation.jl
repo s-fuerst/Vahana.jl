@@ -212,8 +212,6 @@ function new_simulation(model::Model,
         h5file = nothing # we need the sim instance to create the h5file
     )
 
-    sim.h5file = h5open(sim, name * ".h5", "w")
-
     for T in sim.typeinfos.edges_types
         init_field!(sim, T)
         init_storage!(sim, T)
@@ -277,7 +275,8 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
-               return_idmapping = false, partition_algo = :Metis, distribute = true)
+               return_idmapping = false, partition_algo = :Metis, distribute = true,
+               output_filename = nothing)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
 
     _log_info(sim, "<Begin> finish_init!")
@@ -344,6 +343,13 @@ function finish_init!(sim;
 
     foreach(finish_write!(sim), sim.typeinfos.nodes_types)
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
+
+    if output_filename !== nothing
+        if ! endswith(output_filename, ".h5")
+            output_filename = output_filename * ".h5"
+        end
+        sim.h5file = open_h5file(sim, output_filename, "w")
+    end
 
     sim.initialized = true
 
