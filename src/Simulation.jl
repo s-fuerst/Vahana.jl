@@ -345,8 +345,8 @@ function finish_init!(sim;
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
     if output_filename !== nothing
-        if ! endswith(output_filename, ".h5")
-            output_filename = output_filename * ".h5"
+        if endswith(output_filename, ".h5")
+            output_filename = output_filename[1, end-3]
         end
         sim.h5file = open_h5file(sim, output_filename, "w")
     end

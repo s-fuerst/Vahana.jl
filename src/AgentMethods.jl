@@ -188,7 +188,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, ::Type{$T})
         if $immortal 
-            # while distributing the initial graph will also kill immortal agents
+            # distributing the initial graph will also kill immortal agents,
+            # so we can assert this only after the sim is initialized
             if sim.initialized
                 @assert begin
                     T = $T
@@ -348,8 +349,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     @eval function finish_distribute!(sim::$simsymbol, ::Type{$T})
     end
 
-    # some mpi parts are in prepare_write, as we always use the shared_memory
-    # mpi calls, even in single process runs.
     @eval function prepare_read!(sim::$simsymbol,
                           readable::Vector{DataType},
                           ::Type{$T})
