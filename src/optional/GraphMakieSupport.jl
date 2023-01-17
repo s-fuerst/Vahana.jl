@@ -1,48 +1,78 @@
-using Base: nothing_sentinel
-using Makie: axislines!
 using GraphMakie, Makie, Colors
 
 import Graphs, Graphs.SimpleGraphs, NetworkLayout
 
 export plot, create_plot, update_plot!
-export set_agent_positions!, set_agent_colors!
-export set_edge_colors!
 
 Base.@kwdef mutable struct VahanaPlot
     sim::Simulation
     vg::VahanaGraph
+    # a Vahanaplot encapsulate a GraphMakie plot
+    # figure, axis, plot are all returned by the graphplot function
     figure
     axis
     plot
-    last_clicked_agent = nothing
+    # the next field are AgentIDs or Edges that where clicked 
+    # or that are actually hovered
+    clicked_agent = Vector{AgentID}()
+    clicked_edge = Vector{Any}()
+    hovered_agent::Union{AgentID, Nothing} = nothing
+    hovered_edge = nothing
+    # all the agenttypes where the position should be jittered
     pos_jitter = Dict{DataType, Float64}()
+    # the offset of an agent is keeped constant, and stored in this dict
     jitter_val = Dict{AgentID, NTuple{2, Float64}}()
-    node_pos_fn = nothing
-    node_color_fn = nothing
-    edge_color_fn = nothing
+    # the function to call for updating the attributes of the graph
+    update_fn = nothing
+    click_fn = nothing
+    hover_fn = nothing
 end
 
-function _set_agent_plot_properties!(g, f, vp, prop)
+function _set_plot_attrs!(vp, idx, attrs, aid, T)
+    for (k, v) in attrs
+        # jitter node positions
+        if k == :node_pos
+            j = get(vp.pos_jitter, T, 0.0) 
+            jit = get!(vp.jitter_val, aid, ( rand() * j - j/2, rand() * j - j/2 ))
+            v = [ v[1] + jit[1], v[2] + jit[2]]
+        # convert name colors to color values
+        elseif (k == :node_color || k == :edge_color) &&
+            (typeof(v) == String || typeof(v) == Symbol)
+            v = parse(Colorant, v)
+        # elseif k == :edge_transparency
+        #     # change the 
+        #     k = :edge_color
+        #     v = HSLA(HSL(vp.plot[:edge_color][][idx]), v)
+        end
+
+        vp.plot[k][][idx] = v
+    end
+end
+
+function _set_agents_plot_attrs!(f, vp)
     disable_transition_checks(true)
+    changed_attrs = Set{Symbol}()
     for T in vp.vg.agenttypes
         for id in 1:length(readstate(vp.sim, T))
             if length(readdied(vp.sim, T)) == 0 || readdied(vp.sim, T)[id] == false
                 aid = agent_id(vp.sim, AgentNr(id), T)
                 state = agentstate(vp.sim, aid, T)
-                new = g(f(state, aid, vp.sim), aid, T)
-                if new !== nothing
-                    vp.plot[prop][][vp.vg.v2g[aid]] = new
-                end
+                new::Dict{Symbol, Any} = f(state, aid, vp)
+                _set_plot_attrs!(vp, vp.vg.v2g[aid], new, aid, T)
+                foreach(a -> push!(changed_attrs, a), keys(new))
             end
         end
     end
-    vp.plot[prop][] = vp.plot[prop][];
+    for a in changed_attrs 
+        vp.plot[a][] = vp.plot[a][]
+    end
     disable_transition_checks(false)
     nothing
 end
 
-function _set_edge_plot_properties!(g, f, vp, prop)
+function _set_edge_plot_properties!(f, vp)
     disable_transition_checks(true)
+    changed_attrs = Set{Symbol}()
     for i in 1:Graphs.ne(vp.vg)
         tid = vp.vg.edgetypeidx[i]
         T = vp.sim.typeinfos.edges_types[tid]
@@ -56,38 +86,16 @@ function _set_edge_plot_properties!(g, f, vp, prop)
         es = has_trait(vp.sim, T, :Stateless) ? T() : (filter(edges) do edge
                                                            edge.from == from
                                                        end |> only).state
-        new = g(f(es, from, to, vp.last_clicked_agent, vp.sim), to, T)
-        if new !== nothing
-            vp.plot[prop][][i] = new
-        end
+        new = f(es, from, to, vp)
+        attrs = _set_plot_attrs!(vp, i, new, 0, T)
+        foreach(a -> push!(changed_attrs, a), keys(new))
     end
-    vp.plot[prop][] = vp.plot[prop][]
+    for a in changed_attrs
+        vp.plot[a][] = vp.plot[a][]
+    end
     disable_transition_checks(false)
     nothing
 end
-
-function set_agent_colors!(f, vp::VahanaPlot)
-    _set_agent_plot_properties!(f, vp, :node_color) do color, _, _
-        typeof(color) == String ? parse(Colorant, color) : color
-    end
-end
-
-set_agent_colors!(vp::VahanaPlot, f) = set_agent_colors!(f, vp)
-
-function set_edge_colors!(f, vp::VahanaPlot)
-    _set_edge_plot_properties!(f, vp, :edge_color) do color, to, _
-        typeof(color) == String ? parse(Colorant, color) : color
-    end
-end
-
-function set_agent_positions!(f, vp; jitter = nothing)
-    _set_agent_plot_properties!(f, vp, :node_pos) do pos, id, T
-        j = isnothing(jitter) ? get(vp.pos_jitter, T, 0.0) : jitter
-        jit = get!(vp.jitter_val, id, ( rand() * j - j/2, rand() * j - j/2 ))
-        [ pos[1] + jit[1], pos[2] + jit[2]]
-    end
-end
-
 
 import Base.display
 
@@ -96,10 +104,10 @@ display(vp::VahanaPlot) = Base.display(vp.figure)
 function create_plot(sim::Simulation;
               agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
               edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
-              agent_pos_fn = nothing,
-              pos_jitter = nothing,
-              agent_color_fn = nothing,
-              edge_color_fn = nothing)
+              update_fn = nothing,
+              click_fn = nothing,
+              hover_fn = nothing,
+              pos_jitter = nothing)
     vg = vahanagraph(sim; agenttypes = agenttypes, edgetypes = edgetypes)
 
     f, ax, p = plot(vg)
@@ -108,16 +116,16 @@ function create_plot(sim::Simulation;
                     figure = f,
                     axis = ax,
                     plot = p,
-                    node_pos_fn = agent_pos_fn,
-                    node_color_fn = agent_color_fn,
-                    edge_color_fn = edge_color_fn)
+                    update_fn = update_fn,
+                    click_fn = click_fn,
+                    hover_fn = hover_fn)
 
     if !isnothing(pos_jitter)
         vp.pos_jitter = Dict(pos_jitter)
     end
 
     function _node_click_action(idx, _, _)
-        vp.last_clicked_agent = vg.g2v[idx]
+        vp.clicked_agent = vg.g2v[idx]
         update_plot!(vp)
     end
     register_interaction!(vp.axis,
@@ -127,12 +135,13 @@ function create_plot(sim::Simulation;
 end
 
 function update_plot!(vp::VahanaPlot)
-    isnothing(vp.node_color_fn) ? nothing :
-        set_agent_colors!(vp.node_color_fn, vp)
-    isnothing(vp.node_pos_fn) ? nothing :
-        set_agent_positions!(vp.node_pos_fn, vp)
-    isnothing(vp.edge_color_fn) ? nothing :
-        set_edge_colors!(vp.edge_color_fn, vp)
+    if ! isnothing(vp.update_fn)
+        _set_agents_plot_attrs!(vp.update_fn, vp)
+        _set_edge_plot_properties!(vp.update_fn, vp)
+    end
+
+    autolimits!(vp.axis)
+    
     vp
 end
 
@@ -216,16 +225,33 @@ function plot(vg::VahanaGraph)
     rv = 1:nv(vg)
     re = 1:ne(vg)
     p = graphplot(vg,
-                  node_size = [ 10 for _ in rv],
                   node_color = [ agentcolors[type_nr(vg.g2v[i]) + 1]
                                  for i in rv ],
+                  node_size = [ 10 for _ in rv ],
+                  node_marker = [ :circle for _ in rv ],
+#                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
                   nlabels = [ "" for _ in rv ],
+                  nlabels_align = [ (:left, :bottom) for _ in rv ],
+                  nlabels_color = [ :black for _ in rv ],
+                  nlabels_distance = [ 0.0 for _ in rv ],
+                  nlabels_offset = [ Makie.Point(0, 0) for _ in rv ],
+                  nlabels_textsize = [ 14 for _ in rv ],
                   edge_color = [ edgecolors[vg.edgetypeidx[i] + 1]
                                  for i in re ],
-                  elabels = [ "" for _ in re ])
-    
-    p.plot.elabels_align = (:left, :bottom)
-    p.plot.elabels_rotation = 0
+                  edge_width = [ 1.5 for _ in re ],
+                  elabels = [ "" for _ in re ],
+                  elabels_align = [ (:left, :bottom) for _ in re ],
+                  elabels_color = [ :black for _ in re ],
+                  elabels_distance = [ 0.0 for _ in re ],
+                  elabels_offset = [ Makie.Point(0, 0) for _ in re ],
+                  elabels_rotation = Vector{Any}([ Makie.automatic for _ in re ]),
+                  elabels_shift = [ 0.5 for _ in re ],
+                  elabels_side = [ :left for _ in re ],
+                  elabels_textsize = [ 14 for _ in re ],
+                  arrow_shift = [ 0.5 for _ in re ],
+                  #arrow_show = [ true for _ in re ], ! supported by Makie
+                  arrow_size = [ 12 for _ in re ]
+                  )
 
     # hidedecorations!(p.axis)
     hidespines!(p.axis)
