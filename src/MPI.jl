@@ -135,7 +135,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
         end
 
         with_logger(sim) do
-            @debug "<Begin> transmit_agents!" agenttype=T
+            @debug "<Begin> transmit_agents!" agenttype=$T
         end
         
         for ET in readableET
