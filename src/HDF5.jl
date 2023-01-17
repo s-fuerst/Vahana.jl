@@ -9,6 +9,9 @@ import Base.convert
 convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}}, ci::CartesianIndex{2}) =
     (x = ci[1], y = ci[2])
 
+convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}}, ci::CartesianIndex{3}) =
+    (x = ci[1], y = ci[2], z = ci[3])
+
 
 # this is called in new_simulation
 function open_h5file(sim::Simulation, filename = sim.name, readwrite::String = "w")
@@ -23,13 +26,12 @@ function open_h5file(sim::Simulation, filename = sim.name, readwrite::String = "
     HDF5.attributes(fid)["modelname"] = sim.model.name
     HDF5.attributes(fid)["modelhash"] = hash(sim.model)
     HDF5.attributes(fid)["simulationname"] = sim.name
+    HDF5.attributes(fid)["fileformat"] = 1
     
     # write the parameters
     pid = create_group(fid, "params")
     for k in fieldnames(typeof(sim.params))
-        if mpi.isroot
-            pid[string(k)] = getfield(sim.params, k)
-        end
+        pid[string(k)] = getfield(sim.params, k)
     end
 
     gid = create_group(fid, "globals")
@@ -48,11 +50,16 @@ function open_h5file(sim::Simulation, filename = sim.name, readwrite::String = "
 end
 
 function write_globals(sim::Simulation, fields = fieldnames(typeof(sim.globals)))
+    if sim.h5file === nothing
+        return
+    end
+    
     _log_time(sim, "write globals") do
         t = "t_" * string(sim.num_transitions)
 
         for k in fieldnames(typeof(sim.globals))
             if k in fields
+                @info k sim.globals
                 gid = sim.h5file["globals"][string(k)]
                 HDF5.attributes(gid)["last_transition"] = sim.num_transitions
                 gid[t] = getfield(sim.globals, k)
@@ -68,20 +75,17 @@ function write_agents(sim::Simulation, types::Vector{DataType} = sim.typeinfos.n
 # foreignstate   last_transmit  nextid         shmdied        write
 
 # read: died reuseable state
+    if sim.h5file === nothing
+        return
+    end
 
     _log_time(sim, "write agents") do
         t = "t_" * string(sim.num_transitions)
 
         for T in types
             field = getproperty(sim, Symbol(T))
-            num_agents = if !has_trait(sim, T, :Immortal, :Agent)
-                field.nextid - 1
-            else
-                length(field.read.died)
-            end
-
+            num_agents = field.nextid - 1
             vec_space = dataspace((num_agents,))
-
             
             tid = create_group(sim.h5file["agents"][string(T)], t)
             for pe in 0:(mpi.size-1)
@@ -109,6 +113,22 @@ function write_agents(sim::Simulation, types::Vector{DataType} = sim.typeinfos.n
     nothing
 end
 
+function write_edges(sim::Simulation, types::Vector{DataType} = sim.typeinfos.edges_types)
+    if sim.h5file === nothing
+        return
+    end
+
+    _log_time(sim, "write edges") do
+        t = "t_" * string(sim.num_transitions)
+
+        for T in types
+            # prepare_read! triggers the distributions of the edges to the
+            # correct nodes
+            prepare_read!(sim, Vector{DataType}(), T)
+            finish_read!(sim, T)
+        end
+    end
+end
 
 function write_snapshot(sim::Simulation)
     fid = sim.h5file

@@ -276,7 +276,7 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
                return_idmapping = false, partition_algo = :Metis, distribute = true,
-               output_filename = nothing)
+               output_filename = sim.name)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
 
     _log_info(sim, "<Begin> finish_init!")
