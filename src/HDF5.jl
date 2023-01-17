@@ -23,13 +23,12 @@ function open_h5file(sim::Simulation, filename = sim.name, readwrite::String = "
     HDF5.attributes(fid)["modelname"] = sim.model.name
     HDF5.attributes(fid)["modelhash"] = hash(sim.model)
     HDF5.attributes(fid)["simulationname"] = sim.name
+
     
     # write the parameters
     pid = create_group(fid, "params")
     for k in fieldnames(typeof(sim.params))
-        if mpi.isroot
-            pid[string(k)] = getfield(sim.params, k)
-        end
+        pid[string(k)] = getfield(sim.params, k)
     end
 
     gid = create_group(fid, "globals")
@@ -45,6 +44,18 @@ function open_h5file(sim::Simulation, filename = sim.name, readwrite::String = "
     foreach(T -> create_group(eid, string(T)), sim.typeinfos.edges_types)
 
     fid
+end
+
+function close_h5file(sim::Simulation)
+    if sim.h5file == nothing
+        return
+    end
+
+    _log_time(sim, "close h5file") do
+        close(sim.h5file)
+    end
+
+    nothing
 end
 
 function write_globals(sim::Simulation, fields = fieldnames(typeof(sim.globals)))
@@ -74,32 +85,29 @@ function write_agents(sim::Simulation, types::Vector{DataType} = sim.typeinfos.n
 
         for T in types
             field = getproperty(sim, Symbol(T))
-            num_agents = if !has_trait(sim, T, :Immortal, :Agent)
+            num_agents = if has_trait(sim, T, :Immortal, :Agent)
                 field.nextid - 1
             else
                 length(field.read.died)
             end
 
-            vec_space = dataspace((num_agents,))
+            vec_num_agents = MPI.Allgather(num_agents, mpi.comm)
 
-            
             tid = create_group(sim.h5file["agents"][string(T)], t)
             for pe in 0:(mpi.size-1)
                 peid = create_group(tid, "pe_" * string(pe))
                 if ! has_trait(sim, T, :Immortal, :Agent)
+                    create_dataset(peid, "died", Bool, (vec_num_agents[pe+1],))
                     if pe == mpi.rank 
-                        peid["died"] = field.read.died
-                    elseif HDF5.has_parallel()
-                        create_dataset(peid, "died", HDF5.Datatype(Bool), vec_space)
+                        peid["died"][:] = field.read.died
                     end
                 end
                 if ! has_trait(sim, T, :Stateless, :Agent)
+                    create_dataset(peid, "state",
+                                   HDF5.Datatype(HDF5.hdf5_type_id(T)),
+                                   dataspace((Int64(vec_num_agents[pe+1]),)))
                     if pe == mpi.rank 
-                        peid["state"] = field.read.state
-                    elseif HDF5.has_parallel()
-                        dset = create_dataset(peid, "state",
-                                              HDF5.Datatype(HDF5.hdf5_type_id(T)),
-                                              vec_space)
+                       peid["state"][:] = field.read.state
                     end
                 end
             end

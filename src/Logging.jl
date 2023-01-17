@@ -33,7 +33,7 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
     now = time()
     buf = IOBuffer()
     iob = IOContext(buf, logger.stream)
-    msglines = eachsplit(chomp(convert(String, string(message))::String), '\n')
+    msglines = split(chomp(convert(String, string(message))::String), '\n')
     msg1, rest = Iterators.peel(msglines)
     # check for <Begin> or <End> tags
     msg1split = split(msg1, ">")
@@ -77,7 +77,7 @@ function createLogger(name, logging, debug)
         nothing
     logger = logging ?
         VahanaLogger(logfile,
-                     debug ? Debug : Info,
+                     debug ? Logging.Debug : Logging.Info,
                      debug,
                      time(),
                      Dict{String, Float64}(),

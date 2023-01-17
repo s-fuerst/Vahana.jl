@@ -297,7 +297,7 @@ function finish_init!(sim;
         # we are creating an own partition only when no partition is given
         if length(partition) == 0 && mpi.isroot
             if partition_algo == :Metis
-                @info "Partitioning the Simulation with Metis"
+                _log_info(sim, ">>> Partitioning the Simulation with Metis")
                 vsg = _log_time(sim, "create simple graph", true) do 
                     vahanasimplegraph(sim; show_ignorefrom_warning = false)
                 end
@@ -310,7 +310,7 @@ function finish_init!(sim;
                 end
                 _log_debug(sim, "<End> remap ids")
             elseif partition_algo == :EqualAgentNumbers
-                @info "Partitioning the Simulation / equal number of nodes per type"
+                _log_info(sim, ">>> Partitioning the Simulation / equal number of nodes per type")
                 _log_debug(sim, "<Begin> create equal partitions")
                 for T in sim.typeinfos.nodes_types
                     ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
@@ -322,7 +322,7 @@ function finish_init!(sim;
             end
         end
         if mpi.isroot
-            @info "Distributing the Simulation"
+            _log_info(sim, ">>> Distributing the Simulation")
         end
         _log_time(sim, "distribute!") do
             distribute!(sim, partition) end
@@ -412,15 +412,13 @@ function finish_simulation!(sim)
     end
     empty!(sim.rasters)
 
-    if sim.h5file !== nothing
-        HDF5.close(sim.h5file)
-    end
+    close_h5file(sim)
 
+    _log_info(sim, "<End> finish_simulation!")
+    
     if sim.logging.file !== nothing
         close(sim.logging.file)
     end
-        
-    _log_info(sim, "<End> finish_simulation!")
 
     sim.globals
 end
