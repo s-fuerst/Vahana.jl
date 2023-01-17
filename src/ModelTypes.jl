@@ -201,5 +201,12 @@ end
 register_edgetype!(t::Type{T}, props...; kwargs...) where T =
     types -> register_edgetype!(types, t, props...; kwargs...) 
 
-has_trait(sim, T::DataType, trait::Symbol) = 
-    trait in sim.typeinfos.edges_attr[T][:traits]
+has_trait(sim, T::DataType, trait::Symbol, ge = :Edge) =
+    if ge == :Edge
+        trait in sim.typeinfos.edges_attr[T][:traits]
+    elseif ge == :Agent 
+        trait in sim.typeinfos.nodes_attr[T][:traits]
+    else
+        @error "Unknown graph element, use :Agent or :Edge"
+    end
+        
