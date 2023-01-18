@@ -132,7 +132,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(initialized::Bool),
                   :(intransition::Bool),
                   :(num_transitions::Int64),
-                  :(logging::Log),
+                  :(logger::Log),
                   :(h5file::Union{HDF5.File, Nothing}),
                   edgefields...,
                   nodefields...)
@@ -208,7 +208,7 @@ function new_simulation(model::Model,
         initialized = false,
         intransition = false,
         num_transitions = 0,
-        logging = createLogger($name, $logging, $debug),
+        logger = create_logger($name, $logging, $debug),
         h5file = nothing # we need the sim instance to create the h5file
     )
 
@@ -348,7 +348,7 @@ function finish_init!(sim;
         if endswith(output_filename, ".h5")
             output_filename = output_filename[1, end-3]
         end
-        sim.h5file = open_h5file(sim, output_filename, "w")
+        create_h5file!(sim, output_filename, "w")
     end
 
     sim.initialized = true
@@ -372,13 +372,24 @@ end
     copy_simulation!(sim)
 
 Create an independent copy of the simulation `sim`. Since part of the
-memory is allocated via MPI, you should not use deepcopy.
+memory is allocated via MPI, you should not use deepcopy. 
+
+Also, the copy does not write to an output or logger file. If these
+are needed, you can create these files for the copy by calling
+[`create_h5file!`](@ref) and/or [`create_logger!`](@ref) and assigning
+the results to the h5file/logging field of the returned simulation.
+
+Returns the copy of the simulation.
 """
 function copy_simulation(sim)
     copy = deepcopy(sim)
-    # we copied also the MPI Windows, so that the copy points to the same
-    # memory as the original. So this must be fixed.
+    # we also copied the MPI windows, so the copy points to the same
+    # memory as the original. So this needs to be fixed.
     foreach(T -> copy_shm!(copy, T), sim.typeinfos.nodes_types)
+    copy.h5file = nothing
+    # disable logging for the copy
+    copy.logger = create_logger(sim.name, false, false)
+
     copy
 end
 
@@ -412,12 +423,12 @@ function finish_simulation!(sim)
     end
     empty!(sim.rasters)
 
-    close_h5file(sim)
+    close_h5file!(sim)
 
     _log_info(sim, "<End> finish_simulation!")
     
-    if sim.logging.file !== nothing
-        close(sim.logging.file)
+    if sim.logger.file !== nothing
+        close(sim.logger.file)
     end
 
     sim.globals

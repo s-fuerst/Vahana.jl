@@ -330,7 +330,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         with_logger(sim) do
             @debug "<Begin> edges_alltoall!" edgetype=$T
         end
-        # for sending them via AllToAll we flatten the perPE structure 
+        # for sending them via AllToAll we flatten the perPE structure
         longvec = reduce(vcat, perPE)
         sendbuf = if length(longvec) > 0
             VBuffer(longvec, [ length(perPE[i]) for i in 1:mpi.size ])

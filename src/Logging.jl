@@ -3,7 +3,7 @@ using Logging, Dates
 using Base: debug_color
 import Logging: with_logger, shouldlog, min_enabled_level, catch_exceptions, handle_message
 
-export with_logger
+export with_logger, create_logger!
 
 struct VahanaLogger <: Logging.AbstractLogger
     stream::IO
@@ -72,7 +72,7 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
     nothing
 end
 
-function createLogger(name, logging, debug)
+function create_logger(name, logging, debug)
     logfile = logging ? open(name * "_" * string(mpi.rank) * ".log"; write = true) :
         nothing
     logger = logging ?
@@ -90,9 +90,17 @@ end
 """
 TODO: DOC
 """
+function create_logger!(sim, debug = false, name = sim.name)
+    sim.logger = create_logger(name, true, debug)
+end
+
+
+"""
+TODO: DOC
+"""
 function with_logger(f::Function, sim::Simulation)
-    if sim.logging.logger !== nothing
-        with_logger(f, sim.logging.logger)
+    if sim.logger.logger !== nothing
+        with_logger(f, sim.logger.logger)
     end
 end
 
