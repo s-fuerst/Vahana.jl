@@ -4,6 +4,7 @@ using HDF5
 
 export create_h5file!, close_h5file!
 export write_globals, write_params, write_agents, write_edges, write_snapshot
+export read_snapshot!
 
 import Base.convert
 
@@ -13,23 +14,33 @@ convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}}, ci::CartesianIndex{2}
 convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}}, ci::CartesianIndex{3}) =
     (x = ci[1], y = ci[2], z = ci[3])
 
+import Base.hash
+hash(model::Model) = hash(model.types.edges_attr) +
+    hash(model.types.edges_types) +
+    hash(model.types.nodes_attr) +
+    hash(model.types.nodes_types) +
+    hash(model.types.nodes_type2id) 
 
 # this is called in new_simulation
-function create_h5file!(sim::Simulation, filename = sim.name, readwrite::String = "w")
+function create_h5file!(sim::Simulation, filename = sim.name)
     fid = if HDF5.has_parallel()
         _log_info(sim, "Create hdf5 file in parallel mode")
-        HDF5.h5open(filename * ".h5", readwrite, mpi.comm, MPI.Info())
+        HDF5.h5open(filename * ".h5", "w", mpi.comm, MPI.Info())
     else
         _log_info(sim, "Create hdf5 file without parallel mode")
-        HDF5.h5open(filename * "_" * string(mpi.rank) * ".h5", readwrite)
+        HDF5.h5open(filename * "_" * string(mpi.rank) * ".h5", "w")
     end
 
     sim.h5file = fid
 
-    attrs(fid)["modelname"] = sim.model.name
-    attrs(fid)["modelhash"] = hash(sim.model)
     attrs(fid)["simulationname"] = sim.name
+    attrs(fid)["modelname"] = sim.model.name
+    @info "hash_create" hash(sim.model) 
+    attrs(fid)["modelhash"] = hash(sim.model)
     attrs(fid)["fileformat"] = 1
+    attrs(fid)["mpisize"] = mpi.size
+    attrs(fid)["mpirank"] = mpi.rank
+    attrs(fid)["HDF5parallel"] = HDF5.has_parallel()
     
     # write the parameters
     pid = create_group(fid, "params")
@@ -269,4 +280,49 @@ function write_snapshot(sim::Simulation)
     
     write_agents(sim)
     write_edges(sim)
+end
+
+function open_h5file!(sim::Simulation, filename)
+    # first we sanitize the filename
+    if endswith(filename, ".h5")
+        filename = filename[1:end-3]
+    end
+    if endswith(filename, "_0")
+        filename = filename[1:end-2]
+    end
+    # we can have a single file written in parallel mode, or mpi.size files
+    # written without parallel mode. In the later case, the filenames
+    # end with _0, _1 ... _mpi.size-1
+    parallel = isfile(filename * ".h5")
+    filenames::Vector{String} = if parallel
+        [ filename * ".h5" ]
+    else
+        # first we open file _0 to get mpi.size
+        fid = HDF5.h5open(filename * "_0.h5", "r")
+        h5mpisize = attrs(fid)["mpisize"]
+        close(fid)
+        [ filename * "_$(i).h5" for i in 0:(h5mpisize-1) ]
+    end
+
+    # In the case that we have seperate files for each process, we don't
+    # need to open the files in parallel mode
+    fids = if HDF5.has_parallel() && parallel && mpi.size > 1
+        _log_info(sim, "Open hdf5 file in parallel mode")
+        [ HDF5.h5open(f, "r", mpi.comm, MPI.Info()) for f in filenames ]
+    else
+        _log_info(sim, "Open hdf5 file without parallel mode")
+        [ HDF5.h5open(f, "r") for f in filenames ]
+    end
+
+    @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
+       The file was written for a different model than that of the given simulation.     
+    """
+    h5mpisize = attrs(fids[1])["mpisize"]
+    if mpi.size > 1
+        @assert mpi.size == h5mpisize """
+            The file can only be read with 1 or $(h5mpisize) processes
+        """
+    end
+
+    length(fids) > 1 ? fids : fill(fids[1], h5mpisize)
 end

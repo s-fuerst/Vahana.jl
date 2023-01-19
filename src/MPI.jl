@@ -353,7 +353,6 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         # this number directly into the edges container of the receiving PE
         if $stateless && $ignorefrom
             for (to, numedges) in recvbuf.data
-                @assert numedges == 1
                 up = if $singletype
                     updateid(to) |> agent_nr
                 else
@@ -364,7 +363,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
                     @inbounds @edgewrite($T)[up] = true
                 else
                     if $singletype || haskey(@edgewrite($T), up)
-                        @inbounds @edgewrite($T)[up] += 1
+                        @inbounds @edgewrite($T)[up] += numedges
                     else
                         @inbounds @edgewrite($T)[up] = numedges
                     end

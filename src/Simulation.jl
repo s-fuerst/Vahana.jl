@@ -348,7 +348,7 @@ function finish_init!(sim;
         if endswith(output_filename, ".h5")
             output_filename = output_filename[1, end-3]
         end
-        create_h5file!(sim, output_filename, "w")
+        create_h5file!(sim, output_filename)
     end
 
     sim.initialized = true
