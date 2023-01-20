@@ -6,3 +6,4 @@
 /docs/src/tutorial1.md
 /LocalPreferences.toml
 *.h5
+*.log
