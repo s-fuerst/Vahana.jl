@@ -125,6 +125,7 @@ function construct_model(typeinfos::ModelTypes, name::String)
     fields = Expr(:block,
                   :(model::Model),
                   :(name::String),
+                  :(filename::String),
                   :(params::P),
                   :(globals::G),
                   :(typeinfos::ModelTypes),
@@ -196,11 +197,13 @@ function new_simulation(model::Model,
                  params::P = nothing,
                  globals::G = nothing;
                  name = model.name,
+                 filename = name,
                  logging = false, debug = false) where {P, G}
     
     sim::Simulation = @eval $(Symbol(model.name))(
         model = $model,
         name = $name,
+        filename = $filename,
         params = $params,
         globals = $globals,
         typeinfos = $(model.types),
@@ -275,8 +278,7 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
-               return_idmapping = false, partition_algo = :Metis, distribute = true,
-               output_filename = sim.name)
+               return_idmapping = false, partition_algo = :Metis, distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
 
     _log_info(sim, "<Begin> finish_init!")
@@ -343,13 +345,6 @@ function finish_init!(sim;
 
     foreach(finish_write!(sim), sim.typeinfos.nodes_types)
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
-
-    if output_filename !== nothing
-        if endswith(output_filename, ".h5")
-            output_filename = output_filename[1, end-3]
-        end
-        create_h5file!(sim, output_filename)
-    end
 
     sim.initialized = true
 

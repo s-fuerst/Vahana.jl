@@ -1,10 +1,11 @@
 using MPI
 
+using Base: typesof
 using HDF5
 
 export create_h5file!, close_h5file!
 export write_globals, write_params, write_agents, write_edges, write_snapshot
-export read_snapshot!
+export open_h5file, read_agents!
 
 import Base.convert
 
@@ -22,7 +23,11 @@ hash(model::Model) = hash(model.types.edges_attr) +
     hash(model.types.nodes_type2id) 
 
 # this is called in new_simulation
-function create_h5file!(sim::Simulation, filename = sim.name)
+function create_h5file!(sim::Simulation, filename = sim.filename)
+    if endswith(filename, ".h5")
+        filename = filename[1, end-3]
+    end
+    
     fid = if HDF5.has_parallel()
         _log_info(sim, "Create hdf5 file in parallel mode")
         HDF5.h5open(filename * ".h5", "w", mpi.comm, MPI.Info())
@@ -35,7 +40,6 @@ function create_h5file!(sim::Simulation, filename = sim.name)
 
     attrs(fid)["simulationname"] = sim.name
     attrs(fid)["modelname"] = sim.model.name
-    @info "hash_create" hash(sim.model) 
     attrs(fid)["modelhash"] = hash(sim.model)
     attrs(fid)["fileformat"] = 1
     attrs(fid)["mpisize"] = mpi.size
@@ -92,7 +96,11 @@ function close_h5file!(sim::Simulation)
 end
 
 function write_params(sim::Simulation)
-    if sim.h5file !== nothing && sim.params !== nothing
+    if sim.h5file === nothing
+        create_h5file!(sim)
+    end
+
+    if sim.params !== nothing
         for k in fieldnames(typeof(sim.params))
             write(sim.h5file["params"][string(k)], getfield(sim.params, k))
         end
@@ -102,10 +110,14 @@ end
 function write_globals(sim::Simulation,
                 fields = sim.globals === nothing ?
                     nothing : fieldnames(typeof(sim.globals)))
-    if sim.h5file === nothing || fields === nothing
+    if sim.h5file === nothing 
+        create_h5file!(sim)
+    end
+
+    if fields === nothing
         return
     end
-    
+     
     _log_time(sim, "write globals") do
         t = "t_" * string(sim.num_transitions)
 
@@ -121,9 +133,10 @@ function write_globals(sim::Simulation,
     nothing
 end
 
-function write_agents(sim::Simulation, types::Vector{DataType} = sim.typeinfos.nodes_types)
-    if sim.h5file === nothing
-        return
+function write_agents(sim::Simulation,
+               types::Vector{DataType} = sim.typeinfos.nodes_types)
+    if sim.h5file === nothing 
+        create_h5file!(sim)
     end
 
     _log_time(sim, "write agents") do
@@ -184,7 +197,7 @@ end
 
 function write_edges(sim::Simulation, types::Vector{DataType} = sim.typeinfos.edges_types)
     if sim.h5file === nothing
-        return
+       create_h5file!(sim)
     end
 
     neighbors_only(T) = (has_trait(sim, T, :Stateless) || fieldcount(T) == 0) &&
@@ -255,7 +268,7 @@ end
 function write_rasters(sim::Simulation,
                 rasters = sim.rasters === nothing ? nothing : keys(sim.rasters))
     if sim.h5file === nothing
-        return
+       create_h5file!(sim)
     end
 
     _log_time(sim, "write rasters") do
@@ -267,7 +280,7 @@ end
 
 function write_snapshot(sim::Simulation)
     if sim.h5file === nothing
-        return
+       create_h5file!(sim)
     end
 
     fid = sim.h5file
@@ -282,7 +295,7 @@ function write_snapshot(sim::Simulation)
     write_edges(sim)
 end
 
-function open_h5file!(sim::Simulation, filename)
+function open_h5file(sim::Simulation, filename)
     # first we sanitize the filename
     if endswith(filename, ".h5")
         filename = filename[1:end-3]
@@ -325,4 +338,111 @@ function open_h5file!(sim::Simulation, filename)
     end
 
     length(fids) > 1 ? fids : fill(fids[1], h5mpisize)
+end
+
+
+function find_transition_group(ids, transition::Int)
+    if length(ids) == 0
+        return (nothing, nothing)
+    end
+    ts = filter(<=(transition), map(s -> parse(Int64, s[3:end]), keys(ids)))
+    if length(ts) == 0
+        return (nothing, nothing)
+    end
+    last_transition = maximum(ts)
+    (ids["t_$(last_transition)"], last_transition)
+end
+
+function find_agent_peid(fid, transition::Int, rank, T::DataType)
+    (trid, last_transition) =
+        find_transition_group(fid["agents"][string(T)], transition)
+    if trid === nothing
+        (nothing, nothing)
+    else
+        (trid["pe_$(rank)"], last_transition)
+    end
+end
+
+function _read_agents_restore!(sim::Simulation, fids, transition, T::DataType)
+    (peid, last_transition) =
+        find_agent_peid(fids[mpi.rank + 1], transition, mpi.rank, T)
+
+    if peid === nothing
+        @info "Found no data for $T which was written before transition $(transition)"
+        return sim
+    end
+
+    with_logger(sim) do
+        @debug("<Begin> _read_agents_restore!",
+               agenttype=T, transition=transition)
+    end
+    
+    field = getproperty(sim, Symbol(T))
+
+    for ET in sim.typeinfos.edges_types
+        field.last_transmit[ET] = -1
+    end
+    
+    size = attrs(peid)["array_size"]
+    field.nextid = size + 1
+
+    if ! has_trait(sim, T, :Immortal, :Agent)
+        if size > 0
+            field.write.died = peid["died"][]
+        else
+            field.write.died = Vector{Bool}()
+        end
+    end
+    if fieldcount(T) > 0
+        if size > 0
+            field.write.state = Vector{T}(undef, size)
+            filestate = peid["state"][]
+            @assert sizeof(filestate[1]) == sizeof(T)
+            # we know that T is a bitstype, so this allows to "cast" the type
+            # from the tuple we get from the HDF5 library to the type T,
+            # assuming that each field is stored and read with the correct type
+            Base._memcpy!(field.write.state, filestate, size * sizeof(T))
+        end    
+    end
+
+    # this move the state to the shared memory (and to read) 
+    finish_write!(sim, T)
+
+    empty!(field.read.reuseable)
+    if ! has_trait(sim, T, :Immortal, :Agent)
+        for i in 1:size
+            if field.read.died[i]
+                push!(field.read.reuseable, i)
+            end
+        end
+    end
+    
+    _log_debug(sim, "<End> _read_agents_restore!")
+
+    sim
+end
+
+
+# merge distributed graph into a single one
+
+function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)                    
+end
+
+
+function read_agents!(sim::Simulation,
+               fids::Vector{HDF5.File},
+               transition = typemax(Int64),
+               types::Vector{DataType} = sim.typeinfos.nodes_types)
+    _log_time(sim, "read agents") do
+        merge::Bool = length(fids) > mpi.size
+        @assert !merge || mpi.size == 1
+        
+        for T in types
+            if merge
+                _read_agents_merge!(sim, fids, transition, T)
+            else
+                _read_agents_restore!(sim, fids, transition, T)
+            end
+        end
+    end
 end

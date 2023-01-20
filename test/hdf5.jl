@@ -1,9 +1,18 @@
+using OhMyREPL
+
 using Revise
 
 using Vahana
 
-struct Agent
+using Test
+
+struct InnerStruct
+    f::Float64
     i::Int64
+end
+
+struct Agent
+    inner::InnerStruct
     f::Float64
 end
 
@@ -26,11 +35,17 @@ struct Params
     pb::Int64
 end
 
-function test(model)
-    sim = model |>
-        new_simulation(Params(1,2), Globals(1,2))
+function sumi2o(state, _, _)
+    Agent(state.inner, state.inner.f + state.inner.i)
+end
 
-    ids = add_agents!(sim, [ Agent(i,i) for i in 1:(5 * mpi.size) ])
+function test(model)
+    @info "start model $(model.name)" mpi.rank
+    
+    sim = model |>
+        new_simulation(Params(1,2), Globals(1,2); logging = true, debug = true)
+
+    ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:(5 * mpi.size) ])
 
     for id in ids
         add_edge!(sim, id, id, EdgeState(id, id))
@@ -40,11 +55,10 @@ function test(model)
 
     add_agent!(sim, StatelessAgent())
 
-    add_raster!(sim, :vierdspace, (2,2,2,1), _ -> StatelessAgent())
+    add_raster!(sim, :fourdspace, (2,2,2,1), _ -> StatelessAgent())
 
     finish_init!(sim;
                  partition_algo = :EqualAgentNumbers)
-
 
     write_snapshot(sim)
 
@@ -60,8 +74,27 @@ function test(model)
     write_params(sim)
 
     close(sim.h5file)
-    #    finish_simulation!(sim)
-    sim
+
+    restored = new_simulation(model, Params(3,4), Globals(3,4))
+
+    read_agents!(restored, open_h5file(restored, sim.name))
+
+    @test sim.Agent.read.died == restored.Agent.read.died
+    @test sim.Agent.read.state == restored.Agent.read.state
+    @test sim.Agent.read.reuseable == restored.Agent.read.reuseable
+    @test sim.Agent.nextid == restored.Agent.nextid
+    
+    apply_transition!(sim, sumi2o, [ Agent ], [ Agent ], [ Agent ])
+
+    restored.initialized = true
+
+    apply_transition!(restored, sumi2o, [ Agent ], [ Agent ], [ Agent ])
+
+    @test sim.Agent.read.state == restored.Agent.read.state
+
+#    finish_simulation!(sim)
+    
+    (sim, restored)
 end
 
 model = ModelTypes() |>
@@ -91,4 +124,5 @@ model = ModelTypes() |>
                        to_agenttype = Agent) |>
     construct_model("hdf5_neighbors")
 
-sim  = test(model)
+(sim, restored)  = test(model)
+

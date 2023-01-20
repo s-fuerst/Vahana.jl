@@ -291,6 +291,11 @@ function show_agent(sim,
     if id == 0
         agents = readstate(sim, T) |> keys
         
+        if ! has_trait(sim, T, :Immortal, :Agent)
+            field = getproperty(sim, Symbol(T))
+            agents = [ a for a in agents if ! field.read.died[a] ]
+        end
+        
         if length(agents) == 0
             println("No agent of type $T found.")
             return

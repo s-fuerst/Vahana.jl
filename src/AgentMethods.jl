@@ -20,7 +20,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         @nextid($T) = AgentNr(1)
 
         for ET in sim.typeinfos.edges_types
-            @agent($T).last_transmit[ET] = 0
+            @agent($T).last_transmit[ET] = -1
         end
         
         nothing
@@ -239,6 +239,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
             end
 
+            # maybe the state has change, so we must clear the cache 
             empty!(@agent($T).foreigndied)
         end
 
@@ -257,6 +258,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
 
+            # maybe the state has change, so we must clear the cache 
             empty!(@agent($T).foreignstate)
         else
             # for stateless T this is a fast operation (25 ns), and
