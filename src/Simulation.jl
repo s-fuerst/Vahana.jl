@@ -364,7 +364,7 @@ end
 
 
 """
-    copy_simulation!(sim)
+    copy_simulation(sim)
 
 Create an independent copy of the simulation `sim`. Since part of the
 memory is allocated via MPI, you should not use deepcopy. 

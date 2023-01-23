@@ -1,3 +1,4 @@
+using Makie: Observables
 using GraphMakie, Makie, Colors
 
 import Graphs, Graphs.SimpleGraphs, NetworkLayout
@@ -6,6 +7,7 @@ export plot, create_plot, update_plot!
 
 Base.@kwdef mutable struct VahanaPlot
     sim::Simulation
+    original::Simulation
     vg::VahanaGraph
     # a Vahanaplot encapsulate a GraphMakie plot
     # figure, axis, plot are all returned by the graphplot function
@@ -24,8 +26,12 @@ Base.@kwdef mutable struct VahanaPlot
     jitter_val = Dict{AgentID, NTuple{2, Float64}}()
     # the function to call for updating the attributes of the graph
     update_fn = nothing
-    click_fn = nothing
-    hover_fn = nothing
+    step_fn = nothing
+    reset_fn = nothing
+    # click_fn = nothing
+    # hover_fn = nothing
+    # add a lineplot for the following globals vector
+    globals = Dict{Symbol, Observable}()
 end
 
 function _set_plot_attrs!(vp, idx, attrs, aid, T)
@@ -35,14 +41,14 @@ function _set_plot_attrs!(vp, idx, attrs, aid, T)
             j = get(vp.pos_jitter, T, 0.0) 
             jit = get!(vp.jitter_val, aid, ( rand() * j - j/2, rand() * j - j/2 ))
             v = [ v[1] + jit[1], v[2] + jit[2]]
-        # convert name colors to color values
+            # convert name colors to color values
         elseif (k == :node_color || k == :edge_color) &&
             (typeof(v) == String || typeof(v) == Symbol)
             v = parse(Colorant, v)
-        # elseif k == :edge_transparency
-        #     # change the 
-        #     k = :edge_color
-        #     v = HSLA(HSL(vp.plot[:edge_color][][idx]), v)
+            # elseif k == :edge_transparency
+            #     # change the 
+            #     k = :edge_color
+            #     v = HSLA(HSL(vp.plot[:edge_color][][idx]), v)
         end
 
         vp.plot[k][][idx] = v
@@ -79,7 +85,7 @@ function _set_edge_plot_properties!(f, vp)
         vedge = vp.vg.edges[i]
         from = vp.vg.g2v[vedge.src]
         to = vp.vg.g2v[vedge.dst]
-        edges = edges_to(vp.vg.sim, to, T)
+        edges = edges_to(vp.sim, to, T)
         if isnothing(edges) # this can happen after a state change of sim
             continue
         end
@@ -101,24 +107,41 @@ import Base.display
 
 display(vp::VahanaPlot) = Base.display(vp.figure)
 
+obsrange(x) = 1:length(x)
+
+function _draw_globals(sim, axglobals, obglobals)
+    plots = Dict{Symbol, Lines}()
+    for (name, obs) in obglobals
+            
+        plots[name] = lines!(axglobals, lift(obsrange, obs), obs, label = String(name))
+    end
+    axislegend(axglobals)
+end
+
 function create_plot(sim::Simulation;
               agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
               edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
               update_fn = nothing,
-              click_fn = nothing,
-              hover_fn = nothing,
-              pos_jitter = nothing)
+              step_fn = nothing,
+              reset_fn = nothing,
+              pos_jitter = nothing,
+              globals::Vector{Symbol} = Vector{Symbol}())
     vg = vahanagraph(sim; agenttypes = agenttypes, edgetypes = edgetypes)
 
     f, ax, p = plot(vg)
-    vp = VahanaPlot(sim = sim,
+
+    obglobals = map(sym -> sym => Observable(getglobal(sim, sym)), globals)
+    
+    vp = VahanaPlot(sim = copy_simulation(sim),
+                    original = sim,
                     vg = vg,
                     figure = f,
                     axis = ax,
                     plot = p,
                     update_fn = update_fn,
-                    click_fn = click_fn,
-                    hover_fn = hover_fn)
+                    step_fn = step_fn,
+                    reset_fn = reset_fn,
+                    globals = obglobals)
 
     if !isnothing(pos_jitter)
         vp.pos_jitter = Dict(pos_jitter)
@@ -130,7 +153,36 @@ function create_plot(sim::Simulation;
     end
     register_interaction!(vp.axis,
                           :nodeclick, NodeClickHandler(_node_click_action))
+
+    # if length(obglobals) > 0
+    #     _draw_globals(sim, Axis(f[1, 2]), obglobals)
+    # end
+    
+    if step_fn !== nothing
+        f[2, 1] = buttongrid = GridLayout(tellwidth = false)
+
+        buttongrid[1, 1] = resetbutton = Button(f, label="Reset")
+        on(resetbutton.clicks) do _
+            @info "reset"
+            finish_simulation!(vp.sim)
+            vp.sim = copy_simulation(vp.original)
+            vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
+            #            _draw_globals(vp.sim, Axis(f[1, 2]), globals)
+            update_plot!(vp)
+        end
         
+        buttongrid[1, 2] = stepbutton = Button(f, label="Step")
+        on(stepbutton.clicks) do _
+            step_fn(vp.sim)
+            vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
+            #            _draw_globals(vp.sim, Axis(f[1, 2]), globals)
+            update_plot!(vp)
+        end
+    end
+
+    
+    #    end
+
     update_plot!(vp)
 end
 
@@ -229,7 +281,7 @@ function plot(vg::VahanaGraph)
                                  for i in rv ],
                   node_size = [ 10 for _ in rv ],
                   node_marker = [ :circle for _ in rv ],
-#                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
+                  #                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
                   nlabels = [ "" for _ in rv ],
                   nlabels_align = [ (:left, :bottom) for _ in rv ],
                   nlabels_color = [ :black for _ in rv ],
