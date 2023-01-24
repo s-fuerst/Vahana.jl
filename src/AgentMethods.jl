@@ -188,8 +188,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, ::Type{$T})
         if $immortal 
-            # distributing the initial graph will also kill immortal agents,
-            # so we can assert this only after the sim is initialized
+            # distributing the initial graph or reading from file will
+            # also kill immortal agents, so we can assert this only
+            # after the sim is initialized
             if sim.initialized
                 @assert begin
                     T = $T

@@ -39,9 +39,7 @@ function sumi2o(state, _, _)
     Agent(state.inner, state.inner.f + state.inner.i)
 end
 
-function test(model)
-    @info "start model $(model.name)" mpi.rank
-    
+function createsim(model, distribute = true)
     sim = model |>
         new_simulation(Params(1,2), Globals(1,2); logging = true, debug = true)
 
@@ -58,32 +56,62 @@ function test(model)
     add_raster!(sim, :fourdspace, (2,2,2,1), _ -> StatelessAgent())
 
     finish_init!(sim;
-                 partition_algo = :EqualAgentNumbers)
+                 partition_algo = :EqualAgentNumbers, distribute = distribute)
 
-    write_snapshot(sim)
+    sim
+end    
 
-    apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], [ Agent ]) do state, id, sim
-        num_neighbors(sim, id, EdgeState) == 1 ? nothing : state
+function runsim(model, write)
+    @info "start model $(model.name)" mpi.rank
+    
+    sim = createsim(model)
+
+    if write
+        write_snapshot(sim)
     end
 
-    write_agents(sim, [ Agent ])
+    apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], [ Agent ]) do state, id, sim
+        r = num_neighbors(sim, id, EdgeState) == 1 ? nothing : state
+        r
+    end
 
+    if write
+        write_agents(sim, [ Agent ])
+    end
 
     sim.params = Params(3,4)
     
-    write_params(sim)
+    if write
+        write_params(sim)
+        close(sim.h5file)
+    end
 
-    close(sim.h5file)
+    sim
+end
 
+function restore(sim)
     restored = new_simulation(model, Params(3,4), Globals(3,4))
 
     read_agents!(restored, open_h5file(restored, sim.name))
+    restored
+end
 
+function test_write_restore(model)
+    sim = runsim(model, true)
+    restored = restore(sim)
+    test(sim, restored)
+    
+    finish_simulation!(sim)
+    finish_simulation!(restored)
+end
+
+
+function test(sim, restored)
     @test sim.Agent.read.died == restored.Agent.read.died
     @test sim.Agent.read.state == restored.Agent.read.state
     @test sim.Agent.read.reuseable == restored.Agent.read.reuseable
     @test sim.Agent.nextid == restored.Agent.nextid
-    
+
     apply_transition!(sim, sumi2o, [ Agent ], [ Agent ], [ Agent ])
 
     restored.initialized = true
@@ -91,38 +119,5 @@ function test(model)
     apply_transition!(restored, sumi2o, [ Agent ], [ Agent ], [ Agent ])
 
     @test sim.Agent.read.state == restored.Agent.read.state
-
-#    finish_simulation!(sim)
-    
-    (sim, restored)
 end
-
-model = ModelTypes() |>
-    register_agenttype!(Agent) |>
-    register_agenttype!(StatelessAgent) |>
-    register_edgetype!(EdgeState) |>
-    register_edgetype!(StatelessEdge) |>
-    construct_model("hdf5_default")
-
-test(model)
-
-model = ModelTypes() |>
-    register_agenttype!(Agent) |>
-    register_agenttype!(StatelessAgent, :Immortal) |>
-    register_edgetype!(EdgeState, :IgnoreFrom) |>
-    register_edgetype!(StatelessEdge) |>
-    construct_model("hdf5_ignore_immortal")
-
-test(model)
-
-
-model = ModelTypes() |>
-    register_agenttype!(Agent) |>
-    register_agenttype!(StatelessAgent, :Immortal) |>
-    register_edgetype!(EdgeState, :NumNeighborsOnly) |>
-    register_edgetype!(StatelessEdge, :HasNeighborOnly, :SingleAgentType;
-                       to_agenttype = Agent) |>
-    construct_model("hdf5_neighbors")
-
-(sim, restored)  = test(model)
 

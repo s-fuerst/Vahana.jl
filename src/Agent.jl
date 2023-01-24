@@ -30,10 +30,10 @@ const BITS_TYPE = 8
 const MAX_TYPES = 2 ^ BITS_TYPE
 
 const ProcessID = UInt32
-const BITS_PROCESS = 18
+const BITS_PROCESS = 20
 
 const AgentNr = UInt64
-const BITS_AGENTNR = 38
+const BITS_AGENTNR = 36
 
 const AgentID = UInt64
 
@@ -46,13 +46,19 @@ const AgentID = UInt64
 const SHIFT_TYPE = BITS_PROCESS + BITS_AGENTNR
 const SHIFT_RANK = BITS_AGENTNR
 
-function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
+function agent_id(typeID::TypeID, rank::Int64, agent_nr::AgentNr)::AgentID
     @mayassert typeID <= 2 ^ BITS_TYPE
+    @mayassert rank <= 2 ^ BITS_PROCESS
     @mayassert agent_nr <= 2 ^ BITS_AGENTNR
     AgentID(typeID) << SHIFT_TYPE +
-        mpi.rank << SHIFT_RANK +
+        rank << SHIFT_RANK +
         agent_nr
 end
+
+function agent_id(typeID::TypeID, agent_nr::AgentNr)::AgentID
+    agent_id(typeID, mpi.rank, agent_nr)
+end
+
 
 const process_mask = (2 ^ BITS_PROCESS - 1) << BITS_AGENTNR 
 remove_process(agentID::AgentID) = ~process_mask & agentID
