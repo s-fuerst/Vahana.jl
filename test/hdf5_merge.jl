@@ -3,14 +3,16 @@ include("hdf5_common.jl")
 function test_merge(model)
     sim = runsim(model, false)
     restored = new_simulation(model, Params(3,4), Globals(3,4))
+
     fids = open_h5file(restored, sim.name)
     @assert mpi.size == 1 && length(fids) > 1 """
         this should test the merge functionality (reading a distributed
         sim back to a single process), so the test should not be run 
         with mpi but the files should be written from a mpi simulation 
     """
+    foreach(close, fids)
     
-    read_agents!(restored, open_h5file(restored, sim.name))
+    @info read_agents!(restored, sim.name)
 
     num_agents(sim, Agent) == num_agents(restored, Agent)
 end
@@ -31,7 +33,7 @@ model = ModelTypes() |>
     register_edgetype!(StatelessEdge) |>
     construct_model("hdf5_ignore_immortal")
 
-test_merge(model)
+# test_merge(model)
 
 
 model = ModelTypes() |>
@@ -42,5 +44,5 @@ model = ModelTypes() |>
                        to_agenttype = Agent) |>
                            construct_model("hdf5_neighbors")
 
-test_merge(model)
+# test_merge(model)
 

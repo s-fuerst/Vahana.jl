@@ -9,11 +9,13 @@ export open_h5file, read_agents!
 
 import Base.convert
 
-convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}}, ci::CartesianIndex{2}) =
-    (x = ci[1], y = ci[2])
+convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}},
+        ci::CartesianIndex{2}) =
+            (x = ci[1], y = ci[2])
 
-convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}}, ci::CartesianIndex{3}) =
-    (x = ci[1], y = ci[2], z = ci[3])
+convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}},
+        ci::CartesianIndex{3}) =
+            (x = ci[1], y = ci[2], z = ci[3])
 
 import Base.hash
 hash(model::Model) = hash(model.types.edges_attr) +
@@ -183,8 +185,8 @@ function write_agents(sim::Simulation,
     nothing
 end
 
-# We need to convert the Edges depending of the edge traits to different structs
-# that will be then saved to the HDF5 file
+# We need to convert the Edges depending of the edge traits to
+# different structs that will be then saved to the HDF5 file
 
 struct CompleteEdge{T}
     to::AgentID
@@ -201,10 +203,11 @@ struct EdgeCount
     count::Int64
 end
 
-_neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) || fieldcount(T) == 0) &&
-    has_trait(sim, T, :IgnoreFrom)
+_neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
+    fieldcount(T) == 0) && has_trait(sim, T, :IgnoreFrom)
 
-function write_edges(sim::Simulation, types::Vector{DataType} = sim.typeinfos.edges_types)
+function write_edges(sim::Simulation,
+              types::Vector{DataType} = sim.typeinfos.edges_types)
     if sim.h5file === nothing
         create_h5file!(sim)
     end
@@ -236,15 +239,18 @@ function write_edges(sim::Simulation, types::Vector{DataType} = sim.typeinfos.ed
                 # so we have four different cases 
                 peid = if _neighbors_only(sim, T)
                     if has_trait(sim, T, :SingleAgentType)
-                        create_dataset(tid, pename, eltype(edges), vec_num_edges[pe+1])
+                        create_dataset(tid, pename, eltype(edges),
+                                       vec_num_edges[pe+1])
                     else
                         create_dataset(tid, pename,
-                                       HDF5.Datatype(HDF5.hdf5_type_id(EdgeCount)),
+                                       HDF5.Datatype(HDF5.hdf5_type_id(
+                                           EdgeCount)),
                                        dataspace((Int64(vec_num_edges[pe+1]),)))
                     end
                 elseif fieldcount(T) == 0
                     create_dataset(tid, pename,
-                                   HDF5.Datatype(HDF5.hdf5_type_id(StatelessEdge)),
+                                   HDF5.Datatype(HDF5.hdf5_type_id(
+                                       StatelessEdge)),
                                    dataspace((Int64(vec_num_edges[pe+1]),)))
                 elseif has_trait(sim, T, :IgnoreFrom)
                     create_dataset(tid, pename,
@@ -252,7 +258,8 @@ function write_edges(sim::Simulation, types::Vector{DataType} = sim.typeinfos.ed
                                    dataspace((Int64(vec_num_edges[pe+1]),)))
                 else     
                     create_dataset(tid, pename,
-                                   HDF5.Datatype(HDF5.hdf5_type_id(CompleteEdge{T})),
+                                   HDF5.Datatype(HDF5.hdf5_type_id(
+                                       CompleteEdge{T})),
                                    dataspace((Int64(vec_num_edges[pe+1]),)))
                 end
 
@@ -336,6 +343,7 @@ function open_h5file(sim::Simulation, filename)
         # first we open file _0 to get mpi.size
         if ! isfile(filename * "_0.h5")
             println("No hdf5 file(s) for $(filename) found in folder $(pwd())")
+            return []
         end
         fid = HDF5.h5open(filename * "_0.h5", "r")
         h5mpisize = attrs(fid)["mpisize"]
@@ -354,9 +362,10 @@ function open_h5file(sim::Simulation, filename)
     end
 
     # TODO: find a model hash that works
-    # @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
-    #    The file was written for a different model than that of the given simulation.     
-    # """
+    @info "hash" hash(sim.model) attrs(fids[1])["modelhash"]
+    @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
+       The file was written for a different model than that of the given simulation.     
+    """
     h5mpisize = attrs(fids[1])["mpisize"]
     if mpi.size > 1
         @assert mpi.size == h5mpisize """
@@ -477,15 +486,22 @@ function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
 end
 
 function read_agents!(sim::Simulation,
-               fids::Vector{HDF5.File};
+               name::String;
                transition = typemax(Int64),
                types::Vector{DataType} = sim.typeinfos.nodes_types)
+    idmapping = Dict{AgentID, AgentID}()
+    fids = open_h5file(sim, name)
+    if length(fids) == 0
+        return
+    end
+    
     _log_time(sim, "read agents") do
         merge::Bool = length(fids) > mpi.size
         @assert !merge || mpi.size == 1
-        
+
         for T in types
-            peid = find_peid(fids[mpi.rank+1]["agents"], transition, mpi.rank, T)
+            peid = find_peid(fids[mpi.rank+1]["agents"],
+                             transition, mpi.rank, T)
 
             if peid === nothing
                 @info "Found no data for $T which was written before transition $(transition)"
@@ -504,7 +520,7 @@ function read_agents!(sim::Simulation,
             end
             
             if merge
-                _read_agents_merge!(sim, fids, transition, T)
+                merge!(idmapping, _read_agents_merge!(sim, fids, transition, T))
             else
                 _read_agents_restore!(sim, field, peid, T)
             end
@@ -513,7 +529,8 @@ function read_agents!(sim::Simulation,
         end
     end
 
-    sim
+    foreach(close, fids)
+    idmapping
 end
 
 
@@ -522,39 +539,77 @@ function read_edges!(sim::Simulation,
               idmapfunc = identity,
               transition = typemax(Int64),
               types::Vector{DataType} = sim.typeinfos.edges_types)
-    _log_time(sim, "read edges") do
-        for fid in fids
-            peid = find_peid(fids[mpi.rank + 1]["edges"], transition, mpi.rank, T)
+    @assert length(fids) == mpi.size || idmapfunc !== identity """
+      read_edges! can be only merging a distributed graph when an idmap is given
+    """
+    
+    for T in types
+        with_logger(sim) do
+            @info("<Begin> read edges", edgetype = T, transition = transition)
+        end
+
+        ranks = if mpi.size > 1
+            [ mpi.rank ]
+        else
+            1:mpi.size
+        end
+        
+        for rank in ranks
+            peid = find_peid(fids[rank + 1]["edges"], transition, rank, T)
 
             if peid === nothing
-                @info "Found no data for $T which was written before transition $(transition)"
-                return sim
-            end
-
-            with_logger(sim) do
-                @debug("<Begin> _read_agents_restore!",
-                       agenttype=T, transition=transition)
-            end
-            
-            field = getproperty(sim, Symbol(T))
-
-            #  
-            
-
-            _log_debug(sim, "<End> _read_agents_restore!")
-
-            sim
-            
-            merge::Bool = length(fids) > mpi.size
-            @assert !merge || mpi.size == 1
-            
-            for T in types
-                if merge
-                    _read_edges_merge!(sim, fids, transition, T)
-                else
-                    _read_edges_restore!(sim, fids, transition, T)
-                end
+                @info """
+            Found no data for $T which was written before transition $(transition)
+                """
+            else
+                _read_edges!(sim, peid, rank, T)
             end
         end
+
+        _log_info(sim, "<End> read edges")
     end
+end
+
+
+function _read_edges!(sim::Simulation, peid, rank, T)
+    typeid = sim.typeinfos.nodes_type2id[T]
+    field = getproperty(sim, Symbol(T))
+    
+    if _neighbors_only(sim, T)
+        if has_trait(sim, T, :SingleAgentType)
+            for (idx, num_neighbors) in peid[]
+                newid = idmapfunc(agent_id(typeid, rank, idx))
+                newidx = agent_nr(newid)
+                if length(field.read) < newidx
+                    resize!(field.read, newidx)
+                end
+                field.read[newidx] = num_neighbors
+            end
+        else
+        end
+    elseif fieldcount(T) == 0
+    elseif has_trait(sim, T, :IgnoreFrom)
+    else     
+    end
+end
+
+function read_snapshot!(sim::Simulation,
+                 name::String;
+                 transition = typemax(Int64))
+    fids = open_h5file(sim, name)
+
+    if sim.h5file === nothing
+        create_h5file!(sim)
+    end
+
+    fid = sim.h5file
+
+    attrs(fid)["last_snapshot"] = sim.num_transitions
+
+    if sim.globals !== nothing
+        write_globals(sim)
+    end
+    
+    idmapping = read_agents!(sim, name)
+    write_edges(sim)
 end

@@ -92,7 +92,7 @@ end
 function restore(sim)
     restored = new_simulation(model, Params(3,4), Globals(3,4))
 
-    read_agents!(restored, open_h5file(restored, sim.name))
+    read_agents!(restored, sim.name)
     restored
 end
 
