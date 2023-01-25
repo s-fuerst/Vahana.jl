@@ -126,7 +126,10 @@ function create_plot(sim::Simulation;
               reset_fn = nothing,
               pos_jitter = nothing,
               globals::Vector{Symbol} = Vector{Symbol}())
-    vg = vahanagraph(sim; agenttypes = agenttypes, edgetypes = edgetypes)
+    vg = vahanagraph(sim;
+                     agenttypes = agenttypes,
+                     edgetypes = edgetypes,
+                     drop_multiedges = true)
 
     f, ax, p = plot(vg)
 
@@ -227,7 +230,7 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
     if ! isnothing(edges)
         es = (filter(edges) do edge
                   edge.from == from
-              end |> only).state
+              end |> first).state
         str = " $(typeof(es))"
         if nfields(es) > 0
             fnames = es |> typeof |> fieldnames

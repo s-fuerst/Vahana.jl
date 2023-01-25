@@ -73,7 +73,8 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
 end
 
 function create_logger(name, logging, debug)
-    logfile = logging ? open(name * "_" * string(mpi.rank) * ".log"; write = true) :
+    logfile = logging ? open("""$(mkpath("logs"))/$(name)_$(mpi.rank).log""";
+                             write = true) :
         nothing
     logger = logging ?
         VahanaLogger(logfile,

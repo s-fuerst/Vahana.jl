@@ -16,7 +16,7 @@ struct Agent
     f::Float64
 end
 
-struct StatelessAgent end
+struct RasterAgent end
 
 struct EdgeState
     f::AgentID
@@ -24,6 +24,10 @@ struct EdgeState
 end
 
 struct StatelessEdge end
+
+struct RasterEdge
+    a::Int64
+end
 
 struct Globals
     ga::Int64
@@ -39,11 +43,18 @@ function sumi2o(state, _, _)
     Agent(state.inner, state.inner.f + state.inner.i)
 end
 
+# the test model has the following structure:
+# we create mpi.size * 8 agent of type Agent
+
+
+
+
+
 function createsim(model, distribute = true)
     sim = model |>
         new_simulation(Params(1,2), Globals(1,2); logging = true, debug = true)
 
-    ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:(5 * mpi.size) ])
+    ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:(16 * mpi.size) ])
 
     for id in ids
         add_edge!(sim, id, id, EdgeState(id, id))
@@ -51,9 +62,12 @@ function createsim(model, distribute = true)
         add_edge!(sim, id, ids[2], EdgeState(id, ids[1]))
     end
 
-    add_agent!(sim, StatelessAgent())
+    rids = add_raster!(sim, :fourdspace, (2,2,2,1), _ -> RasterAgent())
 
-    add_raster!(sim, :fourdspace, (2,2,2,1), _ -> StatelessAgent())
+    for id in ids
+        add_edge!(sim, id, rids[mod1(id, 8)], RasterEdge(id % 8 + 1))
+    end
+    
 
     finish_init!(sim;
                  partition_algo = :EqualAgentNumbers, distribute = distribute)
@@ -70,14 +84,14 @@ function runsim(model, write)
         write_snapshot(sim)
     end
 
-    apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], [ Agent ]) do state, id, sim
-        r = num_neighbors(sim, id, EdgeState) == 1 ? nothing : state
-        r
+    apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, id, sim
+        Agent(state.inner, state.f - 2)
     end
 
     if write
-        write_agents(sim, [ Agent ])
+        write_snapshot(sim)
     end
+
 
     sim.params = Params(3,4)
     
@@ -89,10 +103,15 @@ function runsim(model, write)
     sim
 end
 
+function remove_some_rasternodes(state, id, sim)
+    nstate = neighborstates(sim, id, RasterEdge, Agent) |> first
+    mod1(nstate.f, 8) > 4.5 ? nothing : state
+end    
+    
+
 function restore(sim)
     restored = new_simulation(model, Params(3,4), Globals(3,4))
-
-    read_agents!(restored, sim.name)
+    read_snapshot!(restored, sim.name)
     restored
 end
 
@@ -100,6 +119,19 @@ function test_write_restore(model)
     sim = runsim(model, true)
     restored = restore(sim)
     test(sim, restored)
+
+    apply_transition!(sim,
+                      remove_some_rasternodes,
+                      [ RasterAgent ],
+                      [ RasterAgent, RasterEdge, Agent ],
+                      [ RasterAgent ])
+
+    apply_transition!(restored,
+                      remove_some_rasternodes,
+                      [ RasterAgent ],
+                      [ RasterAgent, RasterEdge, Agent ],
+                      [ RasterAgent ])
+
     
     finish_simulation!(sim)
     finish_simulation!(restored)

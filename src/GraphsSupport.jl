@@ -92,12 +92,10 @@ agents/edgetypes (see [`register_agenttype!`](@ref) and
 This subgraphs implements the AbstractSimpleGraph interface from the
 Graphs.jl package.
 
-The edge types must not have the :IgnoreFrom trait.
-
-!!! info 
-
-    `vahanasimplegraph` is only available when the Graphs.jl package is
-    imported by the client.
+The edge types must not have the :IgnoreFrom property. If there are
+edge types with this property in the `edgetypes` vector, a warning will
+be displayed and these edges will be ignored. The warning can be
+suppressed by setting `show_ignorefrom_warning` to false.
 
 !!! warning    
 
@@ -183,11 +181,11 @@ end
 
 # SingleAgentType not supported (und IgnoreFrom sowieso nicht)
 """
-    vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true)
+    vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true, drop_multiedges = false)
 
 Creates a subgraph with nodes for all agents that have one of the
 `agenttypes` types, and all edges that have one of the `edgetypes`
-types and whose both adjacent node types are in `agenttypes`.
+types and whose both adjacent agents have are of a type in `agenttypes`.
 
 The default values for `agenttypes` and `edgetypes` are all registered
 agents/edgetypes (see [`register_agenttype!`](@ref) and
@@ -197,26 +195,29 @@ This subgraphs implements the AbstractGraph interface from the
 Graphs.jl package, so that e.g. GraphMakie can be used to visualize
 the subgraph. See also [`plot`](@ref).
 
-The edge types must not have the :IgnoreFrom trait.
+The AbstractGraph interface allows multiple edges between two nodes,
+but some functions (e.g. those that convert the graph to a binary
+(sparse) matrix) may produce undefined results for these graphs,
+e.g. when graphplot is called from GraphMakie.jl. If the keyword
+`drop_multiedges` is true and there are multiple edges, only the edge
+of the type that is first in the edgetypes vector is added to the
+generated graph.
 
-!!! info 
-
-    `vahanagraph` is only available when the Graphs.jl package is
-    imported by the client.
-
-!!! warning    
-
-    The AbstractGraph interface allows multiple edges between
-    two nodes, but some function (e.g. those that convert the graph
-    into a binary (sparse)matrix can produce undefined results
-    for those graphs. So use this function with care. 
+The edge types must not have the :IgnoreFrom property. If there are
+edge types with this property in the `edgetypes` vector, a warning will
+be displayed and these edges will be ignored. The warning can be
+suppressed by setting `show_ignorefrom_warning` to false.
 """ 
 function vahanagraph(sim;
               agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
-              edgetypes::Vector{DataType} = sim.typeinfos.edges_types)
+              edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
+              show_ignorefrom_warning = true,
+              drop_multiedges = false)
     g2v = Vector{AgentID}()
     v2g = Dict{AgentID, Int64}()
     edgetype = Vector{Int64}()
+
+    existing = Set{Tuple{AgentID, AgentID}}()
     
     nv = 0
     for T in agenttypes
@@ -248,8 +249,15 @@ function vahanagraph(sim;
             f = get(v2g, hasproperty(e, :from) ? e.from : e, nothing)
             t = get(v2g, to, nothing)
             if f !== nothing && t !== nothing
-                push!(edges, Graphs.Edge(f, t))
-                push!(edgetype, edgetypeidx)
+                if (f, t) in existing && drop_multiedges
+                    println("Edge $e to agent $(string(to, base=16)) will not be shown")
+                else
+                    if drop_multiedges
+                        push!(existing, (f, t))
+                    end
+                    push!(edges, Graphs.Edge(f, t))
+                    push!(edgetype, edgetypeidx)
+                end
             end
         end
         edgetypeidx += 1
