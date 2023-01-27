@@ -120,6 +120,9 @@ function test_write_restore(model)
     restored = restore(sim)
     test(sim, restored)
 
+    # TODO: fix this in restore()
+    restored.initialized = true
+    
     apply_transition!(sim,
                       remove_some_rasternodes,
                       [ RasterAgent ],
@@ -144,12 +147,25 @@ function test(sim, restored)
     @test sim.Agent.read.reuseable == restored.Agent.read.reuseable
     @test sim.Agent.nextid == restored.Agent.nextid
 
-    apply_transition!(sim, sumi2o, [ Agent ], [ Agent ], [ Agent ])
+    @test sim.RasterAgent.read.died == restored.RasterAgent.read.died
+    @test sim.RasterAgent.read.state == restored.RasterAgent.read.state
+    @test sim.RasterAgent.read.reuseable == restored.RasterAgent.read.reuseable
+    @test sim.RasterAgent.nextid == restored.RasterAgent.nextid
 
-    restored.initialized = true
+    function checkedges(sim_edges, restored_edges)
+        for to in keys(sim_edges)
+            for edge in sim_edges[to]
+                @info "test" edge
+                @test edge in restored_edges[to]
+            end
+        end
+    end
 
-    apply_transition!(restored, sumi2o, [ Agent ], [ Agent ], [ Agent ])
+    checkedges(sim.EdgeState.read, restored.EdgeState.read)
 
-    @test sim.Agent.read.state == restored.Agent.read.state
+    checkedges(sim.RasterEdge.read, restored.RasterEdge.read)
+
+    checkedges(sim.StatelessEdge.read, restored.StatelessEdge.read)
+
 end
 
