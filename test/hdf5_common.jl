@@ -54,11 +54,12 @@ function createsim(model, distribute = true)
     sim = model |>
         new_simulation(Params(1,2), Globals(1,2); logging = true, debug = true)
 
-    ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:(16 * mpi.size) ])
+    ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:16 ])
 
     for id in ids
         add_edge!(sim, id, id, EdgeState(id, id))
         add_edge!(sim, id, ids[2], StatelessEdge())
+        add_edge!(sim, id, ids[5], StatelessEdge())
         add_edge!(sim, id, ids[2], EdgeState(id, ids[1]))
     end
 
@@ -92,10 +93,15 @@ function runsim(model, write)
         write_snapshot(sim)
     end
 
-
+    apply_transition!(sim, remove_some_rasternodes, 
+                      [ RasterAgent ],
+                      [ RasterAgent, RasterEdge, Agent ],
+                      [ RasterAgent, RasterEdge ])
+    
     sim.params = Params(3,4)
     
     if write
+        write_snapshot(sim)
         write_params(sim)
         close(sim.h5file)
     end
@@ -105,13 +111,15 @@ end
 
 function remove_some_rasternodes(state, id, sim)
     nstate = neighborstates(sim, id, RasterEdge, Agent) |> first
+    e = edges_to(sim, id, RasterEdge) |> first
+    add_edge!(sim, e.from, id, RasterEdge(e.state.a * 2))
     mod1(nstate.f, 8) > 4.5 ? nothing : state
 end    
-    
 
-function restore(sim)
+
+function restore(sim; kwargs...)
     restored = new_simulation(model, Params(3,4), Globals(3,4))
-    read_snapshot!(restored, sim.name)
+    read_snapshot!(restored, sim.name; kwargs...)
     restored
 end
 
@@ -120,21 +128,19 @@ function test_write_restore(model)
     restored = restore(sim)
     test(sim, restored)
 
-    # TODO: fix this in restore()
-    restored.initialized = true
-    
     apply_transition!(sim,
                       remove_some_rasternodes,
                       [ RasterAgent ],
                       [ RasterAgent, RasterEdge, Agent ],
-                      [ RasterAgent ])
+                      [ RasterAgent, RasterEdge ])
 
     apply_transition!(restored,
                       remove_some_rasternodes,
                       [ RasterAgent ],
                       [ RasterAgent, RasterEdge, Agent ],
-                      [ RasterAgent ])
+                      [ RasterAgent, RasterEdge ])
 
+    test(sim, restored)
     
     finish_simulation!(sim)
     finish_simulation!(restored)
@@ -152,20 +158,23 @@ function test(sim, restored)
     @test sim.RasterAgent.read.reuseable == restored.RasterAgent.read.reuseable
     @test sim.RasterAgent.nextid == restored.RasterAgent.nextid
 
-    function checkedges(sim_edges, restored_edges)
-        for to in keys(sim_edges)
-            for edge in sim_edges[to]
-                @info "test" edge
-                @test edge in restored_edges[to]
+    function checkedges(sim_edges, restored_edges, T)
+        if Vahana.has_trait(sim, T, :SingleAgentType)
+            @test sim_edges == restored_edges
+        else
+            for to in keys(sim_edges)
+                for edge in sim_edges[to]
+                    @test edge in restored_edges[to]
+                end
             end
         end
     end
 
-    checkedges(sim.EdgeState.read, restored.EdgeState.read)
+    checkedges(sim.EdgeState.read, restored.EdgeState.read, EdgeState)
 
-    checkedges(sim.RasterEdge.read, restored.RasterEdge.read)
+    checkedges(sim.RasterEdge.read, restored.RasterEdge.read, RasterEdge)
 
-    checkedges(sim.StatelessEdge.read, restored.StatelessEdge.read)
+    checkedges(sim.StatelessEdge.read, restored.StatelessEdge.read, StatelessEdge)
 
 end
 

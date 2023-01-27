@@ -24,7 +24,7 @@ function construct_prettyprinting_methods(simsymbol)
             end
             for t in nodes_types
                 print(io, "\n\t Type $t \
-                           with $(_show_num_agents(sim, t)) Agent(s)")
+                           with $(_show_num_agents(sim, t)) agent(s)")
             end
         end
 
@@ -39,12 +39,12 @@ function construct_prettyprinting_methods(simsymbol)
                     :SingleAgentType in edgetypetraits) ||
                     (:SingleAgentType in edgetypetraits &&
                     :size in keys(sim.typeinfos.edges_attr[t]))
-                    print(io, "\n\t Type $t") 
+                    print(io, "\n\t Type $t with edge(s) for $(_show_num_edges(sim, t)) agent(s)") 
                 else
                     print(io, "\n\t Type $t \
-                               with $(_show_num_edges(sim, t)) Edges(s)")
+                               with $(_show_num_edges(sim, t)) edge(s)")
                     if ! (:SingleAgentType in edgetypetraits)
-                        print(io, " for $(_show_num_a_with_e(sim, t)) Agent(s)")
+                        print(io, " for $(_show_num_a_with_e(sim, t)) agent(s)")
                     end
                 end
             end

@@ -75,7 +75,7 @@ g = SimpleGraphs.complete_graph(50)
 # Vahana needs the information how to convert the nodes and edges of
 # the SimpleGraphs object to the Vahana structure, this is done by the
 # constructor functions in the third and forth arguments of
-# [`add_graph!`](@ref). We do not need the Graph.vertix and Graph.edge
+# [`add_graph!`](@ref). We do not need the Graph.vertex and Graph.edge
 # arguments of this constructor functions, but for other use cases
 # e.g. for bipartite graphs, it would be possible to create agents of
 # different types depending on this information.

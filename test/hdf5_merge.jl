@@ -2,7 +2,7 @@ include("hdf5_common.jl")
 
 function test_merge(model)
     sim = runsim(model, false)
-    restored = new_simulation(model, Params(3,4), Globals(3,4))
+    restored = restore(sim)
 
     fids = open_h5file(restored, sim.name)
     @assert mpi.size == 1 && length(fids) > 1 """
@@ -11,10 +11,24 @@ function test_merge(model)
         with mpi but the files should be written from a mpi simulation 
     """
     foreach(close, fids)
-    
-    @info read_agents!(restored, sim.name)
 
-    num_agents(sim, Agent) == num_agents(restored, Agent)
+    function checkedges(sim_edges, restored_edges, T)
+        if Vahana.has_trait(sim, T, :SingleAgentType)
+            @test sim_edges == restored_edges
+        else
+            for to in keys(sim_edges)
+                for edge in sim_edges[to]
+                    @test edge in restored_edges[to]
+                end
+            end
+        end
+    end
+
+    checkedges(sim.EdgeState.read, restored.EdgeState.read, EdgeState)
+
+    checkedges(sim.RasterEdge.read, restored.RasterEdge.read, RasterEdge)
+
+    checkedges(sim.StatelessEdge.read, restored.StatelessEdge.read, StatelessEdge)
 end
 
 model = ModelTypes() |>

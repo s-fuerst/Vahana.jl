@@ -503,6 +503,11 @@ by calling suppress_warnings(true) after importing Vahana.
                 end
             else  
                 deleteat!(ac, findall(__is_from, ac))
+                if ! $singletype
+                    if length(ac) == 0
+                        delete!(@edgewrite($T), to)
+                    end
+                end
             end
         end        
     end

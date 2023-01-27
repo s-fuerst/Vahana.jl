@@ -222,7 +222,7 @@ function write_edges(sim::Simulation,
     if sim.h5file === nothing
         create_h5file!(sim)
     end
-    
+
     _log_time(sim, "write edges") do
         t = "t_" * string(sim.num_transitions)
 
@@ -245,6 +245,9 @@ function write_edges(sim::Simulation,
 
             tid = create_group(gid, t)
             for pe in 0:(mpi.size-1)
+                if ! parallel_write && ! (pe == mpi.rank)
+                    continue
+                end
                 pename = "pe_" * string(pe)
                 # what we write depends on :Stateless and :IgnoreFrom,
                 # so we have four different cases 
@@ -513,6 +516,7 @@ function read_agents!(sim::Simulation,
     end
 
     idmapping = Dict{AgentID, AgentID}()
+    sim.intransition = true
     
     _log_time(sim, "read agents") do
         merge::Bool = length(fids) > mpi.size
@@ -549,6 +553,7 @@ function read_agents!(sim::Simulation,
     end
 
     foreach(close, fids)
+    sim.intransition = false
     idmapping
 end
 
@@ -565,6 +570,10 @@ function read_edges!(sim::Simulation,
     @assert length(fids) == mpi.size || idmapfunc !== identity """
       read_edges! can be only merging a distributed graph when an idmap is given
     """
+
+    # we call add_edge! but there is a check that this is only done
+    # at initialization time or in a transition function
+    sim.intransition = true
     
     for T in types
         with_logger(sim) do
@@ -574,9 +583,10 @@ function read_edges!(sim::Simulation,
         ranks = if mpi.size > 1
             [ mpi.rank ]
         else
-            0:(mpi.size-1)
+            0:(length(fids)-1)
         end
         
+        prepare_write!(sim, false, T)
         for rank in ranks
             peid = find_peid(fids[rank + 1]["edges"], transition, rank, T)
 
@@ -585,26 +595,28 @@ function read_edges!(sim::Simulation,
             Found no data for $T which was written before transition $(transition)
                 """
             else
-                prepare_write!(sim, false, T)
                 _read_edges!(sim, peid, rank, idmapfunc, T)
-                finish_write!(sim, T)
             end
         end
+        finish_write!(sim, T)
 
         _log_info(sim, "<End> read edges")
     end
 
+    sim.intransition = false
+    
     foreach(close, fids)
 end
 
 
 function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
     field = getproperty(sim, Symbol(T))
+
     numedges = length(peid[])
     if numedges == 0
         return
     end
-    
+
     if _neighbors_only(sim, T)
         # num neighbors (for has_neighbors it's just 1 or 0 as num neighbors)
         if has_trait(sim, T, :SingleAgentType)
@@ -614,14 +626,14 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
                 newid = idmapfunc(agent_id(typeid, rank, AgentNr(idx)))
                 newidx = agent_nr(newid)
                 if length(field.read) < newidx
-                    resize!(field.read, newidx)
+                    resize!(field.write, newidx)
                 end
-                field.read[newidx] = num_neighbors
+                field.write[newidx] = num_neighbors
             end
         else
             # EdgeCount struct
             for ec in peid[]
-                field.read[idmapfunc(ec.to)] = ec.count
+                field.write[idmapfunc(ec.to)] = ec.count
             end
         end
     elseif fieldcount(T) == 0
@@ -644,6 +656,7 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
         @assert sizeof(peid[1]) == sizeof(CompleteEdge{T})
         Base._memcpy!(vec, peid[], numedges * sizeof(CompleteEdge{T}))
         for ce in vec
+            @info "add_edge" ce from=idmapfunc(ce.edge.from) to=idmapfunc(ce.to) state=ce.edge.state
             add_edge!(sim, idmapfunc(ce.edge.from), idmapfunc(ce.to),
                       ce.edge.state)
         end
