@@ -52,6 +52,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     attrs(fid)["mpisize"] = mpi.size
     attrs(fid)["mpirank"] = mpi.rank
     attrs(fid)["HDF5parallel"] = HDF5.has_parallel()
+    attrs(fid)["initialized"] = sim.initialized
     
     # write the parameters
     pid = create_group(fid, "params")
@@ -586,6 +587,8 @@ function read_edges!(sim::Simulation,
 
         _log_info(sim, "<End> read edges")
     end
+
+    foreach(close, fids)
 end
 
 
@@ -644,6 +647,12 @@ end
 function read_snapshot!(sim::Simulation,
                  name::String;
                  transition = typemax(Int64))
+    fids = open_h5file(sim, name)
+    if length(fids) == 0
+        return
+    end
+    sim.initialized = attrs(fids[1])["initialized"]
+    foreach(close, fids)
     
     idmapping = read_agents!(sim, name; transition = transition)
     if length(idmapping) > 0
