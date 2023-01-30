@@ -1,4 +1,8 @@
+using Revise
+
 include("hdf5_common.jl")
+
+import Vahana: has_trait, type_nr, agent_id, agent_nr, AgentID, AgentNr
 
 function test_merge(model)
     sim = runsim(model, false)
@@ -13,12 +17,34 @@ function test_merge(model)
     foreach(close, fids)
 
     function checkedges(sim_edges, restored_edges, T)
-        if Vahana.has_trait(sim, T, :SingleAgentType)
-            @test sim_edges == restored_edges
-        else
-            for to in keys(sim_edges)
-                for edge in sim_edges[to]
-                    @test edge in restored_edges[to]
+        for to in keys(sim_edges)
+            to = AgentID(to)
+            AT = has_trait(sim, T, :SingleAgentType) ?
+                Agent :
+                sim.typeinfos.nodes_id2type[type_nr(to)]
+            if AT == Agent
+                rto = filter(enumerate(restored.Agent.read.state) |>
+                    collect) do (i, state)
+                        state.f == sim.Agent.read.state[agent_nr(to)].f 
+                    end |> first |> first
+                rto = agent_id(sim, AgentNr(rto), Agent)
+                if has_trait(sim, T, :IgnoreFrom) &&
+                    has_trait(sim, T, :Stateless)
+                    if has_trait(sim, T, :SingleAgentType)
+                        @test sim_edges[agent_nr(to)] ==
+                            restored_edges[agent_nr(rto)]
+                    else
+                        @test sim_edges[to] == restored_edges[rto]
+                    end      
+                else 
+                    for edge in sim_edges[to]
+                        if has_trait(sim, T, :IgnoreFrom)
+                            @test edge in restored_edges[rto]
+                        else
+                            states = map(e -> e.state, restored_edges[rto])
+                            @test edge.state in states
+                        end
+                    end
                 end
             end
         end
@@ -42,24 +68,24 @@ model = ModelTypes() |>
 test_merge(model)
 
 model = ModelTypes() |>
-    register_agenttype!(Agent) |>
-    register_agenttype!(RasterAgent, :Immortal) |>
+    register_agenttype!(Agent, :Immortal) |>
+    register_agenttype!(RasterAgent) |>
     register_edgetype!(EdgeState, :IgnoreFrom) |>
     register_edgetype!(RasterEdge) |>
     register_edgetype!(StatelessEdge) |>
     construct_model("hdf5_ignore_immortal")
 
-# test_merge(model)
+test_merge(model)
 
 
 model = ModelTypes() |>
-    register_agenttype!(Agent) |>
-    register_agenttype!(RasterAgent, :Immortal) |>
+    register_agenttype!(Agent, :Immortal) |>
+    register_agenttype!(RasterAgent) |>
     register_edgetype!(EdgeState, :NumNeighborsOnly) |>
     register_edgetype!(RasterEdge) |>
     register_edgetype!(StatelessEdge, :HasNeighborOnly, :SingleAgentType;
                        to_agenttype = Agent) |>
                            construct_model("hdf5_neighbors")
 
-# test_merge(model)
+test_merge(model)
 
