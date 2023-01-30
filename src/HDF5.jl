@@ -28,6 +28,7 @@ parallel_write() = HDF5.has_parallel() && mpi.active
 
 # this is called in new_simulation
 function create_h5file!(sim::Simulation, filename = sim.filename)
+    @assert sim.initialized 
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
     end
@@ -55,7 +56,6 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     attrs(fid)["HDF5parallel"] = HDF5.has_parallel()
     attrs(fid)["initialized"] = sim.initialized
     
-    # write the parameters
     pid = create_group(fid, "params")
     for k in fieldnames(typeof(sim.params))
         create_dataset(pid, string(k), typeof(getfield(sim.params, k)), 1)
@@ -67,8 +67,12 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
         create_group(gid, string(k))
     end
 
-    create_group(fid, "rasters")
-    write_rasters(sim)
+    rid = create_group(fid, "rasters")
+    _log_time(sim, "write rasters") do
+        for raster in keys(sim.rasters)
+            rid[string(raster)] = sim.rasters[raster]
+        end
+    end       
 
     aid = create_group(fid, "agents")
     foreach(sim.typeinfos.nodes_types) do T
@@ -302,19 +306,6 @@ function write_edges(sim::Simulation,
     end
 end
 
-function write_rasters(sim::Simulation,
-                rasters = sim.rasters === nothing ? nothing : keys(sim.rasters))
-    if sim.h5file === nothing
-        create_h5file!(sim)
-    end
-
-    _log_time(sim, "write rasters") do
-        for raster in rasters
-            sim.h5file["rasters"][string(raster)] = sim.rasters[raster]
-        end
-    end       
-end
-
 function write_snapshot(sim::Simulation)
     if sim.h5file === nothing
         create_h5file!(sim)
@@ -380,9 +371,9 @@ function open_h5file(sim::Simulation, filename)
     end
 
     # TODO improve hash function
-#    @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
-#    The file was written for a different model than that of the given simulation.
-#    """
+    #    @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
+    #    The file was written for a different model than that of the given simulation.
+    #    """
     h5mpisize = attrs(fids[1])["mpisize"]
     if mpi.size > 1
         @assert mpi.size == h5mpisize """
@@ -418,7 +409,6 @@ end
 function _read_agents_restore!(sim::Simulation, field, peid, T::DataType)
     size = attrs(peid)["array_size"]
     field.nextid = size + 1
-    @info "read_agents_restore" mpi.rank size peid
 
     if ! has_trait(sim, T, :Immortal, :Agent)
         if size > 0
@@ -661,9 +651,37 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
     end
 end
 
+function read_rasters!(sim::Simulation,
+                name::String;
+                idmapping)
+    # the rasters are immutable arrays of agents_ids. So there
+    # is no need to read them more then once
+    if length(sim.rasters) > 0
+        return
+    end
+    
+    @info "read rasters!"  sim.rasters
+    fids = open_h5file(sim, name)
+    if length(fids) == 0
+        return
+    end
+
+    rid = first(fids)["rasters"]
+    @info rid
+
+    for raster in keys(rid)
+        @info "read raster" rid rid[raster]
+        sim.rasters[Symbol(raster)] =
+            length(idmapping) == 0 ? rid[raster][] :
+            map(id -> get(idmapping, id, 0), rid[raster][]) 
+    end
+    
+    foreach(close, fids)
+end
+
 function read_snapshot!(sim::Simulation,
-                 name::String;
-                 transition = typemax(Int64))
+                        name::String;
+                        transition = typemax(Int64))
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -672,7 +690,8 @@ function read_snapshot!(sim::Simulation,
     foreach(close, fids)
     
     idmapping = read_agents!(sim, name; transition = transition)
-
+    @info idmapping
+    
     # read_agents! returns `nothing` when no file was found
     if idmapping === nothing
         return sim
@@ -681,7 +700,12 @@ function read_snapshot!(sim::Simulation,
     if length(idmapping) > 0
         read_edges!(sim, name; transition = transition,
                     idmapfunc = (key) -> idmapping[key])
+        read_rasters!(sim, name; 
+                      idmapping)
     else
         read_edges!(sim, name; transition = transition)
+        read_rasters!(sim, name)
+        
     end
+
 end
