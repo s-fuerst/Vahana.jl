@@ -1,6 +1,8 @@
 include("hdf5_common.jl")
 
-rm("h5", recursive = true, force = true)
+if mpi.isroot
+    # rm("h5", recursive = true, force = true)
+end
 
 model = ModelTypes() |>
     register_agenttype!(Agent) |>

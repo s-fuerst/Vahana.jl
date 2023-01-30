@@ -24,7 +24,7 @@ hash(model::Model) = hash(model.types.edges_attr) +
     hash(model.types.nodes_type2id) 
 
 
-parallel_write = HDF5.has_parallel() && mpi.size > 1
+parallel_write() = HDF5.has_parallel() && mpi.active
 
 # this is called in new_simulation
 function create_h5file!(sim::Simulation, filename = sim.filename)
@@ -35,7 +35,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
         filename = mkpath("h5") * "/" * filename
     end
     
-    fid = if parallel_write
+    fid = if parallel_write()
         _log_info(sim, "Create hdf5 file in parallel mode")
         HDF5.h5open(filename * ".h5", "w", mpi.comm, MPI.Info())
     else
@@ -163,7 +163,7 @@ function write_agents(sim::Simulation,
 
             tid = create_group(gid, t)
             for pe in 0:(mpi.size-1)
-                if ! parallel_write && ! (pe == mpi.rank)
+                if ! parallel_write() && ! (pe == mpi.rank)
                     continue
                 end
                 peid = create_group(tid, "pe_" * string(pe))
@@ -181,9 +181,7 @@ function write_agents(sim::Simulation,
                         peid["state"][:] = field.read.state
                     end
                 end
-                if pe == mpi.rank
-                    attrs(peid)["array_size"] = num_agents
-                end
+                attrs(peid)["array_size"] = vec_num_agents[pe+1]
             end
         end
     end
@@ -245,7 +243,7 @@ function write_edges(sim::Simulation,
 
             tid = create_group(gid, t)
             for pe in 0:(mpi.size-1)
-                if ! parallel_write && ! (pe == mpi.rank)
+                if ! parallel_write() && ! (pe == mpi.rank)
                     continue
                 end
                 pename = "pe_" * string(pe)
@@ -420,6 +418,7 @@ end
 function _read_agents_restore!(sim::Simulation, field, peid, T::DataType)
     size = attrs(peid)["array_size"]
     field.nextid = size + 1
+    @info "read_agents_restore" mpi.rank size peid
 
     if ! has_trait(sim, T, :Immortal, :Agent)
         if size > 0
@@ -656,7 +655,6 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
         @assert sizeof(peid[1]) == sizeof(CompleteEdge{T})
         Base._memcpy!(vec, peid[], numedges * sizeof(CompleteEdge{T}))
         for ce in vec
-            @info "add_edge" ce from=idmapfunc(ce.edge.from) to=idmapfunc(ce.to) state=ce.edge.state
             add_edge!(sim, idmapfunc(ce.edge.from), idmapfunc(ce.to),
                       ce.edge.state)
         end

@@ -142,8 +142,8 @@ function test_write_restore(model)
 
     test(sim, restored)
     
-    finish_simulation!(sim)
     finish_simulation!(restored)
+    finish_simulation!(sim)
 end
 
 
