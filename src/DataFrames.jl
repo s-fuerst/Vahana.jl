@@ -10,13 +10,16 @@ function as_dataframe(sim::Simulation, T::DataType; show_types = false, show_age
     read = getproperty(sim, Symbol(T)).read
     if T in tinfos.nodes_types # Agents
         tid = tinfos.nodes_type2id[T]
-        df.ids = map(nr -> agent_id(tid, agent_nr(AgentID(nr))),
-                     1:length(read))
+        df.id = map(nr -> agent_id(tid, agent_nr(AgentID(nr))),
+                     1:length(read.state))
         if fieldcount(T) > 0
             df = hcat(df, DataFrame(read.state))
         end
         if ! has_trait(sim, T, :Immortal, :Agent)
-            subset!(df, :ids => id -> read.died[agent_nr.(id)])
+            subset!(df, :id => id -> .! read.died[agent_nr.(id)])
+        end
+        if show_agentnr
+            df.id = map(agent_nr, df.id)
         end
     elseif T in sim.typeinfos.edges_types # Networks
         # First check the Num/HasNeighborsOnly case
