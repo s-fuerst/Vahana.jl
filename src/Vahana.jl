@@ -143,6 +143,7 @@ include("GraphsSupport.jl")
 
 include("Logging.jl")
 
+include("DataFrames.jl")
 # temporary of LSP
 # include("optional/MakieSupport.jl")
 # include("optional/GraphMakieSupport.jl")
