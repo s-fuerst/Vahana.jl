@@ -13,6 +13,49 @@ function Base.show(io::IO, mime::MIME"text/plain", edge::Edge{T}) where {T}
     end
 end 
 
+######################################## Model
+
+function Base.show(io::IO, ::MIME"text/plain", model::Model)
+    printstyled(io, "\nModel Name: ", model.name; color = :magenta)
+
+    nodes_types = model.types.nodes_types
+    if length(nodes_types) >= 1
+        printstyled(io, "\nAgent(s):"; color = :cyan)
+    end
+    for T in nodes_types
+        node_traits = model.types.nodes_attr[T][:traits]
+        print(io, "\n\t Type $T")
+        if :Immortal in node_traits
+            printstyled(io, " with Trait: ")
+            print(io, ":Immortal")
+        end
+    end
+
+    edges_types = model.types.edges_types
+    if length(edges_types) >= 1
+        printstyled(io, "\nNetworks(s):"; color = :cyan)
+    end
+    for T in edges_types
+        edge_traits = model.types.edges_attr[T][:traits]
+        firsttrait = true
+        print(io, "\n\t Type $T")
+        for k in [ :Stateless, :IgnoreFrom, :SingleEdge, :IgnoreSourceState, :SingleAgentType ]
+            if k in edge_traits
+                if firsttrait
+                    firsttrait = false
+                    printstyled(io, " with Trait(s): ")
+                    print(io, "$k")
+                else
+                    print(io, ", $k")
+                end
+            end
+        end
+        if :SingleAgentType in edge_traits
+            print(io, "{$(model.types.edges_attr[T][:to_agenttype])}")
+        end
+    end
+end
+
 ######################################## Simulation
 
 function construct_prettyprinting_methods(simsymbol)
@@ -80,10 +123,7 @@ function construct_prettyprinting_methods(simsymbol)
             end
         end
         
-        printstyled(io, "Model Name: ", sim.model.name; color = :magenta)
-        if sim.model.name != sim.name
-            printstyled(io, "\nSimulation Name: ", sim.name; color = :magenta)
-        end
+        printstyled(io, "\nSimulation Name: ", sim.name; color = :magenta)
         show_struct(io, sim.params, "Parameter")
         show_agent_types(io, sim)
         show_edge_types(io, sim)
@@ -277,11 +317,11 @@ traversed to find the edges where the agent `id` is the source. Since
 this can take some time for large graphs, this search can be disabled.
 """
 function show_agent(sim,
-             t::Type{T},
-             id = 0;
-             max = 5,
-             stateof = :Edge,
-             source = true) where T
+                    t::Type{T},
+                    id = 0;
+                    max = 5,
+                    stateof = :Edge,
+                    source = true) where T
     if !sim.initialized
         println("show_agent can not be called before finish_init!.")
         return

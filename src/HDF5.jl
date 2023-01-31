@@ -2,12 +2,11 @@ using MPI
 
 using HDF5
 
-export create_h5file!, close_h5file!
-export write_globals, write_params, write_agents, write_edges, write_snapshot
-export open_h5file, read_agents!, read_edges!, read_snapshot!
+export create_h5file!, open_h5file, close_h5file!
+export write_globals, write_agents, write_edges, write_snapshot
+export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 
 import Base.convert
-
 convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}},
         ci::CartesianIndex{2}) =
             (x = ci[1], y = ci[2])
@@ -57,10 +56,11 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     attrs(fid)["initialized"] = sim.initialized
     
     pid = create_group(fid, "params")
-    for k in fieldnames(typeof(sim.params))
-        create_dataset(pid, string(k), typeof(getfield(sim.params, k)), 1)
+    if sim.params !== nothing
+        for k in fieldnames(typeof(sim.params))
+            sim.h5file["params"][string(k)] = getfield(sim.params, k)
+        end
     end
-    write_params(sim)
     
     gid = create_group(fid, "globals")
     for k in fieldnames(typeof(sim.globals))
@@ -90,7 +90,6 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
             has_trait(sim, T, :SingleAgentType)
         attrs(tid)[":IgnoreSourceState"] =
             has_trait(sim, T, :IgnoreSourceState)
-
     end
 
     fid
@@ -108,18 +107,6 @@ function close_h5file!(sim::Simulation)
     sim.h5file = nothing
 
     nothing
-end
-
-function write_params(sim::Simulation)
-    if sim.h5file === nothing
-        create_h5file!(sim)
-    end
-
-    if sim.params !== nothing
-        for k in fieldnames(typeof(sim.params))
-            write(sim.h5file["params"][string(k)], getfield(sim.params, k))
-        end
-    end
 end
 
 function write_globals(sim::Simulation,
@@ -329,7 +316,7 @@ end
 # of the vector point to the same file. So
 # fid[mpi.rank][...][pe_mpi.rank] access always the data that was stored
 # by mpi.rank, independent if h5parallel was used or not.
-function open_h5file(sim::Simulation, filename)
+function open_h5file(sim::Union{Simulation, Nothing}, filename)
     # first we sanitize the filename
     if endswith(filename, ".h5")
         filename = filename[1:end-3]
@@ -363,10 +350,14 @@ function open_h5file(sim::Simulation, filename)
     # In the case that we have seperate files for each process, we don't
     # need to open the files in parallel mode
     fids = if HDF5.has_parallel() && parallel && mpi.size > 1
-        _log_info(sim, "Open hdf5 file in parallel mode")
+        if sim !== nothing
+            _log_info(sim, "Open hdf5 file in parallel mode")
+        end
         [ HDF5.h5open(f, "r", mpi.comm, MPI.Info()) for f in filenames ]
     else
-        _log_info(sim, "Open hdf5 file without parallel mode")
+        if sim !== nothing
+            _log_info(sim, "Open hdf5 file without parallel mode")
+        end
         [ HDF5.h5open(f, "r") for f in filenames ]
     end
 
@@ -444,7 +435,6 @@ function _read_agents_restore!(sim::Simulation, field, peid, T::DataType)
     end
 end
 
-
 # merge distributed graph into a single one.
 function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
     idmapping = Dict{AgentID, AgentID}()
@@ -493,6 +483,29 @@ function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
     finish_write!(sim, T)
     
     idmapping
+end
+
+function read_params(name::String, T::DataType)
+    fids = open_h5file(nothing, name)
+    if length(fids) == 0
+        return
+    end
+
+    pid = fids[1]["params"]
+    params = map(k -> pid[k][], keys(pid))
+    T(params...)
+end
+
+function read_globals(name::String, T::DataType, transition = typemax(Int64))
+    fids = open_h5file(nothing, name)
+    if length(fids) == 0
+        return
+    end
+
+    globals = []
+    gid = fids[1]["globals"]
+    globals = map(k -> find_transition_group(gid[k], transition)[], keys(gid))
+    T(globals...)
 end
 
 function read_agents!(sim::Simulation,
@@ -660,17 +673,14 @@ function read_rasters!(sim::Simulation,
         return
     end
     
-    @info "read rasters!"  sim.rasters
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
     end
 
     rid = first(fids)["rasters"]
-    @info rid
 
     for raster in keys(rid)
-        @info "read raster" rid rid[raster]
         sim.rasters[Symbol(raster)] =
             length(idmapping) == 0 ? rid[raster][] :
             map(id -> get(idmapping, id, 0), rid[raster][]) 
@@ -680,17 +690,20 @@ function read_rasters!(sim::Simulation,
 end
 
 function read_snapshot!(sim::Simulation,
-                        name::String;
-                        transition = typemax(Int64))
+                 name::String;
+                 transition = typemax(Int64))
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
     end
     sim.initialized = attrs(fids[1])["initialized"]
     foreach(close, fids)
+
+    sim.params = read_params(name, typeof(sim.params))
+
+    sim.globals = read_globals(name, typeof(sim.globals), transition)
     
     idmapping = read_agents!(sim, name; transition = transition)
-    @info idmapping
     
     # read_agents! returns `nothing` when no file was found
     if idmapping === nothing
@@ -700,12 +713,9 @@ function read_snapshot!(sim::Simulation,
     if length(idmapping) > 0
         read_edges!(sim, name; transition = transition,
                     idmapfunc = (key) -> idmapping[key])
-        read_rasters!(sim, name; 
-                      idmapping)
+        read_rasters!(sim, name; idmapping)
     else
         read_edges!(sim, name; transition = transition)
-        read_rasters!(sim, name)
-        
+        read_rasters!(sim, name; idmapping)
     end
-
 end

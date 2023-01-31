@@ -98,11 +98,8 @@ function runsim(model, write)
                       [ RasterAgent, RasterEdge, Agent ],
                       [ RasterAgent, RasterEdge ])
     
-    sim.params = Params(3,4)
-    
     if write
         write_snapshot(sim)
-        write_params(sim)
         close(sim.h5file)
     end
 
@@ -116,9 +113,8 @@ function remove_some_rasternodes(state, id, sim)
     mod1(nstate.f, 8) > 4.5 ? nothing : state
 end    
 
-
 function restore(sim; kwargs...)
-    restored = new_simulation(model, Params(3,4), Globals(3,4))
+    restored = new_simulation(model, Params(0,0), Globals(0,0))
     read_snapshot!(restored, sim.name; kwargs...)
     restored
 end
@@ -157,6 +153,9 @@ function test(sim, restored)
     @test sim.RasterAgent.read.state == restored.RasterAgent.read.state
     @test sim.RasterAgent.read.reuseable == restored.RasterAgent.read.reuseable
     @test sim.RasterAgent.nextid == restored.RasterAgent.nextid
+
+    @test sim.params == restored.params
+    @test sim.globals == restored.globals
 
     function checkedges(sim_edges, restored_edges, T)
         if Vahana.has_trait(sim, T, :SingleAgentType)

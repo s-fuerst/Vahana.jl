@@ -16,6 +16,9 @@ function test_merge(model)
     """
     foreach(close, fids)
 
+    @test sim.params == restored.params
+    @test sim.globals == restored.globals
+
     function checkedges(sim_edges, restored_edges, T)
         for to in keys(sim_edges)
             to = AgentID(to)
