@@ -22,6 +22,7 @@ hash(model::Model) = hash(model.types.edges_attr) +
     hash(model.types.nodes_types) +
     hash(model.types.nodes_type2id) 
 
+transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
@@ -63,9 +64,6 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     end
     
     gid = create_group(fid, "globals")
-    for k in fieldnames(typeof(sim.globals))
-        create_group(gid, string(k))
-    end
 
     rid = create_group(fid, "rasters")
     _log_time(sim, "write rasters") do
@@ -119,15 +117,21 @@ function write_globals(sim::Simulation,
     if fields === nothing
         return
     end
+
+    gid = sim.h5file["globals"]
+    if haskey(attributes(gid), "last_change") &&
+        sim.globals_last_change == attrs(gid)["last_change"]
+        return
+    end
+    attrs(gid)["last_change"] = sim.globals_last_change
     
     _log_time(sim, "write globals") do
-        t = "t_" * string(sim.num_transitions)
+        t = transition_str(sim)
+        tid = create_group(gid, t)
 
         for k in fieldnames(typeof(sim.globals))
             if k in fields
-                gid = sim.h5file["globals"][string(k)]
-                attrs(gid)["last_transition"] = sim.num_transitions
-                gid[t] = getfield(sim.globals, k)
+                tid[string(k)] = getfield(sim.globals, k)
             end
         end
     end
@@ -142,17 +146,23 @@ function write_agents(sim::Simulation,
     end
 
     _log_time(sim, "write agents") do
-        t = "t_" * string(sim.num_transitions)
+        t = transition_str(sim)
 
         for T in types
             gid = sim.h5file["agents"][string(T)]
-            attrs(gid)["last_transition"] = sim.num_transitions
 
             field = getproperty(sim, Symbol(T))
+            if haskey(attributes(gid), "last_change") &&
+                field.last_change == attrs(gid)["last_change"]
+                continue
+            end
+            attrs(gid)["last_change"] = field.last_change
+
             num_agents = Int64(field.nextid - 1)
             vec_num_agents = MPI.Allgather(num_agents, mpi.comm)
 
             tid = create_group(gid, t)
+            attrs(tid)["last_change"] = field.last_change
             for pe in 0:(mpi.size-1)
                 if ! parallel_write() && ! (pe == mpi.rank)
                     continue
@@ -213,11 +223,16 @@ function write_edges(sim::Simulation,
     end
 
     _log_time(sim, "write edges") do
-        t = "t_" * string(sim.num_transitions)
+        t = transition_str(sim)
 
         for T in types
             gid = sim.h5file["edges"][string(T)]
-            attrs(gid)["last_transition"] = sim.num_transitions
+            field = getproperty(sim, Symbol(T))
+            if haskey(attributes(gid), "last_change") &&
+                field.last_change == attrs(gid)["last_change"]
+                continue
+            end
+            attrs(gid)["last_change"] = field.last_change
 
             # prepare_read! triggers the distributions of the edges to the
             # correct nodes
@@ -233,6 +248,7 @@ function write_edges(sim::Simulation,
             vec_num_edges = MPI.Allgather(num_edges, mpi.comm)
 
             tid = create_group(gid, t)
+            attrs(tid)["last_change"] = field.last_change
             for pe in 0:(mpi.size-1)
                 if ! parallel_write() && ! (pe == mpi.rank)
                     continue
@@ -376,7 +392,7 @@ function open_h5file(sim::Union{Simulation, Nothing}, filename)
 end
 
 
-function find_transition_group(ids, transition::Int)
+function find_transition_nr(ids, transition::Int)
     if length(ids) == 0
         return nothing
     end
@@ -384,9 +400,11 @@ function find_transition_group(ids, transition::Int)
     if length(ts) == 0
         return nothing
     end
-    last_transition = maximum(ts)
-    ids["t_$(last_transition)"]
+    maximum(ts)
 end
+
+find_transition_group(ids, transition::Int) =
+    ids["t_$(find_transition_nr(ids, transition))"]
 
 function find_peid(gid, transition::Int, rank, T::DataType)
     trid = find_transition_group(gid[string(T)], transition)
@@ -493,6 +511,9 @@ function read_params(name::String, T::DataType)
 
     pid = fids[1]["params"]
     params = map(k -> pid[k][], keys(pid))
+
+    foreach(close, fids)
+
     T(params...)
 end
 
@@ -503,8 +524,11 @@ function read_globals(name::String, T::DataType, transition = typemax(Int64))
     end
 
     globals = []
-    gid = fids[1]["globals"]
-    globals = map(k -> find_transition_group(gid[k], transition)[], keys(gid))
+    tid = find_transition_group(fids[1]["globals"], transition)
+    globals = map(k -> tid[k][], keys(tid))
+
+    foreach(close, fids)
+    
     T(globals...)
 end
 
@@ -539,15 +563,16 @@ function read_agents!(sim::Simulation,
             end
 
             field = getproperty(sim, Symbol(T))
-
-            for ET in sim.typeinfos.edges_types
-                field.last_transmit[ET] = -1
-            end
             
             if merge
                 merge!(idmapping, _read_agents_merge!(sim, fids, transition, T))
             else
                 _read_agents_restore!(sim, field, peid, T)
+            end
+            field.last_change = find_transition_nr(fids[mpi.rank+1]["agents"][string(T)],
+                                                   transition)
+            for ET in sim.typeinfos.edges_types
+                field.last_transmit[ET] = -1
             end
 
             _log_debug(sim, "<End> _read_agents_restore!")
@@ -601,6 +626,9 @@ function read_edges!(sim::Simulation,
             end
         end
         finish_write!(sim, T)
+
+        getproperty(sim, Symbol(T)).last_change =
+            find_transition_nr(fids[mpi.rank+1]["edges"][string(T)], transition)
 
         _log_info(sim, "<End> read edges")
     end
@@ -697,6 +725,9 @@ function read_snapshot!(sim::Simulation,
         return
     end
     sim.initialized = attrs(fids[1])["initialized"]
+    sim.num_transitions = transition == typemax(Int64) ?
+        attrs(fids[1])["last_snapshot"] : transition
+    sim.globals_last_change = find_transition_nr(fids[1]["globals"], transition)
     foreach(close, fids)
 
     sim.params = read_params(name, typeof(sim.params))
@@ -718,4 +749,6 @@ function read_snapshot!(sim::Simulation,
         read_edges!(sim, name; transition = transition)
         read_rasters!(sim, name; idmapping)
     end
+    
+    sim
 end

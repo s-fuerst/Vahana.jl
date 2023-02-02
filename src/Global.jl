@@ -19,7 +19,10 @@ Set the value of the field `name` of the `globals` struct for simulation `sim`.
 See also [`new_simulation`](@ref), [`aggregate`](@ref), [`pushglobal!`](@ref) and
 [`getglobal`](@ref)
 """
-setglobal!(sim, name, value) = setfield!(sim.globals, name, value)
+function setglobal!(sim, name, value)
+    sim.globals_last_change = sim.num_transitions - 1
+    setfield!(sim.globals, name, value)
+end
 
 """
     pushglobal!(sim::Simulation, name, value)
@@ -34,6 +37,7 @@ be used to add a value to this vector, instead of writing
 See also [`construct_model`](@ref), [`aggregate`](@ref), [`setglobal!`](@ref) and
 [`getglobal`](@ref)
 """
-pushglobal!(sim, name, value) =
-    setfield!(sim.globals, name, push!(getfield(sim.globals, name), value))
-
+function pushglobal!(sim, name, value)
+    sim.globals_last_change = sim.num_transitions - 1
+    push!(getfield(sim.globals, name), value)
+end

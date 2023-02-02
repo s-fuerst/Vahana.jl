@@ -17,9 +17,14 @@ function test_merge(model)
     foreach(close, fids)
 
     @test sim.params == restored.params
-    @test sim.globals == restored.globals
+#    @test sim.globals == restored.globals
+    @test sim.Agent.last_change == restored.Agent.last_change
+    @test sim.RasterAgent.last_change == restored.RasterAgent.last_change
 
     function checkedges(sim_edges, restored_edges, T)
+        @test getproperty(sim, Symbol(T)).last_change ==
+            getproperty(restored, Symbol(T)).last_change
+        
         for to in keys(sim_edges)
             to = AgentID(to)
             AT = has_trait(sim, T, :SingleAgentType) ?

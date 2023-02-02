@@ -1,4 +1,4 @@
-import DataFrames: DataFrame, subset!
+import DataFrames: DataFrame, subset!, nrow
 
 export as_dataframe
 
@@ -7,8 +7,8 @@ function as_dataframe(sim::Simulation, T::DataType; show_types = false, show_age
 
     df = DataFrame()
     tinfos = sim.typeinfos
-    read = getproperty(sim, Symbol(T)).read
     if T in tinfos.nodes_types # Agents
+        read = getproperty(sim, Symbol(T)).read
         tid = tinfos.nodes_type2id[T]
         df.id = map(nr -> agent_id(tid, agent_nr(AgentID(nr))),
                      1:length(read.state))
@@ -22,6 +22,7 @@ function as_dataframe(sim::Simulation, T::DataType; show_types = false, show_age
             df.id = map(agent_nr, df.id)
         end
     elseif T in sim.typeinfos.edges_types # Networks
+        read = getproperty(sim, Symbol(T)).read
         # First check the Num/HasNeighborsOnly case
         if has_trait(sim, T, :IgnoreFrom) && has_trait(sim, T, :Stateless)
             df.to = collect(keys(read))
@@ -75,8 +76,21 @@ function as_dataframe(sim::Simulation, T::DataType; show_types = false, show_age
                 df.from = map(agent_nr, df.from)
             end
         end
+    elseif T == typeof(sim.globals)
+        for i in 1:fieldcount(T)
+            field = getfield(sim.globals, i)
+            if typeof(field) <: Vector
+                if nrow(df) > 0 && nrow(df) != length(field)
+                    printstyled("""
+Length of :$(fieldname(T,i)) does not match the length of the other vectors, 
+so this field will not be added to the dataframe"""; color = :red)
+                else
+                    df[!,fieldname(T,i)] = field
+                end
+            end
+        end
     else
-        printstyled("Type $T is neither an agent type nor an edge type\n";
+        printstyled("Type $T is neither an agent type nor an edge nor the global type\n";
                     color = :red)
     end
     df

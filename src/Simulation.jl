@@ -128,10 +128,13 @@ function construct_model(typeinfos::ModelTypes, name::String)
                   :(filename::String),
                   :(params::P),
                   :(globals::G),
+                  :(globals_last_change::Int64),
                   :(typeinfos::ModelTypes),
                   :(rasters::Dict{Symbol, Array}),
                   :(initialized::Bool),
                   :(intransition::Bool),
+                  # after a transition this is the next transition nr
+                  # in a transtion this is the current transtion nr
                   :(num_transitions::Int64),
                   :(logger::Log),
                   :(h5file::Union{HDF5.File, Nothing}),
@@ -206,6 +209,7 @@ function new_simulation(model::Model,
         filename = $filename,
         params = $params,
         globals = $globals,
+        globals_last_change = 0,
         typeinfos = $(model.types),
         rasters = Dict{Symbol, Array}(),
         initialized = false,
@@ -501,7 +505,7 @@ function apply_transition!(sim,
                     add_existing = Vector{DataType}())
     @assert sim.initialized "You must call finish_init! before apply_transition!"
     with_logger(sim) do
-        @info "<Begin> apply_transition!" func transition=sim.num_transitions
+        @info "<Begin> apply_transition!" func transition=sim.num_transitions+1
     end
     
     # must be set to true before prepare_read! (as this calls add_edge!)
@@ -523,7 +527,7 @@ function apply_transition!(sim,
 
     for C in call
         with_logger(sim) do
-            @debug "<Begin> tf_call!" agenttype=C transition=sim.num_transitions
+            @debug "<Begin> tf_call!" agenttype=C transition=sim.num_transitions+1
         end
         rfunc = C in read ? transition_with_read! : transition_without_read!
         wfunc = C in write ? transition_with_write! : transition_without_write!

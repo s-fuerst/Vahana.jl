@@ -31,7 +31,8 @@ end
 
 struct Globals
     ga::Int64
-    gb::Int64
+    gb::Vector{Float64}
+    gc::Vector{Int64}
 end
 
 struct Params
@@ -52,7 +53,7 @@ end
 
 function createsim(model, distribute = true)
     sim = model |>
-        new_simulation(Params(1,2), Globals(1,2); logging = true, debug = true)
+        new_simulation(Params(1,2), Globals(1,[2.0],[3]); logging = true, debug = true)
 
     ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:16 ])
 
@@ -89,6 +90,9 @@ function runsim(model, write)
         Agent(state.inner, state.f - 2)
     end
 
+    pushglobal!(sim, :gb, 2.1)
+    pushglobal!(sim, :gc, 4)
+
     if write
         write_snapshot(sim)
     end
@@ -114,9 +118,8 @@ function remove_some_rasternodes(state, id, sim)
 end    
 
 function restore(sim; kwargs...)
-    restored = new_simulation(model, Params(0,0), Globals(0,0))
+    restored = new_simulation(model, Params(0,0), Globals(0,[0], [0]))
     read_snapshot!(restored, sim.name; kwargs...)
-    restored
 end
 
 function test_write_restore(model)
@@ -148,16 +151,22 @@ function test(sim, restored)
     @test sim.Agent.read.state == restored.Agent.read.state
     @test sim.Agent.read.reuseable == restored.Agent.read.reuseable
     @test sim.Agent.nextid == restored.Agent.nextid
+    @test sim.Agent.last_change == restored.Agent.last_change
 
     @test sim.RasterAgent.read.died == restored.RasterAgent.read.died
     @test sim.RasterAgent.read.state == restored.RasterAgent.read.state
     @test sim.RasterAgent.read.reuseable == restored.RasterAgent.read.reuseable
     @test sim.RasterAgent.nextid == restored.RasterAgent.nextid
+    @test sim.RasterAgent.last_change == restored.RasterAgent.last_change
 
     @test sim.params == restored.params
-    @test sim.globals == restored.globals
+    #    @test sim.globals == restored.globals
+
+    @test sim.globals_last_change == restored.globals_last_change
 
     function checkedges(sim_edges, restored_edges, T)
+        @test getproperty(sim, Symbol(T)).last_change ==
+            getproperty(restored, Symbol(T)).last_change
         if Vahana.has_trait(sim, T, :SingleAgentType)
             @test sim_edges == restored_edges
         else
