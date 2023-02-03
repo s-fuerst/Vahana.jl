@@ -1,43 +1,43 @@
-export setglobal!, getglobal, pushglobal!
+export set_global!, get_global, push_global!
 
 """
-    getglobal(sim::Simulation, name)
+    get_global(sim::Simulation, name)
 
 Returns the value of the field `name` of the `globals` struct for simulation `sim`.
 
-See also [`new_simulation`](@ref), [`setglobal!`](@ref) and [`pushglobal!`](@ref)
+See also [`new_simulation`](@ref), [`set_global!`](@ref) and [`push_global!`](@ref)
 """
-getglobal(sim, name) = getfield(sim.globals, name)
+get_global(sim, name) = getfield(sim.globals, name)
 
 """
-    setglobal!(sim::Simulation, name, value)
+    set_global!(sim::Simulation, name, value)
 
 Set the value of the field `name` of the `globals` struct for simulation `sim`.
 
-`setglobal!` must not be called within a transition function. 
+`set_global!` must not be called within a transition function. 
 
-See also [`new_simulation`](@ref), [`aggregate`](@ref), [`pushglobal!`](@ref) and
-[`getglobal`](@ref)
+See also [`new_simulation`](@ref), [`aggregate`](@ref), [`push_global!`](@ref) and
+[`get_global`](@ref)
 """
-function setglobal!(sim, name, value)
+function set_global!(sim, name, value)
     sim.globals_last_change = sim.num_transitions - 1
     setfield!(sim.globals, name, value)
 end
 
 """
-    pushglobal!(sim::Simulation, name, value)
+    push_global!(sim::Simulation, name, value)
 
 In the case that a field of the `globals` struct from the Simulation
-constructor is a vector (e.g. for time series data), `pushglobal!` can
+constructor is a vector (e.g. for time series data), `push_global!` can
 be used to add a value to this vector, instead of writing
-`setglobal!(sim, name, push!(getglobal(sim, name), value)`.
+`set_global!(sim, name, push!(get_global(sim, name), value)`.
 
-`pushglobal!` must not be called within a transition function. 
+`push_global!` must not be called within a transition function. 
 
-See also [`construct_model`](@ref), [`aggregate`](@ref), [`setglobal!`](@ref) and
-[`getglobal`](@ref)
+See also [`construct_model`](@ref), [`aggregate`](@ref), [`set_global!`](@ref) and
+[`get_global`](@ref)
 """
-function pushglobal!(sim, name, value)
+function push_global!(sim, name, value)
     sim.globals_last_change = sim.num_transitions - 1
     push!(getfield(sim.globals, name), value)
 end

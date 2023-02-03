@@ -35,7 +35,7 @@ Inside a transition function the following functions can be used to access the s
 ## Globals and Parameters
 ```@docs
 param
-getglobal
+get_global
 ```
 
 ## Get Agent(state)

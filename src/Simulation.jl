@@ -179,8 +179,8 @@ simulation. Parameter values are constant in a simulation run and can be
 retrieved via the [`param`](@ref) function.
 
 `globals` must be a mutable struct (or `nothing`). The values of these fields are
-accessible for all agents via the [`getglobal`](@ref) function. The values can
-be changed by calling [`setglobal!`](@ref) or [`pushglobal!`](@ref). 
+accessible for all agents via the [`get_global`](@ref) function. The values can
+be changed by calling [`set_global!`](@ref) or [`push_global!`](@ref). 
 
 The optional keyword argument `name` is used as meta-information about
 the simulation and has no effect on the dynamics, since `name` is not
@@ -193,7 +193,7 @@ agents and edges for the initial state, it is necessary to call
 time.
 
 See also [`construct_model`](@ref), [`param`](@ref),
-[`getglobal`](@ref), [`setglobal!`](@ref), [`pushglobal!`](@ref)
+[`get_global`](@ref), [`set_global!`](@ref), [`push_global!`](@ref)
 and [`finish_init!`](@ref)
 """
 function new_simulation(model::Model,

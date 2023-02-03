@@ -394,9 +394,9 @@ calc_average_price(sim3)
 
 for _ in 1:10
     apply_transition!(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers], [ Bought ])
-    pushglobal!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Bought))
+    push_global!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Bought))
     apply_transition!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
-    pushglobal!(sim, :p, calc_average_price(sim))
+    push_global!(sim, :p, calc_average_price(sim))
 end
 
 # To get the resulting timeseries, we use the `getglobal` function:

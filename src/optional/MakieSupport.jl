@@ -16,14 +16,14 @@ element of `names`.
     `plotglobals` is only available when a Makie backend is imported
     by the client.
 
-See also [`pushglobal!`](@ref), [`getglobal`](@ref)
+See also [`push_global!`](@ref), [`get_global`](@ref)
 """
 function plotglobals(sim, names::Vector{Symbol})
     f = Figure()
     ax = Axis(f[1,1])
     plots = Dict{Symbol, Lines}()
     for name in names
-        vals = getglobal(sim, name)
+        vals = get_global(sim, name)
         plots[name] = lines!(ax, 1:length(vals), vals, label = String(name))
     end
     axislegend()

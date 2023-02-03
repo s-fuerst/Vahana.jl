@@ -21,6 +21,6 @@ calc_rasterstate
 You can add a new or additional value to the `globals` struct with:
 
 ```@docs
-setglobal!
-pushglobal!
+set_global!
+push_global!
 ```

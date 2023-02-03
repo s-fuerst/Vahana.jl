@@ -111,7 +111,7 @@ function handle_leave(persons, edge, sim, lid)
     ptime = persons[pid]
     delete!(persons, pid)
 
-    day = getglobal(sim, :day)
+    day = get_global(sim, :day)
     minute::Int64 = floor(day * 24 * 60 + edge.state.time)
 
     p = agentstate(sim, edge.from, Person)
@@ -157,7 +157,7 @@ function handle_leave(persons, edge, sim, lid)
 end 
 
 function contact_model(::Val{Person}, id::AgentID, sim)
-    day = getglobal(sim, :day)
+    day = get_global(sim, :day)
     checked(foreach, edges_to(sim, id, Contact)) do edge
         if edge.state.day > day - 2
             add_edge!(sim, id, edge)
@@ -178,7 +178,7 @@ function contact_model(::Val{Location}, id::AgentID, sim)
         event = edge.state
         if event.type == Arrival
             persons[edge.from] =
-                floor(getglobal(sim, :day) * 24 * 60 + event.time)
+                floor(get_global(sim, :day) * 24 * 60 + event.time)
         else
             handle_leave(persons, edge, sim, id)
         end
@@ -190,7 +190,7 @@ function contact_model(::Val{Location}, id::AgentID, sim)
 end    
 
 function change_health(p::Person, newState::HealthState, sim)
-    Person(newState, getglobal(sim, :day), p.quarantine_start)
+    Person(newState, get_global(sim, :day), p.quarantine_start)
 end
 
 # function check_infection(p::Person, id, sim)
@@ -202,7 +202,7 @@ function disease_progression(p::Person, id, sim)
         return change_health(p, E, sim)
     end
 
-    day = getglobal(sim, :day)
+    day = get_global(sim, :day)
 
     ## original diseaseprogression
     if p.health == E && p.health_changed == day - 3
@@ -221,7 +221,7 @@ function disease_progression(p::Person, id, sim)
 end
 
 function quarantine(p::Person, id, sim)
-    day = getglobal(sim, :day)
+    day = get_global(sim, :day)
 
     if has_neighbor(sim, id, Inform) && p.quarantine_start < 0
         return Person(p.health, p.health_changed, day)
@@ -261,7 +261,7 @@ function init(sim, filename)
 
     finish_init!(sim)
 
-    pushglobal!(sim, :reports, aggregate(sim, Report, +, Person; init = Report()))
+    push_global!(sim, :reports, aggregate(sim, Report, +, Person; init = Report()))
 
     sim
 end
@@ -269,7 +269,7 @@ end
 #add_globalstate!(sim, aggregate(sim, Person, p -> Report(p), +)
 
 function runstep!(sim)
-    setglobal!(sim, :day, Int32(getglobal(sim, :day) + 1))
+    set_global!(sim, :day, Int32(getglobal(sim, :day) + 1))
 
     apply_transition!(sim, contact_model, [ Person, Location ],
                       [ Contact, EndOfDay, MovementEvent ],
@@ -285,7 +285,7 @@ function runstep!(sim)
                       [ Person ])
 
     report = aggregate(sim, Report, +, Person; init = Report())
-    pushglobal!(sim, :reports, report)
+    push_global!(sim, :reports, report)
     println(report)
     sim
 end

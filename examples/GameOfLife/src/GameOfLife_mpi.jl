@@ -44,7 +44,7 @@ function transition(c::Cell, id, sim)
  end
 
 function countactive!(sim)
-    pushglobal!(sim, :numactive, aggregate(sim, c -> c.active, +, Cell))
+    push_global!(sim, :numactive, aggregate(sim, c -> c.active, +, Cell))
 end
 
 function addgrid!(sim)
@@ -53,7 +53,7 @@ function addgrid!(sim)
         agentstate(sim, id, Cell).active
     end
     
-    pushglobal!(sim, :grid, sparse(r))
+    push_global!(sim, :grid, sparse(r))
 end 
 
 model = ModelTypes() |>
@@ -91,7 +91,7 @@ function step!(sim)
         @info "<End> GC"
     end
 #     addgrid!(sim)
-#     getglobal(sim, :grid) |> last
+#     get_global(sim, :grid) |> last
 end
 
 sim = init(Params(rules = (2,3,3,3),
@@ -108,6 +108,6 @@ end
 
 finish_simulation!(sim)
 
-println(getglobal(sim, :numactive)[10])
+println(get_global(sim, :numactive)[10])
 # this produces a nice view of the current state in the REPL
-#getglobal(sim, :grid) |> last
+#get_global(sim, :grid) |> last

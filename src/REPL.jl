@@ -394,16 +394,10 @@ function show_agent(sim,
     id
 end
 
-"""
-TODO DOC 
-"""
 function num_edges(sim, t::Type{T}; write = false) where T
     _num_edges(sim, t, write)
 end
 
-"""
-TODO DOC 
-"""
 function num_agents(sim, ::Type{T}) where T
     field = getproperty(sim, Symbol(T))
     attr = sim.typeinfos.nodes_attr[T]

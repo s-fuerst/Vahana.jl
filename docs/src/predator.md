@@ -438,16 +438,16 @@ values, we can then also calculate the mean energy values.
 
 ````@example predator
 function update_globals(sim)
-    pushglobal!(sim, :predator_pop, aggregate(sim, _ -> 1, +, Predator; init = 0))
-    pushglobal!(sim, :prey_pop, aggregate(sim, _ -> 1, +, Prey; init = 0))
-    pushglobal!(sim, :cells_with_food,
+    push_global!(sim, :predator_pop, aggregate(sim, _ -> 1, +, Predator; init = 0))
+    push_global!(sim, :prey_pop, aggregate(sim, _ -> 1, +, Prey; init = 0))
+    push_global!(sim, :cells_with_food,
                 aggregate(sim, c -> c.countdown == 0, +, Cell))
-    pushglobal!(sim, :mean_predator_energy,
+    push_global!(sim, :mean_predator_energy,
                 aggregate(sim, p -> p.energy, +, Predator; init = 0) /
-                    last(getglobal(sim, :predator_pop)))
-    pushglobal!(sim, :mean_prey_energy,
+                    last(get_global(sim, :predator_pop)))
+    push_global!(sim, :mean_prey_energy,
                 aggregate(sim, p -> p.energy, +, Prey; init = 0) /
-                    last(getglobal(sim, :prey_pop)))
+                    last(get_global(sim, :prey_pop)))
 end;
 nothing #hide
 ````

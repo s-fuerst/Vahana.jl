@@ -133,7 +133,7 @@ function create_plot(sim::Simulation;
 
     f, ax, p = plot(vg)
 
-    obglobals = map(sym -> sym => Observable(getglobal(sim, sym)), globals)
+    obglobals = map(sym -> sym => Observable(get_global(sim, sym)), globals)
     
     vp = VahanaPlot(sim = copy_simulation(sim),
                     original = sim,

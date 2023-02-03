@@ -86,8 +86,8 @@ function runsim(model, write)
         Agent(state.inner, state.f - 2)
     end
 
-    pushglobal!(sim, :gb, 2.1)
-    pushglobal!(sim, :gc, 4)
+    push_global!(sim, :gb, 2.1)
+    push_global!(sim, :gc, 4)
 
     if write
         write_snapshot(sim)
