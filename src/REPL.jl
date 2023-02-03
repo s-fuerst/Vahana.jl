@@ -67,7 +67,7 @@ function construct_prettyprinting_methods(simsymbol)
             end
             for t in nodes_types
                 print(io, "\n\t Type $t \
-                           with $(_show_num_agents(sim, t)) agent(s)")
+                           with $(num_agents(sim, t)) agent(s)")
             end
         end
 
@@ -82,7 +82,7 @@ function construct_prettyprinting_methods(simsymbol)
                     :SingleAgentType in edgetypetraits) ||
                     (:SingleAgentType in edgetypetraits &&
                     :size in keys(sim.typeinfos.edges_attr[t]))
-                    print(io, "\n\t Type $t with edge(s) for $(_show_num_edges(sim, t)) agent(s)") 
+                    print(io, "\n\t Type $t with edge(s) for $(num_edges(sim, t)) agent(s)") 
                 else
                     print(io, "\n\t Type $t \
                                with $(_show_num_edges(sim, t)) edge(s)")
@@ -138,23 +138,6 @@ end
 
 ######################################## Collections
 
-
-function _show_collection(iter, max)
-    count = 1
-    for (k, v) in iter
-        _printid(k)
-        print(" => ")
-        println(v)
-        count += 1
-        if count > max
-            break
-        end
-    end
-    if count > max
-        println("...")
-    end
-end
-
 # In the :IgnoreFrom case we set edge.from to 0.
 function _reconstruct_edge(e, edgetypetraits, edgeT)
     if :Stateless in edgetypetraits
@@ -207,19 +190,6 @@ function _show_num_a_with_e(sim, ::Type{T}) where T
         "$(length(edgeread(sim, T)))/$(length(edgewrite(sim, T))) (R/W)"
     else
         "$(length(edgeread(sim, T)))"
-    end
-end
-
-function _show_num_agents(sim, t::Type{T}) where {T}
-    "$(num_agents(sim, t))"
-end
-
-
-function _show_num_edges(sim, t::Type{T}) where {T}
-    if !sim.initialized 
-        "$(num_edges(sim, t; write = true))"
-    else
-        "$(num_edges(sim, t))"
     end
 end
 
