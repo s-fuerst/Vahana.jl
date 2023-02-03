@@ -5,6 +5,7 @@ using HDF5
 export create_h5file!, open_h5file, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
+export list_snapshots
 
 import Base.convert
 convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}},
@@ -90,6 +91,8 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
             has_trait(sim, T, :IgnoreSourceState)
     end
 
+    create_group(fid, "snapshots")
+    
     fid
 end
 
@@ -309,12 +312,14 @@ function write_edges(sim::Simulation,
     end
 end
 
-function write_snapshot(sim::Simulation)
+function write_snapshot(sim::Simulation, comment::String = "")
     if sim.h5file === nothing
         create_h5file!(sim)
     end
 
     fid = sim.h5file
+    gid = create_group(fid["snapshots"], transition_str(sim))
+    attrs(gid)["comment"] = comment
 
     attrs(fid)["last_snapshot"] = sim.num_transitions
 
@@ -751,4 +756,14 @@ function read_snapshot!(sim::Simulation,
     end
     
     sim
+end
+
+function list_snapshots(name)
+    fids = open_h5file(nothing, name)
+    sid = fids[1]["snapshots"]
+    
+    if length(keys(sid)) == 0
+        return nothing
+    end
+    map(t -> (parse(Int64, t[3:end]), attrs(sid[t])["comment"]), keys(sid))
 end

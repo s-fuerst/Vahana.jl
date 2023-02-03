@@ -1,5 +1,5 @@
 export num_edges
-export show_network, show_agents, show_agent, do_edges
+export show_agent, do_edges
 
 using Printf
 
@@ -235,63 +235,6 @@ function _printid(id, nrformatted = true)
         Printf.@printf "0x%016x" id
     end
 end    
-
-
-function show_type(sim, ::Type{T}, what::Symbol; write = false, max = 5) where T
-    if what == :Agent
-        readfield = readstate(sim, T)
-        writefield = writestate(sim, T)
-    else
-        readfield = read(sim, T)
-        writefield = Vahana.write(sim, T)
-    end
-
-    if length(readfield) > 0
-        printstyled("Read:\n"; color = :cyan)
-        _show_collection(enumerate(readfield), max)
-    end
-
-    if write
-        if length(writefield) > 0
-            printstyled("Write:\n"; color = :cyan)
-            _show_collection(writefield, max)
-        end
-    end
-end
-
-"""
-    show_network(sim, ::Type{T}; write = false, max = 5) 
-
-Display (some of) the edges of type T.
-
-In a parallized simulation, only the edges that are in the partition
-of the graph associated with the function calling process are shown.
-
-When the keyword `write` is set to true, also the edges that are added in
-the initialization phase or current transition function are shown.
-
-The keyword `max` determine the maximal number of shown edges.
-"""
-show_network(sim, t::Type{T}; kwargs...) where T =
-    show_type(sim, t, :Edge; kwargs...)
-
-"""
-    show_agents(sim, ::Type{T}) 
-
-Display (some of) the agents of the type T.
-
-In a parallized simulation, only the agents that are in the partition
-of the graph associated with the function calling process are shown.
-
-When the keyword `write` is set to true, also the agents that are added in
-the initialization phase or current transition function are shown.
-
-The keyword `max` determine the maximal number of shown agents.
-
-"""
-show_agents(sim, t::Type{T}; kwargs...) where T =
-    show_type(sim, t, :Agent; kwargs...)
-
 
 """
     show_agent(sim, Type{T}, id=0; max=5, stateof=:Edge, source = true) 

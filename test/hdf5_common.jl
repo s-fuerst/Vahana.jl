@@ -47,10 +47,6 @@ end
 # the test model has the following structure:
 # we create mpi.size * 8 agent of type Agent
 
-
-
-
-
 function createsim(model, distribute = true)
     sim = model |>
         new_simulation(Params(1,2), Globals(1,[2.0],[3]); logging = true, debug = true)
@@ -83,7 +79,7 @@ function runsim(model, write)
     sim = createsim(model)
 
     if write
-        write_snapshot(sim)
+        write_snapshot(sim, "Initial state")
     end
 
     apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, id, sim
@@ -103,7 +99,7 @@ function runsim(model, write)
                       [ RasterAgent, RasterEdge ])
     
     if write
-        write_snapshot(sim)
+        write_snapshot(sim, "Final state")
         close(sim.h5file)
     end
 
