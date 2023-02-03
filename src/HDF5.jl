@@ -50,7 +50,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     attrs(fid)["simulationname"] = sim.name
     attrs(fid)["modelname"] = sim.model.name
     attrs(fid)["modelhash"] = hash(sim.model)
-    @info "wrote hash" attrs(fid)["modelhash"] hash(sim.model)
+    # @info "wrote hash" attrs(fid)["modelhash"] hash(sim.model)
     attrs(fid)["fileformat"] = 1
     attrs(fid)["mpisize"] = mpi.size
     attrs(fid)["mpirank"] = mpi.rank
@@ -294,7 +294,11 @@ function write_edges(sim::Simulation,
                             [ EdgeCount(to, count) for (to, count) in edges ]
                         end
                     elseif fieldcount(T) == 0
-                        map(e -> StatelessEdge(e[1], e[2].from), edges)
+                        if has_trait(sim, T, :Stateless)
+                            map(e -> StatelessEdge(e[1], e[2]), edges)
+                        else
+                            map(e -> StatelessEdge(e[1], e[2].from), edges)
+                        end
                     elseif has_trait(sim, T, :IgnoreFrom)
                         map(e -> IgnoreFromEdge(e[1], e[2]), edges)
                     else     

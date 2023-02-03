@@ -323,8 +323,9 @@ end
 
         finish_simulation!(sim)
     end
+    
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 
-# this hack should help that the output is not scrambled
-sleep(mpi.rank * 0.05)
 

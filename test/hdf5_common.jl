@@ -1,10 +1,8 @@
-using OhMyREPL
-
-using Revise
-
 using Vahana
 
 using Test
+
+suppress_warnings(true)
 
 struct InnerStruct
     f::Float64
@@ -74,8 +72,6 @@ function createsim(model, distribute = true)
 end    
 
 function runsim(model, write)
-    @info "start model $(model.name)" mpi.rank
-    
     sim = createsim(model)
 
     if write
@@ -113,72 +109,8 @@ function remove_some_rasternodes(state, id, sim)
     mod1(nstate.f, 8) > 4.5 ? nothing : state
 end    
 
-function restore(sim; kwargs...)
+function restore(model, sim; kwargs...)
     restored = new_simulation(model, Params(0,0), Globals(0,[0], [0]))
     read_snapshot!(restored, sim.name; kwargs...)
-end
-
-function test_write_restore(model)
-    sim = runsim(model, true)
-    restored = restore(sim)
-    test(sim, restored)
-
-    apply_transition!(sim,
-                      remove_some_rasternodes,
-                      [ RasterAgent ],
-                      [ RasterAgent, RasterEdge, Agent ],
-                      [ RasterAgent, RasterEdge ])
-
-    apply_transition!(restored,
-                      remove_some_rasternodes,
-                      [ RasterAgent ],
-                      [ RasterAgent, RasterEdge, Agent ],
-                      [ RasterAgent, RasterEdge ])
-
-    test(sim, restored)
-    
-    finish_simulation!(restored)
-    finish_simulation!(sim)
-end
-
-
-function test(sim, restored)
-    @test sim.Agent.read.died == restored.Agent.read.died
-    @test sim.Agent.read.state == restored.Agent.read.state
-    @test sim.Agent.read.reuseable == restored.Agent.read.reuseable
-    @test sim.Agent.nextid == restored.Agent.nextid
-    @test sim.Agent.last_change == restored.Agent.last_change
-
-    @test sim.RasterAgent.read.died == restored.RasterAgent.read.died
-    @test sim.RasterAgent.read.state == restored.RasterAgent.read.state
-    @test sim.RasterAgent.read.reuseable == restored.RasterAgent.read.reuseable
-    @test sim.RasterAgent.nextid == restored.RasterAgent.nextid
-    @test sim.RasterAgent.last_change == restored.RasterAgent.last_change
-
-    @test sim.params == restored.params
-    #    @test sim.globals == restored.globals
-
-    @test sim.globals_last_change == restored.globals_last_change
-
-    function checkedges(sim_edges, restored_edges, T)
-        @test getproperty(sim, Symbol(T)).last_change ==
-            getproperty(restored, Symbol(T)).last_change
-        if Vahana.has_trait(sim, T, :SingleAgentType)
-            @test sim_edges == restored_edges
-        else
-            for to in keys(sim_edges)
-                for edge in sim_edges[to]
-                    @test edge in restored_edges[to]
-                end
-            end
-        end
-    end
-
-    checkedges(sim.EdgeState.read, restored.EdgeState.read, EdgeState)
-
-    checkedges(sim.RasterEdge.read, restored.RasterEdge.read, RasterEdge)
-
-    checkedges(sim.StatelessEdge.read, restored.StatelessEdge.read, StatelessEdge)
-
 end
 

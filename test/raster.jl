@@ -283,6 +283,9 @@ raster_model = ModelTypes() |>
     @test aggregate(sim, a -> a.active, +, Grid3D) == 10
     
     finish_simulation!(sim)
+
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 
 @testset "Raster_NodeID" begin
@@ -349,6 +352,9 @@ end
     @test raster[2,2] == 0
     @test raster[5,5] == 10
     finish_simulation!(sim)
+
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 
 @testset "MoveTo_Dist" begin
@@ -410,6 +416,8 @@ end
     @onrankof p2 @test num_neighbors(sim, p2, OnPosition) == 1+4*2
     disable_transition_checks(false)
     finish_simulation!(sim)
-    
+
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 

@@ -48,6 +48,8 @@ if mpi.size == 1
             end
         end
     end
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 
 @testset "Edges Agg" begin
@@ -102,6 +104,8 @@ end
         runedgesaggregatetest(ET)
         GC.gc(true)
     end
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 
 @testset "Remove Edges" begin
@@ -177,4 +181,7 @@ end
         runremoveedgestest(ET)
         GC.gc(true)
     end
+    
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end

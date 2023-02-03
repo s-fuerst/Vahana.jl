@@ -66,4 +66,7 @@ model = ModelTypes() |>
 
     test_edgetype(DEdge)
     test_edgetype(DEdgeST)
+
+    # this hack should help that the output is not scrambled in the mpi test
+    sleep(mpi.rank * 0.05)
 end

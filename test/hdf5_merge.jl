@@ -6,7 +6,7 @@ import Vahana: has_trait, type_nr, agent_id, agent_nr, AgentID, AgentNr
 
 function test_merge(model)
     sim = runsim(model, false)
-    restored = restore(sim)
+    restored = restore(model, sim)
 
     fids = open_h5file(restored, sim.name)
     @assert mpi.size == 1 && length(fids) > 1 """
@@ -17,7 +17,7 @@ function test_merge(model)
     foreach(close, fids)
 
     @test sim.params == restored.params
-#    @test sim.globals == restored.globals
+    #    @test sim.globals == restored.globals
     @test sim.Agent.last_change == restored.Agent.last_change
     @test sim.RasterAgent.last_change == restored.RasterAgent.last_change
 
@@ -44,7 +44,7 @@ function test_merge(model)
                     else
                         @test sim_edges[to] == restored_edges[rto]
                     end      
-                else 
+                elseif ! has_trait(sim, T, :Stateless)
                     for edge in sim_edges[to]
                         if has_trait(sim, T, :IgnoreFrom)
                             @test edge in restored_edges[rto]
@@ -65,35 +65,38 @@ function test_merge(model)
     checkedges(sim.StatelessEdge.read, restored.StatelessEdge.read, StatelessEdge)
 end
 
-model = ModelTypes() |>
-    register_agenttype!(Agent) |>
-    register_agenttype!(RasterAgent) |>
-    register_edgetype!(EdgeState) |>
-    register_edgetype!(RasterEdge) |>
-    register_edgetype!(StatelessEdge) |>
-    construct_model("hdf5_default")
+@testset "HDF5 merge" begin
+    model_default = ModelTypes() |>
+        register_agenttype!(Agent) |>
+        register_agenttype!(RasterAgent) |>
+        register_edgetype!(EdgeState) |>
+        register_edgetype!(RasterEdge) |>
+        register_edgetype!(StatelessEdge) |>
+        construct_model("hdf5_default")
 
-test_merge(model)
+    test_merge(model_default)
 
-model = ModelTypes() |>
-    register_agenttype!(Agent, :Immortal) |>
-    register_agenttype!(RasterAgent) |>
-    register_edgetype!(EdgeState, :IgnoreFrom) |>
-    register_edgetype!(RasterEdge) |>
-    register_edgetype!(StatelessEdge) |>
-    construct_model("hdf5_ignore_immortal")
+    model_immortal = ModelTypes() |>
+        register_agenttype!(Agent, :Immortal) |>
+        register_agenttype!(RasterAgent) |>
+        register_edgetype!(EdgeState, :IgnoreFrom) |>
+        register_edgetype!(RasterEdge) |>
+        register_edgetype!(StatelessEdge, :Stateless) |>
+        construct_model("hdf5_ignore_immortal")
 
-test_merge(model)
+    test_merge(model_immortal)
+    
+    model_neighbors = ModelTypes() |>
+        register_agenttype!(Agent, :Immortal) |>
+        register_agenttype!(RasterAgent) |>
+        register_edgetype!(EdgeState, :NumNeighborsOnly) |>
+        register_edgetype!(RasterEdge) |>
+        register_edgetype!(StatelessEdge, :HasNeighborOnly, :SingleAgentType;
+                           to_agenttype = Agent) |>
+                               construct_model("hdf5_neighbors")
 
+    test_merge(model_neighbors)
 
-model = ModelTypes() |>
-    register_agenttype!(Agent, :Immortal) |>
-    register_agenttype!(RasterAgent) |>
-    register_edgetype!(EdgeState, :NumNeighborsOnly) |>
-    register_edgetype!(RasterEdge) |>
-    register_edgetype!(StatelessEdge, :HasNeighborOnly, :SingleAgentType;
-                       to_agenttype = Agent) |>
-                           construct_model("hdf5_neighbors")
-
-test_merge(model)
-
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
+end
