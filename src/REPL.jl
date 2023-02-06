@@ -1,5 +1,5 @@
 export num_edges
-export show_agent, do_edges
+export show_agent, do_agents, do_edges
 
 using Printf
 
@@ -408,6 +408,16 @@ function num_agents(sim, ::Type{T}) where T
     else
         field.nextid - 1
     end 
+end
+
+
+"""
+TODO DOC 
+"""
+function do_agents(g, f, sim, ::Type{T}) where T
+    agent_ids = [ agent_id(sim, AgentID(nr), T)
+                  for nr in keys(getproperty(sim, Symbol(T)).read.state) ]
+    f(g, agent_ids)
 end
 
 """
