@@ -11,6 +11,9 @@ function __init__()
     @require GraphMakie="1ecd5474-83a3-4783-bb4f-06765db800d2" begin
         include("optional/GraphMakieSupport.jl")
     end
+    @require DataFrames="a93c6f00-e57d-5684-b7b6-d8193f3e46c0" begin
+        include("optional/DataFrames.jl")
+    end
 
     mpiinit()
 end
@@ -142,8 +145,6 @@ include("Raster.jl")
 include("GraphsSupport.jl")
 
 include("Logging.jl")
-
-include("DataFrames.jl")
 # temporary of LSP
 # include("optional/MakieSupport.jl")
 # include("optional/GraphMakieSupport.jl")

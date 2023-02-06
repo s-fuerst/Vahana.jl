@@ -1,8 +1,8 @@
 import DataFrames: DataFrame, subset!, nrow
 
-export as_dataframe
+export DataFrame
 
-function as_dataframe(sim::Simulation, T::DataType; show_types = false, show_agentnr = false)
+function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentnr = false)
     @assert mpi.size == 1 "You can not use dataframes in a parallel run"
 
     df = DataFrame()

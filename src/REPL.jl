@@ -85,7 +85,7 @@ function construct_prettyprinting_methods(simsymbol)
                     print(io, "\n\t Type $t with edge(s) for $(num_edges(sim, t)) agent(s)") 
                 else
                     print(io, "\n\t Type $t \
-                               with $(_show_num_edges(sim, t)) edge(s)")
+                               with $(num_edges(sim, t)) edge(s)")
                     if ! (:SingleAgentType in edgetypetraits)
                         print(io, " for $(_show_num_a_with_e(sim, t)) agent(s)")
                     end

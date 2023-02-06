@@ -7,15 +7,25 @@ export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export list_snapshots
 
+# hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
+# are using those. The Pos2D/3D types can be used to add a Cell position
+# to an agent state, with automatical conversion from an Cartesianindex.
+Pos2D = NamedTuple{(:x, :y), Tuple{Int64, Int64}}
+Pos3D = NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
+
 import Base.convert
-convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}},
-        ci::CartesianIndex{2}) =
-            (x = ci[1], y = ci[2])
+convert(::Type{Pos2D}, ci::CartesianIndex{2}) = (x = ci[1], y = ci[2])
 
-convert(::Type{NamedTuple{(:x, :y), Tuple{Int64, Int64}}},
-        ci::CartesianIndex{3}) =
-            (x = ci[1], y = ci[2], z = ci[3])
+convert(::Type{Pos3D}, ci::CartesianIndex{3}) = (x = ci[1], y = ci[2], z = ci[3])
 
+# HDF5.jl does not support enumerations. We convert them to there
+# integer type. As we (unsafe) cast the read data to the struct while
+# reading, it is not necessary to convert the integer back to an
+# enumeration explicitly.
+import HDF5.hdf5_type_id
+hdf5_type_id(::Type{T}, ::Val{false}) where {I, T <: Enum{I}} = hdf5_type_id(I)
+
+# TODO: this does not work as expected, write a stable hash function
 import Base.hash
 hash(model::Model) = hash(model.types.edges_attr) +
     hash(model.types.edges_types) +
@@ -155,7 +165,7 @@ function write_agents(sim::Simulation,
             gid = sim.h5file["agents"][string(T)]
 
             field = getproperty(sim, Symbol(T))
-            if haskey(attributes(gid), "last_change") &&
+            if haskey(attrs(gid), "last_change") &&
                 field.last_change == attrs(gid)["last_change"]
                 continue
             end
@@ -231,7 +241,7 @@ function write_edges(sim::Simulation,
         for T in types
             gid = sim.h5file["edges"][string(T)]
             field = getproperty(sim, Symbol(T))
-            if haskey(attributes(gid), "last_change") &&
+            if haskey(attrs(gid), "last_change") &&
                 field.last_change == attrs(gid)["last_change"]
                 continue
             end
@@ -727,7 +737,7 @@ function read_rasters!(sim::Simulation,
 end
 
 function read_snapshot!(sim::Simulation,
-                 name::String;
+                 name::String = sim.name;
                  transition = typemax(Int64))
     fids = open_h5file(sim, name)
     if length(fids) == 0
@@ -736,12 +746,19 @@ function read_snapshot!(sim::Simulation,
     sim.initialized = attrs(fids[1])["initialized"]
     sim.num_transitions = transition == typemax(Int64) ?
         attrs(fids[1])["last_snapshot"] : transition
-    sim.globals_last_change = find_transition_nr(fids[1]["globals"], transition)
+    globals_last_change = find_transition_nr(fids[1]["globals"], transition)
+    if globals_last_change !== nothing
+        sim.globals_last_change = globals_last_change
+    end
     foreach(close, fids)
 
-    sim.params = read_params(name, typeof(sim.params))
+    if sim.params !== nothing
+        sim.params = read_params(name, typeof(sim.params))
+    end
 
-    sim.globals = read_globals(name, typeof(sim.globals), transition)
+    if sim.globals !== nothing
+        sim.globals = read_globals(name, typeof(sim.globals), transition)
+    end
     
     idmapping = read_agents!(sim, name; transition = transition)
     
