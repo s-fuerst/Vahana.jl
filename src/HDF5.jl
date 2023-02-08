@@ -42,7 +42,7 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 parallel_write() = HDF5.has_parallel() && mpi.active
 
 function create_h5file!(sim::Simulation, filename = sim.filename)
-    @assert sim.initialized 
+    @assert sim.initialized "You can write only initialized simulations"
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
     end
@@ -164,6 +164,8 @@ function write_globals(sim::Simulation,
         end
     end
 
+    flush(sim.h5file)
+    
     nothing
 end
 
@@ -214,6 +216,8 @@ function write_agents(sim::Simulation,
             end
         end
     end
+
+    flush(sim.h5file)
 
     nothing
 end
@@ -339,6 +343,10 @@ function write_edges(sim::Simulation,
             finish_read!(sim, T)
         end
     end
+
+    flush(sim.h5file)
+
+    nothing
 end
 
 function write_snapshot(sim::Simulation, comment::String = "")
@@ -798,7 +806,12 @@ function list_snapshots(name::String)
     if length(keys(sid)) == 0
         return nothing
     end
-    map(t -> (parse(Int64, t[3:end]), attrs(sid[t])["comment"]), keys(sid))
+    snapshots =
+        map(t -> (parse(Int64, t[3:end]), attrs(sid[t])["comment"]), keys(sid))
+
+    foreach(close, fids)
+
+    snapshots
 end
 
 list_snapshots(sim::Simulation) = list_snapshots(sim.name)
