@@ -28,14 +28,16 @@ struct RasterEdge
 end
 
 struct Globals
+    pos::Pos2D
     ga::Int64
     gb::Vector{Float64}
     gc::Vector{Int64}
 end
 
 struct Params
-    pa::Int64
     pb::Int64
+    pa::Vector{Float64}
+    pos::Pos3D
 end
 
 function sumi2o(state, _, _)
@@ -47,7 +49,9 @@ end
 
 function createsim(model, distribute = true)
     sim = model |>
-        new_simulation(Params(1,2), Globals(1,[2.0],[3]); logging = true, debug = true)
+        new_simulation(Params(1, [2.0, 2.1], (x = 3, y = 4, z = 5)),
+                       Globals(Pos(1, 2), 3, [4.0, 4.1], [5, 6, 7]);
+                       logging = true, debug = true)
 
     ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:16 ])
 
@@ -110,7 +114,9 @@ function remove_some_rasternodes(state, id, sim)
 end    
 
 function restore(model, sim; kwargs...)
-    restored = new_simulation(model, Params(0,0), Globals(0,[0], [0]))
+    restored = new_simulation(model,
+                              Params(0, [0, 0], Pos(0, 0, 0)),
+                              Globals(Pos(0, 0), 0, [0], [0]))
     read_snapshot!(restored, sim.name; kwargs...)
 end
 

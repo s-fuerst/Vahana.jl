@@ -16,6 +16,7 @@ MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
+NetworkLayout = "46757867-2c16-5918-afeb-47bfcb05e46a"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 

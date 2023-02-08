@@ -1,17 +1,21 @@
 using MPI
 
+using HDF5: H5S_SCALAR
 using HDF5
 
 export create_h5file!, open_h5file, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export list_snapshots
-
+export Pos, Pos2D, Pos3D
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
 # are using those. The Pos2D/3D types can be used to add a Cell position
 # to an agent state, with automatical conversion from an Cartesianindex.
 Pos2D = NamedTuple{(:x, :y), Tuple{Int64, Int64}}
 Pos3D = NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
+
+Pos(x, y) = (x = x, y = y)
+Pos(x, y, z) = (x = x, y = y, z = z)
 
 import Base.convert
 convert(::Type{Pos2D}, ci::CartesianIndex{2}) = (x = ci[1], y = ci[2])
@@ -43,9 +47,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
     end
-    if filename == sim.model.name
-        filename = mkpath("h5") * "/" * filename
-    end
+    filename = mkpath("h5") * "/" * filename
     
     fid = if parallel_write()
         _log_info(sim, "Create hdf5 file in parallel mode")
@@ -70,7 +72,14 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     pid = create_group(fid, "params")
     if sim.params !== nothing
         for k in fieldnames(typeof(sim.params))
-            sim.h5file["params"][string(k)] = getfield(sim.params, k)
+            field = getfield(sim.params, k)
+            if typeof(field) <: Array
+                pid[string(k)] = field
+                attrs(pid[string(k)])["array"] = true
+            else
+                pid[string(k)] = [ field ]
+                attrs(pid[string(k)])["array"] = false
+            end
         end
     end
     
@@ -144,7 +153,14 @@ function write_globals(sim::Simulation,
 
         for k in fieldnames(typeof(sim.globals))
             if k in fields
-                tid[string(k)] = getfield(sim.globals, k)
+                field = getfield(sim.globals, k)
+                if typeof(field) <: Array
+                    tid[string(k)] = field
+                    attrs(tid[string(k)])["array"] = true
+                else
+                    tid[string(k)] = [ field ]
+                    attrs(tid[string(k)])["array"] = false
+                end
             end
         end
     end
@@ -269,7 +285,7 @@ function write_edges(sim::Simulation,
                 pename = "pe_" * string(pe)
                 # what we write depends on :Stateless and :IgnoreFrom,
                 # so we have four different cases 
-                peid = if _neighbors_only(sim, T)
+                if _neighbors_only(sim, T)
                     if has_trait(sim, T, :SingleAgentType)
                         create_dataset(tid, pename, eltype(edges),
                                        vec_num_edges[pe+1])
@@ -388,12 +404,12 @@ function open_h5file(sim::Union{Simulation, Nothing}, filename)
         if sim !== nothing
             _log_info(sim, "Open hdf5 file in parallel mode")
         end
-        [ HDF5.h5open(f, "r", mpi.comm, MPI.Info()) for f in filenames ]
+        [ HDF5.h5open(f, "r+", mpi.comm, MPI.Info()) for f in filenames ]
     else
         if sim !== nothing
             _log_info(sim, "Open hdf5 file without parallel mode")
         end
-        [ HDF5.h5open(f, "r") for f in filenames ]
+        [ HDF5.h5open(f, "r+") for f in filenames ]
     end
 
     # TODO improve hash function
@@ -497,6 +513,7 @@ function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
         died = has_trait(sim, T, :Immortal, :Agent) ? fill(false, size) :
             peid["died"][]
         state = if fieldcount(T) > 0
+#            return HDF5.read(peid, "state" => T)
             vec = Vector{T}(undef, size)
             @assert sizeof(peid["state"][][1]) == sizeof(T)
             # we know that T is a bitstype, so this allows to "cast" the type
@@ -522,18 +539,30 @@ function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
     idmapping
 end
 
+
+function _read_gorp(hid, T)
+    unsorted = Dict(map(keys(hid)) do k
+                        k => if attrs(hid[k])["array"]
+                            hid[k][]
+                        else
+                            hid[k][1]
+                        end
+                    end)
+    
+    map(n -> unsorted[string(n)], fieldnames(T))
+end
+
 function read_params(name::String, T::DataType)
     fids = open_h5file(nothing, name)
     if length(fids) == 0
         return
     end
 
-    pid = fids[1]["params"]
-    params = map(k -> pid[k][], keys(pid))
-
+    values = _read_gorp(fids[1]["params"], T)
+    
     foreach(close, fids)
 
-    T(params...)
+    T(values...)
 end
 
 function read_globals(name::String, T::DataType, transition = typemax(Int64))
@@ -542,13 +571,11 @@ function read_globals(name::String, T::DataType, transition = typemax(Int64))
         return
     end
 
-    globals = []
-    tid = find_transition_group(fids[1]["globals"], transition)
-    globals = map(k -> tid[k][], keys(tid))
+    values = _read_gorp(find_transition_group(fids[1]["globals"], transition),T)
 
     foreach(close, fids)
-    
-    T(globals...)
+
+    T(values...)
 end
 
 function read_agents!(sim::Simulation,
@@ -738,7 +765,8 @@ end
 
 function read_snapshot!(sim::Simulation,
                  name::String = sim.name;
-                 transition = typemax(Int64))
+                 transition = typemax(Int64),
+                 writeable = false)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -775,11 +803,16 @@ function read_snapshot!(sim::Simulation,
         read_edges!(sim, name; transition = transition)
         read_rasters!(sim, name; idmapping)
     end
+
+    if writeable
+        fids = open_h5file(sim, name)
+        sim.h5file = fids[mpi.rank+1]
+    end
     
     sim
 end
 
-function list_snapshots(name)
+function list_snapshots(name::String)
     fids = open_h5file(nothing, name)
     sid = fids[1]["snapshots"]
     
@@ -788,3 +821,5 @@ function list_snapshots(name)
     end
     map(t -> (parse(Int64, t[3:end]), attrs(sid[t])["comment"]), keys(sid))
 end
+
+list_snapshots(sim::Simulation) = list_snapshots(sim.name)

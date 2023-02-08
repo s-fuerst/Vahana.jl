@@ -37,7 +37,9 @@ function test(sim, restored)
     @test sim.RasterAgent.nextid == restored.RasterAgent.nextid
     @test sim.RasterAgent.last_change == restored.RasterAgent.last_change
 
-    @test sim.params == restored.params
+    @test sim.params.pa == restored.params.pa
+    @test sim.params.pb == restored.params.pb
+    @test sim.params.pos == restored.params.pos
     #    @test sim.globals == restored.globals
 
     @test sim.globals_last_change == restored.globals_last_change
