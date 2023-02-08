@@ -22,7 +22,7 @@ convert(::Type{Pos2D}, ci::CartesianIndex{2}) = (x = ci[1], y = ci[2])
 
 convert(::Type{Pos3D}, ci::CartesianIndex{3}) = (x = ci[1], y = ci[2], z = ci[3])
 
-# HDF5.jl does not support enumerations. We convert them to there
+# HDF5.jl does not support enumerations. We convert them to their
 # integer type. As we (unsafe) cast the read data to the struct while
 # reading, it is not necessary to convert the integer back to an
 # enumeration explicitly.
@@ -41,7 +41,6 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
-# this is called in new_simulation
 function create_h5file!(sim::Simulation, filename = sim.filename)
     @assert sim.initialized 
     if endswith(filename, ".h5")
@@ -463,13 +462,7 @@ function _read_agents_restore!(sim::Simulation, field, peid, T::DataType)
     end
     if fieldcount(T) > 0
         if size > 0
-            field.write.state = Vector{T}(undef, size)
-            filestate = peid["state"][]
-            @assert sizeof(filestate[1]) == sizeof(T)
-            # we know that T is a bitstype, so this allows to "cast" the type
-            # from the tuple we get from the HDF5 library to the type T,
-            # assuming that each field is stored and read with the correct type
-            Base._memcpy!(field.write.state, filestate, size * sizeof(T))
+            field.write.state = HDF5.read(peid["state"], T)
         end    
     else
         field.write.state = fill(T(), size)
@@ -513,14 +506,7 @@ function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
         died = has_trait(sim, T, :Immortal, :Agent) ? fill(false, size) :
             peid["died"][]
         state = if fieldcount(T) > 0
-#            return HDF5.read(peid, "state" => T)
-            vec = Vector{T}(undef, size)
-            @assert sizeof(peid["state"][][1]) == sizeof(T)
-            # we know that T is a bitstype, so this allows to "cast" the type
-            # from the tuple we get from the HDF5 library to the type T,
-            # assuming that each field is stored and read with the correct type
-            Base._memcpy!(vec, peid["state"][], size * sizeof(T))
-            vec
+            HDF5.read(peid, "state" => T)
         else
             fill(T(), size)
         end
@@ -538,7 +524,6 @@ function _read_agents_merge!(sim::Simulation, fids, transition, T::DataType)
     
     idmapping
 end
-
 
 function _read_gorp(hid, T)
     unsorted = Dict(map(keys(hid)) do k
@@ -721,17 +706,11 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
         # T struct
         # for add_edge! we need always a from id, even when it's ignored
         dummy = AgentID(0)
-        vec = Vector{IgnoreFromEdge{T}}(undef, numedges)
-        @assert sizeof(peid[1]) == sizeof(IgnoreFromEdge{T})
-        Base._memcpy!(vec, peid[], numedges * sizeof(IgnoreFromEdge{T}))
-        for edge in vec
+        for edge in HDF5.read(peid, IgnoreFromEdge{T})
             add_edge!(sim, dummy, idmapfunc(edge.to), edge.state)
         end
     else
-        vec = Vector{CompleteEdge{T}}(undef, numedges)
-        @assert sizeof(peid[1]) == sizeof(CompleteEdge{T})
-        Base._memcpy!(vec, peid[], numedges * sizeof(CompleteEdge{T}))
-        for ce in vec
+        for ce in HDF5.read(peid, CompleteEdge{T})
             add_edge!(sim, idmapfunc(ce.edge.from), idmapfunc(ce.to),
                       ce.edge.state)
         end
