@@ -212,7 +212,7 @@ end
 
 function _show_num_a_with_e(sim, ::Type{T}) where T
     if !sim.initialized 
-        "$(length(edgeread(sim, T)))/$(length(edgewrite(sim, T))) (R/W)"
+        "$(length(edgewrite(sim, T)))"
     else
         "$(length(edgeread(sim, T)))"
     end
@@ -418,8 +418,8 @@ function show_agent(sim,
     id
 end
 
-function num_edges(sim, t::Type{T}; write = false) where T
-    _num_edges(sim, t, write)
+function num_edges(sim, t::Type{T}) where T
+    _num_edges(sim, t, ! sim.initialized)
 end
 
 function num_agents(sim, ::Type{T}) where T

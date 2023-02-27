@@ -1,5 +1,6 @@
 using MPI
 
+using Printf: PositionCounter
 using HDF5
 
 export create_h5file!, open_h5file, close_h5file!
@@ -20,6 +21,10 @@ import Base.convert
 convert(::Type{Pos2D}, ci::CartesianIndex{2}) = (x = ci[1], y = ci[2])
 
 convert(::Type{Pos3D}, ci::CartesianIndex{3}) = (x = ci[1], y = ci[2], z = ci[3])
+
+convert(::Type{CartesianIndex{2}}, pos::Pos2D) = CartesianIndex(pos[1], pos[2])
+
+convert(::Type{CartesianIndex{3}}, pos::Pos3D) = CartesianIndex(pos[1], pos[2], pos[3])
 
 # HDF5.jl does not support enumerations. We convert them to their
 # integer type. As we (unsafe) cast the read data to the struct while

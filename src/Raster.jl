@@ -1,7 +1,7 @@
 import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
-export calc_raster, calc_rasterstate, move_to!
+export calc_raster, calc_rasterstate, move_to!, cellid
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
@@ -281,12 +281,8 @@ position `pos`. `pos` must be of type CartesianIndex or a Dims{N}.
 
 See also [`add_raster!`](@ref), [`move_to!`](@ref),
 [`add_edge!`](@ref) and [`agentstate`](@ref)
-
-Can be only called after [`finish_init!`](@ref).
-
 """
 function cellid(sim, name::Symbol, pos)
-    @assert sim.initialized "cellid can be only called after finish_init!"
     sim.rasters[name][CartesianIndex(pos)]
 end
 
