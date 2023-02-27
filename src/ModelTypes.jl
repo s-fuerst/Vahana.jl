@@ -54,7 +54,7 @@ See also [`add_agent!`](@ref) and [`add_agents!`](@ref)
 """
 function register_agenttype!(types::ModelTypes, ::Type{T}, traits...) where T
     @assert !(Symbol(T) in types.nodes_types) "Each type can be added only once"
-    @assert isbitstype(T)
+    @assert isbitstype(T) "Agenttypes must be bitstypes"
     type_number = length(types.nodes_type2id) + 1
     @assert type_number < MAX_TYPES "Can not add new type, 
                                 maximal number of types already registered"
@@ -124,7 +124,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
                      kwargs...)  where T
     global show_single_edge_and_type_warning
     @assert !(T in types.edges_types) "Each type can be added only once"
-    @assert isbitstype(T)
+    @assert isbitstype(T) "Edgetypes must be bitstypes"
     push!(types.edges_types, T)
     types.edges_attr[T] = kwargs
     traits = Set{Symbol}(traits)
