@@ -139,12 +139,19 @@ end
 ######################################## Collections
 
 # In the :IgnoreFrom case we set edge.from to 0.
-function _reconstruct_edge(e, edgetypetraits, edgeT)
+function _reconstruct_edge(sim, e, edgetypetraits, edgeT)
     if :Stateless in edgetypetraits
         if :IgnoreFrom in edgetypetraits
             Edge(AgentID(0), edgeT())
         else
-            Edge(e, edgeT())
+            # if :SingleEdge in edgetypetraits
+            #     @info edgeT sim.typeinfos.edges_attr[edgeT] e
+            #     agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
+            #     aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e))
+            #     Edge(aid, edgeT())
+            # else
+                Edge(e, edgeT())
+            # end
         end
     elseif :IgnoreFrom in edgetypetraits
         Edge(AgentID(0), e)
@@ -153,8 +160,23 @@ function _reconstruct_edge(e, edgetypetraits, edgeT)
     end
 end        
 
-function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
-    e = _reconstruct_edge(e, edgetypetraits, edgeT)
+function _show_edge(sim, e, neighborstate, edgeT)
+    function show_struct(s)
+        if nfields(s) >= 1
+            first = true
+            # printstyled("\n$(name)(s):"; color = :cyan)
+            for k in typeof(s) |> fieldnames
+                if k in neighborstate
+                    f = getfield(s, k)
+                    print(" $k=$f,")
+                end
+            end
+        end
+    end
+ 
+    
+    edgetypetraits = sim.typeinfos.edges_attr[edgeT][:traits]
+    e = _reconstruct_edge(sim, e, edgetypetraits, edgeT)
     if !(:IgnoreFrom in edgetypetraits) && e.from == 0
         return
     end
@@ -164,9 +186,10 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
     else
         _printid(e.from)
     end
-    if stateof == :Edge || :IgnoreFrom in edgetypetraits
+    if ! (:Stateless in edgetypetraits)
         print(" $(e.state)")
-    else
+    end
+    if length(neighborstate) > 0
         # for the to edges we get an empty edgetype traits, as we constructed
         # those edges they don't have the same traits
         # But here we need the original traits, so we access them directly
@@ -175,9 +198,11 @@ function _show_edge(sim, e, edgetypetraits, stateof, edgeT)
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             # We disable assertions to call agentstate from the REPL
             # but this is only done temporary and in a newer world age
-            print(" $(Base.invokelatest(agentstate, sim, aid, agentT))")
+            show_struct(Base.invokelatest(agentstate, sim, aid, agentT))
+            # print(" $(Base.invokelatest(agentstate, sim, aid, agentT))")
         else
-            print(" $(Base.invokelatest(agentstate_flexible, sim, e.from))")
+            show_struct(Base.invokelatest(agentstate_flexible, sim, e.from))
+            # print(" $(Base.invokelatest(agentstate_flexible, sim, e.from))")
         end
     end
 end
@@ -230,11 +255,10 @@ traversed to find the edges where the agent `id` is the source. Since
 this can take some time for large graphs, this search can be disabled.
 """
 function show_agent(sim,
-                    t::Type{T},
-                    id = 0;
-                    max = 5,
-                    stateof = :Edge,
-                    source = true) where T
+             t::Type{T},
+             id = 0;
+             max = 5,
+             neighborstate = []) where T
     if !sim.initialized
         println("show_agent can not be called before finish_init!.")
         return
@@ -329,16 +353,16 @@ function show_agent(sim,
                 else
                     # write the header for this edgetype, 
                     printstyled("\n\tfrom:              "; color = :green)
-                    if stateof == :Edge || :IgnoreFrom in edgetypetraits
+                    if ! (:Stateless in edgetypetraits)
                         printstyled("edge.state:"; color = :green)
-                    else
+                    elseif length(neighborstate) > 0
                         printstyled("state of edge.from:"; color = :green)
                     end
                     if :SingleEdge in edgetypetraits
-                        _show_edge(sim, d, edgetypetraits, stateof, edgeT)
+                        _show_edge(sim, d, neighborstate, edgeT)
                     else
                         for e in first(d, max)
-                            _show_edge(sim, e, edgetypetraits, stateof, edgeT)
+                            _show_edge(sim, e, neighborstate, edgeT)
                         end
                         if length(d) > max
                             println("\n\t... ($(length(d)-max) not shown)")
@@ -347,44 +371,44 @@ function show_agent(sim,
                 end
             end
         end
-
-        if ! source continue end
         
-        if :IgnoreFrom in edgetypetraits
-            if !justcount
-                printstyled("\n\tFor edgetypes with the :IgnoreFrom trait " *
-                    "the edges to an agent can not be determined."; color = :red)
-            end
-            continue
-        end
-        # collect the outgoing edges and overwrite the from id
-        # with the to id
-        edges_agents = Vector{Edge}()
-        for (eid, e) in edges_iterator(sim, edgeT)
-            edge = _reconstruct_edge(e, edgetypetraits, edgeT)
-            
-            if id == edge.from
-                push!(edges_agents, Edge(AgentID(eid), edge.state))
-            end   
-        end
+        # if ! source continue end
+        
+        # if :IgnoreFrom in edgetypetraits
+        #     if !justcount
+        #         printstyled("\n\tFor edgetypes with the :IgnoreFrom trait " *
+        #             "the edges to an agent can not be determined."; color = :red)
+        #     end
+        #     continue
+        # end
+        # # collect the outgoing edges and overwrite the from id
+        # # with the to id
+        # edges_agents = Vector{Edge}()
+        # for (eid, e) in edges_iterator(sim, edgeT)
+        #     edge = _reconstruct_edge(sim, e, edgetypetraits, edgeT)
 
-        if length(edges_agents) > 0
-            if ! edgeTheadershown
-                printstyled("\n    $edgeT"; color = :yellow)
-            end
-            printstyled("\n\tto:                "; color = :green)
-            if stateof==:Edge
-                printstyled("edge.state:"; color = :green)
-            else
-                printstyled("state of edge.to:"; color = :green)
-            end
-            for ea in first(edges_agents, max)
-                _show_edge(sim, ea, [], stateof, edgeT)
-            end
-            if length(edges_agents) > max
-                println("\n\t... ($(length(edges_agents)-max) not shown)")
-            end
-        end
+        #     if id == edge.from
+        #         push!(edges_agents, Edge(AgentID(eid), edge.state))
+        #     end   
+        # end
+
+        # if length(edges_agents) > 0
+        #     if ! edgeTheadershown
+        #         printstyled("\n    $edgeT"; color = :yellow)
+        #     end
+        #     printstyled("\n\tto:                "; color = :green)
+        #     if ! (:Stateless in edgetypetraits)
+        #         printstyled("edge.state:"; color = :green)
+        #     elseif neighborstate
+        #         printstyled("state of edge.to:"; color = :green)
+        #     end
+        #     for ea in first(edges_agents, max)
+        #         _show_edge(sim, ea, neighborstate, edgeT)
+        #     end
+        #     if length(edges_agents) > max
+        #         println("\n\t... ($(length(edges_agents)-max) not shown)")
+        #     end
+        # end
     end
     println()
 

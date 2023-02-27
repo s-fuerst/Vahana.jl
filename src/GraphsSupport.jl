@@ -169,7 +169,7 @@ Base.show(io::IO, _::MIME"text/plain", vg::VahanaSimpleGraph) =
 
 ######################################## VahanaGraph
 
-struct VahanaGraph <: Graphs.AbstractGraph{Int64}
+mutable struct VahanaGraph <: Graphs.AbstractGraph{Int64}
     sim
     agenttypes::Vector{DataType}
     edgetypes::Vector{DataType}

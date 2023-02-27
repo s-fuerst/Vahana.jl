@@ -1,6 +1,5 @@
 using MPI
 
-using HDF5: H5S_SCALAR
 using HDF5
 
 export create_h5file!, open_h5file, close_h5file!
@@ -140,7 +139,7 @@ function write_globals(sim::Simulation,
     end
 
     gid = sim.h5file["globals"]
-    if haskey(attributes(gid), "last_change") &&
+    if haskey(HDF5.attributes(gid), "last_change") &&
         sim.globals_last_change == attrs(gid)["last_change"]
         return
     end
