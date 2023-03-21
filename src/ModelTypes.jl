@@ -53,8 +53,8 @@ of the simulation. When the size of the population is constant
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
 function register_agenttype!(types::ModelTypes, ::Type{T}, traits...) where T
-    @assert !(Symbol(T) in types.nodes_types) "Each type can be added only once"
-    @assert isbitstype(T) "Agenttypes must be bitstypes"
+    @assert !(Symbol(T) in types.nodes_types) "Type $T is already registered"
+    @assert isbitstype(T) "Agenttypes $T must be bitstypes"
     type_number = length(types.nodes_type2id) + 1
     @assert type_number < MAX_TYPES "Can not add new type, 
                                 maximal number of types already registered"
@@ -123,8 +123,8 @@ See also [Edge Traits](./performance.md#Edge-Traits), [`add_edge!`](@ref) and
 function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
                      kwargs...)  where T
     global show_single_edge_and_type_warning
-    @assert !(T in types.edges_types) "Each type can be added only once"
-    @assert isbitstype(T) "Edgetypes must be bitstypes"
+    @assert !(T in types.edges_types) "Type $T is already registered"
+    @assert isbitstype(T) "Edgetypes $T must be bitstypes"
     push!(types.edges_types, T)
     types.edges_attr[T] = kwargs
     traits = Set{Symbol}(traits)

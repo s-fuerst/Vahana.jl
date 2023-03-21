@@ -1,5 +1,5 @@
 export num_edges
-export show_agent, do_agents, do_edges
+export show_agent, do_agents, do_edges, all_agentstates
 
 using Printf
 
@@ -438,11 +438,25 @@ end
 """
 TODO DOC 
 """
+# TODO: for mortal agents we must filter the agent_ids list, also
+# add support for parallel runs (and move this away from repl). Or add
+# a function that return all agentstates
 function do_agents(g, f, sim, ::Type{T}) where T
     agent_ids = [ agent_id(sim, AgentID(nr), T)
                   for nr in keys(getproperty(sim, Symbol(T)).read.state) ]
     f(g, agent_ids)
 end
+
+"""
+TODO DOC 
+"""
+# TODO: for mortal agents we must filter the agent_ids list, also
+# add support for parallel runs (and move this away from repl). Or add
+# a function that return all agentstates
+function all_agentstates(sim, ::Type{T}) where T
+    values(getproperty(sim, Symbol(T)).read.state)
+end
+    
 
 """
 TODO DOC 
