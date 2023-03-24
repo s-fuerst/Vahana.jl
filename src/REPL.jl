@@ -288,8 +288,10 @@ function show_agent(sim,
     typeid = sim.typeinfos.nodes_type2id[T]
     # id can be always the local nr, so we first ensure that id
     # is the complete agent_id
-    if id <= 2 ^ BITS_AGENTNR
-        id = agent_id(typeid, AgentNr(id))
+    id = if id <= 2 ^ BITS_AGENTNR
+        agent_id(typeid, AgentNr(id))
+    else
+        AgentID(id)
     end
     # first we print the id of the agent and the state of the agent
     printstyled("Id / Local Nr: "; color = :cyan)
