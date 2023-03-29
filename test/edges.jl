@@ -248,7 +248,7 @@ function runedgestest()
         sim = new_simulation(model_edges, nothing, nothing)
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-            @test num_edges(sim, t) == 0
+            @test num_edges(sim, t; write = false) == 0
         end
 
         @test num_agents(sim, Agent) == 0
@@ -272,13 +272,13 @@ function runedgestest()
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             @test num_edges(sim, t; write = true) == 2
-            @test num_edges(sim, t) == 0
+            @test num_edges(sim, t; write = false) == 0
         end
         
         finish_init!(sim)
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
-            @test num_edges(sim, t) == 2
+            @test num_edges(sim, t; write = false) == 2
         end
 
         finish_simulation!(sim)

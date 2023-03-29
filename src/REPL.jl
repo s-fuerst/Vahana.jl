@@ -420,8 +420,12 @@ function show_agent(sim,
     id
 end
 
-function num_edges(sim, t::Type{T}) where T
-    _num_edges(sim, t, ! sim.initialized)
+function num_edges(sim, t::Type{T}; write = nothing) where T
+    if write === nothing
+        _num_edges(sim, t, ! sim.initialized)
+    else
+        _num_edges(sim, t, write)
+    end
 end
 
 function num_agents(sim, ::Type{T}) where T
