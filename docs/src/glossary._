@@ -26,7 +26,7 @@ therefore a position in the space of the raster. See also [`add_raster!`](@ref).
 In Vahana, a model is a collection of all defined agent and edge types
 that describes the state space of the simulation. However, the model
 does not know anything about how the state of a simulation is changed.
-See also [`construct_model`](@ref).
+See also [`create_model`](@ref).
 
 ## Network
 
@@ -42,7 +42,7 @@ See also [`construct_model`](@ref).
 
 A simulation is an instance of the model. There can exist multiple
 simulation in a single Julia session, each simulation with potential
-different parameters and state. See also [`new_simulation`](@ref).
+different parameters and state. See also [`create_simulation`](@ref).
 
 ## Source / Target
 

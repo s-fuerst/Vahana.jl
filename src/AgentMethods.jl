@@ -54,7 +54,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         @mayassert sim.initialized == false || sim.intransition """
         You can call add_agent! only in the initialization phase (until
         `finish_init!` is called) or within a transition function called by
-        `apply_transition`.
+        `apply`.
         """
         nr = _get_next_id(sim, $T)
         @inbounds @writestate($T)[nr] = agent
@@ -401,12 +401,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end
     end        
 
-    @eval function aggregate(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
+    @eval function mapreduce(sim::$simsymbol, f, op, ::Type{$T}; kwargs...)
         with_logger(sim) do
-            @info "<Begin> aggregate agents" f op agenttype=$T
+            @info "<Begin> mapreduce agents" f op agenttype=$T
         end
         @mayassert ! sim.intransition """
-        You can not call aggregate inside of a transition function."""
+        You can not call mapreduce inside of a transition function."""
         emptyval = val4empty(op; kwargs...)
 
         if $immortal
@@ -430,7 +430,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
         end
 
-        _log_info(sim, "<End> aggregate agents")
+        _log_info(sim, "<End> mapreduce agents")
         
         r
     end

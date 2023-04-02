@@ -102,7 +102,7 @@ T must have been previously registered by calling
 from or to this agent before [`finish_init!`](@ref) is called (in the
 case that `add_agent!` is called in the initialization phase), or before
 the transition funcion is finished (in the case that add_agent! is
-called in an [`apply_transition!`](@ref) callback). Do not use the ID
+called in an [`apply!`](@ref) callback). Do not use the ID
 for other purposes, they are not guaranteed to be stable.
 
 See also [`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
@@ -127,7 +127,7 @@ calling [`register_agenttype!`](@ref).
 create edges from or to this agents before [`finish_init!`](@ref) is
 called (in the case that add_agents! is called in the initialization
 phase), or before the transition funcion is finished (in the case that
-add_agents!  is called in an [`apply_transition!`](@ref) callback). Do
+add_agents!  is called in an [`apply!`](@ref) callback). Do
 not use the ID for other purposes, they are not guaranteed to be stable.
 
 See also [`add_agent!`](@ref), [`register_agenttype!`](@ref),
@@ -149,7 +149,7 @@ Returns the state of an agent of type T.
 
 In the case where the type T is not determinable when writing the code
 (e.g., since there is no limit to the edges between agents,
-[`edges_to`](@ref) can return agentID of different agent types),
+[`edges`](@ref) can return agentID of different agent types),
 [`agentstate_flexible`](@ref) must be used instead.
 
 !!! warning 

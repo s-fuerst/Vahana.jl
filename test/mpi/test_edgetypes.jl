@@ -58,25 +58,25 @@ statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeEI, MPIE
 model = ModelTypes() |>
     register_agenttype!(AgentState1) |>
     register_agenttype!(AgentState2) |>
-    register_edgetype!(MPIEdgeD) |>
-    register_edgetype!(MPIEdgeS, :Stateless) |>
-    register_edgetype!(MPIEdgeE, :SingleEdge) |>
-    register_edgetype!(MPIEdgeT, :SingleAgentType; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeI, :IgnoreFrom) |>
-    register_edgetype!(MPIEdgeSE, :Stateless, :SingleEdge) |>
-    register_edgetype!(MPIEdgeST, :Stateless, :SingleAgentType; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeSI, :Stateless, :IgnoreFrom) |>
-    register_edgetype!(MPIEdgeEI, :SingleEdge, :IgnoreFrom) |>
-    register_edgetype!(MPIEdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
-    register_edgetype!(MPIEdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1) |>
-    register_edgetype!(MPIEdgeTs, :SingleAgentType; to_agenttype = AgentState1, size = mpi.size * 2) |>
-    register_edgetype!(MPIEdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size* 2) |>
-    register_edgetype!(MPIEdgeSTs, :Stateless, :SingleAgentType; to_agenttype = AgentState1, size = mpi.size * 2) |>
-    register_edgetype!(MPIEdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size * 2) |>
-    register_edgetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = AgentState1, size = mpi.size * 2) |>
-    construct_model("MPI EdgeTypes");
+    register_edgestatetype!(MPIEdgeD) |>
+    register_edgestatetype!(MPIEdgeS, :Stateless) |>
+    register_edgestatetype!(MPIEdgeE, :SingleEdge) |>
+    register_edgestatetype!(MPIEdgeT, :SingleType; target = AgentState1) |>
+    register_edgestatetype!(MPIEdgeI, :IgnoreFrom) |>
+    register_edgestatetype!(MPIEdgeSE, :Stateless, :SingleEdge) |>
+    register_edgestatetype!(MPIEdgeST, :Stateless, :SingleType; target = AgentState1) |>
+    register_edgestatetype!(MPIEdgeSI, :Stateless, :IgnoreFrom) |>
+    register_edgestatetype!(MPIEdgeEI, :SingleEdge, :IgnoreFrom) |>
+    register_edgestatetype!(MPIEdgeTI, :SingleType, :IgnoreFrom; target = AgentState1) |>
+    register_edgestatetype!(MPIEdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    register_edgestatetype!(MPIEdgeSTI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1) |>
+    register_edgestatetype!(MPIEdgeSETI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1) |>
+    register_edgestatetype!(MPIEdgeTs, :SingleType; target = AgentState1, size = mpi.size * 2) |>
+    register_edgestatetype!(MPIEdgeTsI, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size* 2) |>
+    register_edgestatetype!(MPIEdgeSTs, :Stateless, :SingleType; target = AgentState1, size = mpi.size * 2) |>
+    register_edgestatetype!(MPIEdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
+    register_edgestatetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
+    create_model("MPI EdgeTypes");
 
 # We have the following edge setup (as an example for mpi.size of 3, but
 # everything is modulo mpi.size)
@@ -101,13 +101,13 @@ function check_state(ET)
         if has_trait(sim, ET, :SingleEdge)
             @test has_neighbor(sim, id, ET)
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test neighborstates(sim, id, ET, AgentState1).idx ==
+                @test edgestates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx - 1, mpi.size)
             end
         else
-            @test num_neighbors(sim, id, ET) == 1
+            @test num_edges(sim, id, ET) == 1
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test first(neighborstates(sim, id, ET, AgentState1)).idx ==
+                @test first(edgestates(sim, id, ET, AgentState1)).idx ==
                     mod1(agent.idx - 1, mpi.size)
             end
         end
@@ -124,25 +124,25 @@ end
 # AS1_3 <- AS2_1
 
 # so the edges are going only to AgentState1. The edges from AS2 are
-# dropped for the :SingleEdge and :SingleAgentType traits.
+# dropped for the :SingleEdge and :SingleType traits.
 function check_state_rev1(ET)
     (agent::AgentState1, id, sim) -> begin
         if has_trait(sim, ET, :SingleEdge) 
             @test has_neighbor(sim, id, ET)
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test neighborstates(sim, id, ET, AgentState1).idx ==
+                @test edgestates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
-        elseif has_trait(sim, ET, :SingleAgentType)
-            @test num_neighbors(sim, id, ET) == 1
+        elseif has_trait(sim, ET, :SingleType)
+            @test num_edges(sim, id, ET) == 1
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test first(neighborstates(sim, id, ET, AgentState1)).idx ==
+                @test first(edgestates(sim, id, ET, AgentState1)).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
         else
-            @test num_neighbors(sim, id, ET) == 2
+            @test num_edges(sim, id, ET) == 2
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test first(neighborstates_flexible(sim, id, ET)).idx ==
+                @test first(edgestates_flexible(sim, id, ET)).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
         end
@@ -152,8 +152,8 @@ end
 # check that nothing is going to the AS2 agents anymore
 function check_state_rev2(ET)
     (_, id, sim) -> begin
-        # for the SingleAgentType we determined that ET can only go to AS1 agents
-        if ! has_trait(sim, ET, :SingleAgentType)
+        # for the SingleType we determined that ET can only go to AS1 agents
+        if ! has_trait(sim, ET, :SingleType)
             @test ! has_neighbor(sim, id, ET)
         end
     end
@@ -166,8 +166,8 @@ end
 # a second reverse does not result in the original state 
 function reverse_edge_direction(ET)
     (state, id, sim) -> begin
-        # In the :SingleAgentType case there are no edges to AgentState2
-        if has_trait(sim, ET, :SingleAgentType) && typeof(state) == AgentState2
+        # In the :SingleType case there are no edges to AgentState2
+        if has_trait(sim, ET, :SingleType) && typeof(state) == AgentState2
             return
         end
         # If we would reverse the edges in the :SingleEdge case,
@@ -196,7 +196,7 @@ function reverse_edge_direction(ET)
 end
 
 function testforedgetype(ET)
-    sim = new_simulation(model, nothing, nothing)
+    sim = create_simulation(model, nothing, nothing)
 
     part = Dict{AgentID, UInt32}()
 
@@ -212,12 +212,12 @@ function testforedgetype(ET)
             toid2 = agentids2[i]
             if ! has_trait(sim, ET, :Stateless)
                 add_edge!(sim, fromid, toid, ET(fromid, toid))
-                if ! has_trait(sim, ET, :SingleAgentType)
+                if ! has_trait(sim, ET, :SingleType)
                     add_edge!(sim, fromid, toid2, ET(fromid, toid))
                 end
             else
                 add_edge!(sim, fromid, toid, ET())
-                if ! has_trait(sim, ET, :SingleAgentType)
+                if ! has_trait(sim, ET, :SingleType)
                     add_edge!(sim, fromid, toid2, ET())
                 end
             end
@@ -235,12 +235,12 @@ function testforedgetype(ET)
     @test num_agents(sim, AgentState1) == (mpi.isroot ? mpi.size : 0)
     @test num_agents(sim, AgentState2) == (mpi.isroot ? mpi.size : 0)
 
-    num_edges_per_PE = has_trait(sim, ET, :SingleAgentType) ? 1 : 2
+    num_edges_per_PE = has_trait(sim, ET, :SingleType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
 
     finish_init!(sim; partition = part)
     
-    apply_transition!(sim, check_state(ET), [ AgentState1 ],
+    apply!(sim, check_state(ET), [ AgentState1 ],
                       [ AgentState1, ET ], [])
     
     @test num_agents(sim, AgentState1) == 1
@@ -248,18 +248,18 @@ function testforedgetype(ET)
 
     # we are testing now that new edges in the transition functions are
     # send to the correct ranks
-    apply_transition!(sim, reverse_edge_direction(ET),
+    apply!(sim, reverse_edge_direction(ET),
                       [ AgentState1, AgentState2 ],
                       [ AgentState1, AgentState2, ET ],
                       [ ET ])
 
 
-    apply_transition!(sim, check_state_rev1(ET),
+    apply!(sim, check_state_rev1(ET),
                       [ AgentState1 ],
                       [ AgentState1, AgentState2, ET ],
                       [])
 
-    apply_transition!(sim, check_state_rev2(ET),
+    apply!(sim, check_state_rev2(ET),
                       [ AgentState2 ],
                       [ ET ], [])
 

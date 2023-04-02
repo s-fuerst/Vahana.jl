@@ -85,7 +85,7 @@ function _set_edge_plot_properties!(f, vp)
         vedge = vp.vg.edges[i]
         from = vp.vg.g2v[vedge.src]
         to = vp.vg.g2v[vedge.dst]
-        edges = edges_to(vp.sim, to, T)
+        edges = edges(vp.sim, to, T)
         if isnothing(edges) # this can happen after a state change of sim
             continue
         end
@@ -225,7 +225,7 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
         return string(totype)
     end
     disable_transition_checks(true)
-    edges = edges_to(vg.sim, to, totype)
+    edges = edges(vg.sim, to, totype)
     disable_transition_checks(false)
     if ! isnothing(edges)
         es = (filter(edges) do edge

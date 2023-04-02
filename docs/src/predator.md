@@ -163,15 +163,15 @@ const ppsim = ModelTypes() |>
     register_agenttype!(Predator) |>
     register_agenttype!(Prey) |>
     register_agenttype!(Cell) |>
-    register_edgetype!(PredatorPosition, :SingleAgentType; to_agenttype = Cell) |>
-    register_edgetype!(PreyPosition, :SingleAgentType; to_agenttype = Cell) |>
-    register_edgetype!(PredatorView) |>
-    register_edgetype!(PreyView) |>
-    register_edgetype!(VisiblePrey, :SingleAgentType; to_agenttype = Predator) |>
-    register_edgetype!(Die, :HasNeighborOnly) |>
-    register_edgetype!(Eat, :HasNeighborOnly) |>
-    construct_model("Predator Prey") |>
-    new_simulation(AllParams(), PPGlobals())
+    register_edgestatetype!(PredatorPosition, :SingleType; target = Cell) |>
+    register_edgestatetype!(PreyPosition, :SingleType; target = Cell) |>
+    register_edgestatetype!(PredatorView) |>
+    register_edgestatetype!(PreyView) |>
+    register_edgestatetype!(VisiblePrey, :SingleType; target = Predator) |>
+    register_edgestatetype!(Die, :HasEdgeOnly) |>
+    register_edgestatetype!(Eat, :HasEdgeOnly) |>
+    create_model("Predator Prey") |>
+    create_simulation(AllParams(), PPGlobals())
 ````
 
 ## Initialization
@@ -247,7 +247,7 @@ iterate over each prey on the cell and add edges to all predators
 the can view the cell.
 
 It may seem strange that the transition function does not return the state of
-the cell. The `apply_transition!` method has the keyword argument
+the cell. The `apply!` method has the keyword argument
 `invariant_compute`, if this is set to true as we do this later when
 we call `find_prey`, Vahana knows that the state of the agents being
 called will not be change and the return values of the transition
@@ -255,8 +255,8 @@ functions are ignored.
 
 ````@example predator
 function find_prey(::Cell, id, sim)
-    checked(foreach, neighborids(sim, id, PreyPosition)) do preyid
-        checked(foreach, neighborids(sim, id, PredatorView)) do predid
+    checked(foreach, edgeids(sim, id, PreyPosition)) do preyid
+        checked(foreach, edgeids(sim, id, PredatorView)) do predid
             add_edge!(sim, preyid, predid, VisiblePrey())
         end
     end
@@ -277,9 +277,9 @@ function move(state::Predator, id, sim)
     e = state.energy - param(sim, :predator).loss_per_turn
     if e > 0
         # we need to access the pos of the prey which is part of it's state
-        prey = neighborstates(sim, id, VisiblePrey, Prey)
+        prey = edgestates(sim, id, VisiblePrey, Prey)
         newpos = if isnothing(prey)
-            nextcellid = rand(neighborids(sim, id, PredatorView))
+            nextcellid = rand(edgeids(sim, id, PredatorView))
             agentstate(sim, nextcellid, Cell).pos
         else
             rand(prey).pos
@@ -302,11 +302,11 @@ the `countdown` field of a cell is equal to 0.
 function move(state::Prey, id, sim)
     e = state.energy - param(sim, :prey).loss_per_turn
     if e > 0
-        withgrass = filter(neighborids(sim, id, PreyView)) do id
+        withgrass = filter(edgeids(sim, id, PreyView)) do id
             agentstate(sim, id, Cell).countdown == 0
         end
         nextcellid = if length(withgrass) == 0
-            rand(neighborids(sim, id, PreyView))
+            rand(edgeids(sim, id, PreyView))
         else
             rand(withgrass)
         end
@@ -340,7 +340,7 @@ For these matches, `Die` edges are generated from the cell to the
 prey and `Eat` edges are generated from the cell to the
 predator. Since it is not important for the model at which location
 a prey animal was eaten, the `Die` and `Eat` edgetypes have the
-property `:HasNeighborOnly`.
+property `:HasEdgeOnly`.
 
 If prey on the cell has survived and the cell contains grass
 (countdown == 0), an `Eat` edge is created with one of the surviving
@@ -348,8 +348,8 @@ prey as the target.
 
 ````@example predator
 function try_eat(state::Cell, id, sim)
-    predators = neighborids(sim, id, PredatorPosition)
-    prey = neighborids(sim, id, PreyPosition)
+    predators = edgeids(sim, id, PredatorPosition)
+    prey = edgeids(sim, id, PreyPosition)
 
     # first the predators eat the prey, in case that both are on the cell
     if ! isnothing(predators) && ! isnothing(prey)
@@ -379,7 +379,7 @@ The reproduction rule for predator and prey is almost the same, so we
 first define a function that can be used for both species. In this function we first
 check if the animal found something to eat. In this case on of the
 previous transition functions did create a edge of typ `Eat` with
-the animal as target, so we can use the `has_neighbor` function to check
+the animal as target, so we can use the `has_edge` function to check
 if this is the case.
 
 If the energy of the animal is above the threshold given as
@@ -432,21 +432,21 @@ end;
 nothing #hide
 ````
 
-We update the global values and use the `aggregate` method to count
+We update the global values and use the `mapreduce` method to count
 the population and the number of cells with food. Based on the
 values, we can then also calculate the mean energy values.
 
 ````@example predator
 function update_globals(sim)
-    push_global!(sim, :predator_pop, aggregate(sim, _ -> 1, +, Predator; init = 0))
-    push_global!(sim, :prey_pop, aggregate(sim, _ -> 1, +, Prey; init = 0))
+    push_global!(sim, :predator_pop, mapreduce(sim, _ -> 1, +, Predator; init = 0))
+    push_global!(sim, :prey_pop, mapreduce(sim, _ -> 1, +, Prey; init = 0))
     push_global!(sim, :cells_with_food,
-                aggregate(sim, c -> c.countdown == 0, +, Cell))
+                mapreduce(sim, c -> c.countdown == 0, +, Cell))
     push_global!(sim, :mean_predator_energy,
-                aggregate(sim, p -> p.energy, +, Predator; init = 0) /
+                mapreduce(sim, p -> p.energy, +, Predator; init = 0) /
                     last(get_global(sim, :predator_pop)))
     push_global!(sim, :mean_prey_energy,
-                aggregate(sim, p -> p.energy, +, Prey; init = 0) /
+                mapreduce(sim, p -> p.energy, +, Prey; init = 0) /
                     last(get_global(sim, :prey_pop)))
 end;
 nothing #hide
@@ -473,30 +473,30 @@ position of the potential offspring.
 
 ````@example predator
 function step!(sim)
-    apply_transition!(sim, move,
+    apply!(sim, move,
                       [ Prey ],
                       [ PreyView ],
                       [ PreyView, PreyPosition ])
 
-    apply_transition!(sim, find_prey,
+    apply!(sim, find_prey,
                       [ Cell ],
                       [ PreyPosition, PredatorView ],
                       [ VisiblePrey ];
                       invariant_compute = true)
 
-    apply_transition!(sim, move,
+    apply!(sim, move,
                       [ Predator ],
                       [ PredatorView, VisiblePrey ],
                       [ PredatorView, PredatorPosition ])
 
-    apply_transition!(sim, grow_food, [ Cell ], [], [])
+    apply!(sim, grow_food, [ Cell ], [], [])
 
-    apply_transition!(sim, try_eat,
+    apply!(sim, try_eat,
                       [ Cell ],
                       [ PredatorPosition, PreyPosition ],
                       [ Die, Eat ])
 
-    apply_transition!(sim, try_reproduce,
+    apply!(sim, try_reproduce,
                       [ Predator, Prey ],
                       [ Die, Eat ],
                       [ PredatorPosition, PreyPosition,
@@ -539,7 +539,7 @@ combination with the function `calc_raster` of Vahana. E.g. the number of
 PreyPosition or PredatorPosition edges connected to an edge give us
 the number of Prey/Predator currently on that cell.
 
-Note that the function name `num_neighbors` can be confusing when it
+Note that the function name `num_edges` can be confusing when it
 appears in conjunction with grids. In Vahana, neighbors are always
 neighbors in a graph, so in our specific case, the neighbors of a
 cell in the Predator/PreyPosition network are the Predators/Prey
@@ -563,7 +563,7 @@ nothing #hide
 
 ````@example predator
 calc_raster(ppsim, :raster) do id
-    num_neighbors(ppsim, id, PredatorPosition)
+    num_edges(ppsim, id, PredatorPosition)
 end |> heatmap |> add_colorbar
 ````
 
@@ -571,7 +571,7 @@ end |> heatmap |> add_colorbar
 
 ````@example predator
 calc_raster(ppsim, :raster) do id
-    num_neighbors(ppsim, id, PreyPosition)
+    num_edges(ppsim, id, PreyPosition)
 end |> heatmap |> add_colorbar
 ````
 

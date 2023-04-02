@@ -4,7 +4,7 @@
 
 ### breaking changes:
 - New trait names for AgentTypes (Immortal instead of Vector)
-- apply_transition! arguments 
+- apply! arguments 
 - calc_raster needs information about the return type of f
 
 ## v0.4
@@ -26,7 +26,7 @@
 - [`agentstate`](@ref) and [`neighborstates`](@ref) need the agent
   type as additional parameter.
 
-- [`neighborids`](@ref) and [`edgestates`](@ref) no longer accept a
+- [`edgeids`](@ref) and [`edgestates`](@ref) no longer accept a
   vector of edges, they now work directly with the AgentID.
 
 - The argument order of [`aggregate`](@ref) changed, the agent or edge

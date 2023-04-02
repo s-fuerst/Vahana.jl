@@ -1,6 +1,5 @@
 using MPI
 
-using Printf: PositionCounter
 using HDF5
 
 export create_h5file!, open_h5file, close_h5file!
@@ -107,8 +106,8 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
         attrs(tid)[":Stateless"] = has_trait(sim, T, :Stateless)
         attrs(tid)[":IgnoreFrom"] = has_trait(sim, T, :IgnoreFrom)
         attrs(tid)[":SingleEdge"] = has_trait(sim, T, :SingleEdge)
-        attrs(tid)[":SingleAgentType"] =
-            has_trait(sim, T, :SingleAgentType)
+        attrs(tid)[":SingleType"] =
+            has_trait(sim, T, :SingleType)
         attrs(tid)[":IgnoreSourceState"] =
             has_trait(sim, T, :IgnoreSourceState)
     end
@@ -293,7 +292,7 @@ function write_edges(sim::Simulation,
                 # what we write depends on :Stateless and :IgnoreFrom,
                 # so we have four different cases 
                 if _neighbors_only(sim, T)
-                    if has_trait(sim, T, :SingleAgentType)
+                    if has_trait(sim, T, :SingleType)
                         create_dataset(tid, pename, eltype(edges),
                                        vec_num_edges[pe+1])
                     else
@@ -321,7 +320,7 @@ function write_edges(sim::Simulation,
 
                 if pe == mpi.rank 
                     converted = if _neighbors_only(sim, T)
-                        if has_trait(sim, T, :SingleAgentType)
+                        if has_trait(sim, T, :SingleType)
                             edges
                         else
                             [ EdgeCount(to, count) for (to, count) in edges ]
@@ -692,16 +691,16 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
 
     if _neighbors_only(sim, T)
         # num neighbors (for has_neighbors it's just 1 or 0 as num neighbors)
-        if has_trait(sim, T, :SingleAgentType)
-            AT = sim.typeinfos.edges_attr[T][:to_agenttype]
+        if has_trait(sim, T, :SingleType)
+            AT = sim.typeinfos.edges_attr[T][:target]
             typeid = sim.typeinfos.nodes_type2id[AT]
-            for (idx, num_neighbors) in enumerate(peid[])
+            for (idx, num_edges) in enumerate(peid[])
                 newid = idmapfunc(agent_id(typeid, rank, AgentNr(idx)))
                 newidx = agent_nr(newid)
                 if length(field.read) < newidx
                     resize!(field.write, newidx)
                 end
-                field.write[newidx] = num_neighbors
+                field.write[newidx] = num_edges
             end
         else
             # EdgeCount struct

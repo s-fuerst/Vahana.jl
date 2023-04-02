@@ -33,13 +33,13 @@ function Base.show(io::IO, ::MIME"text/plain", model::Model)
 
     edges_types = model.types.edges_types
     if length(edges_types) >= 1
-        printstyled(io, "\nNetworks(s):"; color = :cyan)
+        printstyled(io, "\nEdge(s):"; color = :cyan)
     end
     for T in edges_types
         edge_traits = model.types.edges_attr[T][:traits]
         firsttrait = true
         print(io, "\n\t Type $T")
-        for k in [ :Stateless, :IgnoreFrom, :SingleEdge, :IgnoreSourceState, :SingleAgentType ]
+        for k in [ :Stateless, :IgnoreFrom, :SingleEdge, :IgnoreSourceState, :SingleType ]
             if k in edge_traits
                 if firsttrait
                     firsttrait = false
@@ -50,8 +50,8 @@ function Base.show(io::IO, ::MIME"text/plain", model::Model)
                 end
             end
         end
-        if :SingleAgentType in edge_traits
-            print(io, "{$(model.types.edges_attr[T][:to_agenttype])}")
+        if :SingleType in edge_traits
+            print(io, "{$(model.types.edges_attr[T][:target])}")
         end
     end
 end
@@ -74,19 +74,19 @@ function construct_prettyprinting_methods(simsymbol)
         function show_edge_types(io::IO, sim)
             edges_types = sim.typeinfos.edges_types
             if length(edges_types) >= 1
-                printstyled(io, "\nNetworks(s):"; color = :cyan)
+                printstyled(io, "\nEdge(s):"; color = :cyan)
             end
             for t in edges_types
                 edgetypetraits = sim.typeinfos.edges_attr[t][:traits]
                 if (:SingleEdge in edgetypetraits &&
-                    :SingleAgentType in edgetypetraits) ||
-                    (:SingleAgentType in edgetypetraits &&
+                    :SingleType in edgetypetraits) ||
+                    (:SingleType in edgetypetraits &&
                     :size in keys(sim.typeinfos.edges_attr[t]))
                     print(io, "\n\t Type $t with edge(s) for $(num_edges(sim, t)) agent(s)") 
                 else
                     print(io, "\n\t Type $t \
                                with $(num_edges(sim, t)) edge(s)")
-                    if ! (:SingleAgentType in edgetypetraits)
+                    if ! (:SingleType in edgetypetraits)
                         print(io, " for $(_show_num_a_with_e(sim, t)) agent(s)")
                     end
                 end
@@ -146,7 +146,7 @@ function _reconstruct_edge(sim, e, edgetypetraits, edgeT)
         else
             # if :SingleEdge in edgetypetraits
             #     @info edgeT sim.typeinfos.edges_attr[edgeT] e
-            #     agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
+            #     agentT = sim.typeinfos.edges_attr[edgeT][:target]
             #     aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e))
             #     Edge(aid, edgeT())
             # else
@@ -193,8 +193,8 @@ function _show_edge(sim, e, neighborstate, edgeT)
         # for the to edges we get an empty edgetype traits, as we constructed
         # those edges they don't have the same traits
         # But here we need the original traits, so we access them directly
-        if :SingleAgentType in sim.typeinfos.edges_attr[edgeT][:traits]
-            agentT = sim.typeinfos.edges_attr[edgeT][:to_agenttype]
+        if :SingleType in sim.typeinfos.edges_attr[edgeT][:traits]
+            agentT = sim.typeinfos.edges_attr[edgeT][:target]
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             # We disable assertions to call agentstate from the REPL
             # but this is only done temporary and in a newer world age
@@ -307,7 +307,7 @@ function show_agent(sim,
         end
     end
     # the all the edges for the agent
-    printstyled("\nNetwork(s):"; color = :cyan)
+    printstyled("\nEdge(s):"; color = :cyan)
     for edgeT in sim.typeinfos.edges_types
         edgeTheadershown = false
         read_container = edgeread(sim, edgeT)
@@ -315,28 +315,28 @@ function show_agent(sim,
         justcount = :IgnoreFrom in edgetypetraits && :Stateless in edgetypetraits
         
         if (:SingleEdge in edgetypetraits &&
-            :SingleAgentType in edgetypetraits &&
+            :SingleType in edgetypetraits &&
             !justcount)
             printstyled("\n\tIt is not possible to give reliable information " *
                 "about the edges of the agent when the\n\tcorresponding edgetype " *
-                "has the :SingleEdge and :SingleAgentType trait combination.";
+                "has the :SingleEdge and :SingleType trait combination.";
                         color = :red)
             continue
         end
         # The agent_nr(id) returns wrong ids when used for agent of
-        # a differnt type then given in :to_agenttype, so we must check this
-        if (!(:SingleAgentType in edgetypetraits) ||
-            T == sim.typeinfos.edges_attr[edgeT][:to_agenttype])
+        # a differnt type then given in :target, so we must check this
+        if (!(:SingleType in edgetypetraits) ||
+            T == sim.typeinfos.edges_attr[edgeT][:target])
             # unify the agentid. For vector (:SingleAgent) types, this must
             # be the index, and for dict types, the AgentID
             aid = agent_id(sim.typeinfos.nodes_type2id[T], agent_nr(id))
-            nid = :SingleAgentType in edgetypetraits ? agent_nr(id) : aid
+            nid = :SingleType in edgetypetraits ? agent_nr(id) : aid
             # this rather complex statement checks that the agent has
-            # edges of this type towards him. In the :SingleAgentType case we
+            # edges of this type towards him. In the :SingleType case we
             # check the vector for #undef entries, in the other case we use haskey
-            if (!(:SingleAgentType in edgetypetraits &&
+            if (!(:SingleType in edgetypetraits &&
                 !isassigned(read_container, nid)) &&
-                (:SingleAgentType in edgetypetraits ||
+                (:SingleType in edgetypetraits ||
                 haskey(read_container, nid)))
 
                 # output the network name and derive some information
@@ -349,8 +349,8 @@ function show_agent(sim,
                         printstyled("\n\thas_neighbor:  "; color = :green)
                         print("$(has_neighbor(sim, aid, edgeT))")
                     else
-                        printstyled("\n\tnum_neighbors: "; color = :green)
-                        print("$(num_neighbors(sim, aid, edgeT))")
+                        printstyled("\n\tnum_edges: "; color = :green)
+                        print("$(num_edges(sim, aid, edgeT))")
                     end
                 else
                     # write the header for this edgetype, 

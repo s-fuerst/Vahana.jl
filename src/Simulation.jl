@@ -1,12 +1,12 @@
 import Base.deepcopy
 import Logging.with_logger
 
-export construct_model
-export new_simulation, finish_simulation!
+export create_model
+export create_simulation, finish_simulation!
 export finish_init!
-export apply_transition, apply_transition!
+export apply, apply!
 export param
-export aggregate
+export mapreduce
 export copy_simulation
 
 # this is mutable, as we assign write -> read in finish_write!
@@ -90,7 +90,7 @@ mutable struct EdgeFields{ET, EST}
 end
 
 """
-    construct_model(types::ModelTypes, name::String)
+    create_model(types::ModelTypes, name::String)
 
 Adds a structure and methods corresponding to the type information of
 `types` to the Julia session. The new structure is named `name`, and
@@ -98,10 +98,10 @@ all methods are specific to this structure using Julia's multiple
 dispatch concept, so it is possible to have different models in the
 same Julia session (as long as `name` is different).
 
-Returns a [`Model`](@ref) that can be used in [`new_simulation`](@ref) to create 
+Returns a [`Model`](@ref) that can be used in [`create_simulation`](@ref) to create 
 a concrete simulation.
 """
-function construct_model(typeinfos::ModelTypes, name::String) 
+function create_model(typeinfos::ModelTypes, name::String) 
     simsymbol = Symbol(name)
 
     edgefields = [
@@ -167,12 +167,12 @@ end
 num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
 
 """
-    new_simulation(model::Model, params = nothing, globals = nothing; name)
+    create_simulation(model::Model, params = nothing, globals = nothing; name)
 
 Creates and return a new simulation object, which stores the complete state 
 of a simulation. 
 
-`model` is an `Model` instance created by [`construct_model`](@ref).
+`model` is an `Model` instance created by [`create_model`](@ref).
 
 `params` must be a struct (or `nothing`) that contains all parameters of a
 simulation. Parameter values are constant in a simulation run and can be
@@ -192,11 +192,11 @@ agents and edges for the initial state, it is necessary to call
 [`finish_init!`](@ref) before applying a transition function for the first
 time.
 
-See also [`construct_model`](@ref), [`param`](@ref),
+See also [`create_model`](@ref), [`param`](@ref),
 [`get_global`](@ref), [`set_global!`](@ref), [`push_global!`](@ref)
 and [`finish_init!`](@ref)
 """
-function new_simulation(model::Model,
+function create_simulation(model::Model,
                  params::P = nothing,
                  globals::G = nothing;
                  name = model.name,
@@ -238,12 +238,12 @@ function new_simulation(model::Model,
 end
 
 # pipeable versions 
-construct_model(name::String) = types -> construct_model(types, name)
+create_model(name::String) = types -> create_model(types, name)
 
-new_simulation(params::P = nothing,
+create_simulation(params::P = nothing,
                globals::G = nothing;
                kwargs...) where {P, G} =
-                   model -> new_simulation(model, params, globals; kwargs...)
+                   model -> create_simulation(model, params, globals; kwargs...)
 
 function _create_equal_partition(d, ids)
     l = length(ids)
@@ -277,8 +277,8 @@ the rank on which the agent "lives" after `finish_init!`.
     `distribute` must be set to false.
 
 
-See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
-[`apply_transition!`](@ref) and [`finish_simulation!`](@ref)
+See also [`register_agenttype!`](@ref), [`register_edgestatetype!`](@ref),
+[`apply!`](@ref) and [`finish_simulation!`](@ref)
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
@@ -441,7 +441,7 @@ end
 Returns the value of the field `name` of the `params` struct from the
 Simulation constructor.
 
-See also [`construct_model`](@ref)
+See also [`create_model`](@ref)
 """
 param(sim, name) = getfield(sim.params, name)
 
@@ -466,7 +466,7 @@ finish_write!(sim) = t -> finish_write!(sim, t)
 
 
 """
-    apply_transition!(sim, func, call, read, write; 
+    apply!(sim, func, call, read, write; 
                       add_existing = Vector{DataType}())
 
 Apply the transition function `func` to the simulation state. 
@@ -490,22 +490,22 @@ id::AgentID, sim::Simulation)`.
 If T is in `write`, the transition function must return either an agent
 of type T or `nothing`. If `nothing` is returned, the agent will be
 removed from the simulation, otherwise the agent with id `id`
-(starting with the next `apply_transition!` call) will have the
+(starting with the next `apply!` call) will have the
 returned state. 
 
 TODO DOC add_existing
 
-See also [`apply_transition`](@ref)
+See also [`apply`](@ref)
 """
-function apply_transition!(sim,
+function apply!(sim,
                     func::Function,
                     call::Vector,
                     read::Vector,
                     write::Vector;
                     add_existing = Vector{DataType}())
-    @assert sim.initialized "You must call finish_init! before apply_transition!"
+    @assert sim.initialized "You must call finish_init! before apply!"
     with_logger(sim) do
-        @info "<Begin> apply_transition!" func transition=sim.num_transitions+1
+        @info "<Begin> apply!" func transition=sim.num_transitions+1
     end
     
     # must be set to true before prepare_read! (as this calls add_edge!)
@@ -551,29 +551,29 @@ function apply_transition!(sim,
     sim.intransition = false
     
     # must be incremented after the transition, so that read only
-    # functions like aggregate tries to transfer the necessary states
+    # functions like mapreduce tries to transfer the necessary states
     # only once 
     sim.num_transitions = sim.num_transitions + 1
 
-    _log_info(sim, "<End> apply_transition!")
+    _log_info(sim, "<End> apply!")
     
     sim
 end
 
-function apply_transition!(func::Function,
+function apply!(func::Function,
                     sim,
                     call::Vector,
                     read::Vector,
                     write::Vector;
                     kwargs ...)
-    apply_transition!(sim, func, call, read, write; kwargs ...)
+    apply!(sim, func, call, read, write; kwargs ...)
 end
 
 
 """
-    apply_transition(sim, func, compute, networks, rebuild) -> Simulation
+    apply(sim, func, compute, networks, rebuild) -> Simulation
 
-Call [`apply_transition!`](@ref) with a copy of the simulation so that the
+Call [`apply!`](@ref) with a copy of the simulation so that the
 state of `sim` itself is not changed.
 
 Can be very useful during development, especially if Vahana is used in
@@ -582,32 +582,34 @@ be used in the final code.
 
 Returns the copy of the simulation.
 
-See also [`apply_transition!`](@ref)
+See also [`apply!`](@ref)
 """
-function apply_transition(sim,
+function apply(sim,
                    func::Function,
                    call::Vector,
                    read::Vector,
                    write::Vector;
                    kwargs ...) 
     newsim = deepcopy(sim)
-    apply_transition!(newsim, func, call, read, write; kwargs ...)
+    apply!(newsim, func, call, read, write; kwargs ...)
     newsim
 end
 
-function apply_transition(func::Function,
+function apply(func::Function,
                    sim,
                    call::Vector,
                    read::Vector,
                    write::Vector;
                    kwargs ...)
-    apply_transition(sim, func, call, read, write; kwargs ...)
+    apply(sim, func, call, read, write; kwargs ...)
 end
 
-######################################## aggregate
+######################################## mapreduce
 
+
+import Base.mapreduce
 """
-    aggregate(sim, f, op, ::Type{T}; kwargs ...)
+    mapreduce(sim, f, op, ::Type{T}; kwargs ...)
 
 Calculate an aggregated value, based on the state of all agents or
 edges of type T.
@@ -615,10 +617,10 @@ edges of type T.
 `f` is applied to all of these agents or edges and then `op` is used to
 reduce (aggregate) the values returned by `f`.
 
-aggregate is based on mapreduce, `f`, `op` and `kwargs` are
+mapreduce is calling Base.mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
 
 TODO DOC: additional kwargs
 """
-function aggregate(::__MODEL__, f, op, ::Type; kwargs...) end
+function mapreduce(::__MODEL__, f, op, ::Type; kwargs...) end

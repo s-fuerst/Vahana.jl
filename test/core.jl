@@ -32,10 +32,10 @@ begin
         register_agenttype!(AImmFixed, :Immortal) |>
         register_agenttype!(AImmFixedOversize, :Immortal) |>
         register_agenttype!(ADefault) |>
-        register_edgetype!(ESDict) |>
-        register_edgetype!(ESLDict1) |> 
-        register_edgetype!(ESLDict2, :SingleAgentType; to_agenttype = AImm) |>
-        construct_model("Test Core")
+        register_edgestatetype!(ESDict) |>
+        register_edgestatetype!(ESLDict1) |> 
+        register_edgestatetype!(ESLDict2, :SingleType; target = AImm) |>
+        create_model("Test Core")
 end
 
 function add_example_network!(sim)
@@ -45,7 +45,7 @@ function add_example_network!(sim)
     avids  = add_agents!(sim, [ AImm(i)      for i in 1:10 ])
     avfids = add_agents!(sim, [ AImmFixed(i) for i in 1:10 ])
 
-    # agent with edges, used for aggregate
+    # agent with edges, used for mapreduce
     add_agents!(sim, [ AImmFixedOversize(i) for i in 1:10 ])
     add_agents!(sim, [ AMortalFixed(i)      for i in 1:10 ])
     add_agents!(sim, [ ADefault(i, true)          for i in 1:10 ])
@@ -71,7 +71,7 @@ end
 function create_sum_state_neighbors(edgetypeval) 
     function sum_state_neighbors(agent, id, sim)
 #        @info id edgetypeval getproperty(sim, Symbol(edgetypeval)).readable
-        nstates = neighborstates_flexible(sim, id, edgetypeval)
+        nstates = edgestates_flexible(sim, id, edgetypeval)
         s = 0
         if !isnothing(nstates)
             for n in nstates
@@ -85,12 +85,12 @@ end
 import Vahana.updateids
 
 function test_aggregate(sim, T::DataType)
-    @test aggregate(sim, a -> a.foo, +, T) == reduce(+, 1:10)
-    @test aggregate(sim, a -> a.foo, *, T) == reduce(*, 1:10)
-    @test aggregate(sim, a -> a.foo, &, T; datatype = Int) == reduce(&, 1:10)
-    @test aggregate(sim, a -> a.foo, |, T; datatype = Int) == reduce(|, 1:10)
-    @test aggregate(sim, a -> a.foo, max, T) == reduce(max, 1:10)
-    @test aggregate(sim, a -> a.foo, min, T) == reduce(min, 1:10)
+    @test mapreduce(sim, a -> a.foo, +, T) == reduce(+, 1:10)
+    @test mapreduce(sim, a -> a.foo, *, T) == reduce(*, 1:10)
+    @test mapreduce(sim, a -> a.foo, &, T; datatype = Int) == reduce(&, 1:10)
+    @test mapreduce(sim, a -> a.foo, |, T; datatype = Int) == reduce(|, 1:10)
+    @test mapreduce(sim, a -> a.foo, max, T) == reduce(max, 1:10)
+    @test mapreduce(sim, a -> a.foo, min, T) == reduce(min, 1:10)
 end    
 
 function test_aggregate_mortal(sim, T::DataType)
@@ -98,15 +98,15 @@ function test_aggregate_mortal(sim, T::DataType)
     
     # we are testing that there aggregate also works when on a rank
     # no agent of this type is existing
-    apply_transition!(sim, [ T ], [ T ], [ T ]) do state, _, _
+    apply!(sim, [ T ], [ T ], [ T ]) do state, _, _
         mpi.isroot ? state : nothing
     end
 
-    agg = aggregate(sim, a -> a.foo, +, T)
+    agg = mapreduce(sim, a -> a.foo, +, T)
 end    
 
 function createsim()
-    sim = new_simulation(model; logging = true, debug = true)
+    sim = create_simulation(model; logging = true, debug = true)
 
     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
     
@@ -139,43 +139,43 @@ end
         enable_asserts(true)
     end
 
-    @testset "edges_to" begin
+    @testset "edges" begin
         Vahana.disable_transition_checks(true)
-        @onrankof a1id @test length(edges_to(sim, a1id, ESDict)) == 4
-        @onrankof a1id @test length(edges_to(sim, a1id, ESLDict1)) == 10
-        # # Check that we can call edges_to also for an empty set of neighbors
-        @onrankof a2id @test edges_to(sim, a2id, ESDict) === nothing
-        @onrankof a2id @test edges_to(sim, a2id, ESLDict1) === nothing
+        @onrankof a1id @test length(edges(sim, a1id, ESDict)) == 4
+        @onrankof a1id @test length(edges(sim, a1id, ESLDict1)) == 10
+        # # Check that we can call edges also for an empty set of neighbors
+        @onrankof a2id @test edges(sim, a2id, ESDict) === nothing
+        @onrankof a2id @test edges(sim, a2id, ESLDict1) === nothing
         Vahana.disable_transition_checks(false)
     end
 
     @testset "neighbors & edgestates" begin
         Vahana.disable_transition_checks(true)
-        # we must disable the neighborids checks
-        @onrankof avids[1] @test length(neighborids(sim, avids[1], ESLDict2)) == 1
-        @onrankof avids[10] @test length(neighborids(sim, avids[10], ESLDict2)) == 1
+        # we must disable the edgeids checks
+        @onrankof avids[1] @test length(edgeids(sim, avids[1], ESLDict2)) == 1
+        @onrankof avids[10] @test length(edgeids(sim, avids[10], ESLDict2)) == 1
 
 
-        edges = edges_to(sim, a1id, ESLDict1)
-        @onrankof a1id @test (edges)[1].from == avids[1]
-        @onrankof a1id @test (edges)[10].from == avids[10]
-        edges = neighborids(sim, avids[10], ESLDict2)
-        @onrankof avids[10] @test edges[1] == avfids[10]
+        es = edges(sim, a1id, ESLDict1)
+        @onrankof a1id @test (es)[1].from == avids[1]
+        @onrankof a1id @test (es)[10].from == avids[10]
+        es = edgeids(sim, avids[10], ESLDict2)
+        @onrankof avids[10] @test es[1] == avfids[10]
         Vahana.disable_transition_checks(false)
     end
 
-    @testset "neighborstates" begin
+    @testset "edgestates" begin
         Vahana.disable_transition_checks(true)
-        @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
-        @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
+        @onrankof a1id @test AImm(1) in edgestates(sim, a1id, ESLDict1, AImm)
+        @onrankof a1id @test AMortal(3) in edgestates_flexible(sim, a1id, ESDict)
         Vahana.disable_transition_checks(false)
     end
 
-    @testset "num_neighbors" begin
+    @testset "num_edges" begin
         Vahana.disable_transition_checks(true)
-        @onrankof a1id @test num_neighbors(sim, a1id, ESDict) == 4
-        @onrankof a2id @test num_neighbors(sim, a2id, ESDict) == 0
-        @onrankof avids[1] @test num_neighbors(sim, avids[1], ESLDict2) == 1
+        @onrankof a1id @test num_edges(sim, a1id, ESDict) == 4
+        @onrankof a2id @test num_edges(sim, a2id, ESDict) == 0
+        @onrankof avids[1] @test num_edges(sim, avids[1], ESLDict2) == 1
         Vahana.disable_transition_checks(false)
     end
 
@@ -198,15 +198,15 @@ end
         @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
         enable_asserts(true)
 
-        # now check apply_transition! for the different nodefieldfactories
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+        # now check apply! for the different nodefieldfactories
+        apply!(sim, create_sum_state_neighbors(ESLDict1),
                           [ AMortal ], [ allagenttypes; ESLDict1 ],  [ AMortal ])
         disable_transition_checks(true)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
             AMortal(sum(1:10) + 1)
         disable_transition_checks(false)
         
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+        apply!(sim, create_sum_state_neighbors(ESLDict1),
                           [ AMortal ], [ allagenttypes; ESLDict1 ], [ AMortal ])
         disable_transition_checks(true)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
@@ -221,19 +221,19 @@ end
         @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
         enable_asserts(true)
 
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
+        apply!(sim, create_sum_state_neighbors(ESLDict2),
                           [ AImm ], [ allagenttypes; ESLDict2 ], [ AImm ])
         disable_transition_checks(true)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(2)
         disable_transition_checks(false)
 
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
+        apply!(sim, create_sum_state_neighbors(ESLDict2),
                           [ AImm ], [ allagenttypes; ESLDict2 ], [ AImm ])
         disable_transition_checks(true)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(3)
         disable_transition_checks(false)
 
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict2),
+        apply!(sim, create_sum_state_neighbors(ESLDict2),
                           [ AImm ], [ allagenttypes; ESLDict2 ], [ AImm ])
         disable_transition_checks(true)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(4)
@@ -252,21 +252,21 @@ end
         @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
         enable_asserts(true)
 
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+        apply!(sim, create_sum_state_neighbors(ESLDict1),
                           [ AImmFixed ], [ allagenttypes; ESLDict1 ], [ AImmFixed ])
         disable_transition_checks(true)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(3)
         disable_transition_checks(false)
 
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+        apply!(sim, create_sum_state_neighbors(ESLDict1),
                           [ AImmFixed ], [ allagenttypes; ESLDict1 ], [ AImmFixed ])
         disable_transition_checks(true)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(5)
         disable_transition_checks(false)
 
-        apply_transition!(sim, create_sum_state_neighbors(ESLDict1),
+        apply!(sim, create_sum_state_neighbors(ESLDict1),
                           [ AImmFixed ], [ allagenttypes; ESLDict1 ], [ AImmFixed ])
         disable_transition_checks(true)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
@@ -278,8 +278,8 @@ end
     finish_simulation!(sim)
     
     # TODO transition with add_agent! and add_edge!
-    @testset "Aggregate" begin
-        sim = new_simulation(model; name = "Aggregate")
+    @testset "Mapreduce" begin
+        sim = create_simulation(model; name = "Mapreduce")
 
         (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
 
@@ -295,7 +295,7 @@ end
 
         finish_simulation!(sim)
 
-        sim = new_simulation(model; name = "Aggregate")
+        sim = create_simulation(model; name = "Mapreduce")
 
         (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
 
@@ -303,23 +303,23 @@ end
         
         #  testing the & and | for boolean 
         # currenty all bool of ADefault are true
-        @test aggregate(sim, a -> a.bool, &, ADefault) == true
-        @test aggregate(sim, a -> a.bool, |, ADefault) == true
+        @test mapreduce(sim, a -> a.bool, &, ADefault) == true
+        @test mapreduce(sim, a -> a.bool, |, ADefault) == true
 
         # set all bool to false
-        apply_transition!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
+        apply!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
             ADefault(state.foo, false)
         end
 
-        @test aggregate(sim, a -> a.bool, &, ADefault) == false
-        @test aggregate(sim, a -> a.bool, |, ADefault) == false
+        @test mapreduce(sim, a -> a.bool, &, ADefault) == false
+        @test mapreduce(sim, a -> a.bool, |, ADefault) == false
 
         # every second will be true, so that && is false and || is true
-        apply_transition!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
+        apply!(sim, [ ADefault ], [ ADefault ], [ ADefault ]) do state, id, sim
             ADefault(state.foo, mod(id, 2) == 1)
         end
-        @test aggregate(sim, a -> a.bool, &, ADefault) == false
-        @test aggregate(sim, a -> a.bool, |, ADefault) == true
+        @test mapreduce(sim, a -> a.bool, &, ADefault) == false
+        @test mapreduce(sim, a -> a.bool, |, ADefault) == true
 
         finish_simulation!(sim)
     end

@@ -1,7 +1,7 @@
 import Base.zero
 
 # In the following comment:
-# SType stands for the :SingleAgentType trait
+# SType stands for the :SingleType trait
 # SEdge stands for the :SingleEdge trait
 # and
 # Ignore stands for the :IgnoreFrom trait
@@ -47,7 +47,7 @@ import Base.zero
 function construct_types(T, attr::Dict{Symbol, Any})
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleAgentType in attr[:traits]
+    singletype = :SingleType in attr[:traits]
     stateless = :Stateless in attr[:traits]
     
     A = if singletype
@@ -104,7 +104,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleAgentType in attr[:traits]
+    singletype = :SingleType in attr[:traits]
     stateless = :Stateless in attr[:traits]
 
     singletype_size = get(attr, :size, 0)
@@ -123,7 +123,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
 
     # for the singletype case we can access the type of the agent via AT
     AT = if singletype
-        attr[:to_agenttype]
+        attr[:target]
     else
         nothing
     end
@@ -180,7 +180,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     #
     # init_field! is (and must be) called, after the field is
     # constructed. If the field is a dict, init_field! is a noop, for
-    # it is a vector with size information (:SingleAgentType with size
+    # it is a vector with size information (:SingleType with size
     # keyword), the vector will be resized and the memory will be
     # initialized to zero if necessary (= the container is a bittype).
     #
@@ -260,7 +260,7 @@ by calling suppress_warnings(true) after importing Vahana.
     # in the case, that there is no container for this agent, the *container!
     # version constructs an empty container and returns this one.
     # The last one should be only used for writing edges like in add_edge! and
-    # the first one one for read operations like edges_to
+    # the first one one for read operations like edges
     if singletype
         @eval function _get_agent_container(sim::$simsymbol,
                                      to::AgentID,
@@ -273,15 +273,15 @@ by calling suppress_warnings(true) after importing Vahana.
                 @edge($T).readable || ! config.check_readable
             end """
             You try to access an edge of type $(t) but the type is not in
-            the `read` argument of the apply_transition! function.
+            the `read` argument of the apply! function.
             """
             @mayassert begin
                 t = $T
-                at = $(attr[:to_agenttype])
+                at = $(attr[:target])
                 tnr = type_nr(to)
-                sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
+                sim.typeinfos.nodes_id2type[tnr] == $(attr[:target])
             end """
-            The :SingleAgentType trait is set for $t, and the agent type is 
+            The :SingleType trait is set for $t, and the agent type is 
             specified as $(at).
             But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
@@ -297,11 +297,11 @@ by calling suppress_warnings(true) after importing Vahana.
 
             @mayassert begin
                 t = $T
-                at = $(attr[:to_agenttype])
+                at = $(attr[:target])
                 tnr = type_nr(to)
-                sim.typeinfos.nodes_id2type[tnr] == $(attr[:to_agenttype])
+                sim.typeinfos.nodes_id2type[tnr] == $(attr[:target])
             end """
-            The :SingleAgentType trait is set for $t, and the agent type is 
+            The :SingleType trait is set for $t, and the agent type is 
             specified as $(at).
             But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
@@ -325,7 +325,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 @edge($T).readable || ! config.check_readable
             end """
             You try to access an edge of type $(t) but the type is not in
-            the `read` argument of the apply_transition! function.
+            the `read` argument of the apply! function.
             """
             get(field, to, nothing)
         end
@@ -338,7 +338,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
-            `apply_transition`.
+            `apply`.
             """
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
@@ -354,7 +354,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
-            `apply_transition`.
+            `apply`.
             """
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
@@ -394,7 +394,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
-            `apply_transition`.
+            `apply`.
             """
             @mayassert _can_add(@edgewrite($T), to,
                                 _valuetostore(from, edgestate), $T) """
@@ -420,7 +420,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
-            `apply_transition`.
+            `apply`.
             """
             if $multinode && ! $ignorefrom && node_nr(edge.from) != mpi.node
                 push!(@edge($T).
@@ -441,7 +441,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
-            `apply_transition`.
+            `apply`.
             """
             if $multinode && ! $ignorefrom && node_nr(from) != mpi.node
                 push!(@edge($T).
@@ -552,61 +552,61 @@ by calling suppress_warnings(true) after importing Vahana.
     end
 
     # Rules for the edge functions:
-    # stateless => !aggregate, !edges_to, !edgestates
-    # singledge => !num_neighbors
-    # ignorefrom => !edges_to, !neighborids
+    # stateless => !mapreduce, !edges, !edgestates
+    # singledge => !num_edges
+    # ignorefrom => !edges, !edgeids
 
-    #- edges_to
+    #- edges
     if !stateless && !ignorefrom
-        @eval function edges_to(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        @eval function edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
             _get_agent_container(sim, to, $T, @edgeread($T))
         end
     else
-        @eval function edges_to(::$simsymbol, ::AgentID, t::Type{$MT})
+        @eval function edges(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            edges_to is not defined for the trait combination of $t
+            edges is not defined for the trait combination of $t
             """
         end
     end
 
-    #- neighborids
+    #- edgeids
     if !ignorefrom
         if stateless
-            @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            @eval function edgeids(sim::$simsymbol, to::AgentID, ::Type{$MT})
                 _get_agent_container(sim, to, $T, @edgeread($T))
             end
         else
             if singleedge
-                @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
+                @eval function edgeids(sim::$simsymbol, to::AgentID, ::Type{$MT})
                     ac = _get_agent_container(sim, to, $T, @edgeread($T))
                     isnothing(ac) ? nothing : ac.from
                 end
             else
-                @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
+                @eval function edgeids(sim::$simsymbol, to::AgentID, ::Type{$MT})
                     ac = _get_agent_container(sim, to, $T, @edgeread($T))
                     isnothing(ac) ? nothing : map(e -> e.from, ac)
                 end
             end
         end
     else
-        @eval function neighborids(::$simsymbol, ::AgentID, t::Type{$MT})
+        @eval function edgeids(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            neighborids is not defined for the trait combination of $t
+            edgeids is not defined for the trait combination of $t
             """
         end
     end
 
-    #- neighborstates
+    #- edgestates
     if singleedge
-        @eval function neighborstates(sim::$simsymbol, id::AgentID,
+        @eval function edgestates(sim::$simsymbol, id::AgentID,
                                edgetype::Type{$MT}, agenttype::Type) 
-            nid = neighborids(sim, id, edgetype)
+            nid = edgeids(sim, id, edgetype)
             isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
         end
     else
-        @eval function neighborstates(sim::$simsymbol, id::AgentID,
+        @eval function edgestates(sim::$simsymbol, id::AgentID,
                                edgetype::Type{$MT}, agenttype::Type) 
-            checked(map, neighborids(sim, id, edgetype)) do nid
+            checked(map, edgeids(sim, id, edgetype)) do nid
                 agentstate(sim, nid, agenttype)
             end
         end
@@ -640,23 +640,23 @@ else
     end
 end
 
-#- num_neighbors
+#- num_edges
 if !singleedge
     if ignorefrom && stateless
-        @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        @eval function num_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
             n = _get_agent_container(sim, to, $T, @edgeread($T))
             isnothing(n) ? 0 : n
         end
     else
-        @eval function num_neighbors(sim::$simsymbol, to::AgentID, ::Type{$MT})
+        @eval function num_edges(sim::$simsymbol, to::AgentID, ::Type{$MT})
             ac = _get_agent_container(sim, to, $T, @edgeread($T))
             isnothing(ac) ? 0 : length(ac)
         end
     end
 else
-    @eval function num_neighbors(::$simsymbol, ::AgentID, t::Type{$MT})
+    @eval function num_edges(::$simsymbol, ::AgentID, t::Type{$MT})
         @assert false """
-            num_neighbors is not defined for the trait combination of $t
+            num_edges is not defined for the trait combination of $t
             """
     end
 end
@@ -670,7 +670,7 @@ if ignorefrom && stateless
     end
 elseif !singleedge 
     @eval function has_neighbor(sim::$simsymbol, to::AgentID, t::Type{$MT})
-        num_neighbors(sim,to, t) >= 1
+        num_edges(sim,to, t) >= 1
     end
 elseif !singletype 
     @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
@@ -703,7 +703,7 @@ else
     end
 end
 
-#- aggregate incl. helper functions
+#- mapreduce incl. helper functions
 if singletype
     @eval _removeundef(sim::$simsymbol, ::Type{$MT}) = edges -> begin
         [ @inbounds edges[i] for i=1:length(edges) if isassigned(edges, i)]
@@ -752,11 +752,11 @@ else
     end 
 end
 
-#- aggregate
+#- mapreduce
 if ! stateless
-    @eval function aggregate(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
+    @eval function mapreduce(sim::$simsymbol, f, op, t::Type{$MT}; kwargs...)
         with_logger(sim) do
-            @info "<Begin> aggregate edges" f op edgetype=$T
+            @info "<Begin> mapreduce edges" f op edgetype=$T
         end
         emptyval = val4empty(op; kwargs...)
 
@@ -772,14 +772,14 @@ if ! stateless
         mpiop = get(kwargs, :mpiop, op)
         r = MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
 
-        _log_info(sim, "<End> aggregate edges")
+        _log_info(sim, "<End> mapreduce edges")
 
         r
     end
 else
-    @eval function aggregate(::$simsymbol, f, op, t::Type{$MT}; kwargs...)
+    @eval function mapreduce(::$simsymbol, f, op, t::Type{$MT}; kwargs...)
         @assert false """
-            aggregate is not defined for the trait combination of $t
+            mapreduce is not defined for the trait combination of $t
             """
     end
 end

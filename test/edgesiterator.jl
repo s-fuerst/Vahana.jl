@@ -6,7 +6,7 @@ import Vahana: has_trait, @onrankof
 if mpi.size == 1
     @testset "Edges Iter" begin
         function runedgesitertest(ET)
-            eisim = new_simulation(model_edges; logging = true, debug = true)
+            eisim = create_simulation(model_edges; logging = true, debug = true)
 
             @test Vahana.edges_iterator(eisim, ET) |> length == 0
             @test Vahana.edges_iterator(eisim, ET) |> collect |> length == 0
@@ -54,9 +54,9 @@ end
 
 @testset "Edges Agg" begin
     function runedgesaggregatetest(ET::DataType)
-        sim = new_simulation(model_edges; logging = true, debug = true)
+        sim = create_simulation(model_edges; logging = true, debug = true)
 
-        @test aggregate(sim, e -> e.foo, +, ET) == 0
+        @test mapreduce(sim, e -> e.foo, +, ET) == 0
         
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         for id in aids
@@ -65,20 +65,20 @@ end
 
         finish_init!(sim)
 
-        @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
+        @test mapreduce(sim, e -> e.foo, +, ET) == sum(1:10)
 
         # first we test that edges to the agents are removed
-        apply_transition!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
+        apply!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
             nothing
         end
 
-        @test aggregate(sim, e -> e.foo, +, ET) == 0
+        @test mapreduce(sim, e -> e.foo, +, ET) == 0
 
         finish_simulation!(sim)
         # we now create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
 
-        sim = new_simulation(model_edges; logging = true, debug = true)
+        sim = create_simulation(model_edges; logging = true, debug = true)
 
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
@@ -88,14 +88,14 @@ end
 
         finish_init!(sim)
 
-        @test aggregate(sim, e -> e.foo, +, ET) == sum(1:10)
+        @test mapreduce(sim, e -> e.foo, +, ET) == sum(1:10)
 
         # first we test that edges to the agents are removed
-        apply_transition!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
+        apply!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
             nothing
         end
 
-        @test aggregate(sim, e -> e.foo, +, ET) == 0
+        @test mapreduce(sim, e -> e.foo, +, ET) == 0
 
         finish_simulation!(sim)
     end
@@ -110,12 +110,12 @@ end
 
 @testset "Remove Edges" begin
     # some remove stuff is already tested above, but here we
-    # use num_edges instead of aggregate to test this for all types.
+    # use num_edges instead of mapreduce to test this for all types.
     # but this does not work for distributed runs
     function runremoveedgestest(ET::DataType)
         # we create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
-        sim = new_simulation(model_edges; logging = true, debug = true)
+        sim = create_simulation(model_edges; logging = true, debug = true)
 
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
@@ -134,7 +134,7 @@ end
         end
 
         # first we test that edges to the agents are removed
-        apply_transition!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
+        apply!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
             nothing
         end
 
@@ -147,7 +147,7 @@ end
         finish_simulation!(sim)
         # we create edges from type AgentB to Agent and remove all
         # agents of type AgentB. This should also remove the edges.
-        sim = new_simulation(model_edges, nothing, nothing)
+        sim = create_simulation(model_edges, nothing, nothing)
 
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
@@ -169,7 +169,7 @@ end
         end
 
         # # first we test that edges to the agents are removed
-        # apply_transition!(sim, [ AgentB ], [], []) do state, id, sim
+        # apply!(sim, [ AgentB ], [], []) do state, id, sim
         #     nothing
         # end
 

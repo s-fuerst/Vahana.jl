@@ -13,8 +13,8 @@ The usual workflow is as follows:
 - Define all Agent and Edge types
 - Create a [`ModelTypes`](@ref) instance
 - Register the defined Agent and Edge types 
-- Call [`construct_model`](@ref) to create an model (state space) object
-- Call [`new_simulation`](@ref) to create a simulation of this model
+- Call [`create_model`](@ref) to create an model (state space) object
+- Call [`create_simulation`](@ref) to create a simulation of this model
 
 The simplest example of creating a simulation is:
 
@@ -24,9 +24,9 @@ struct EdgeState end
 
 const sim = ModelTypes() |>
     register_agenttype!(Agent) |>
-    register_edgetype!(EdgeState) |>
-    construct_model("Minimal Example") |>
-    new_simulation(nothing, nothing)
+    register_edgestatetype!(EdgeState) |>
+    create_model("Minimal Example") |>
+    create_simulation(nothing, nothing)
 ```
 
 After the simulation is created, the next step is its initialization,
@@ -40,7 +40,7 @@ edge types.
 ```@docs
 ModelTypes
 register_agenttype!
-register_edgetype!
+register_edgestatetype!
 ```
 
 !!! tip
@@ -57,16 +57,16 @@ generated. See [Performance Tuning](./performance.md) for details.
 
 !!! tip
 
-	As [`construct_model`](@ref) adds new methods, it increments the
+	As [`create_model`](@ref) adds new methods, it increments the
 	["world age counter"](https://docs.julialang.org/en/v1/manual/methods/#Redefining-Methods).
 	This means, that you can not construct the model in the same function
-	as you initialize it. But you can call [`new_simulation`](@ref) in the same function so
+	as you initialize it. But you can call [`create_simulation`](@ref) in the same function so
 	
 	```
-    const model = construct_model(modeltypes, "Minimal Example") 
+    const model = create_model(modeltypes, "Minimal Example") 
 	
 	function create_and_init()
-		sim = new_simulation(model, nothing, nothing)
+		sim = create_simulation(model, nothing, nothing)
 		add_agent!(sim, Agent())
 	end
 	```
@@ -74,12 +74,12 @@ generated. See [Performance Tuning](./performance.md) for details.
 	is valid code. 
 
 ```@docs
-construct_model
+create_model
 Model
 ```
 
 # Create a Simulation
 
 ```@docs
-new_simulation
+create_simulation
 ```

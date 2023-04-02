@@ -51,8 +51,8 @@ We have now all elements to create an uninitialized simulation.
 ````@example hegselmann
 const hkmodel = ModelTypes() |>
     register_agenttype!(HKAgent) |>
-    register_edgetype!(Knows) |>
-    construct_model("Hegselmann-Krause");
+    register_edgestatetype!(Knows) |>
+    create_model("Hegselmann-Krause");
 nothing #hide
 ````
 
@@ -69,8 +69,8 @@ We show here for both use cases one example and are creating for each
 one an own simulation
 
 ````@example hegselmann
-const cgsim = new_simulation(hkmodel, HKParams(0.2), nothing);
-const snapsim = new_simulation(hkmodel, HKParams(0.2), nothing)
+const cgsim = create_simulation(hkmodel, HKParams(0.2), nothing);
+const snapsim = create_simulation(hkmodel, HKParams(0.2), nothing)
 ````
 
 ## SimpleGraphs
@@ -167,7 +167,7 @@ opinions of the remaining agents. As we have
 function step(agent, id, sim)
     ε = param(sim, :ε)
 
-    accepted = filter(neighborstates(sim, id, Knows, HKAgent)) do other
+    accepted = filter(edgestates(sim, id, Knows, HKAgent)) do other
         abs(other.opinion - agent.opinion) < ε
     end
     HKAgent(mean(map(a -> a.opinion, accepted)))
@@ -178,13 +178,13 @@ nothing #hide
 We can now apply the transition function to the complete graph simulation
 
 ````@example hegselmann
-apply_transition!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+apply!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
 ````
 
 Or to our facebook dataset
 
 ````@example hegselmann
-apply_transition!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+apply!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [])
 ````
 
 # Plot
@@ -221,7 +221,7 @@ Since the full graph is very cluttered and the Facebook dataset is
 too large, we construct a Clique graph using Graphs.jl.
 
 ````@example hegselmann
-const cysim = new_simulation(hkmodel, HKParams(0.25), nothing);
+const cysim = create_simulation(hkmodel, HKParams(0.25), nothing);
 const cyids = add_graph!(cysim,
                          SimpleGraphs.clique_graph(7, 8),
                          _ -> HKAgent(rand()),
@@ -244,7 +244,7 @@ And then the state after 500 iterations
 
 ````@example hegselmann
 for _ in 1:500
-    apply_transition!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [])
+    apply!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [])
 end
 
 plot_opinion(cysim)

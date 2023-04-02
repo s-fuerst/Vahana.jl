@@ -6,9 +6,9 @@ import Graphs: SimpleGraphs
 # The traits are
 # (S) Stateless
 # (E) SingleEdge
-# (T) SingleAgentType, which can also have a size information (Ts)
+# (T) SingleType, which can also have a size information (Ts)
 # (I) IgnoreFrom
-# so EdgeET means an Edge(State) with the SingleEdge and SingleAgentType traits
+# so EdgeET means an Edge(State) with the SingleEdge and SingleType traits
 
 struct Agent foo::Int64 end
 struct AgentB foo::Int64 end # this is used to test the removal of "dead" edges (in edgesiterator)
@@ -42,25 +42,25 @@ allEdgeTypes = [ statelessEdgeTypes; statefulEdgeTypes ]
 model_edges = ModelTypes() |>
     register_agenttype!(Agent) |>
     register_agenttype!(AgentB) |>
-    register_edgetype!(EdgeD) |>
-    register_edgetype!(EdgeS, :Stateless) |>
-    register_edgetype!(EdgeE, :SingleEdge) |>
-    register_edgetype!(EdgeT, :SingleAgentType; to_agenttype = Agent) |>
-    register_edgetype!(EdgeI, :IgnoreFrom) |>
-    register_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
-    register_edgetype!(EdgeST, :Stateless, :SingleAgentType; to_agenttype = Agent) |>
-    register_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
-    register_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
-    register_edgetype!(EdgeTI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    register_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
-    register_edgetype!(EdgeSTI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    register_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent) |>
-    register_edgetype!(EdgeTs, :SingleAgentType; to_agenttype = Agent, size = 10) |>
-    register_edgetype!(EdgeTsI, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    register_edgetype!(EdgeSTs, :Stateless, :SingleAgentType; to_agenttype = Agent, size = 10) |>
-    register_edgetype!(EdgeSTsI, :Stateless, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    register_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleAgentType, :IgnoreFrom; to_agenttype = Agent, size = 10) |>
-    construct_model("Test Edges")
+    register_edgestatetype!(EdgeD) |>
+    register_edgestatetype!(EdgeS, :Stateless) |>
+    register_edgestatetype!(EdgeE, :SingleEdge) |>
+    register_edgestatetype!(EdgeT, :SingleType; target = Agent) |>
+    register_edgestatetype!(EdgeI, :IgnoreFrom) |>
+    register_edgestatetype!(EdgeSE, :Stateless, :SingleEdge) |>
+    register_edgestatetype!(EdgeST, :Stateless, :SingleType; target = Agent) |>
+    register_edgestatetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
+    register_edgestatetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
+    register_edgestatetype!(EdgeTI, :SingleType, :IgnoreFrom; target = Agent) |>
+    register_edgestatetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    register_edgestatetype!(EdgeSTI, :Stateless, :SingleType, :IgnoreFrom; target = Agent) |>
+    register_edgestatetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = Agent) |>
+    register_edgestatetype!(EdgeTs, :SingleType; target = Agent, size = 10) |>
+    register_edgestatetype!(EdgeTsI, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
+    register_edgestatetype!(EdgeSTs, :Stateless, :SingleType; target = Agent, size = 10) |>
+    register_edgestatetype!(EdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
+    register_edgestatetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
+    create_model("Test Edges")
 
 
 hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
@@ -68,7 +68,7 @@ hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 
 
 function runedgestest()
     @testset "Edges" begin
-        sim = new_simulation(model_edges, nothing, nothing)
+        sim = create_simulation(model_edges, nothing, nothing)
         
         (a1id, a2id, a3id) = add_agents!(sim, Agent(1), Agent(2), Agent(3))
 
@@ -118,46 +118,46 @@ function runedgestest()
         end
 
         finish_init!(sim)
-        # # with this apply_transition we ensure
-        # apply_transition(sim, [ Agent, AgentB ], allEdgeTypes, []) do _,_,_ end
+        # # with this apply we ensure
+        # apply(sim, [ Agent, AgentB ], allEdgeTypes, []) do _,_,_ end
 
-        @testset "edges_to" begin
+        @testset "edges" begin
             disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs]
-                e = edges_to(sim, a3id, t)
+                e = edges(sim, a3id, t)
                 @test e[1] == Edge(a2id, t(1))
                 @test e[2] == Edge(a1id, t(2))
-                e = edges_to(sim, a2id, t)
+                e = edges(sim, a2id, t)
                 @test e === nothing
             end
             for t in [EdgeE]
-                e = edges_to(sim, a3id, t)
+                e = edges(sim, a3id, t)
                 @test e == Edge(a2id, t(1))
             end
             disable_transition_checks(false)
                     
             for t in  [ EdgeI, EdgeEI, EdgeTI, EdgeTsI, EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI, EdgeSTs, EdgeSTsI, EdgeSETsI  ]
-                @test_throws AssertionError edges_to(sim, a1id, t)
+                @test_throws AssertionError edges(sim, a1id, t)
             end
         end
 
-        @testset "neighborids" begin
+        @testset "edgeids" begin
             disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
-                e = neighborids(sim, a3id, t)
+                e = edgeids(sim, a3id, t)
                 @test e[1] == a2id
                 @test e[2] == a1id
-                e = neighborids(sim, a2id, t)
+                e = edgeids(sim, a2id, t)
                 @test e === nothing
             end
             for t in [EdgeE, EdgeSE]
-                e = neighborids(sim, a3id, t)
+                e = edgeids(sim, a3id, t)
                 @test e == a2id
             end
             disable_transition_checks(false)
             for t in [EdgeI, EdgeTI, EdgeTsI, EdgeSI, EdgeSTI, EdgeSTsI,
                    EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
-                @test_throws AssertionError neighborids(sim, a1id, t)
+                @test_throws AssertionError edgeids(sim, a1id, t)
             end
         end
 
@@ -181,17 +181,17 @@ function runedgestest()
             end
         end
         
-        @testset "num_neighbors" begin
+        @testset "num_edges" begin
             disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeI, EdgeTI, EdgeTsI,
                    EdgeS, EdgeST, EdgeSTs, EdgeST, EdgeSTI, EdgeSTsI]
-                @test num_neighbors(sim, a1id, t) == 1
-                @test num_neighbors(sim, a2id, t) == 0
-                @test num_neighbors(sim, a3id, t) == 2
+                @test num_edges(sim, a1id, t) == 1
+                @test num_edges(sim, a2id, t) == 0
+                @test num_edges(sim, a3id, t) == 2
             end
             disable_transition_checks(false)
             for t in [EdgeE, EdgeEI, EdgeSE, EdgeSETI, EdgeSETsI]
-                @test_throws AssertionError num_neighbors(sim, a1id, t)
+                @test_throws AssertionError num_edges(sim, a1id, t)
             end
         end
 
@@ -207,26 +207,26 @@ function runedgestest()
             disable_transition_checks(false)
         end
         
-        @testset "aggregate" begin
+        @testset "mapreduce" begin
             for t in [ EdgeD, EdgeT, EdgeI, EdgeTI, EdgeTs, EdgeTsI ]
-                @test aggregate(sim, a -> a.foo, +, t) == 6
+                @test mapreduce(sim, a -> a.foo, +, t) == 6
             end
             for t in [ EdgeE, EdgeEI ]
-                @test aggregate(sim, a -> a.foo, +, t) == 4
+                @test mapreduce(sim, a -> a.foo, +, t) == 4
             end
             for t in  [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
                      EdgeSTs, EdgeSTsI, EdgeSETsI  ]
-                @test_throws AssertionError aggregate(sim, a -> a.foo, +, t)
+                @test_throws AssertionError mapreduce(sim, a -> a.foo, +, t)
             end
         end
 
         @testset "neighbor_states" begin
             disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
-                e = neighborids(sim, a3id, t)
+                e = edgeids(sim, a3id, t)
                 @test e[1] == a2id
                 @test e[2] == a1id
-                e = neighborids(sim, a2id, t)
+                e = edgeids(sim, a2id, t)
                 @test e === nothing
             end
             disable_transition_checks(false)
@@ -245,7 +245,7 @@ function runedgestest()
     end
 
     @testset "num_edges" begin
-        sim = new_simulation(model_edges, nothing, nothing)
+        sim = create_simulation(model_edges, nothing, nothing)
 
         for t in [ statefulEdgeTypes; statelessEdgeTypes ]
             @test num_edges(sim, t; write = false) == 0
@@ -289,7 +289,7 @@ end
 
 @testset "transition" begin
     for ET in [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI ]
-        sim = new_simulation(model_edges)
+        sim = create_simulation(model_edges)
 
         if Vahana.has_trait(sim, ET, :SingleEdge)
             finish_simulation!(sim)
@@ -307,49 +307,49 @@ end
 
         finish_init!(sim)
 
-        apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
-            @test num_neighbors(sim, id, ET) == nagents-1
+        apply!(sim, [ Agent ], [ ET ], []) do _, id, sim
+            @test num_edges(sim, id, ET) == nagents-1
         end
 
         # write was empty, so we should get the same results when doing
         # the same transition again
-        apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
-            @test num_neighbors(sim, id, ET) == nagents-1
+        apply!(sim, [ Agent ], [ ET ], []) do _, id, sim
+            @test num_edges(sim, id, ET) == nagents-1
         end
 
         # write the edges by copying them from before
-        apply_transition!(sim, [ Agent ], [], [ ET ]; add_existing = [ ET ]) do _, id, sim
+        apply!(sim, [ Agent ], [], [ ET ]; add_existing = [ ET ]) do _, id, sim
         end
-        apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
-            @test num_neighbors(sim, id, ET) == nagents-1
+        apply!(sim, [ Agent ], [ ET ], []) do _, id, sim
+            @test num_edges(sim, id, ET) == nagents-1
         end
 
         if ET == EdgeD
             # write the edges by readding them 
-            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]) do _, id, sim
-                add_edges!(sim, id, edges_to(sim, id, ET))
+            apply!(sim, [ Agent ], [ ET ], [ ET ]) do _, id, sim
+                add_edges!(sim, id, edges(sim, id, ET))
             end
-            apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
-                @test num_neighbors(sim, id, ET) == nagents-1
+            apply!(sim, [ Agent ], [ ET ], []) do _, id, sim
+                @test num_edges(sim, id, ET) == nagents-1
             end
 
-            apply_transition!(sim, [ Agent ], [], []) do _, id, sim end
+            apply!(sim, [ Agent ], [], []) do _, id, sim end
 
             # write the edges by copying and readding 
-            apply_transition!(sim, [ Agent ], [ ET ], [ ET ]; add_existing = [ ET ]) do _, id, sim
-                add_edges!(sim, id, edges_to(sim, id, ET))
+            apply!(sim, [ Agent ], [ ET ], [ ET ]; add_existing = [ ET ]) do _, id, sim
+                add_edges!(sim, id, edges(sim, id, ET))
             end
 
             # (we should have them twice after now)
-            apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
-                @test num_neighbors(sim, id, ET) == (nagents-1) * 2
+            apply!(sim, [ Agent ], [ ET ], []) do _, id, sim
+                @test num_edges(sim, id, ET) == (nagents-1) * 2
             end
 
             # this time no one adds the edges, so they should be gone afterwards
-            apply_transition!(sim, [ Agent ], [], [ ET ]) do _, id, sim
+            apply!(sim, [ Agent ], [], [ ET ]) do _, id, sim
             end
-            apply_transition!(sim, [ Agent ], [ ET ], []) do _, id, sim
-                @test num_neighbors(sim, id, ET) == 0
+            apply!(sim, [ Agent ], [ ET ], []) do _, id, sim
+                @test num_edges(sim, id, ET) == 0
             end
         end
 

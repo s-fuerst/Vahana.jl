@@ -28,7 +28,7 @@ end
 function initial_active(c::Cell, id, sim)
     if c.active
         foreach(nid -> add_edge!(sim, id, nid, ActiveNeighbor()),
-                neighborids(sim, id, Neighbor))
+                edgeids(sim, id, Neighbor))
     end
     c
 end
@@ -36,13 +36,13 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    n = num_neighbors(sim, id, ActiveNeighbor)
+    n = num_edges(sim, id, ActiveNeighbor)
     rules = param(sim, :rules)
     if (c.active == true && n <= rules[4] && n >= rules[1]) ||
         (c.active == false && n >= rules[3] && n <= rules[4])
 
         foreach(nid -> add_edge!(sim, id, nid, ActiveNeighbor()),
-                neighborids(sim, id, Neighbor))
+                edgeids(sim, id, Neighbor))
 
         return Cell(true)
     end
@@ -54,9 +54,9 @@ size = dim[1] * dim[2]
 
 const model = ModelTypes() |>    
     register_agenttype!(Cell, :ConstantSize) |> 
-    register_edgetype!(Neighbor, :Stateless, :SingleAgentType; to_agenttype = Cell, size=size) |>
-    register_edgetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleAgentType; to_agenttype = Cell , size=size) |>
-    construct_model("GameOfLife")
+    register_edgestatetype!(Neighbor, :Stateless, :SingleType; target = Cell, size=size) |>
+    register_edgestatetype!(ActiveNeighbor, :Stateless, :IgnoreFrom, :SingleType; target = Cell , size=size) |>
+    create_model("GameOfLife")
 
 
 function init!(sim)
@@ -69,7 +69,7 @@ function init!(sim)
 
     finish_init!(sim)
 
-    apply_transition!(sim, initial_active,
+    apply!(sim, initial_active,
                       [Cell],
                       [Cell, Neighbor, ActiveNeighbor],
                       [Cell, ActiveNeighbor])
@@ -77,14 +77,14 @@ function init!(sim)
 end
 
 function step!(sim)
-    apply_transition!(sim, transition,
+    apply!(sim, transition,
                       [Cell],
                       [Cell, Neighbor, ActiveNeighbor],
                       [Cell, ActiveNeighbor])
     calc_rasterstate(sim, :raster, c -> c.active, Bool, Cell)
 end
 
-const sim = new_simulation(model,
+const sim = create_simulation(model,
                            Params(rules = SA[2,3,3,3],
                                   dims = dim),
                            nothing)
@@ -95,7 +95,7 @@ init!(sim)
 #@benchmark
 step!(sim)
 
-# @btime apply_transition!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
+# @btime apply!(sim, transition, [Cell], [Neighbor, ActiveNeighbor], [ActiveNeighbor])
 
 if mpi.isroot
     @time for i in 1:200 step!(sim) end

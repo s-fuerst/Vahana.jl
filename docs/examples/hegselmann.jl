@@ -38,8 +38,8 @@ end
 
 const hkmodel = ModelTypes() |>
     register_agenttype!(HKAgent) |>
-    register_edgetype!(Knows) |>
-    construct_model("Hegselmann-Krause");
+    register_edgestatetype!(Knows) |>
+    create_model("Hegselmann-Krause");
 
 # # Add the graph 
 
@@ -53,8 +53,8 @@ const hkmodel = ModelTypes() |>
 # We show here for both use cases one example and are creating for each
 # one an own simulation
 
-const cgsim = new_simulation(hkmodel, HKParams(0.2), nothing);
-const snapsim = new_simulation(hkmodel, HKParams(0.2), nothing)
+const cgsim = create_simulation(hkmodel, HKParams(0.2), nothing);
+const snapsim = create_simulation(hkmodel, HKParams(0.2), nothing)
 
 # ## SimpleGraphs 
 
@@ -137,7 +137,7 @@ finish_init!(snapsim)
 function step(agent, id, sim)
     ε = param(sim, :ε)
 
-    accepted = filter(neighborstates(sim, id, Knows, HKAgent)) do other
+    accepted = filter(edgestates(sim, id, Knows, HKAgent)) do other
         abs(other.opinion - agent.opinion) < ε
     end
     HKAgent(mean(map(a -> a.opinion, accepted)))
@@ -145,11 +145,11 @@ end;
 
 # We can now apply the transition function to the complete graph simulation
 
-apply_transition!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+apply!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
 # Or to our facebook dataset
 
-apply_transition!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+apply!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
 # # Plot
 
@@ -178,7 +178,7 @@ end;
 # Since the full graph is very cluttered and the Facebook dataset is
 # too large, we construct a Clique graph using Graphs.jl.
 
-const cysim = new_simulation(hkmodel, HKParams(0.25), nothing);
+const cysim = create_simulation(hkmodel, HKParams(0.25), nothing);
 const cyids = add_graph!(cysim,
                          SimpleGraphs.clique_graph(7, 8),
                          _ -> HKAgent(rand()),
@@ -196,7 +196,7 @@ plot_opinion(cysim)
 # And then the state after 500 iterations
 
 for _ in 1:500
-    apply_transition!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+    apply!(cysim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 end
 
 plot_opinion(cysim)

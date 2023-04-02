@@ -145,7 +145,7 @@ end;
 # `Params` constructor.
 
 # The second struct allows us to add a global state to the
-# simulation, which can be an exogenous input or an (aggregated) state
+# simulation, which can be an exogenous input or an (mapreduced) state
 # from the simulation itself. This global state can then be used for the
 # agents' decisions or, as in our case, as the output of the simulation,
 # namely the development of the average price and excess demand.
@@ -158,24 +158,24 @@ end
 # We now have all the elements needed to construct an uninitialized
 # simulation. Therefore we combine first all the Agent- and Edgetypes
 # into a `ModelTypes` collection, via the `register_agenttype!` and
-# `register_edgetype!` functions, and then call `contruct_model` on this
+# `register_edgestatetype!` functions, and then call `contruct_model` on this
 # collection. 
 
 const model = ModelTypes() |>
     register_agenttype!(Buyer) |>
     register_agenttype!(Seller) |>
-    register_edgetype!(KnownSellers) |>
-    register_edgetype!(Bought) |>
-    construct_model("Excess Demand");
+    register_edgestatetype!(KnownSellers) |>
+    register_edgestatetype!(Bought) |>
+    create_model("Excess Demand");
 
-# `construct_model` returns a blueprint for our simulation. Simulations
+# `create_model` returns a blueprint for our simulation. Simulations
 # itself can be seen as instances of models, where each simulation has
 # it's individual state and set of parameters. The Simulation is
-# instanciated by the `new_simulation` function, which needs beside
+# instanciated by the `create_simulation` function, which needs beside
 # the model also the parameters struct and the globals struct, whereby
 # the parameters and globals can be also `nothing`. 
 
-const sim = new_simulation(model,
+const sim = create_simulation(model,
                            Params(numBuyer = 50,
                                   numSeller = 5,
                                   knownSellers = 2),
@@ -257,8 +257,8 @@ show_agents(sim, Buyer)
 
 # This transition function is called for all Buyers. First the `edge_to`
 # function is used to get a `Vector` that cotains all the sellers known
-# by `b`. It's important to call `edges_to` only for `id`, and not
-# e.g. to `from` IDs of edges derived by `edges_to`.
+# by `b`. It's important to call `edges` only for `id`, and not
+# e.g. to `from` IDs of edges derived by `edges`.
 
 # One of the available edges to a sellers is selected using the `rand`
 # function. For this seller the state is accessed via the `agentstate`
@@ -278,7 +278,7 @@ show_agents(sim, Buyer)
 # got as function parameter.
 
 function calc_demand(b::Buyer, id, sim)
-    seller_edge = rand(edges_to(sim, id, KnownSellers))
+    seller_edge = rand(edges(sim, id, KnownSellers))
     s = agentstate(sim, seller_edge.from, Seller)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
@@ -314,8 +314,8 @@ end;
 # ## applying the transition functions
 
 # To apply our defined transistion functions to the simulation, Vahana
-# provides the `apply_transition!` function with the signature
-# `apply_transition!(sim::Simulation, f::Function, compute::Vector,
+# provides the `apply!` function with the signature
+# `apply!(sim::Simulation, f::Function, compute::Vector,
 # networks::Vector, rebuild::Vector)`, where `f` is the
 # transition function. `compute` is a vector of agent types. In most
 # cases (like here) this vector will only contain a single type, but in
@@ -339,17 +339,17 @@ end;
 
 # So for our transition functions we have
 
-sim2 = apply_transition(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers ], [ Bought ])
+sim2 = apply(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers ], [ Bought ])
 
 # and
 
-sim3 = apply_transition(sim2, calc_price, [ Seller ], [ Bought ], [ Bought ])
+sim3 = apply(sim2, calc_price, [ Seller ], [ Bought ], [ Bought ])
 
-# We used here a version of the `apply_transition` which returns a copy of
+# We used here a version of the `apply` which returns a copy of
 # the simulation instead of changing the simulation inplace. This can be
 # usefull while implementing the model in the REPL, as the transition
 # does not destroy the original state, but should not be used in
-# production, here always the `apply_transition!` should be used.
+# production, here always the `apply!` should be used.
 
 # But here we can now simply compare the simulation states before and
 # after calling the transition functions:
@@ -371,7 +371,7 @@ show_agents(sim3, Seller)
 
 # E.g. to calculate the excess demand we write
 
-aggregate(sim2, b -> b.x - b.y, +, Bought)
+mapreduce(sim2, b -> b.x - b.y, +, Bought)
 
 # where the second parameter specifies for which agent or edge type the
 # aggregation should be performed, and the anonymous function in the
@@ -383,8 +383,8 @@ aggregate(sim2, b -> b.x - b.y, +, Bought)
 # To calculate the average price we define a helper function
 
 function calc_average_price(sim)
-    m = aggregate(sim, s -> s.p * s.d_y, +, Seller)
-    q = aggregate(sim, s -> s.d_y, +, Seller)
+    m = mapreduce(sim, s -> s.p * s.d_y, +, Seller)
+    q = mapreduce(sim, s -> s.d_y, +, Seller)
     m / q
 end
 
@@ -393,9 +393,9 @@ calc_average_price(sim3)
 # And now we have all elements to run the simulation, e.g. for 10 steps:
 
 for _ in 1:10
-    apply_transition!(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers], [ Bought ])
-    push_global!(sim, :x_minus_y, aggregate(sim, b -> b.x - b.y, +, Bought))
-    apply_transition!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
+    apply!(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers], [ Bought ])
+    push_global!(sim, :x_minus_y, mapreduce(sim, b -> b.x - b.y, +, Bought))
+    apply!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
     push_global!(sim, :p, calc_average_price(sim))
 end
 

@@ -39,10 +39,10 @@ end
 
 const hkmodel = ModelTypes() |>
     register_agenttype!(HKAgent) |>
-    register_edgetype!(Knows) |>
-    construct_model("Hegselmann-Krause");
+    register_edgestatetype!(Knows) |>
+    create_model("Hegselmann-Krause");
 
-const sim = new_simulation(hkmodel, HKParams(0.2), nothing);
+const sim = create_simulation(hkmodel, HKParams(0.2), nothing);
 
 
 
@@ -84,7 +84,7 @@ finish_init!(sim)
 function step(agent, id, sim)
     ε = param(sim, :ε)
 
-    accepted = filter(neighborstates(sim, id, Knows, HKAgent)) do other
+    accepted = filter(edgestates(sim, id, Knows, HKAgent)) do other
         abs(other.opinion - agent.opinion) < ε
     end
     HKAgent(mean(map(a -> a.opinion, accepted)))
@@ -94,8 +94,8 @@ end;
 
 copy = copy_simulation(sim)
 
-apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
-#@time for _ in 1:50 apply_transition!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
+#@time for _ in 1:50 apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
 
 

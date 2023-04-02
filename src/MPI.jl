@@ -247,7 +247,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
 
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleAgentType in attr[:traits]
+    singletype = :SingleType in attr[:traits]
     stateless = :Stateless in attr[:traits]
     
     ST = Vector{Tuple{AgentID, CE}}
@@ -260,10 +260,10 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
     # the container, we get the following values:
     # |                    | Statel. | Ignore | get edges via | sending (ST below) |
     # |--------------------+---------+--------+---------------+--------------------|
-    # | (Vector){Edge{$T}} |         |        | edges_to      | [(toid, Edge{$T})] |
-    # | (Vector){AgentID}  | x       |        | neighborids   | [(toid, fromid)]   |
+    # | (Vector){Edge{$T}} |         |        | edges      | [(toid, Edge{$T})] |
+    # | (Vector){AgentID}  | x       |        | edgeids   | [(toid, fromid)]   |
     # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
-    # | Int64              | x       | x      | num_neighbors | num_neighbors      |
+    # | Int64              | x       | x      | num_edges | num_edges      |
     @eval function sendedges!(sim, sendmap::Dict{AgentID, ProcessID},
                        idmapping, ::Type{$T})
         with_logger(sim) do
@@ -271,7 +271,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         end
 
         if $singletype
-            AT = sim.typeinfos.edges_attr[$T][:to_agenttype]
+            AT = sim.typeinfos.edges_attr[$T][:target]
             agent_typeid = sim.typeinfos.nodes_type2id[AT]
         end
 
@@ -305,7 +305,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
             # all ranks, but on the sendmap there are only the edges
             # of rank 0, as this are the only edges we want to distribute
             if haskey(sendmap, id)
-                # in the SingleAgentType version, we also get entries with 0 edges
+                # in the SingleType version, we also get entries with 0 edges
                 # we skip them, there is no need to use bandwith for that
                 if $stateless && $ignorefrom && e == 0
                     continue

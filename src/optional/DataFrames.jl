@@ -30,8 +30,8 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
                 df.has_neighbor = map(>(0), values(read))
                 subset!(df, :has_neighbor => b -> b)
             else
-                df.num_neighbors = collect(values(read))
-                subset!(df, :num_neighbors => n -> n .> 0)
+                df.num_edges = collect(values(read))
+                subset!(df, :num_edges => n -> n .> 0)
             end
         else
             # for the remaining traits we can use the edges iterator
@@ -53,10 +53,10 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
                 end
             end
         end
-        # when the SingleAgentType trait is active, we must transform the ids
+        # when the SingleType trait is active, we must transform the ids
         # from the vector index to the correct agent id
-        if has_trait(sim, T, :SingleAgentType)
-            totype = tinfos.edges_attr[T][:to_agenttype]
+        if has_trait(sim, T, :SingleType)
+            totype = tinfos.edges_attr[T][:target]
             totypeid = tinfos.nodes_type2id[totype]
             df.to = map(id -> agent_id(totypeid, AgentNr(id)), df.to)
             if ! has_trait(sim, T, :IgnoreFrom)

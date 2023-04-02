@@ -34,10 +34,10 @@ end
 
 sim = ModelTypes() |>
     register_agenttype!(Agent, :Immortal) |>
-    register_edgetype!(EdgeState, :SingleEdge) |>
-    register_edgetype!(NewEdge, :SingleEdge) |>
-    construct_model("agentstatetest") |>
-    new_simulation()
+    register_edgestatetype!(EdgeState, :SingleEdge) |>
+    register_edgestatetype!(NewEdge, :SingleEdge) |>
+    create_model("agentstatetest") |>
+    create_simulation()
 
 ids = add_agents!(sim, [ Agent(i) for i in 1:mpi.size ])
 
@@ -48,8 +48,8 @@ end
 newids = finish_init!(sim; partition_algo = :SameSize)
 
 # first a check that we can read the state after initialization
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state == a.state
@@ -58,12 +58,12 @@ end
 
 # now we update the agentstate and check afterwards that the
 # accessible state is also updated
-apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
+apply!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
     Agent(state.state * 2)
 end
 
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state * 2 == a.state
@@ -73,26 +73,26 @@ end
 
 # when we access the agentstate via the NewEdge type, this will not transfer any
 # new state
-apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
+apply!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
     Agent(state.state / 2)
 end
 
-apply_transition!(sim, [ Agent ], [ Agent, NewEdge ], []) do _, id, sim
-    e = edges_to(sim, id, NewEdge)
+apply!(sim, [ Agent ], [ Agent, NewEdge ], []) do _, id, sim
+    e = edges(sim, id, NewEdge)
     @test isnothing(e)
 end
 
 # now add the NewEdges (by copying the old edges)
-apply_transition!(sim, [ Agent ], [ EdgeState ], [ NewEdge ]) do _, id, simsymbol
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ EdgeState ], [ NewEdge ]) do _, id, simsymbol
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         add_edge!(sim, e.from, id, NewEdge(e.state.state))
     end
 end
 
 # and check that we get the correct agentstate via the new edges
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state == a.state
@@ -105,10 +105,10 @@ finish_simulation!(sim)
 # Test the same for mortal agents
 sim = ModelTypes() |>
     register_agenttype!(Agent) |>
-    register_edgetype!(EdgeState, :SingleEdge) |>
-    register_edgetype!(NewEdge, :SingleEdge) |>
-    construct_model("agentstatetest-mortal") |>
-    new_simulation()
+    register_edgestatetype!(EdgeState, :SingleEdge) |>
+    register_edgestatetype!(NewEdge, :SingleEdge) |>
+    create_model("agentstatetest-mortal") |>
+    create_simulation()
 
 ids = add_agents!(sim, [ Agent(i) for i in 1:mpi.size ])
 
@@ -119,8 +119,8 @@ end
 newids = finish_init!(sim; partition_algo = :SameSize)
 
 # first a check that we can read the state after initialization
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state == a.state
@@ -128,8 +128,8 @@ apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
 end
 
 # call it a second time to trigger the filter of already existing keys
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state == a.state
@@ -139,12 +139,12 @@ end
 
 # now we update the agentstate and check afterwards that the
 # accessible state is also updated
-apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
+apply!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
     Agent(state.state * 2)
 end
 
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state * 2 == a.state
@@ -153,26 +153,26 @@ end
 
 # when we access the agentstate via the NewEdge type, this will not transfer any
 # new state
-apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
+apply!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, _, _
     Agent(state.state / 2)
 end
 
-apply_transition!(sim, [ Agent ], [ Agent, NewEdge ], []) do _, id, sim
-    e = edges_to(sim, id, NewEdge)
+apply!(sim, [ Agent ], [ Agent, NewEdge ], []) do _, id, sim
+    e = edges(sim, id, NewEdge)
     @test isnothing(e)
 end
 
 # now add the NewEdges (by copying the old edges)
-apply_transition!(sim, [ Agent ], [ EdgeState ], [ NewEdge ]) do _, id, simsymbol
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ EdgeState ], [ NewEdge ]) do _, id, simsymbol
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         add_edge!(sim, e.from, id, NewEdge(e.state.state))
     end
 end
 
 # and check that we get the correct agentstate via the new edges
-apply_transition!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
-    e = edges_to(sim, id, EdgeState)
+apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
+    e = edges(sim, id, EdgeState)
     if ! isnothing(e)
         a = agentstate(sim, e.from, Agent)
         @test e.state.state == a.state

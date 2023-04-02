@@ -20,7 +20,7 @@ show_network
 show_agent
 ```
 
-`apply_transition` can be used to calculate a transition function
+`apply` can be used to calculate a transition function
 without modifying the original state. This can be useful in the
 development process, but for the final simulation the function should
-be replaced with the modifying version `apply_transition!`.
+be replaced with the modifying version `apply!`.

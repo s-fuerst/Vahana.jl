@@ -22,7 +22,7 @@ the Graphs.vertix as argument. For each edge of `graph` the
 
 The agent types of agents created by the `agent_constructor` must be
 already registered via [`register_agenttype!`](@ref) and vis a vis the edge
-type via [`register_edgetype!`](@ref).
+type via [`register_edgestatetype!`](@ref).
 
 !!! info
 
@@ -87,7 +87,7 @@ types and whose both adjacent node types are in `agenttypes`.
 
 The default values for `agenttypes` and `edgetypes` are all registered
 agents/edgetypes (see [`register_agenttype!`](@ref) and
-[`register_edgetype!`](@ref)).
+[`register_edgestatetype!`](@ref)).
 
 This subgraphs implements the AbstractSimpleGraph interface from the
 Graphs.jl package.
@@ -179,7 +179,7 @@ mutable struct VahanaGraph <: Graphs.AbstractGraph{Int64}
     edgetypeidx::Vector{Int64}
 end
 
-# SingleAgentType not supported (und IgnoreFrom sowieso nicht)
+# SingleType not supported (und IgnoreFrom sowieso nicht)
 """
     vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true, drop_multiedges = false)
 
@@ -189,7 +189,7 @@ types and whose both adjacent agents have are of a type in `agenttypes`.
 
 The default values for `agenttypes` and `edgetypes` are all registered
 agents/edgetypes (see [`register_agenttype!`](@ref) and
-[`register_edgetype!`](@ref)).
+[`register_edgestatetype!`](@ref)).
 
 This subgraphs implements the AbstractGraph interface from the
 Graphs.jl package, so that e.g. GraphMakie can be used to visualize

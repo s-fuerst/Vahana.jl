@@ -158,7 +158,7 @@ end
 
 function contact_model(::Val{Person}, id::AgentID, sim)
     day = get_global(sim, :day)
-    checked(foreach, edges_to(sim, id, Contact)) do edge
+    checked(foreach, edges(sim, id, Contact)) do edge
         if edge.state.day > day - 2
             add_edge!(sim, id, edge)
         end
@@ -169,11 +169,11 @@ function contact_model(::Val{Location}, id::AgentID, sim)
     # persons at location, entered at which time
     persons = Dict{AgentID, Int64}()
 
-    checked(foreach, edges_to(sim, id, EndOfDay)) do edge
+    checked(foreach, edges(sim, id, EndOfDay)) do edge
         persons[edge.from] = edge.state.time
     end
 
-    event_edges = edges_to(sim, id, MovementEvent)
+    event_edges = edges(sim, id, MovementEvent)
     for edge in event_edges
         event = edge.state
         if event.type == Arrival
@@ -208,7 +208,7 @@ function disease_progression(p::Person, id, sim)
     if p.health == E && p.health_changed == day - 3
         if rand() < 0.5
             p = start_quarantine(p, day)
-            checked(foreach, neighborids(sim, id, Contact)) do nid
+            checked(foreach, edgeids(sim, id, Contact)) do nid
                 add_edge!(sim, id, nid, Inform())
             end
         end
@@ -261,30 +261,30 @@ function init(sim, filename)
 
     finish_init!(sim)
 
-    push_global!(sim, :reports, aggregate(sim, Report, +, Person; init = Report()))
+    push_global!(sim, :reports, mapreduce(sim, Report, +, Person; init = Report()))
 
     sim
 end
 
-#add_globalstate!(sim, aggregate(sim, Person, p -> Report(p), +)
+#add_globalstate!(sim, mapreduce(sim, Person, p -> Report(p), +)
 
 function runstep!(sim)
     set_global!(sim, :day, Int32(getglobal(sim, :day) + 1))
 
-    apply_transition!(sim, contact_model, [ Person, Location ],
+    apply!(sim, contact_model, [ Person, Location ],
                       [ Contact, EndOfDay, MovementEvent ],
                       [ Contact, EndOfDay, Infection ])
 
     
-    apply_transition!(sim, disease_progression, [ Person ],
+    apply!(sim, disease_progression, [ Person ],
                       [ Person, Infection, Contact ],
                       [ Person, Inform ])
 
-    apply_transition!(sim, quarantine, [ Person ],
+    apply!(sim, quarantine, [ Person ],
                       [ Person, Inform ],
                       [ Person ])
 
-    report = aggregate(sim, Report, +, Person; init = Report())
+    report = mapreduce(sim, Report, +, Person; init = Report())
     push_global!(sim, :reports, report)
     println(report)
     sim
@@ -302,13 +302,13 @@ end
 const sim = ModelTypes() |>
         register_agenttype!(Person) |>
         register_agenttype!(Location) |>
-        register_edgetype!(MovementEvent) |>
-        register_edgetype!(Contact) |>
-        register_edgetype!(EndOfDay) |>
-        register_edgetype!(Infection) |>
-        register_edgetype!(Inform) |>
-        construct_model("Episim-Nutshell") |>
-        new_simulation(Params(θ=-0.001, tracing=0.25),
+        register_edgestatetype!(MovementEvent) |>
+        register_edgestatetype!(Contact) |>
+        register_edgestatetype!(EndOfDay) |>
+        register_edgestatetype!(Infection) |>
+        register_edgestatetype!(Inform) |>
+        create_model("Episim-Nutshell") |>
+        create_simulation(Params(θ=-0.001, tracing=0.25),
                        Globals(reports = Vector(), day = 0))
 
 

@@ -5,13 +5,13 @@ function test_write_restore(model)
     restored = restore(model, sim)
     test(sim, restored)
 
-    apply_transition!(sim,
+    apply!(sim,
                       remove_some_rasternodes,
                       [ RasterAgent ],
                       [ RasterAgent, RasterEdge, Agent ],
                       [ RasterAgent, RasterEdge ])
 
-    apply_transition!(restored,
+    apply!(restored,
                       remove_some_rasternodes,
                       [ RasterAgent ],
                       [ RasterAgent, RasterEdge, Agent ],
@@ -47,7 +47,7 @@ function test(sim, restored)
     function checkedges(sim_edges, restored_edges, T)
         @test getproperty(sim, Symbol(T)).last_change ==
             getproperty(restored, Symbol(T)).last_change
-        if Vahana.has_trait(sim, T, :SingleAgentType)
+        if Vahana.has_trait(sim, T, :SingleType)
             @test sim_edges == restored_edges
         else
             for to in keys(sim_edges)
@@ -70,31 +70,30 @@ end
     model_default = ModelTypes() |>
         register_agenttype!(Agent) |>
         register_agenttype!(RasterAgent) |>
-        register_edgetype!(EdgeState) |>
-        register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge) |>
-        construct_model("hdf5_default")
+        register_edgestatetype!(EdgeState) |>
+        register_edgestatetype!(RasterEdge) |>
+        register_edgestatetype!(StatelessEdge) |>
+        create_model("hdf5_default")
 
     test_write_restore(model_default)
 
     model_immortal = ModelTypes() |>
         register_agenttype!(Agent, :Immortal) |>
         register_agenttype!(RasterAgent) |>
-        register_edgetype!(EdgeState, :IgnoreFrom) |>
-        register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge, :Stateless) |>
-        construct_model("hdf5_ignore_immortal")
+        register_edgestatetype!(EdgeState, :IgnoreFrom) |>
+        register_edgestatetype!(RasterEdge) |>
+        register_edgestatetype!(StatelessEdge, :Stateless) |>
+        create_model("hdf5_ignore_immortal")
 
     test_write_restore(model_immortal)
 
     model_neighbors = ModelTypes() |>
         register_agenttype!(Agent, :Immortal) |>
         register_agenttype!(RasterAgent) |>
-        register_edgetype!(EdgeState, :NumNeighborsOnly) |>
-        register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge, :HasNeighborOnly, :SingleAgentType;
-                           to_agenttype = Agent) |>
-                               construct_model("hdf5_neighbors")
+        register_edgestatetype!(EdgeState, :NumEdgesOnly) |>
+        register_edgestatetype!(RasterEdge) |>
+        register_edgestatetype!(StatelessEdge, :HasEdgeOnly, :SingleType; target = Agent) |>
+                               create_model("hdf5_neighbors")
 
     test_write_restore(model_neighbors)
 

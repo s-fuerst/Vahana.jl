@@ -25,7 +25,7 @@ end
 function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
     ignorefrom = :IgnoreFrom in attr[:traits]
     singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleAgentType in attr[:traits]
+    singletype = :SingleType in attr[:traits]
     stateless = :Stateless in attr[:traits]
 
     # for whatever reason, we cannot just use the field type in the
@@ -39,7 +39,7 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
     
     # for the singletype case we can access the type of the agent via AT
     if singletype
-        AT = attr[:to_agenttype]
+        AT = attr[:target]
     end
     
     @eval function edges_iterator(sim::$simsymbol, ::Type{$T}, r::Bool = true)

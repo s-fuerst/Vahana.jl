@@ -20,16 +20,16 @@ end
 
 # This is a dummy struct to define the stubs of functions like add_agent
 # with a type for the simulation. The real type of the simulation is
-# constructed in construct_model (simulations are an instance of a model).
+# constructed in create_model (simulations are an instance of a model).
 # Adding the dummy type to the struct has the advantage, that e.g. LSP will
 # not omit a warning about a possible false call of the function without catching
 # calls to the function with a wrong type for the simulation parameter.
 
 """
     __MODEL__ is a documentation placeholder for the type of the
-simulation that is returned from the [`new_simulation`](@ref)
+simulation that is returned from the [`create_simulation`](@ref)
 call. The concrete type depends on the [`ModelTypes`](@ref) of the
-[`construct_model`](@ref) call, the concrete type name is the name of
+[`create_model`](@ref) call, the concrete type name is the name of
 the model.
 """
 struct __MODEL__ end
@@ -102,10 +102,10 @@ suppress_warnings = (suppress::Bool) -> config.quiet = suppress
 Per default, Vahana expects that the :Stateless trait is set manually.
 
 This design decision was made so as not to confuse users, since then,
-for example, the [`edges_to`](@ref) is not available.
+for example, the [`edges`](@ref) is not available.
 
 This behaviour can be customized by calling `detect_stateless_trait` before
-calling [`register_edgetype!`](@ref).
+calling [`register_edgestatetype!`](@ref).
 """
 detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 

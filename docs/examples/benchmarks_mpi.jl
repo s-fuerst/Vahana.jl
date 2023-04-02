@@ -45,7 +45,7 @@ function prepare(name)
         traits = vcat(traits, :SingleEdge)
     end
     if hastrait(name, "T")
-        traits = vcat(traits, :SingleAgentType)
+        traits = vcat(traits, :SingleType)
     end
     if hastrait(name, "I")
         traits = vcat(traits, :IgnoreFrom)
@@ -54,17 +54,17 @@ function prepare(name)
     if hastrait(name, "F")
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgetype!(EdgeState, traits...; to_agenttype=AgentState, size=3)
+            register_edgestatetype!(EdgeState, traits...; target=AgentState, size=3)
     else
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgetype!(EdgeState, traits...; to_agenttype=AgentState)
+            register_edgestatetype!(EdgeState, traits...; target=AgentState)
     end    
-    construct_model(mt, name)
+    create_model(mt, name)
 end
 
 function createsim(foragg, mt, name)
-    sim = new_simulation(mt, nothing, nothing)
+    sim = create_simulation(mt, nothing, nothing)
 
     a1 = add_agent!(sim, AgentState())
     a2 = add_agent!(sim, AgentState())
@@ -103,7 +103,7 @@ function run_benchmark(mt, name)
     (sim, a1, a2, a3) = createsim(false, mt, name)
 
     if !stateless && !ignorefrom
-        edgeto = @benchmark edges_to($sim, $a3, EdgeState)
+        edgeto = @benchmark edges($sim, $a3, EdgeState)
     else
         edgeto = nothing
     end
@@ -111,7 +111,7 @@ function run_benchmark(mt, name)
     if ignorefrom 
         nids = nothing
     else
-        nids = @benchmark neighborids($sim, $a3, EdgeState)
+        nids = @benchmark edgeids($sim, $a3, EdgeState)
     end
 
     if stateless 
@@ -129,7 +129,7 @@ function run_benchmark(mt, name)
     if singleedge
         numn = nothing
     else
-        numn = @benchmark num_neighbors($sim, $a3, EdgeState)
+        numn = @benchmark num_edges($sim, $a3, EdgeState)
     end
 
     finish_simulation!(sim)
@@ -140,7 +140,7 @@ function run_benchmark(mt, name)
         agg = nothing
     else
         agg = nothing
-#        agg = @benchmark aggregate($sim, s -> s.v, +, EdgeState)
+#        agg = @benchmark mapreduce($sim, s -> s.v, +, EdgeState)
     end
 
     finish_simulation!(sim)
@@ -152,7 +152,7 @@ end
 
 ######################################## create edge table
 
-println("| S | E | T | I | F | add_edge! | edges_to | has_neighbor | num_neighbors | neighborids | edgestates | aggregate |")
+println("| S | E | T | I | F | add_edge! | edges | has_neighbor | num_edges | edgeids | edgestates | mapreduce |")
 
 for t in allEdgeTypes
     mt = prepare(t)
@@ -166,16 +166,16 @@ end
 
 struct AgentWithState state::Int64 end
 
-println("| traits  | add_agent | agentstate | agentstate_flexible | aggregate |")
+println("| traits  | add_agent | agentstate | agentstate_flexible | mapreduce |")
 
 function run_benchmark_agents(mt)
-    sim = new_simulation(mt, nothing, nothing)
+    sim = create_simulation(mt, nothing, nothing)
 
     ids = add_agents!(sim, [ AgentWithState(i) for i in 1:10 ])
 
     finish_init!(sim)
     
-    raggregate = @benchmark aggregate($sim, a -> a.state, +, AgentWithState)
+    raggregate = @benchmark mapreduce($sim, a -> a.state, +, AgentWithState)
     raddagent = @benchmark add_agent!($sim, AgentWithState(1))
     ragentstate = @benchmark agentstate($sim, $(ids[1]), AgentWithState)
     ragentstateflex = @benchmark agentstate_flexible($sim, $(ids[1]))
@@ -185,12 +185,12 @@ end
 
 mt = ModelTypes() |>
     register_agenttype!(AgentWithState) |>
-    construct_model("Mortal");
+    create_model("Mortal");
 run_benchmark_agents(mt);
 
 mt = ModelTypes() |>
     register_agenttype!(AgentWithState, :Immortal) |>
-    construct_model("Immortal");
+    create_model("Immortal");
 run_benchmark_agents(mt);
 
 # ######################################## raster move_to!
@@ -209,11 +209,11 @@ run_benchmark_agents(mt);
 # const sim = ModelTypes() |>
 #     register_agenttype!(GridNode) |>
 #     register_agenttype!(MovingAgent) |>
-#     register_edgetype!(GridEdge) |>
-#     register_edgetype!(OnPosition, :SingleEdge, :SingleAgentType; to_agenttype = GridNode) |>
-#     register_edgetype!(AgentsOnPoint, :SingleAgentType; to_agenttype = MovingAgent) |>
-#     construct_model("Raster_Test") |>
-#     new_simulation(nothing, nothing)
+#     register_edgestatetype!(GridEdge) |>
+#     register_edgestatetype!(OnPosition, :SingleEdge, :SingleType; target = GridNode) |>
+#     register_edgestatetype!(AgentsOnPoint, :SingleType; target = MovingAgent) |>
+#     create_model("Raster_Test") |>
+#     create_simulation(nothing, nothing)
 
 # add_raster!(sim,
 #             :grid,

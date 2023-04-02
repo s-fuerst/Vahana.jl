@@ -49,7 +49,7 @@ end
 
 function createsim(model, distribute = true)
     sim = model |>
-        new_simulation(Params(1, [2.0, 2.1], (x = 3, y = 4, z = 5)),
+        create_simulation(Params(1, [2.0, 2.1], (x = 3, y = 4, z = 5)),
                        Globals(Pos(1, 2), 3, [4.0, 4.1], [5, 6, 7]);
                        logging = true, debug = true)
 
@@ -82,7 +82,7 @@ function runsim(model, write)
         write_snapshot(sim, "Initial state")
     end
 
-    apply_transition!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, id, sim
+    apply!(sim, [ Agent ], [ Agent ], [ Agent ]) do state, id, sim
         Agent(state.inner, state.f - 2)
     end
 
@@ -93,7 +93,7 @@ function runsim(model, write)
         write_snapshot(sim)
     end
 
-    apply_transition!(sim, remove_some_rasternodes, 
+    apply!(sim, remove_some_rasternodes, 
                       [ RasterAgent ],
                       [ RasterAgent, RasterEdge, Agent ],
                       [ RasterAgent, RasterEdge ])
@@ -107,14 +107,14 @@ function runsim(model, write)
 end
 
 function remove_some_rasternodes(state, id, sim)
-    nstate = neighborstates(sim, id, RasterEdge, Agent) |> first
-    e = edges_to(sim, id, RasterEdge) |> first
+    nstate = edgestates(sim, id, RasterEdge, Agent) |> first
+    e = edges(sim, id, RasterEdge) |> first
     add_edge!(sim, e.from, id, RasterEdge(e.state.a * 2))
     mod1(nstate.f, 8) > 4.5 ? nothing : state
 end    
 
 function restore(model, sim; kwargs...)
-    restored = new_simulation(model,
+    restored = create_simulation(model,
                               Params(0, [0, 0], Pos(0, 0, 0)),
                               Globals(Pos(0, 0), 0, [0], [0]))
     read_snapshot!(restored, sim.name; kwargs...)

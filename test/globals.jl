@@ -4,7 +4,7 @@
         bar::Vector{Int64}
     end
 
-    sim = new_simulation(model, nothing, TestGlobals(0,Vector{Int64}()))
+    sim = create_simulation(model, nothing, TestGlobals(0,Vector{Int64}()))
 
     set_global!(sim, :foo, 1.1)
     push_global!(sim, :bar, 1)

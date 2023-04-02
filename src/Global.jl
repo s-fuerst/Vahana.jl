@@ -5,7 +5,7 @@ export set_global!, get_global, push_global!
 
 Returns the value of the field `name` of the `globals` struct for simulation `sim`.
 
-See also [`new_simulation`](@ref), [`set_global!`](@ref) and [`push_global!`](@ref)
+See also [`create_simulation`](@ref), [`set_global!`](@ref) and [`push_global!`](@ref)
 """
 get_global(sim, name) = getfield(sim.globals, name)
 
@@ -16,7 +16,7 @@ Set the value of the field `name` of the `globals` struct for simulation `sim`.
 
 `set_global!` must not be called within a transition function. 
 
-See also [`new_simulation`](@ref), [`aggregate`](@ref), [`push_global!`](@ref) and
+See also [`create_simulation`](@ref), [`mapreduce`](@ref), [`push_global!`](@ref) and
 [`get_global`](@ref)
 """
 function set_global!(sim, name, value)
@@ -34,7 +34,7 @@ be used to add a value to this vector, instead of writing
 
 `push_global!` must not be called within a transition function. 
 
-See also [`construct_model`](@ref), [`aggregate`](@ref), [`set_global!`](@ref) and
+See also [`create_model`](@ref), [`mapreduce`](@ref), [`set_global!`](@ref) and
 [`get_global`](@ref)
 """
 function push_global!(sim, name, value)

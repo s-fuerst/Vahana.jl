@@ -4,7 +4,7 @@ CurrentModule = Vahana
 
 # Initialization
 
-After we created a simulation by calling [`new_simulation`](@ref), we
+After we created a simulation by calling [`create_simulation`](@ref), we
 must build the initial state of the simulation. As in Vahana the state
 of a model is represented as a graph, this means we must add the nodes
 (our agents) and edges to the graph.
@@ -17,7 +17,7 @@ add_agents!
 !!! warning
 
 	The IDs created by add_agent(s)! contain Vahana internal information, that can change
-	after an [`apply_transition!`](@ref) or the [`finish_init!`](@ref) call. This has also 
+	after an [`apply!`](@ref) or the [`finish_init!`](@ref) call. This has also 
 	the implication, that the IDs can only be used temporary and should not be stored
 	in the state of an agent or edge.
 
@@ -77,7 +77,7 @@ move_to!
 
 After all the initial state has been built using the functions
 described above, `finish_init!` must be called before the first call
-of [`apply_transition!`](@ref)
+of [`apply!`](@ref)
 
 ```@docs
 finish_init!

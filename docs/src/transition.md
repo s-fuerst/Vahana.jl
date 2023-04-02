@@ -4,7 +4,7 @@ CurrentModule = Vahana
 
 # Transition Function
 
-As mentioned in the `construct_model` documentation, the model struct
+As mentioned in the `create_model` documentation, the model struct
 is created dynamically incl. a dynamically name for this
 struct. E.g. in the "Game of Life" Example this type is
 `Vahana.var"Game of Life"{Params, Globals} `. In the following documentation
@@ -16,8 +16,8 @@ __MODEL__
 
 
 ```@docs
-apply_transition!
-apply_transition
+apply!
+apply
 ```
 
 
@@ -44,21 +44,21 @@ get_global
 agentstate
 agentstate_flexible
 
-neighborstates
-neighborstates_flexible
+edgestates
+edgestates_flexible
 ```
 ## Get Edge(state)
 
 ```@docs
 edges_to
-num_neighbors
+num_edges
 has_neighbor
 
 edgestates
-neighborids
+edgeids
 ```
 
-For all the function like [`edges_to`](@ref) that returns `nothing` in
+For all the function like [`edges`](@ref) that returns `nothing` in
 the case that there is no edge with the agent as target, it can be
 useful to increase the readability of the code by using the `checked`
 function to test for `nothing`.

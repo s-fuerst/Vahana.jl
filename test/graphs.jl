@@ -10,18 +10,18 @@ struct GraphE end
 
 model_graph = ModelTypes() |>
     register_agenttype!(GraphA) |>
-    register_edgetype!(GraphE) |>
-    construct_model("Test Graph")
+    register_edgestatetype!(GraphE) |>
+    create_model("Test Graph")
 
 @testset "Graphs" begin
     # calculate the sum of all ids
     function sumids(a, id, sim)
         GraphA(a.id,
-               mapreduce(a -> a.id, +, neighborstates_flexible(sim, id, GraphE)))
+               mapreduce(a -> a.id, +, edgestates_flexible(sim, id, GraphE)))
     end
 
 
-    sim = new_simulation(model_graph, nothing, nothing)
+    sim = create_simulation(model_graph, nothing, nothing)
 
     nagents = 4
     
@@ -33,12 +33,12 @@ model_graph = ModelTypes() |>
 
     finish_init!(sim)
 
-    apply_transition!(sim, sumids, [GraphA], [GraphA, GraphE], [GraphA])
+    apply!(sim, sumids, [GraphA], [GraphA, GraphE], [GraphA])
 
     # we have a complete graph, and all agents sum the
     # ids of the neighbors (but ignoring the own)
     # so in overall we have the nagents-1 times the sum of all ids
-    @test aggregate(sim, a -> a.sum, +, GraphA) ==
+    @test mapreduce(sim, a -> a.sum, +, GraphA) ==
         sum(1:nagents) * (nagents - 1)
 
     finish_simulation!(sim)

@@ -16,7 +16,9 @@ function test_merge(model)
     """
     foreach(close, fids)
 
-    @test sim.params == restored.params
+    @test sim.params.pa == restored.params.pa
+    @test sim.params.pb == restored.params.pb
+    @test sim.params.pos == restored.params.pos
     #    @test sim.globals == restored.globals
     @test sim.Agent.last_change == restored.Agent.last_change
     @test sim.RasterAgent.last_change == restored.RasterAgent.last_change
@@ -27,7 +29,7 @@ function test_merge(model)
         
         for to in keys(sim_edges)
             to = AgentID(to)
-            AT = has_trait(sim, T, :SingleAgentType) ?
+            AT = has_trait(sim, T, :SingleType) ?
                 Agent :
                 sim.typeinfos.nodes_id2type[type_nr(to)]
             if AT == Agent
@@ -38,7 +40,7 @@ function test_merge(model)
                 rto = agent_id(sim, AgentNr(rto), Agent)
                 if has_trait(sim, T, :IgnoreFrom) &&
                     has_trait(sim, T, :Stateless)
-                    if has_trait(sim, T, :SingleAgentType)
+                    if has_trait(sim, T, :SingleType)
                         @test sim_edges[agent_nr(to)] ==
                             restored_edges[agent_nr(rto)]
                     else
@@ -69,31 +71,30 @@ end
     model_default = ModelTypes() |>
         register_agenttype!(Agent) |>
         register_agenttype!(RasterAgent) |>
-        register_edgetype!(EdgeState) |>
-        register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge) |>
-        construct_model("hdf5_default")
+        register_edgestatetype!(EdgeState) |>
+        register_edgestatetype!(RasterEdge) |>
+        register_edgestatetype!(StatelessEdge) |>
+        create_model("hdf5_default")
 
     test_merge(model_default)
 
     model_immortal = ModelTypes() |>
         register_agenttype!(Agent, :Immortal) |>
         register_agenttype!(RasterAgent) |>
-        register_edgetype!(EdgeState, :IgnoreFrom) |>
-        register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge, :Stateless) |>
-        construct_model("hdf5_ignore_immortal")
+        register_edgestatetype!(EdgeState, :IgnoreFrom) |>
+        register_edgestatetype!(RasterEdge) |>
+        register_edgestatetype!(StatelessEdge, :Stateless) |>
+        create_model("hdf5_ignore_immortal")
 
     test_merge(model_immortal)
     
     model_neighbors = ModelTypes() |>
         register_agenttype!(Agent, :Immortal) |>
         register_agenttype!(RasterAgent) |>
-        register_edgetype!(EdgeState, :NumNeighborsOnly) |>
-        register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge, :HasNeighborOnly, :SingleAgentType;
-                           to_agenttype = Agent) |>
-                               construct_model("hdf5_neighbors")
+        register_edgestatetype!(EdgeState, :NumEdgesOnly) |>
+        register_edgestatetype!(RasterEdge) |>
+        register_edgestatetype!(StatelessEdge, :HasEdgeOnly, :SingleType; target = Agent) |>
+                               create_model("hdf5_neighbors")
 
     test_merge(model_neighbors)
 

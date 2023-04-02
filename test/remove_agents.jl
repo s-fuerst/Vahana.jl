@@ -7,7 +7,7 @@ struct DAgentRemove end
 struct DEdgeState state::Int64 end
 struct DEdge end
 struct DSingleEdge end
-struct DEdgeST end # ST = SingleAgentType
+struct DEdgeST end # ST = SingleType
 
 count_num_edges(sim, E) = sum(Vahana.join([ num_edges(sim, E) +
     num_edges(sim, DEdgeState) ]))
@@ -15,15 +15,15 @@ count_num_edges(sim, E) = sum(Vahana.join([ num_edges(sim, E) +
 model = ModelTypes() |>
     register_agenttype!(DAgent) |>
     register_agenttype!(DAgentRemove) |>
-    register_edgetype!(DEdge) |>
-    register_edgetype!(DEdgeState) |>
-    register_edgetype!(DSingleEdge, :SingleEdge) |>
-    register_edgetype!(DEdgeST, :SingleAgentType; to_agenttype = DAgent) |>
-    construct_model("remove_agents") 
+    register_edgestatetype!(DEdge) |>
+    register_edgestatetype!(DEdgeState) |>
+    register_edgestatetype!(DSingleEdge, :SingleEdge) |>
+    register_edgestatetype!(DEdgeST, :SingleType; target = DAgent) |>
+    create_model("remove_agents") 
 
 @testset "Dying_Agents" begin
     function test_edgetype(E)
-        sim = new_simulation(model)
+        sim = create_simulation(model)
         
         ids = add_agents!(sim, [ DAgent() for _ in 1:(mpi.size * 3)])
 
@@ -41,7 +41,7 @@ model = ModelTypes() |>
         @test count_num_edges(sim, E) == (mpi.size * 4) + 1
 
         # we remove all ADefault edges, that should also remove the ESDict edges
-        apply_transition!(sim,
+        apply!(sim,
                           [ DAgentRemove ],
                           [],
                           [ DAgentRemove ]) do _,_,_
@@ -50,8 +50,8 @@ model = ModelTypes() |>
 
         @test count_num_edges(sim, E) == (mpi.size * 3) + 1
 
-        apply_transition!(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
-            if num_neighbors(sim, id, E) == 0
+        apply!(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
+            if num_edges(sim, id, E) == 0
                 nothing
             else
                 state

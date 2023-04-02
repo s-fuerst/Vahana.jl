@@ -33,7 +33,7 @@ end
 # The active calculation is from the Agents.jl implementation
 # but seems to we wrong (rules[2] is never used)
 function transition(c::Cell, id, sim)
-    n = mapreduce(a -> a.active, +, neighborstates(sim, id, Neighbor, Cell))
+    n = mapreduce(a -> a.active, +, edgestates(sim, id, Neighbor, Cell))
     rules = param(sim, :rules)
     if c.active == true && n <= rules[4] && n >= rules[1]
         return Cell(true, c.pos)
@@ -44,7 +44,7 @@ function transition(c::Cell, id, sim)
  end
 
 function countactive!(sim)
-    push_global!(sim, :numactive, aggregate(sim, c -> c.active, +, Cell))
+    push_global!(sim, :numactive, mapreduce(sim, c -> c.active, +, Cell))
 end
 
 function addgrid!(sim)
@@ -58,12 +58,12 @@ end
 
 model = ModelTypes() |>
     register_agenttype!(Cell, :Immortal) |>
-    register_edgetype!(Neighbor; to_agenttype = Cell) |>
-    construct_model("Game of Life")
+    register_edgestatetype!(Neighbor; target = Cell) |>
+    create_model("Game of Life")
 
 
 function init(params::Params)
-    sim = new_simulation(model, params, Globals(Vector(), Vector());
+    sim = create_simulation(model, params, Globals(Vector(), Vector());
                          logging = true, debug = true)
 
     add_raster!(sim,
@@ -81,7 +81,7 @@ function init(params::Params)
 end
 
 function step!(sim)
-    apply_transition!(sim, transition, [Cell], [Cell, Neighbor], [Cell])
+    apply!(sim, transition, [Cell], [Cell, Neighbor], [Cell])
     countactive!(sim)
     with_logger(sim) do
         @info "<Begin> GC"
