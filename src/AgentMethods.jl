@@ -129,7 +129,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     @eval agent_id(_::$simsymbol, agent_nr, ::Type{$T}) =
         agent_id($typeid, agent_nr)
     
-    @inline @eval function transition_with_write!(sim, idx, newstate, ::Type{$T})
+    @eval @inline function transition_with_write!(sim, idx, newstate, ::Type{$T})
         if $immortal
             @mayassert begin
                 newstate !== nothing
@@ -145,7 +145,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end
     end
 
-    @inline @eval function transition_without_write!(sim, idx, newstate, ::Type{$T})
+    @eval @inline function transition_without_write!(sim, idx, newstate, ::Type{$T})
         @mayassert begin
             T = $T
             typeof(newstate) != $T

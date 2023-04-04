@@ -3,7 +3,7 @@ export add_graph!
 export vahanagraph, vahanasimplegraph
 
 import Graphs:
-    Graphs, edges, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
+    Graphs, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
 
 import Base:
     show, eltype

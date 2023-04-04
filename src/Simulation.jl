@@ -2,12 +2,11 @@ import Base.deepcopy
 import Logging.with_logger
 
 export create_model
-export create_simulation, finish_simulation!
+export create_simulation, finish_simulation!, copy_simulation
 export finish_init!
 export apply, apply!
 export param
 export mapreduce
-export copy_simulation
 
 # this is mutable, as we assign write -> read in finish_write!
 mutable struct AgentReadWrite{T}
@@ -98,11 +97,11 @@ all methods are specific to this structure using Julia's multiple
 dispatch concept, so it is possible to have different models in the
 same Julia session (as long as `name` is different).
 
-Returns a [`Model`](@ref) that can be used in [`create_simulation`](@ref) to create 
-a concrete simulation.
+Returns a [`Model`](@ref) that can be used in
+[`create_simulation`](@ref) to create a concrete simulation.  
 """
-function create_model(typeinfos::ModelTypes, name::String) 
-    simsymbol = Symbol(name)
+function create_model(typeinfos::ModelTypes, name::String) simsymbol =
+Symbol(name)
 
     edgefields = [
         Expr(Symbol("="),
@@ -167,7 +166,7 @@ end
 num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
 
 """
-    create_simulation(model::Model, params = nothing, globals = nothing; name)
+    create_simulation(model::Model, params = nothing, globals = nothing; name = model.name, filename = name, logging = false, debug = false)
 
 Creates and return a new simulation object, which stores the complete state 
 of a simulation. 
@@ -186,6 +185,15 @@ The optional keyword argument `name` is used as meta-information about
 the simulation and has no effect on the dynamics, since `name` is not
 accessible in the transition functions. If `name` is not given, the
 name of the model is used instead.
+
+The optional `filename` keyword is a string that will be used as the
+name of the h5 file when a simulation or a part of it is written via
+e.g. `write_snapshot`. The file is created in a `h5` subfolder. If
+`filename` is not provided, the `name` argument is used instead.
+
+The keywords `logging` is a boolean flag that enables an automatical log file.
+The log file contains information such as the time spent in different functions. When also `debug` is set to true, the log file contains more details and the
+stream will be flushed after each write.
 
 The simulation starts in an uninitialized state. After adding the
 agents and edges for the initial state, it is necessary to call
@@ -254,8 +262,9 @@ function _create_equal_partition(d, ids)
 end
 
 """
-    finish_init!(sim::Simulation; distribute::Bool, 
-                 partition::Dict{AgentID, ProcessID})
+    finish_init!(sim::Simulation; distribute = true, 
+                 partition::Dict{AgentID, ProcessID}, 
+                 partition_algo = :Metis)
 
 Finish the initialization phase of the simulation. 
 
@@ -263,6 +272,13 @@ Finish the initialization phase of the simulation.
 of the agents to the individual MPI ranks. The dictonary must contain
 all agentids created on the rank as key, the corresponding value is
 the rank on which the agent "lives" after `finish_init!`.
+
+In the case that no `partition` is given and `distribute` is set to true,
+the Graph will be partitioned with the given `partition_algo`. Currently
+two algorithms are supported:
+    - :Metis uses the Metis library for the graph partitioning. 
+    - :EqualAgentNumbers just ensures that per agent type more or less
+      the same number of agents are distributed to each process.
 
 `finish_init!` must be called before applying a transition function. 
 
@@ -275,7 +291,6 @@ the rank on which the agent "lives" after `finish_init!`.
     mpi.isroot check), but then all added agents and edges on other
     ranks then 0 will be discarded. If this is not intended
     `distribute` must be set to false.
-
 
 See also [`register_agenttype!`](@ref), [`register_edgestatetype!`](@ref),
 [`apply!`](@ref) and [`finish_simulation!`](@ref)
@@ -373,8 +388,9 @@ end
 Create an independent copy of the simulation `sim`. Since part of the
 memory is allocated via MPI, you should not use deepcopy. 
 
-Also, the copy does not write to an output or logger file. If these
-are needed, you can create these files for the copy by calling
+Also, the copy is detached from any output or logger file so that not
+sim and copy tried to write to the same file(s). If these are needed,
+you can create these files for the copy by calling
 [`create_h5file!`](@ref) and/or [`create_logger!`](@ref) and assigning
 the results to the h5file/logging field of the returned simulation.
 
@@ -464,45 +480,50 @@ prepare_write!(sim, add_existing) = t -> prepare_write!(sim, t in add_existing, 
 
 finish_write!(sim) = t -> finish_write!(sim, t)
 
+isiterable(v) = applicable(iterate, v)
+
 
 """
-    apply!(sim, func, call, read, write; 
-                      add_existing = Vector{DataType}())
+    apply!(sim, func, call, read, write; add_existing)
 
 Apply the transition function `func` to the simulation state. 
 
-`call` is a vector of agent types, `read` and `write` are vectors of
-agent and/or edge types. 
+`call` must be a collection of agent types, `read` and `write` must be
+collections of agent and/or edge state types.
 
 `call` determines for which agent types the transition function `func`
 is called. Within the transition function, an agent has access to the
 state of agents (including its own state) and to edges only if
-their types are specified in the `read` vector. Accordingly, the agent
+their types are in the `read` collection. Accordingly, the agent
 can change its own state and/or create new agents or edges only if
-their types are specified in the `write` vector.
+their types are in the `write` collection.
 
-Assume that T is an agent type that is in `call` state. In case T is
-also in `read`, the transition function must have the following
-signature: `function(agent::T, id::AgentID, sim::Simulation)`. If T is
-not in `read`, it must have the signature `function(::Val{T},
-id::AgentID, sim::Simulation)`. 
+Assume that T is an agent type that is in `call`. In case T is also in
+`read`, the transition function must have the following signature:
+`transition_function(agent::T, id, sim:)`, where the type declaration
+of agent is optional if `call` contains only a single type. If T is
+not in `read`, it must have the signature `transition_function(::Val{T},
+id::AgentID, sim::Simulation)`.
 
-If T is in `write`, the transition function must return either an agent
-of type T or `nothing`. If `nothing` is returned, the agent will be
-removed from the simulation, otherwise the agent with id `id`
-(starting with the next `apply!` call) will have the
-returned state. 
+If T is in `write`, the transition function must return either an agent of type T
+or `nothing`. If `nothing` is returned, the agent will be removed from
+the simulation, otherwise the agent with id `id` will get the returned
+state after the transition function was called for all agents.
 
-TODO DOC add_existing
+When an agent or edge state type is in `write`, the current agents and
+edges of that type are removed from the simulation. Usually the agents
+are read by returning them from the transition function. If you want keep the
+existing agents/edges for a specific type, you can add this type to the
+optional `add_existing` collection.
 
 See also [`apply`](@ref)
 """
 function apply!(sim,
-                    func::Function,
-                    call::Vector,
-                    read::Vector,
-                    write::Vector;
-                    add_existing = Vector{DataType}())
+         func::Function,
+         call,
+         read,
+         write;
+         add_existing = [])
     @assert sim.initialized "You must call finish_init! before apply!"
     with_logger(sim) do
         @info "<Begin> apply!" func transition=sim.num_transitions+1
@@ -510,7 +531,14 @@ function apply!(sim,
     
     # must be set to true before prepare_read! (as this calls add_edge!)
     sim.intransition = true
-    
+
+    # Do allow also just use a single type as argument, we check this
+    # here and convert the single type to a vector if necessary
+    call = applicable(iterate, call) ? call : [ call ]
+    read = applicable(iterate, read) ? read : [ read ]
+    write = applicable(iterate, write) ? write : [ write ]
+    add_existing = applicable(iterate, add_existing) ? add_existing : [ add_existing ]
+
     # before we call prepare_write! we must ensure that all edges
     # in the storage that are accessible are distributed to the correct
     # ranks. Also we must first transfer the edges, as they determine,
@@ -562,16 +590,16 @@ end
 
 function apply!(func::Function,
                     sim,
-                    call::Vector,
-                    read::Vector,
-                    write::Vector;
+                    call,
+                    read,
+                    write;
                     kwargs ...)
     apply!(sim, func, call, read, write; kwargs ...)
 end
 
 
 """
-    apply(sim, func, compute, networks, rebuild) -> Simulation
+    apply!(sim, func, call, read, write; add_existing)
 
 Call [`apply!`](@ref) with a copy of the simulation so that the
 state of `sim` itself is not changed.
@@ -585,21 +613,21 @@ Returns the copy of the simulation.
 See also [`apply!`](@ref)
 """
 function apply(sim,
-                   func::Function,
-                   call::Vector,
-                   read::Vector,
-                   write::Vector;
-                   kwargs ...) 
-    newsim = deepcopy(sim)
+        func::Function,
+        call,
+        read,
+        write;
+        kwargs ...) 
+    newsim = copy_simulation(sim)
     apply!(newsim, func, call, read, write; kwargs ...)
     newsim
 end
 
 function apply(func::Function,
                    sim,
-                   call::Vector,
-                   read::Vector,
-                   write::Vector;
+                   call,
+                   read,
+                   write;
                    kwargs ...)
     apply(sim, func, call, read, write; kwargs ...)
 end
@@ -620,7 +648,5 @@ reduce (aggregate) the values returned by `f`.
 mapreduce is calling Base.mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
-
-TODO DOC: additional kwargs
 """
 function mapreduce(::__MODEL__, f, op, ::Type; kwargs...) end

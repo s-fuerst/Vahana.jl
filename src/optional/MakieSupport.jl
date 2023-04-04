@@ -27,6 +27,7 @@ function plotglobals(sim, names::Vector{Symbol})
         plots[name] = lines!(ax, 1:length(vals), vals, label = String(name))
     end
     axislegend()
+    display(f)
     f, ax, plots
 end
 

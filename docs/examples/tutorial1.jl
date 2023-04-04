@@ -1,6 +1,17 @@
 #=
 # Tutorial
 
+# Goal
+
+In this tutorial, we will build a model with multiple buyers and
+sellers, whereby the buyers will always randomly choice a seller from
+a fixed subset of the sellers. This subset is of course different for
+each buyer.
+
+We use this model to give a first introduction to Vahana, focusing on
+the core elements but already working with different types of agents
+and edges between them.
+
 # Model Background
 
 We have a simple but volatile market with $n$ buyers, $m$ sellers, and
@@ -33,7 +44,7 @@ y &= \frac{B \cdot (1 - \alpha)}{p}
 
 For illustrative reasons, we neglect production except for the
 assumption that $x$ and $y$ are joint products, so that the seller
-tries to find a price where $x =y$. In the case of a single buyer,
+tries to find a price where $x = y$. In the case of a single buyer,
 the solution is $p = \frac{1 - \alpha}{\alpha}$.  But in our case,
 the sellers are facing different buyers with different preferences
 $\alpha$ and a different budget $B$. So they start with a random
@@ -50,12 +61,6 @@ p_t &= \frac{d_y}{d_x} \cdot p_{t-1} \\
 It's easy to see that in the single buyer case, this will lead to $p =
 \frac{1 - \alpha}{\alpha}$ after a single step.
 
-# Goal
-
-In this tutorial, we will build a model with multiple buyers and
-sellers, whereby the buyers will always randomly choice a seller from
-a fixed subset of the sellers. This subset is of course different for
-each buyer.
 
 # Initialization
 
@@ -70,13 +75,14 @@ using Random
 
 detect_stateless_trait(false); #hide
 
-# We have two types of agents, `Buyer` and `Seller`. In Vahana,
-# agents are defined as (immutable) structs. The structs define the
-# state of the various agent types. All the types defined for the Model
-# must be "plain data" types. Such a type is call isbitstype in Julia,
-# and must fulfill the following contrains: A bitstype is immutable and
-# contains no references to other values, only primitive types and other
-# isbitstype types.
+# We have two types of agents, `Buyer` and `Seller`. In Vahana, agents
+# are defined as (immutable) structs. The structs define the state of
+# the various agent types. All the types defined for the Model must be
+# "plain data" types. Such a type is call isbitstype in Julia, and
+# must fulfill the following contrains: A bitstype is immutable and
+# contains no references to other values, only primitive types and
+# other isbitstype types. This also implies that the type of a struct
+# variables must be declared.
 # 
 # Since we want to calculate the average price of $y$ later, the seller
 # needs to store the quantity of the sold good $y$. So we have:
@@ -124,11 +130,11 @@ struct Bought
     y::Float64
 end
 
-# We need sometimes to sum those quantities, so we define a + operator
-# for the this struct:
+# Sometimes we want to add these quantities, so we define a + operator
+# for this structure
 
 import Base.+
-    +(a::Bought, b::Bought) = Bought(a.x + b.x, a.y + b.y);
++(a::Bought, b::Bought) = Bought(a.x + b.x, a.y + b.y);
 
 # Before we can construct our simulation, we need to define two
 # additional structures. The first structure contains the parameters of
@@ -145,7 +151,7 @@ end;
 # `Params` constructor.
 
 # The second struct allows us to add a global state to the
-# simulation, which can be an exogenous input or an (mapreduced) state
+# simulation, which can be an exogenous input or an (aggregated) state
 # from the simulation itself. This global state can then be used for the
 # agents' decisions or, as in our case, as the output of the simulation,
 # namely the development of the average price and excess demand.
@@ -176,11 +182,11 @@ const model = ModelTypes() |>
 # the parameters and globals can be also `nothing`. 
 
 const sim = create_simulation(model,
-                           Params(numBuyer = 50,
-                                  numSeller = 5,
-                                  knownSellers = 2),
-                           Globals(Vector(),
-                                   Vector()))
+                              Params(numBuyer = 50,
+                                     numSeller = 5,
+                                     knownSellers = 2),
+                              Globals(Vector(),
+                                      Vector()))
 
 # Now we can also populate our simulation with the agents and the
 # `KnownSeller` network (the `Bought` network is a result of the
@@ -213,17 +219,11 @@ end
 sim
 
 # As you can see from the result of the code block above, Vahana has a
-# "pretty print" function for some of its data structures. But to
-# understand the current output, it is important to know that for each
-# of the agent and edge types, Vahana has a container from which it
-# reads the state of the agents/edges and another to which it writes the
-# new state. During the initialization phase, the read containers are
-# empty, and the write containers are filled. In the above output you
-# can see the state of the two containers, where R stands for read and W
-# for write.
+# "pretty print" function for some of its data structures. 
 
-# It's also important to aware that the given numbers are only for the
-# partition of the graph that is assigned to the process.\comment{Das gilt natürlich nur für die spätere MPI Version, und wird deswegen jetzt auch erstmal nicht weiter ausgeführt.}
+# For a parallel simulation it's important to aware that the given
+# numbers are only for the partition of the graph that is assigned to
+# the process.
 
 # To complete the initialization it is necessary to call
 # `finish_init!`. In the later MPI version this will be used e.g. to
@@ -233,20 +233,14 @@ sim
 
 finish_init!(sim)
 
-# Now (after `finish_init!`) we can also have a little look at our
-# agents and edges. But again, we can only see the partition that is
-# assigned to the process.
-
-show_agents(sim, Buyer)
-
 # # Transition functions
 
 # We have now a simulation with an initial state. To modify the state we
 # need to define transition functions. Those functions have the
 # signature `transition_function(agent::T, id::AgentID, sim::Simulation)`.
 
-# The parameter `agent` contains the state of a single agent of the type
-# `T`. The parameter `id` contains the id of this agent, as the id is
+# The argument `agent` contains the state of a single agent of the type
+# `T`. The argument `id` contains the id of this agent, as the id is
 # not part of the agent state itself, and maybe needed for constructing
 # new edges. 
 
@@ -264,18 +258,12 @@ show_agents(sim, Buyer)
 # function. For this seller the state is accessed via the `agentstate`
 # function. In the case that the type of the agent from which we want
 # to access the state is unknown, it's possible to use the
-# `agentstate_flexible` instead. TODO see for details.
+# `agentstate_flexible` instead. 
 
 # Then the agent calculates it's demand for the goods $x$ and $y$, and
 # adds an edge with the information about the demand to the `Bought`
 # network, which is then used in the next transition function by the
 # sellers to sum up the demand and calculate the new price.
-
-# The state of the buyer itself isn't changed, but a transition function
-# must return either an instance of the type of the first parameter (in
-# our actual case a Buyer) or in the case that the agent should be
-# removed from the simulation `nothing`. So we just return the `b` we
-# got as function parameter.
 
 function calc_demand(b::Buyer, id, sim)
     seller_edge = rand(edges(sim, id, KnownSellers))
@@ -283,7 +271,6 @@ function calc_demand(b::Buyer, id, sim)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
     add_edge!(sim, id, seller_edge.from, Bought(x, y))
-    b
 end;
 
 # ## `calc_price`
@@ -292,12 +279,12 @@ end;
 # goods $x$ and $y$ they sold. Therefore they first get all the Bought
 # edges that are pointing to them via the `network(sim, Bought)`.
 
-# In the case that they sold nothing, and therefore no edge (or to be
-# more exact, a Vector with the lenght 0) is returned, they do not
-# change there state. Otherwise the `edgestates` function is used get a
-# Vector that only contain the states of all the edges. Remember that we
-# defined addition for `Bought`. This allows us to use the + Operator in
-# reduce to calculate the sum of all sold goods.
+# In the case that a seller did not sold anything, and therefore no
+# edge exists with the seller as target, [`edgestates`](@ref) returns
+# `nothing` and the seller does not change its state. Otherwise the
+# `edgestates` function returns a Vector that contains the states of
+# all the edges. We can aggregate this vector with the reduce
+# function (remember that we have defined the + operator for Bought above).
 
 # Then we construct a new seller. `q.y / q.x * s.p` is thereby the new
 # price as shown in equation (\ref{eqn:price}).
@@ -307,7 +294,7 @@ function calc_price(s::Seller, id, sim)
     if isnothing(edges) 
         return s
     end
-    q = reduce(+, edges)
+    q = reduce(+, edges) 
     Seller(q.y / q.x * s.p, q.y)
 end;
 
@@ -315,35 +302,68 @@ end;
 
 # To apply our defined transistion functions to the simulation, Vahana
 # provides the `apply!` function with the signature
-# `apply!(sim::Simulation, f::Function, compute::Vector,
-# networks::Vector, rebuild::Vector)`, where `f` is the
-# transition function. `compute` is a vector of agent types. In most
-# cases (like here) this vector will only contain a single type, but in
+# `apply!(sim, f::Function, call, read, write; add_existing)`.
+
+# `f` is in our case one of the transition functions we have already
+# defined above. `call` is a collection of agent types. In most cases
+# (like here) this collection will only contain a single type, but in
 # general it's possible to define a transition function for multiple
 # agent types (e.g. just define also `calc_demand(s::Seller, ...))` in
-# the case that sellers could also bought goods from other sellers, and
-# add `Seller` to the `compute` vector).
+# the case that sellers could also bought goods from other sellers,
+# and add `Seller` to the `call` collection).
 
-# The `networks` vector must contain all edge types which are accessed in
-# the transition function via a call of the `network`
-# function.
+# The `read` collection must contain all agent and edge state types
+# that are accessed in the transition function. Among other things,
+# this transmit in a parallel run the agents and edges to all
+# processes that need to access them. If the Vahana assertion system
+# is active, it checks that only these types are accessed, but if it
+# is disabled via [`enable_asserts`](@ref), forgetting to add types to
+# `read` can lead to incorrect results. Having more types than
+# necessary in the `read` collection, on the other hand, only leads to
+# worse performance.
 
-# And the `rebuild` vector must contain all agent and edge types, which
-# are changed in this transition function. Only the containers of those
-# types and the `compute` types are writeable inside the transition
-# function, calling add\_agent! or add\_edge! on a type that is not in
-# `[ compute; networks ]` will throw an error. 
+# In the case that the `call` type is not in `read` (we do not have this
+# case in this tutorial), the first argument of the transition function is no
+# longer the agent state, and instead the type of the first argument
+# is a Value Type of this `call` type.
 
-# And be aware the writeable containers are starting with an empty set,
-# which also explains the `rebuild` term.
+# The `write` collection must contain all agent and edge state types
+# that are changed in the transition function. In the purest
+# conceptional form (and the first prototypes), the resulting graph of
+# a transition function is the union of the returned agents and edges
+# of all transition function calls, but of course this causes a lot of
+# overhead since stable parts of the graph must also be
+# reconstructed. Instead of this radical behaviour, Vahana removes
+# `only` the part of the graph that are part of the `write`
+# collection. Which also implies, that you can only change the state
+# of agents/edges of a types when you readding also the state of
+# constant elements of that type. In the case that you want
+# e.g. additional edges without changing the existing one, you can use
+# the optional keyword `add_existing`, which is aslo a collection of
+# agent or edge state types. For all types in the collection the
+# existing agents/edges will not be removed even when the type is also
+# in the `write` collection.
 
-# So for our transition functions we have
+# This may sound complicated, but in practice the procedure is actually
+# quite straightforward. Write your transition function as we did above, then
+# check what types of agents the transition function should be called for and add
+# those types to `call`. Then check which types appear in function calls like
+# [`edgestates`](@ref) and add them to `read`. Are you accessing the first
+# argument of the transition function (the state of the agent itself)? Then add
+# that type to `read` as well. Do you want to return a changed state of the
+# agent. Then add that type to `write`. Do you have additional
+# [`add_edge!`](@ref) or [`add_agent!`](@ref) calls. Then add their type
+# to `write` as well. And note that all current agents/edges will be
+# removed from the simulation as long as their type is not also in
+# `add_existing`.
 
-sim2 = apply(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers ], [ Bought ])
+# Following this schema we get for our transition functions 
+
+sim2 = apply(sim, calc_demand, Buyer, [ Buyer, Seller, KnownSellers ], Bought)
 
 # and
 
-sim3 = apply(sim2, calc_price, [ Seller ], [ Bought ], [ Bought ])
+sim3 = apply(sim2, calc_price, Seller, [ Seller, Bought ], Seller)
 
 # We used here a version of the `apply` which returns a copy of
 # the simulation instead of changing the simulation inplace. This can be
@@ -354,11 +374,11 @@ sim3 = apply(sim2, calc_price, [ Seller ], [ Bought ], [ Bought ])
 # But here we can now simply compare the simulation states before and
 # after calling the transition functions:
 
-show_agents(sim, Seller)
+all_agents(sim, Seller)
 
 # and
 
-show_agents(sim3, Seller)
+all_agents(sim3, Seller)
 
 # # Globals
 
@@ -373,7 +393,7 @@ show_agents(sim3, Seller)
 
 mapreduce(sim2, b -> b.x - b.y, +, Bought)
 
-# where the second parameter specifies for which agent or edge type the
+# where the second argument specifies for which agent or edge type the
 # aggregation should be performed, and the anonymous function in the
 # third place describes the assignment for each instance of that
 # type. In our case, the function gets an edge of type `Bought` and
@@ -390,20 +410,31 @@ end
 
 calc_average_price(sim3)
 
-# And now we have all elements to run the simulation, e.g. for 10 steps:
+# And now we have all elements to run the simulation, e.g. for 100 steps:
 
-for _ in 1:10
-    apply!(sim, calc_demand, [ Buyer ], [ Seller, KnownSellers], [ Bought ])
+for _ in 1:100
+    apply!(sim, calc_demand, Buyer, [ Buyer, Seller, KnownSellers ], Bought)
     push_global!(sim, :x_minus_y, mapreduce(sim, b -> b.x - b.y, +, Bought))
-    apply!(sim, calc_price, [ Seller ], [ Bought ], [ Bought ])
+    apply!(sim, calc_price, Seller, [ Seller, Bought ], Seller)
     push_global!(sim, :p, calc_average_price(sim))
 end
 
 # To get the resulting timeseries, we use the `getglobal` function:
 
-getglobal(sim, :p)
+get_global(sim, :p)
 
 # and
 
-getglobal(sim, :x_minus_y)
+get_global(sim, :x_minus_y)
+
+# Or we can convert the globals to a DataFrame. Therefore we must first
+# import the DataFrames package, and can then call a DataFrame constructor
+
+import DataFrames
+
+DataFrame(sim, Globals)
+
+# But we can also create a DataFrame for the agent and edgetypes, e.g.
+
+DataFrame(sim, Bought)
 
