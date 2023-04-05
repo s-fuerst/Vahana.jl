@@ -1,6 +1,6 @@
 export Edge, edgestates
 export add_edge!, add_edges!, edges
-export num_edges, has_neighbor
+export num_edges, has_edge
 export edgestates, edgestates_flexible
 export edgeids
 
@@ -83,7 +83,7 @@ If there is no edge with agent `id` as target, `edges` returns `nothing`.
 edges is not defined if `E` has the trait :IgnoreFrom or :Stateless.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`neighborids`](@ref),
-[`edgestates`](@ref), [`num_edges`](@ref), [`has_neighbor`](@ref)
+[`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function edges(::__MODEL__, id::AgentID, edgetype::Type) end
@@ -100,7 +100,7 @@ If there is no edge with agent `id` as target, `edgeids` returns `nothing`.
 `edgeids` is not defined if `E` has the trait :IgnoreFrom.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgestates`](@ref), [`num_edges`](@ref), [`has_neighbor`](@ref)
+[`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function edgeids(::__MODEL__, id::AgentID, edgetype::Type) end
@@ -116,7 +116,7 @@ If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 `edgestates` is not defined if `E` has the trait :Stateless.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`num_edges`](@ref), [`has_neighbor`](@ref)
+[`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
@@ -145,7 +145,7 @@ for the agents whose state is actually used in the transition
 function.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`num_edges`](@ref), [`has_neighbor`](@ref)
+[`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function edgestates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Type) end
@@ -175,7 +175,7 @@ for the agents whose state is actually used in the transition
 function.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`num_edges`](@ref), [`has_neighbor`](@ref)
+[`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function edgestates_flexible(::__MODEL__, id::AgentID, edgetype::Type) end
@@ -193,18 +193,18 @@ Returns the number of edges of type `E` with agent `id` as target.
 `num_edges` is not defined if T has the trait :SingleEdge
 
 See also [`apply!`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`edgestates`](@ref), [`has_neighbor`](@ref)
+[`edgeids`](@ref), [`edgestates`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function num_edges(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
-    has_neighbor(sim, id::AgentID, ::Type{E}) 
+    has_edge(sim, id::AgentID, ::Type{E}) 
 
 Returns true if there is at least one edge of type `E` with agent `id` as
 target.
 
-`has_neighbor` is not defined if T has the :SingleEdge and :SingleType
+`has_edge` is not defined if T has the :SingleEdge and :SingleType
 traits, with the exception that it has also the :IgnoreFrom and
 :Stateless traits.
 
@@ -212,4 +212,4 @@ See also [`apply!`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`edgestates`](@ref), [`num_edges`](@ref)
 and [`edgestates`](@ref)
 """
-function has_neighbor(::__MODEL__, id::AgentID, edgetype::Type) end
+function has_edge(::__MODEL__, id::AgentID, edgetype::Type) end

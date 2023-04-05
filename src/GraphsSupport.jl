@@ -3,7 +3,7 @@ export add_graph!
 export vahanagraph, vahanasimplegraph
 
 import Graphs:
-    Graphs, edgetype, has_edge, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
+    Graphs, edgetype, has_vertex, inneighbors, ne, nv, outneighbors, vertices, is_directed
 
 import Base:
     show, eltype
@@ -276,7 +276,7 @@ Base.eltype(::VahanaGraph) = Int64
 
 edgetype(vg::VahanaGraph) = Graphs.SimpleEdge{eltype(vg)}
 
-has_edge(vg::VahanaGraph, s, d) = Graphs.Edge(s, d) in vg.edges
+Graphs.has_edge(vg::VahanaGraph, s, d) = Graphs.Edge(s, d) in vg.edges
 
 has_vertex(vg::VahanaGraph, v) = v <= length(vg.g2v)
 

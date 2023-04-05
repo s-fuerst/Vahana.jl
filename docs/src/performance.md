@@ -102,18 +102,18 @@ depends on the edge type traits:
 
 | function                                  | not available for edge type with the trait (combination) |
 |:------------------------------------------|:---------------------------------------------------------|
-| [`edges_to`](@ref)                        | `:IgnoreFrom` or `:Stateless`                            |
+| [`edges`](@ref)                        | `:IgnoreFrom` or `:Stateless`                            |
 | [`edgeids`](@ref)                     | `:IgnoreFrom`                                            |
 | [`edgestates`](@ref)                  | `:IgnoreFrom` or `:SingleEdge`                           |
 | [`edgestates`](@ref), [`mapreduce`](@ref) | `:Stateless`                                             |
-| [`num_neighbors`](@ref)                   | `:SingleEdge`                                            |
-| [`has_neighbor`](@ref)                    | see below                                                |
+| [`num_edges`](@ref)                   | `:SingleEdge`                                            |
+| [`has_edge`](@ref)                    | see below                                                |
 
-The function [`has_neighbor`](@ref) has a complicated rule. This
+The function [`has_edge`](@ref) has a complicated rule. This
 function is not available for edge types with the trait combination
 `:SingleType` and `:SingleEdge`, except that the edge type also
 has the traits `:IgnoreFrom` and `:Stateless`. In this case
-`has_neighbor` can be called, and is even more the only available
+`has_edge` can be called, and is even more the only available
 function from the list above.
 
 #### Special Trait Combinations
@@ -125,11 +125,11 @@ expresses the intent of the combination:
 - `:NumEdgesOnly`: This corresponds to the combination `:IgnoreFrom`
   and `:Stateless`, in this case only the number of edges is counted
   and therefore only calls to [`num_edges`](@ref) and
-  [`has_neighbor`](@ref) are possible.
+  [`has_edge`](@ref) are possible.
 
 - `:HasEdgeOnly`: This corresponds to the combination `:IgnoreFrom`,
   `:Stateless` and `:SingleEdge`, in this case only calls to
-  [`has_neighbor`](@ref) are possible.
+  [`has_edge`](@ref) are possible.
 
 
 ## apply! argument keywords

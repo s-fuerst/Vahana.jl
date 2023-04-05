@@ -198,7 +198,7 @@ end
 
 function disease_progression(p::Person, id, sim)
     ## was check_infection
-    if has_neighbor(sim, id, Infection)
+    if has_edge(sim, id, Infection)
         return change_health(p, E, sim)
     end
 
@@ -223,7 +223,7 @@ end
 function quarantine(p::Person, id, sim)
     day = get_global(sim, :day)
 
-    if has_neighbor(sim, id, Inform) && p.quarantine_start < 0
+    if has_edge(sim, id, Inform) && p.quarantine_start < 0
         return Person(p.health, p.health_changed, day)
     elseif p.quarantine_start + 14 == day
         return Person(p.health, p.health_changed, -1)

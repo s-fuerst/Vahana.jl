@@ -126,7 +126,7 @@ function run_benchmark(mt, name)
     
 
     if ignorefrom && stateless || !singleedge || !singletype
-        hasn = @benchmark has_neighbor($sim, $a3, EdgeState)
+        hasn = @benchmark has_edge($sim, $a3, EdgeState)
     else
         hasn = nothing
     end
@@ -144,7 +144,7 @@ end
 
 ######################################## create edge table
 
-println("| S | E | T | I | F | add_edge! | edges | has_neighbor | num_edges | edgeids | edgestates | mapreduce |")
+println("| S | E | T | I | F | add_edge! | edges | has_edge | num_edges | edgeids | edgestates | mapreduce |")
 
 for t in allEdgeTypes
     mt = prepare(t)

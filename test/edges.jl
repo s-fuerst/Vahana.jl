@@ -195,14 +195,14 @@ function runedgestest()
             end
         end
 
-        @testset "has_neighbor" begin
+        @testset "has_edge" begin
             disable_transition_checks(true)
             for t in [ EdgeS, EdgeSE, EdgeST, EdgeSI, EdgeSEI, EdgeSTI, EdgeSETI,
                     EdgeSTs, EdgeSTsI, EdgeSETsI, EdgeD, EdgeE, EdgeT, EdgeI,
                     EdgeEI, EdgeTI, EdgeTs, EdgeTsI ]
-                @test has_neighbor(sim, a1id, t) == true
-                @test has_neighbor(sim, a2id, t) == false
-                @test has_neighbor(sim, a3id, t) == true
+                @test has_edge(sim, a1id, t) == true
+                @test has_edge(sim, a2id, t) == false
+                @test has_edge(sim, a3id, t) == true
             end
             disable_transition_checks(false)
         end

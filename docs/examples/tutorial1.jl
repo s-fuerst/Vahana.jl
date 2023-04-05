@@ -73,7 +73,7 @@ and to select a seller from the list of known sellers.
 using Vahana
 using Random
 
-detect_stateless_trait(false); #hide
+detect_stateless_trait(true); #hide
 
 # We have two types of agents, `Buyer` and `Seller`. In Vahana, agents
 # are defined as (immutable) structs. The structs define the state of
@@ -266,11 +266,11 @@ finish_init!(sim)
 # sellers to sum up the demand and calculate the new price.
 
 function calc_demand(b::Buyer, id, sim)
-    seller_edge = rand(edges(sim, id, KnownSellers))
-    s = agentstate(sim, seller_edge.from, Seller)
+    seller = rand(edgeids(sim, id, KnownSellers))
+    s = agentstate(sim, seller, Seller)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p
-    add_edge!(sim, id, seller_edge.from, Bought(x, y))
+    add_edge!(sim, id, seller, Bought(x, y))
 end;
 
 # ## `calc_price`
@@ -359,11 +359,11 @@ end;
 
 # Following this schema we get for our transition functions 
 
-sim2 = apply(sim, calc_demand, Buyer, [ Buyer, Seller, KnownSellers ], Bought)
+sim2 = apply(sim, calc_demand, Buyer, [ Buyer, Seller, KnownSellers ], Bought);
 
 # and
 
-sim3 = apply(sim2, calc_price, Seller, [ Seller, Bought ], Seller)
+sim3 = apply(sim2, calc_price, Seller, [ Seller, Bought ], Seller);
 
 # We used here a version of the `apply` which returns a copy of
 # the simulation instead of changing the simulation inplace. This can be

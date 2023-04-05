@@ -13,7 +13,7 @@ To calculate a global value in such a synchronized operation, you can
 use one of the following functions:
 
 ```@docs
-aggregate
+Vahana.mapreduce
 calc_raster
 calc_rasterstate
 ```

@@ -4,16 +4,11 @@ CurrentModule = Vahana
 
 # Transition Function
 
-As mentioned in the `create_model` documentation, the model struct
-is created dynamically incl. a dynamically name for this
-struct. E.g. in the "Game of Life" Example this type is
-`Vahana.var"Game of Life"{Params, Globals} `. In the following documentation
-we use `__MODEL__` as a placeholder for this type.
-
-```@docs
-__MODEL__
-```
-
+As mentioned in the `create_model` documentation, the model struct is
+created dynamically incl. a dynamically name for this struct. E.g. in
+the "Game of Life" Example this type is `Vahana.var"Game of
+Life"{Params, Globals} `. All of this types are subtypes of the
+abstract type `Simulation`.
 
 ```@docs
 apply!
@@ -43,18 +38,17 @@ get_global
 ```@docs
 agentstate
 agentstate_flexible
-
-edgestates
-edgestates_flexible
 ```
 ## Get Edge(state)
 
 ```@docs
-edges_to
+edges
 num_edges
-has_neighbor
+has_edge
 
 edgestates
+edgestates_flexible
+
 edgeids
 ```
 

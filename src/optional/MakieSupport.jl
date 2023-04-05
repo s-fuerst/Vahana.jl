@@ -1,9 +1,9 @@
 using Makie
 
-export plotglobals
+export plot_globals
 
 """
-    plotglobals(sim, names::Vector{Symbol})
+    plot_globals(sim, names::Vector{Symbol})
 
 Creates a Makie lineplot with one line for each global in `names`, wherby
 those global values must be Vectors (or Iterable).
@@ -13,12 +13,12 @@ element of `names`.
 
 !!! info 
 
-    `plotglobals` is only available when a Makie backend is imported
+    `plot_globals` is only available when a Makie backend is imported
     by the client.
 
 See also [`push_global!`](@ref), [`get_global`](@ref)
 """
-function plotglobals(sim, names::Vector{Symbol})
+function plot_globals(sim, names::Vector{Symbol})
     f = Figure()
     ax = Axis(f[1,1])
     plots = Dict{Symbol, Lines}()

@@ -346,8 +346,8 @@ function show_agent(sim,
 
                 if justcount
                     if :SingleEdge in edgetypetraits
-                        printstyled("\n\thas_neighbor:  "; color = :green)
-                        print("$(has_neighbor(sim, aid, edgeT))")
+                        printstyled("\n\thas_edge:  "; color = :green)
+                        print("$(has_edge(sim, aid, edgeT))")
                     else
                         printstyled("\n\tnum_edges: "; color = :green)
                         print("$(num_edges(sim, aid, edgeT))")

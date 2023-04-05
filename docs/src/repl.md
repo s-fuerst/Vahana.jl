@@ -14,9 +14,6 @@ tutorial(s), there are also additional functions that allows to
 investigate the current state of a simulation:
 
 ```@docs
-show_agents
-show_network
-
 show_agent
 ```
 

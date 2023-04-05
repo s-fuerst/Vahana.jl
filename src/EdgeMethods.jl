@@ -224,7 +224,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     #- _can_add is used to check for some singleedge cases, if it's allowed
     # call add_edge! for the agent with id `to`. This should be only done maximal
     # one time, except for the ignorefrom && stateless case, in which we only
-    # support the has_neighbor function, and as true && true = true, we allow multiple
+    # support the has_edge function, and as true && true = true, we allow multiple
     # add_edge calls in this case. For the singletype case we can not
     # check if add_edge! was already called reliably.
     if singleedge && !singletype && !(ignorefrom && stateless)
@@ -662,24 +662,24 @@ else
 end
 
 
-#- has_neighbor
+#- has_edge
 if ignorefrom && stateless
-    @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
+    @eval function has_edge(sim::$simsymbol, to::AgentID, ::Type{$MT})
         ac = _get_agent_container(sim, to, $T, @edgeread($T))
         isnothing(ac) || ac == 0 ? false : true
     end
 elseif !singleedge 
-    @eval function has_neighbor(sim::$simsymbol, to::AgentID, t::Type{$MT})
+    @eval function has_edge(sim::$simsymbol, to::AgentID, t::Type{$MT})
         num_edges(sim,to, t) >= 1
     end
 elseif !singletype 
-    @eval function has_neighbor(sim::$simsymbol, to::AgentID, ::Type{$MT})
+    @eval function has_edge(sim::$simsymbol, to::AgentID, ::Type{$MT})
         haskey(@edgeread($T), to)
     end
 else
-    @eval function has_neighbor(::$simsymbol, ::AgentID, t::Type{$MT})
+    @eval function has_edge(::$simsymbol, ::AgentID, t::Type{$MT})
         @assert false """
-            has_neighbor is not defined for the trait combination of $t
+            has_edge is not defined for the trait combination of $t
             """
     end
 end

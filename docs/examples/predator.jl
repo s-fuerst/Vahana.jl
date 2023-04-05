@@ -325,7 +325,7 @@ end;
 # first define a function that can be used for both species. In this function we first
 # check if the animal found something to eat. In this case on of the
 # previous transition functions did create a edge of typ `Eat` with
-# the animal as target, so we can use the `has_neighbor` function to check
+# the animal as target, so we can use the `has_edge` function to check
 # if this is the case.
 
 # If the energy of the animal is above the threshold given as
@@ -334,7 +334,7 @@ end;
 # position as its parent.
 
 function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
-    if has_neighbor(sim, id, Eat)
+    if has_edge(sim, id, Eat)
         state = C(state.energy + species_params.gain_from_food, state.pos)
     end
     if state.energy > species_params.repro_thres &&
@@ -363,7 +363,7 @@ try_reproduce(state::Predator, id, sim) =
 # reproduce function defined above.
 
 function try_reproduce(state::Prey, id, sim)
-    if has_neighbor(sim, id, Die)
+    if has_edge(sim, id, Die)
         return nothing
     end
     try_reproduce_imp(state, id, sim, Prey,
@@ -447,13 +447,13 @@ for _ in 1:400 step!(ppsim) end
 # ### Time series
 
 # First we create a linechart for the time series stored in the global state.
-# For this purpose Vahana offers the function `plotglobals`. Since
+# For this purpose Vahana offers the function `plot_globals`. Since
 # This function returns not only the Makie Figure itself, but also the
 # Axis and Plots, so that the result can be processed further.
 # If the default result is displayed, the Julia function `first` can be used
 # to extract the mapping from the returned tuple.
 
-plotglobals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first
+plot_globals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first
 
 # ### Spatial distribution
 

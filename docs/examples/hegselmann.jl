@@ -145,7 +145,7 @@ apply!(cgsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 
 apply!(snapsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 
-# # Plot
+# # Create plots
 
 # Finally, we show the visualization possibilities for graphs, and import the
 # necessary packages for this and create a colormap for the nodes.
@@ -173,13 +173,17 @@ finish_init!(cysim);
 
 vp = create_graphplot(cysim)
 
+figure(vp)
+
 # To modify the created plot, the Makie figure, axis and plot, can be
 # accessed via the methods `figure`, `axis` and `plot`. This allows us to modify
 # the graph layout and to remove the decorations.
 
-plot(vp).layout = NetworkLayout.Stress()
+Vahana.plot(vp).layout = NetworkLayout.Stress()
 
 Makie.hidedecorations!(axis(vp))
+
+figure(vp)
 
 # We want that nodes to show the agent's opinion. Instead of modifing
 # the Makie plot `node_color` property directly, it's also possible to
@@ -209,7 +213,7 @@ modify_vis(_::Knows, _, _, _) = Dict(:edge_color => :lightgrey,
 function plot_opinion(sim)
     vp = create_graphplot(cysim,
                           update_fn = modify_vis)
-    plot(vp).layout = NetworkLayout.Stress()
+    Vahana.plot(vp).layout = NetworkLayout.Stress()
     Makie.hidedecorations!(axis(vp))
     Makie.Colorbar(figure(vp)[:, 2]; colormap = colors)
     figure(vp)

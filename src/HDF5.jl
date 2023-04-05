@@ -690,7 +690,7 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
     end
 
     if _neighbors_only(sim, T)
-        # num neighbors (for has_neighbors it's just 1 or 0 as num neighbors)
+        # num neighbors (for has_edges it's just 1 or 0 as num neighbors)
         if has_trait(sim, T, :SingleType)
             AT = sim.typeinfos.edges_attr[T][:target]
             typeid = sim.typeinfos.nodes_type2id[AT]

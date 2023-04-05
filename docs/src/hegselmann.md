@@ -185,7 +185,7 @@ Or to our facebook dataset
 apply!(snapsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 ````
 
-# Plot
+# Create plots
 
 Finally, we show the visualization possibilities for graphs, and import the
 necessary packages for this and create a colormap for the nodes.
@@ -218,6 +218,8 @@ actions.
 
 ````@example hegselmann
 vp = create_graphplot(cysim)
+
+figure(vp)
 ````
 
 To modify the created plot, the Makie figure, axis and plot, can be
@@ -225,9 +227,11 @@ accessed via the methods `figure`, `axis` and `plot`. This allows us to modify
 the graph layout and to remove the decorations.
 
 ````@example hegselmann
-plot(vp).layout = NetworkLayout.Stress()
+Vahana.plot(vp).layout = NetworkLayout.Stress()
 
 Makie.hidedecorations!(axis(vp))
+
+figure(vp)
 ````
 
 We want that nodes to show the agent's opinion. Instead of modifing
@@ -260,7 +264,7 @@ indicate the agent's opinion and add a color bar to the plot.
 function plot_opinion(sim)
     vp = create_graphplot(cysim,
                           update_fn = modify_vis)
-    plot(vp).layout = NetworkLayout.Stress()
+    Vahana.plot(vp).layout = NetworkLayout.Stress()
     Makie.hidedecorations!(axis(vp))
     Makie.Colorbar(figure(vp)[:, 2]; colormap = colors)
     figure(vp)

@@ -16,7 +16,7 @@ add_agents!
 
 !!! warning
 
-	The IDs created by add_agent(s)! contain Vahana internal information, that can change
+	The IDs created by `add_agent(s)!` contain Vahana internal information, that can change
 	after an [`apply!`](@ref) or the [`finish_init!`](@ref) call. This has also 
 	the implication, that the IDs can only be used temporary and should not be stored
 	in the state of an agent or edge.

@@ -91,7 +91,7 @@ model = ModelTypes() |>
 # TODO: Implement agentstate, then we can check that the edges are correct
 function check(ET)
     (agent, id, sim) -> begin
-        @test has_neighbor(sim, id, ET)
+        @test has_edge(sim, id, ET)
     end
 end
 
@@ -99,7 +99,7 @@ end
 function check_state(ET)
     (agent, id, sim) -> begin
         if has_trait(sim, ET, :SingleEdge)
-            @test has_neighbor(sim, id, ET)
+            @test has_edge(sim, id, ET)
             if ! has_trait(sim, ET, :IgnoreFrom)
                 @test edgestates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx - 1, mpi.size)
@@ -128,7 +128,7 @@ end
 function check_state_rev1(ET)
     (agent::AgentState1, id, sim) -> begin
         if has_trait(sim, ET, :SingleEdge) 
-            @test has_neighbor(sim, id, ET)
+            @test has_edge(sim, id, ET)
             if ! has_trait(sim, ET, :IgnoreFrom)
                 @test edgestates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx + 1, mpi.size)
@@ -154,7 +154,7 @@ function check_state_rev2(ET)
     (_, id, sim) -> begin
         # for the SingleType we determined that ET can only go to AS1 agents
         if ! has_trait(sim, ET, :SingleType)
-            @test ! has_neighbor(sim, id, ET)
+            @test ! has_edge(sim, id, ET)
         end
     end
 end

@@ -27,8 +27,8 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
         if has_trait(sim, T, :IgnoreFrom) && has_trait(sim, T, :Stateless)
             df.to = collect(keys(read))
             if has_trait(sim, T, :SingleEdge)
-                df.has_neighbor = map(>(0), values(read))
-                subset!(df, :has_neighbor => b -> b)
+                df.has_edge = map(>(0), values(read))
+                subset!(df, :has_edge => b -> b)
             else
                 df.num_edges = collect(values(read))
                 subset!(df, :num_edges => n -> n .> 0)
