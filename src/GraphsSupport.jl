@@ -268,7 +268,7 @@ end
 
 
 ### AbstractGraph interface for VahanaGraph
-edges(vg::VahanaGraph) = vg.edges
+Graphs.edges(vg::VahanaGraph) = vg.edges
 
 Base.eltype(::VahanaGraph) = Int64
 

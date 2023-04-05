@@ -109,19 +109,13 @@ const snapids = add_graph!(snapsim,
                            _ -> HKAgent(rand()),
                            _ -> Knows());
 
-# Each agent also adds its own opinion to the calculation. We can use
-# the ids returned by the [`add_graph!`](@ref) functions for this.
+# Again each agent also adds its own opinion to the calculation.
 
 foreach(id -> add_edge!(snapsim, id, id, Knows()), snapids) 
 
 finish_init!(snapsim)
 
-
-
-
 # ## Transition Function
-
-
 # Opinions are updated synchronously according to 
 # ```math
 # \begin{aligned}
@@ -145,35 +139,20 @@ end;
 
 # We can now apply the transition function to the complete graph simulation
 
-apply!(cgsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+apply!(cgsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 
 # Or to our facebook dataset
 
-apply!(snapsim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+apply!(snapsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 
 # # Plot
 
 # Finally, we show the visualization possibilities for graphs, and import the
 # necessary packages for this and create a colormap for the nodes.
 
-import CairoMakie, GraphMakie, NetworkLayout, Colors, Makie, Graphs
+import CairoMakie, GraphMakie, NetworkLayout, Colors, Graphs
 
 colors = Colors.range(Colors.colorant"red", stop=Colors.colorant"green", length=100);
-
-# Vahana implements an interactive plot function based on GraphMakie, where
-# agents and edges are given different colors per type by default, and
-# the state of each agent/edge is displayed via mouse hover
-# actions. We are using a helper function to modify the node colors to
-# indicate the agent's opinion and add a color bar to the plot.
-
-function plot_opinion(sim)
-    vg = vahanagraph(sim)
-    f, _, plt = Vahana.plot(vg) 
-    plt.node_color[] = [ colors[nodestate(vg, i).opinion * 100 |> ceil |> Int]
-                         for i in 1:Graphs.nv(vg) ]
-    Makie.Colorbar(f[:, 2]; colormap = colors)
-    f
-end;
 
 # Since the full graph is very cluttered and the Facebook dataset is
 # too large, we construct a Clique graph using Graphs.jl.
@@ -188,6 +167,35 @@ const cyids = add_graph!(cysim,
 foreach(id -> add_edge!(cysim, id, id, Knows()), cyids) 
 
 finish_init!(cysim);
+
+
+# Vahana implements an interactive plot function based on GraphMakie, where
+# agents and edges are given different colors per type by default, and
+# the state of each agent/edge is displayed via mouse hover
+# actions.
+
+vp = create_plot(cysim)
+
+# The returned structure `vp` contains the Makie figure, axis and plot,
+# where the plot is created by the GraphMakie package. So we can modify
+# the graph layout by modifing vp.plot.layout
+
+vp.plot.layout = NetworkLayout.Stress()
+
+# We are using a helper function to modify the node colors to
+# indicate the agent's opinion and add a color bar to the plot.
+
+
+
+function plot_opinion(sim)
+    vg = vahanagraph(sim)
+    f, _, plt = Vahana.plot(vg) 
+    plt.node_color[] = [ colors[nodestate(vg, i).opinion * 100 |> ceil |> Int]
+                         for i in 1:Graphs.nv(vg) ]
+    Makie.Colorbar(f[:, 2]; colormap = colors)
+    f
+end;
+
 
 # First we plot the initial state
 

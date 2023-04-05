@@ -1,4 +1,3 @@
-using Makie: Observables
 using GraphMakie, Makie, Colors
 
 import Graphs, Graphs.SimpleGraphs, NetworkLayout
@@ -225,10 +224,10 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
         return string(totype)
     end
     disable_transition_checks(true)
-    edges = edges(vg.sim, to, totype)
+    es = edges(vg.sim, to, totype)
     disable_transition_checks(false)
-    if ! isnothing(edges)
-        es = (filter(edges) do edge
+    if ! isnothing(es)
+        es = (filter(es) do edge
                   edge.from == from
               end |> first).state
         str = " $(typeof(es))"
