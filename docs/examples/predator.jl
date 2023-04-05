@@ -214,7 +214,7 @@ finish_init!(ppsim)
 # called will not be change and the return values of the transition
 # functions are ignored.
 
-function find_prey(::Cell, id, sim)
+function find_prey(_, id, sim)
     checked(foreach, edgeids(sim, id, PreyPosition)) do preyid
         checked(foreach, edgeids(sim, id, PredatorView)) do predid
             add_edge!(sim, preyid, predid, VisiblePrey())
@@ -405,34 +405,32 @@ update_globals(ppsim);
 
 function step!(sim)
     apply!(sim, move,
-                      [ Prey ],
-                      [ PreyView ],
-                      [ PreyView, PreyPosition ])
+           [ Prey ],
+           [ Prey, PreyView, Cell ],
+           [ Prey, PreyView, PreyPosition ])
 
     apply!(sim, find_prey,
-                      [ Cell ],
-                      [ PreyPosition, PredatorView ],
-                      [ VisiblePrey ];
-                      invariant_compute = true)
+           [ Cell ],
+           [ PreyPosition, PredatorView ],
+           [ VisiblePrey ])
     
     apply!(sim, move,
-                      [ Predator ],
-                      [ PredatorView, VisiblePrey ],
-                      [ PredatorView, PredatorPosition ])
+           [ Predator ],
+           [ Predator, PredatorView, Cell, Prey, VisiblePrey ],
+           [ Predator, PredatorView, PredatorPosition ])
 
-    apply!(sim, grow_food, [ Cell ], [], [])
+    apply!(sim, grow_food, Cell, Cell, Cell)
     
     apply!(sim, try_eat,
-                      [ Cell ],
-                      [ PredatorPosition, PreyPosition ],
-                      [ Die, Eat ])
+           [ Cell ],
+           [ Cell, PredatorPosition, PreyPosition ],
+           [ Cell, Die, Eat ])
 
     apply!(sim, try_reproduce,
-                      [ Predator, Prey ],
-                      [ Die, Eat ],
-                      [ PredatorPosition, PreyPosition,
-                        PredatorView, PreyView ];
-                      add_existing = [ PredatorPosition, PreyPosition,
+           [ Predator, Prey ],
+           [ Predator, Prey, Die, Eat ],
+           [ Predator, Prey, PredatorPosition, PreyPosition, PredatorView, PreyView ];
+           add_existing = [ PredatorPosition, PreyPosition,
                                        PredatorView, PreyView ])
 
     update_globals(sim)
@@ -482,19 +480,19 @@ end;
 
 # #### Predators Positions
 
-calc_raster(ppsim, :raster) do id
+calc_raster(ppsim, :raster, Int64, [ PredatorPosition ]) do id
     num_edges(ppsim, id, PredatorPosition)
 end |> heatmap |> add_colorbar
 
 
 # #### Prey Positions 
 
-calc_raster(ppsim, :raster) do id
+calc_raster(ppsim, :raster, Int64, [ PreyPosition ]) do id
     num_edges(ppsim, id, PreyPosition)
 end |> heatmap |> add_colorbar
 
 # #### Cells that contains food
 
-calc_raster(ppsim, :raster) do id
+calc_raster(ppsim, :raster, Int64, [ Cell ]) do id
     agentstate(ppsim, id, Cell).countdown == 0
 end |> heatmap |> add_colorbar 

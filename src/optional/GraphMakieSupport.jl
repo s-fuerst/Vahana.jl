@@ -2,11 +2,12 @@ using GraphMakie, Makie, Colors
 
 import Graphs, Graphs.SimpleGraphs, NetworkLayout
 
-export plot, create_plot, update_plot!
+export create_graphplot, update_graphplot!
+export plot, axis, figure
+export clicked_agent
 
 Base.@kwdef mutable struct VahanaPlot
     sim::Simulation
-    original::Simulation
     vg::VahanaGraph
     # a Vahanaplot encapsulate a GraphMakie plot
     # figure, axis, plot are all returned by the graphplot function
@@ -16,21 +17,12 @@ Base.@kwdef mutable struct VahanaPlot
     # the next field are AgentIDs or Edges that where clicked 
     # or that are actually hovered
     clicked_agent = Vector{AgentID}()
-    clicked_edge = Vector{Any}()
-    hovered_agent::Union{AgentID, Nothing} = nothing
-    hovered_edge = nothing
     # all the agenttypes where the position should be jittered
     pos_jitter = Dict{DataType, Float64}()
     # the offset of an agent is keeped constant, and stored in this dict
     jitter_val = Dict{AgentID, NTuple{2, Float64}}()
     # the function to call for updating the attributes of the graph
     update_fn = nothing
-    step_fn = nothing
-    reset_fn = nothing
-    # click_fn = nothing
-    # hover_fn = nothing
-    # add a lineplot for the following globals vector
-    globals = Dict{Symbol, Observable}()
 end
 
 function _set_plot_attrs!(vp, idx, attrs, aid, T)
@@ -84,15 +76,15 @@ function _set_edge_plot_properties!(f, vp)
         vedge = vp.vg.edges[i]
         from = vp.vg.g2v[vedge.src]
         to = vp.vg.g2v[vedge.dst]
-        edges = edges(vp.sim, to, T)
-        if isnothing(edges) # this can happen after a state change of sim
+        es = edges(vp.sim, to, T)
+        if isnothing(es) # this can happen after a state change of sim
             continue
         end
-        es = has_trait(vp.sim, T, :Stateless) ? T() : (filter(edges) do edge
+        es = has_trait(vp.sim, T, :Stateless) ? T() : (filter(es) do edge
                                                            edge.from == from
                                                        end |> only).state
         new = f(es, from, to, vp)
-        attrs = _set_plot_attrs!(vp, i, new, 0, T)
+        _set_plot_attrs!(vp, i, new, 0, T)
         foreach(a -> push!(changed_attrs, a), keys(new))
     end
     for a in changed_attrs
@@ -108,42 +100,76 @@ display(vp::VahanaPlot) = Base.display(vp.figure)
 
 obsrange(x) = 1:length(x)
 
-function _draw_globals(sim, axglobals, obglobals)
-    plots = Dict{Symbol, Lines}()
-    for (name, obs) in obglobals
-            
-        plots[name] = lines!(axglobals, lift(obsrange, obs), obs, label = String(name))
-    end
-    axislegend(axglobals)
-end
+"""
+    create_graphplot(sim; agenttypes, edgestatetypes, update_fn, pos_jitter)
 
-function create_plot(sim::Simulation;
+Creates an interactive Makie plot for the the simulation `sim`.
+
+The graph can be restricted to a subgraph with the given `agentypes`
+and `edgestatetypes`, see [`vahanagraph`](@ref) for details.
+
+To modify the properties of the edges and agents a `update_fn` can be
+defined. This function is called for each agent and edge (of types in agenttypes
+and edgestatetypes) and must have for agents the signature
+
+    f(state, id, vp::VahanaPlot)
+
+and for edges
+
+    f(state, source, target, vp::VahanaPlot)
+
+The arguments of this functions are `state` for the agent or edgestate,
+ID for the `id` of the agent called, `from` and `to` for the ID of the
+agents at the source or target of the edge. `vp` is the struct
+returned by `create_graphplot` and can be used to determine the id of
+last clicked agent by calling `clicked_agent(vp)`. The function must
+return a Dict with property names (as Symbol) as keys and their values
+as values. The following properties are available: `node_color`,
+`node_size`, `node_marker`, `nlabels`, `nlabels_align`, `nlabels_color`,
+`nlabels_distance`, `nlabels_offset`, `nlabels_textsize`, `edge_color`,
+`edge_width`, `elables`, `elables_align`, `elables_color`, `elables_distance`,
+`elables_offset`, `elables_rotation`, `elables_shift`, `elables_side`,
+`elabes_textsize`, `arrow_shift`, and `arrow_size`.
+
+Returns a VahanaPlot structure that can be used to access the Makie
+figure, axis and plot via call to the methods `figure`, `axis` and
+`plot` with this struct as (single) argument.
+
+!!! info 
+
+    `create_graphplot` is only available when the GraphMakie package and a
+    Makie backend is imported by the client.
+
+!!! warning
+
+    For the mouse click and hover interaction, the current state of
+    the simulation used to construct the VahanaGraph is accessed. In
+    the case that a transition function is called after the
+    construction of the VahanaGraph, and this transition function
+    modifies the structure of the Graph (add/removes nodes or edges),
+    then this changes are not reflected by the current implementation
+    and can cause errors.
+
+See also [`vahanagraph`](@ref)
+"""
+function create_graphplot(sim::Simulation;
               agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
               edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
               update_fn = nothing,
-              step_fn = nothing,
-              reset_fn = nothing,
-              pos_jitter = nothing,
-              globals::Vector{Symbol} = Vector{Symbol}())
+              pos_jitter = nothing)
     vg = vahanagraph(sim;
                      agenttypes = agenttypes,
                      edgetypes = edgetypes,
                      drop_multiedges = true)
 
-    f, ax, p = plot(vg)
+    f, ax, p = _plot(vg)
 
-    obglobals = map(sym -> sym => Observable(get_global(sim, sym)), globals)
-    
-    vp = VahanaPlot(sim = copy_simulation(sim),
-                    original = sim,
+    vp = VahanaPlot(sim = sim,
                     vg = vg,
                     figure = f,
                     axis = ax,
                     plot = p,
-                    update_fn = update_fn,
-                    step_fn = step_fn,
-                    reset_fn = reset_fn,
-                    globals = obglobals)
+                    update_fn = update_fn)
 
     if !isnothing(pos_jitter)
         vp.pos_jitter = Dict(pos_jitter)
@@ -151,44 +177,35 @@ function create_plot(sim::Simulation;
 
     function _node_click_action(idx, _, _)
         vp.clicked_agent = vg.g2v[idx]
-        update_plot!(vp)
+        update_graphplot!(vp)
     end
     register_interaction!(vp.axis,
                           :nodeclick, NodeClickHandler(_node_click_action))
 
-    # if length(obglobals) > 0
-    #     _draw_globals(sim, Axis(f[1, 2]), obglobals)
-    # end
-    
-    if step_fn !== nothing
-        f[2, 1] = buttongrid = GridLayout(tellwidth = false)
+    # if step_fn !== nothing
+    #     f[2, 1] = buttongrid = GridLayout(tellwidth = false)
 
-        buttongrid[1, 1] = resetbutton = Button(f, label="Reset")
-        on(resetbutton.clicks) do _
-            @info "reset"
-            finish_simulation!(vp.sim)
-            vp.sim = copy_simulation(vp.original)
-            vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
-            #            _draw_globals(vp.sim, Axis(f[1, 2]), globals)
-            update_plot!(vp)
-        end
+    #     buttongrid[1, 1] = resetbutton = Button(f, label="Reset")
+    #     on(resetbutton.clicks) do _
+    #         @info "reset"
+    #         finish_simulation!(vp.sim)
+    #         vp.sim = copy_simulation(vp.original)
+    #         vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
+    #         update_graphplot!(vp)
+    #     end
         
-        buttongrid[1, 2] = stepbutton = Button(f, label="Step")
-        on(stepbutton.clicks) do _
-            step_fn(vp.sim)
-            vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
-            #            _draw_globals(vp.sim, Axis(f[1, 2]), globals)
-            update_plot!(vp)
-        end
-    end
+    #     buttongrid[1, 2] = stepbutton = Button(f, label="Step")
+    #     on(stepbutton.clicks) do _
+    #         step_fn(vp.sim)
+    #         vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
+    #         update_graphplot!(vp)
+    #     end
+    # end
 
-    
-    #    end
-
-    update_plot!(vp)
+    update_graphplot!(vp)
 end
 
-function update_plot!(vp::VahanaPlot)
+function update_graphplot!(vp::VahanaPlot)
     if ! isnothing(vp.update_fn)
         _set_agents_plot_attrs!(vp.update_fn, vp)
         _set_edge_plot_properties!(vp.update_fn, vp)
@@ -198,6 +215,14 @@ function update_plot!(vp::VahanaPlot)
     
     vp
 end
+
+figure(vp::VahanaPlot) = vp.figure
+
+axis(vp::VahanaPlot) = vp.axis
+
+plot(vp::VahanaPlot) = vp.plot
+
+clicked_agent(vp::VahanaPlot) = vp.clicked_agent
 
 function _agenttostring(vg, idx)
     id = vg.g2v[idx]
@@ -243,31 +268,7 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
     end
 end
 
-"""
-    plot(vg::VahanaGraph)
-
-Creates an interactive Makie plot for the VahanaGraph `vg`.
-
-Returns the usual Makie combination of figure, axis, plot.
-
-!!! info 
-
-    `plot` is only available when the GraphMakie package and a
-    Makie backend is imported by the client.
-
-!!! warning
-
-    For the mouse hover interaction, the current state of the
-    simulation used to construct the VahanaGraph is accessed. In the
-    case that a transition function is called after the construction
-    of the VahanaGraph, and this transition function modifies the
-    structure of the Graph (add/removes nodes or edges), then this
-    changes are not reflected by the current implementation and can
-    cause errors.
-
-See also [`vahanagraph`](@ref)
-"""
-function plot(vg::VahanaGraph)
+function _plot(vg::VahanaGraph)
     agentcolors = distinguishable_colors(256,
                                          [RGB(1,1,1), RGB(0,0,0)],
                                          dropseed = true)
@@ -304,7 +305,7 @@ function plot(vg::VahanaGraph)
                   elabels_textsize = [ 14 for _ in re ],
                   arrow_shift = [ 0.5 for _ in re ],
                   #arrow_show = [ true for _ in re ], ! supported by Makie
-                  arrow_size = [ 12 for _ in re ]
+                  arrow_size = [ 12.0 for _ in re ]
                   )
 
     # hidedecorations!(p.axis)

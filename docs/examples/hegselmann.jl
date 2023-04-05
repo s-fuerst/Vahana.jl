@@ -150,9 +150,7 @@ apply!(snapsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 # Finally, we show the visualization possibilities for graphs, and import the
 # necessary packages for this and create a colormap for the nodes.
 
-import CairoMakie, GraphMakie, NetworkLayout, Colors, Graphs
-
-colors = Colors.range(Colors.colorant"red", stop=Colors.colorant"green", length=100);
+import CairoMakie, GraphMakie, NetworkLayout, Colors, Graphs, Makie
 
 # Since the full graph is very cluttered and the Facebook dataset is
 # too large, we construct a Clique graph using Graphs.jl.
@@ -168,36 +166,57 @@ foreach(id -> add_edge!(cysim, id, id, Knows()), cyids)
 
 finish_init!(cysim);
 
-
 # Vahana implements an interactive plot function based on GraphMakie, where
 # agents and edges are given different colors per type by default, and
 # the state of each agent/edge is displayed via mouse hover
 # actions.
 
-vp = create_plot(cysim)
+vp = create_graphplot(cysim)
 
-# The returned structure `vp` contains the Makie figure, axis and plot,
-# where the plot is created by the GraphMakie package. So we can modify
-# the graph layout by modifing vp.plot.layout
+# To modify the created plot, the Makie figure, axis and plot, can be
+# accessed via the methods `figure`, `axis` and `plot`. This allows us to modify
+# the graph layout and to remove the decorations.
 
-vp.plot.layout = NetworkLayout.Stress()
+plot(vp).layout = NetworkLayout.Stress()
+
+Makie.hidedecorations!(axis(vp))
+
+# We want that nodes to show the agent's opinion. Instead of modifing
+# the Makie plot `node_color` property directly, it's also possible to
+# define a helper functions with methods for the different agent and
+# edge types, that are called by `create_graphplot` to determine
+# properties of the nodes and edges of the plot and also supports
+# interactive plot in the case that GLMakie is used as Makie
+# backend. For details please check [`create_graphplot`](@ref).
+
+# We define such a function and are calling it modify_vis, and will set the
+# `update_fn` keyword of `create_graphplot` to this function. 
+
+
+colors = Colors.range(Colors.colorant"red", stop=Colors.colorant"green", length=100)
+
+
+modify_vis(state::HKAgent, _ ,_) = Dict(:node_color => colors[state.opinion * 100 |> ceil |> Int],
+                                       :node_size => 15)
+
+modify_vis(_::Knows, _, _, _) = Dict(:edge_color => :lightgrey,
+                                     :edge_width => 0.5);
+
 
 # We are using a helper function to modify the node colors to
 # indicate the agent's opinion and add a color bar to the plot.
 
-
-
 function plot_opinion(sim)
-    vg = vahanagraph(sim)
-    f, _, plt = Vahana.plot(vg) 
-    plt.node_color[] = [ colors[nodestate(vg, i).opinion * 100 |> ceil |> Int]
-                         for i in 1:Graphs.nv(vg) ]
-    Makie.Colorbar(f[:, 2]; colormap = colors)
-    f
+    vp = create_graphplot(cysim,
+                          update_fn = modify_vis)
+    plot(vp).layout = NetworkLayout.Stress()
+    Makie.hidedecorations!(axis(vp))
+    Makie.Colorbar(figure(vp)[:, 2]; colormap = colors)
+    figure(vp)
 end;
 
 
-# First we plot the initial state
+# And now we can plot the initial state
 
 plot_opinion(cysim)
 

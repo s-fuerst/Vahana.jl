@@ -32,6 +32,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         if $mortal && length(@readreuseable($T)) > 0
             nr = pop!(@readreuseable($T))
             @writedied($T)[nr] = false
+            nr
         else   # immortal or no reusable row was found, use the next row
             nr = @nextid($T)
             # TODO AGENT: add an assterions that we have ids left

@@ -78,6 +78,7 @@ end
 
 # like vahanagraph, only for the AbstractSimpleGraph, see also
 # the comment of VahanaSimpleGraph above
+
 """
     vahanasimplegraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true)
 
@@ -180,6 +181,7 @@ mutable struct VahanaGraph <: Graphs.AbstractGraph{Int64}
 end
 
 # SingleType not supported (und IgnoreFrom sowieso nicht)
+
 """
     vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true, drop_multiedges = false)
 
