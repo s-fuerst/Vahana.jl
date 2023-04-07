@@ -71,7 +71,7 @@ end
 function create_sum_state_neighbors(edgetypeval) 
     function sum_state_neighbors(agent, id, sim)
 #        @info id edgetypeval getproperty(sim, Symbol(edgetypeval)).readable
-        nstates = edgestates_flexible(sim, id, edgetypeval)
+        nstates = neighborstates_flexible(sim, id, edgetypeval)
         s = 0
         if !isnothing(nstates)
             for n in nstates
@@ -139,22 +139,17 @@ end
         enable_asserts(true)
     end
 
-    @testset "edges" begin
+    @testset "edges & edgeids" begin
         Vahana.disable_transition_checks(true)
         @onrankof a1id @test length(edges(sim, a1id, ESDict)) == 4
         @onrankof a1id @test length(edges(sim, a1id, ESLDict1)) == 10
         # # Check that we can call edges also for an empty set of neighbors
         @onrankof a2id @test edges(sim, a2id, ESDict) === nothing
         @onrankof a2id @test edges(sim, a2id, ESLDict1) === nothing
-        Vahana.disable_transition_checks(false)
-    end
 
-    @testset "neighbors & edgestates" begin
-        Vahana.disable_transition_checks(true)
         # we must disable the edgeids checks
         @onrankof avids[1] @test length(edgeids(sim, avids[1], ESLDict2)) == 1
         @onrankof avids[10] @test length(edgeids(sim, avids[10], ESLDict2)) == 1
-
 
         es = edges(sim, a1id, ESLDict1)
         @onrankof a1id @test (es)[1].from == avids[1]
@@ -164,10 +159,10 @@ end
         Vahana.disable_transition_checks(false)
     end
 
-    @testset "edgestates" begin
+    @testset "neighborstates" begin
         Vahana.disable_transition_checks(true)
-        @onrankof a1id @test AImm(1) in edgestates(sim, a1id, ESLDict1, AImm)
-        @onrankof a1id @test AMortal(3) in edgestates_flexible(sim, a1id, ESDict)
+        @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
+        @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
         Vahana.disable_transition_checks(false)
     end
 

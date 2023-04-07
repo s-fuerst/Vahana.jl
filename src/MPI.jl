@@ -260,10 +260,10 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
     # the container, we get the following values:
     # |                    | Statel. | Ignore | get edges via | sending (ST below) |
     # |--------------------+---------+--------+---------------+--------------------|
-    # | (Vector){Edge{$T}} |         |        | edges      | [(toid, Edge{$T})] |
-    # | (Vector){AgentID}  | x       |        | edgeids   | [(toid, fromid)]   |
+    # | (Vector){Edge{$T}} |         |        | edges         | [(toid, Edge{$T})] |
+    # | (Vector){AgentID}  | x       |        | edgeids       | [(toid, fromid)]   |
     # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
-    # | Int64              | x       | x      | num_edges | num_edges      |
+    # | Int64              | x       | x      | num_edges     | num_edges      |
     @eval function sendedges!(sim, sendmap::Dict{AgentID, ProcessID},
                        idmapping, ::Type{$T})
         with_logger(sim) do

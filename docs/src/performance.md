@@ -104,7 +104,7 @@ depends on the edge type traits:
 |:------------------------------------------|:---------------------------------------------------------|
 | [`edges`](@ref)                        | `:IgnoreFrom` or `:Stateless`                            |
 | [`edgeids`](@ref)                     | `:IgnoreFrom`                                            |
-| [`edgestates`](@ref)                  | `:IgnoreFrom` or `:SingleEdge`                           |
+| [`neighborstates`](@ref)                  | `:IgnoreFrom`                            |
 | [`edgestates`](@ref), [`mapreduce`](@ref) | `:Stateless`                                             |
 | [`num_edges`](@ref)                   | `:SingleEdge`                                            |
 | [`has_edge`](@ref)                    | see below                                                |

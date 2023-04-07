@@ -290,11 +290,11 @@ end;
 # price as shown in equation (\ref{eqn:price}).
 
 function calc_price(s::Seller, id, sim)
-    edges = edgestates(sim, id, Bought)
-    if isnothing(edges) 
+    sold = edgestates(sim, id, Bought)
+    if isnothing(sold) 
         return s
     end
-    q = reduce(+, edges) 
+    q = reduce(+, sold) 
     Seller(q.y / q.x * s.p, q.y)
 end;
 

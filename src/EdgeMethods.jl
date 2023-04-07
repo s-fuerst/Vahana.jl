@@ -596,15 +596,15 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
-    #- edgestates
+    #- neighborstates
     if singleedge
-        @eval function edgestates(sim::$simsymbol, id::AgentID,
+        @eval function neighborstates(sim::$simsymbol, id::AgentID,
                                edgetype::Type{$MT}, agenttype::Type) 
             nid = edgeids(sim, id, edgetype)
             isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
         end
     else
-        @eval function edgestates(sim::$simsymbol, id::AgentID,
+        @eval function neighborstates(sim::$simsymbol, id::AgentID,
                                edgetype::Type{$MT}, agenttype::Type) 
             checked(map, edgeids(sim, id, edgetype)) do nid
                 agentstate(sim, nid, agenttype)

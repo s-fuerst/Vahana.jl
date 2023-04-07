@@ -39,17 +39,25 @@ get_global
 agentstate
 agentstate_flexible
 ```
+
+To get the states of all agents that are connected to an agent (with
+the agent as target) via edges of a specific edge type, the
+neighborstates functions can be useful (they are combing
+[`edgeids`](@ref) and [`agentstate`](@ref)).
+
+```@docs
+neighborstates
+neighborstates_flexible
+```
+
 ## Get Edge(state)
 
 ```@docs
 edges
+edgestates
+edgeids
 num_edges
 has_edge
-
-edgestates
-edgestates_flexible
-
-edgeids
 ```
 
 For all the function like [`edges`](@ref) that returns `nothing` in

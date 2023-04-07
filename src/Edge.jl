@@ -1,7 +1,7 @@
 export Edge, edgestates
 export add_edge!, add_edges!, edges
 export num_edges, has_edge
-export edgestates, edgestates_flexible
+export neighborstates, neighborstates_flexible
 export edgeids
 
 # For many function declared in this file, the concrete impementation depends
@@ -84,7 +84,7 @@ edges is not defined if `E` has the trait :IgnoreFrom or :Stateless.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`neighborids`](@ref),
 [`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`edgestates`](@ref)
+and [`neighborstates`](@ref)
 """
 function edges(::__MODEL__, id::AgentID, edgetype::Type) end
 
@@ -101,7 +101,7 @@ If there is no edge with agent `id` as target, `edgeids` returns `nothing`.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`edgestates`](@ref)
+and [`neighborstates`](@ref)
 """
 function edgeids(::__MODEL__, id::AgentID, edgetype::Type) end
 
@@ -117,25 +117,25 @@ If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`edgestates`](@ref)
+and [`neighborstates`](@ref)
 """
 function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
-    edgestates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
+    neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
 
 Returns the state of the agent with type `A` on the source side of the
 edge of type `E` with agent `id` as target if `E` has the trait
 :SingleEdge, or a vector of these agent states otherwise.
 
-If there is no edge with agent `id` as target, `edgestates`
+If there is no edge with agent `id` as target, `neighborstates`
 returns `nothing`.
 
 When the agents on the source side of the edges can have different
 types, and it is impossible to determine the Type{A} you can use
-[`edgestates_flexible`](@ref) instead.
+[`neighborstates_flexible`](@ref) instead.
 
-`edgestates` is not defined if T has the trait :IgnoreFrom 
+`neighborstates` is not defined if T has the trait :IgnoreFrom 
 
 In a parallel run, this function can trigger communication between
 processes. In the case that the state of ALL agents is not needed in
@@ -148,24 +148,24 @@ See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
-function edgestates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Type) end
+function neighborstates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Type) end
 
 
 """
-    edgestates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 
+    neighborstates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 
 
 Returns the state of the agent on the source side of the
 edge of type `E` with agent `id` as target if `E` has the trait
 :SingleEdge, or a vector of these agent states otherwise.
 
-If there is no edge with agent `id` as target, `edgestates_flexible`
+If there is no edge with agent `id` as target, `neighborstates_flexible`
 returns `nothing`.
 
-`edgestates_flexible` is the type instable version of
-[`edgestates`](@ref) and should be only used in the case that the
+`neighborstates_flexible` is the type instable version of
+[`neighborstates`](@ref) and should be only used in the case that the
 type of agent can not be determined.
 
-`edgestates_flexible` is not defined if T has the trait :IgnoreFrom.
+`neighborstates_flexible` is not defined if T has the trait :IgnoreFrom.
 
 In a parallel run, this function can trigger communication between
 processes. In the case that the state of ALL agents is not needed in
@@ -178,9 +178,9 @@ See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
-function edgestates_flexible(::__MODEL__, id::AgentID, edgetype::Type) end
+function neighborstates_flexible(::__MODEL__, id::AgentID, edgetype::Type) end
 
-function edgestates_flexible(sim, id::AgentID, edgetype::Type)
+function neighborstates_flexible(sim, id::AgentID, edgetype::Type)
     nids = edgeids(sim, id, edgetype)
     isnothing(nids) ? nothing : map(id -> agentstate_flexible(sim, id), nids)  
 end
@@ -194,7 +194,7 @@ Returns the number of edges of type `E` with agent `id` as target.
 
 See also [`apply!`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`edgestates`](@ref), [`has_edge`](@ref)
-and [`edgestates`](@ref)
+and [`neighborstates`](@ref)
 """
 function num_edges(::__MODEL__, id::AgentID, edgetype::Type) end
 
@@ -210,6 +210,6 @@ traits, with the exception that it has also the :IgnoreFrom and
 
 See also [`apply!`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`edgestates`](@ref), [`num_edges`](@ref)
-and [`edgestates`](@ref)
+and [`neighborstates`](@ref)
 """
 function has_edge(::__MODEL__, id::AgentID, edgetype::Type) end

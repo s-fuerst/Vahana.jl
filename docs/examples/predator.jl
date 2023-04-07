@@ -234,7 +234,7 @@ function move(state::Predator, id, sim)
     e = state.energy - param(sim, :predator).loss_per_turn
     if e > 0
         ## we need to access the pos of the prey which is part of it's state
-        prey = edgestates(sim, id, VisiblePrey, Prey)
+        prey = neighborstates(sim, id, VisiblePrey, Prey)
         newpos = if isnothing(prey)
             nextcellid = rand(edgeids(sim, id, PredatorView))
             agentstate(sim, nextcellid, Cell).pos

@@ -131,10 +131,13 @@ finish_init!(snapsim)
 function step(agent, id, sim)
     ε = param(sim, :ε)
 
-    accepted = filter(edgestates(sim, id, Knows, HKAgent)) do other
-        abs(other.opinion - agent.opinion) < ε
+    opinions = map(a -> a.opinion, neighborstates(sim, id, Knows, HKAgent))
+
+    accepted = filter(opinions) do opinion
+        abs(opinion - agent.opinion) < ε
     end
-    HKAgent(mean(map(a -> a.opinion, accepted)))
+    
+    HKAgent(mean(accepted))
 end;
 
 # We can now apply the transition function to the complete graph simulation

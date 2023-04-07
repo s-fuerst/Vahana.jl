@@ -35,7 +35,7 @@ raster_model = ModelTypes() |>
     # calculate the sum of all ids
     function diffuse(a, id, sim)
         GridA(a.pos, a.active ||
-            mapreduce(a -> a.active, |, edgestates(sim, id, GridE, GridA)))
+            mapreduce(a -> a.active, |, neighborstates(sim, id, GridE, GridA)))
     end
 
     sim = create_simulation(raster_model, nothing, nothing)
@@ -141,7 +141,7 @@ raster_model = ModelTypes() |>
     ### 3D 
     function diffuse3D(a, id, sim)
         Grid3D(a.pos, a.active ||
-            mapreduce(a -> a.active, |, edgestates(sim, id, GridE, Grid3D)))
+            mapreduce(a -> a.active, |, neighborstates(sim, id, GridE, Grid3D)))
     end
 
     finish_simulation!(sim)
@@ -295,7 +295,7 @@ end
 
     # sum the value of all agents that are on the cell position
     function sum_on_pos(::Val{Position}, id, sim)
-        nstates = edgestates_flexible(sim, id, OnPosition)
+        nstates = neighborstates_flexible(sim, id, OnPosition)
         if !isnothing(nstates)
             Position(mapreduce(c -> c.value, +, nstates))
         else
@@ -307,7 +307,7 @@ end
     # pos is determined by the state of the current pos
     function value_on_pos(::Val{MovingAgent}, id, sim)
         # sum is not a sum operator, but a field of the agentstate of Position
-        value = first(edgestates_flexible(sim, id, OnPosition)).sum
+        value = first(neighborstates_flexible(sim, id, OnPosition)).sum
         move_to!(sim, :raster, id, (value, value), OnPosition(), OnPosition())
         MovingAgent(value)
     end

@@ -107,7 +107,7 @@ function runsim(model, write)
 end
 
 function remove_some_rasternodes(state, id, sim)
-    nstate = edgestates(sim, id, RasterEdge, Agent) |> first
+    nstate = neighborstates(sim, id, RasterEdge, Agent) |> first
     e = edges(sim, id, RasterEdge) |> first
     add_edge!(sim, e.from, id, RasterEdge(e.state.a * 2))
     mod1(nstate.f, 8) > 4.5 ? nothing : state

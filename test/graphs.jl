@@ -17,7 +17,8 @@ model_graph = ModelTypes() |>
     # calculate the sum of all ids
     function sumids(a, id, sim)
         GraphA(a.id,
-               mapreduce(a -> a.id, +, edgestates_flexible(sim, id, GraphE)))
+               mapreduce(a -> a.id, +,
+                         neighborstates_flexible(sim, id, GraphE)))
     end
 
 

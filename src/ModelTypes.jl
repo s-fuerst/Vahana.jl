@@ -100,7 +100,7 @@ the traits parameters:
 
 - `:IgnoreFrom`: The ID of the source agent is not stored. This
   implies that the state of the agents on the source of the edge is
-  not accessible via the [`edgestates`](@ref) function.
+  not accessible via the [`neighborstates`](@ref) function.
 - `:Stateless`: Store only the ID of the source agent. 
 - `:SingleType`: All target agents have the same type, needs also keyword
   `target` (see below).

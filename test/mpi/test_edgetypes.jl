@@ -101,13 +101,13 @@ function check_state(ET)
         if has_trait(sim, ET, :SingleEdge)
             @test has_edge(sim, id, ET)
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test edgestates(sim, id, ET, AgentState1).idx ==
+                @test neighborstates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx - 1, mpi.size)
             end
         else
             @test num_edges(sim, id, ET) == 1
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test first(edgestates(sim, id, ET, AgentState1)).idx ==
+                @test first(neighborstates(sim, id, ET, AgentState1)).idx ==
                     mod1(agent.idx - 1, mpi.size)
             end
         end
@@ -130,19 +130,19 @@ function check_state_rev1(ET)
         if has_trait(sim, ET, :SingleEdge) 
             @test has_edge(sim, id, ET)
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test edgestates(sim, id, ET, AgentState1).idx ==
+                @test neighborstates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
         elseif has_trait(sim, ET, :SingleType)
             @test num_edges(sim, id, ET) == 1
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test first(edgestates(sim, id, ET, AgentState1)).idx ==
+                @test first(neighborstates(sim, id, ET, AgentState1)).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
         else
             @test num_edges(sim, id, ET) == 2
             if ! has_trait(sim, ET, :IgnoreFrom)
-                @test first(edgestates_flexible(sim, id, ET)).idx ==
+                @test first(neighborstates_flexible(sim, id, ET)).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
         end

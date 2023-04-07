@@ -165,7 +165,7 @@ must be equal to f(id).
 
 `accessible` is a vector of Agent and/or Edge types. This vector must
 list all types that are accessed directly (e.g. via
-[`agentstate`](@ref) or indirectly (e.g. via [`edgestates`](@ref)
+[`agentstate`](@ref) or indirectly (e.g. via [`neighborstates`](@ref)
 in the transition function.
 
 If the results of `calc_raster` depend only on the state of the cells
