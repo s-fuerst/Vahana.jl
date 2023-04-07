@@ -13,6 +13,8 @@
 
 using Vahana, Statistics, BenchmarkTools
 
+
+enable_asserts(false)
 # We have a finite number $n$ of agents, where the state of
 # the agents are a real number $x_i(t)$ in the [0,1] interval which
 # represents the opinion of that agent. 
@@ -37,12 +39,18 @@ end
 
 # We have now all elements to create an uninitialized simulation.
 
-const hkmodel = ModelTypes() |>
+const model_traitless = ModelTypes() |>
     register_agenttype!(HKAgent) |>
     register_edgestatetype!(Knows) |>
     create_model("Hegselmann-Krause");
 
-const sim = create_simulation(hkmodel, HKParams(0.2), nothing);
+
+const model_withtraits = ModelTypes() |>
+    register_agenttype!(HKAgent, :Immortal) |>
+    register_edgestatetype!(Knows, :Stateless, :SingleType; target=HKAgent, size = 1000) |>
+    create_model("Hegselmann-Krause-Traits");
+
+const sim = create_simulation(model_traitless, HKParams(0.2), nothing);
 
 
 
@@ -84,7 +92,7 @@ finish_init!(sim)
 function step(agent, id, sim)
     ε = param(sim, :ε)
 
-    accepted = filter(edgestates(sim, id, Knows, HKAgent)) do other
+    accepted = filter(neighborstates(sim, id, Knows, HKAgent)) do other
         abs(other.opinion - agent.opinion) < ε
     end
     HKAgent(mean(map(a -> a.opinion, accepted)))
@@ -94,7 +102,7 @@ end;
 
 copy = copy_simulation(sim)
 
-apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+#@benchmark apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
 #@time for _ in 1:50 apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
 

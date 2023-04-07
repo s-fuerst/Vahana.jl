@@ -3,7 +3,7 @@ import Vahana.@rootonly
 import Vahana.disable_transition_checks
 
 # A for Agent, Imm for Immortal
-# Fixed doesn't have a real meaning anymore, in earlier versions
+# Fixed and Oversize doesn't have a real meaning anymore, in earlier versions
 # there was a size keyword that allows to give an upper bound for the size
 # of the population. 
 struct AMortal           foo::Int64 end
@@ -164,6 +164,39 @@ end
         @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
         @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
         Vahana.disable_transition_checks(false)
+    end
+
+    @testset "all_agents & num_agents" begin
+        copy = copy_simulation(sim)
+        @test length(all_agents(copy, AMortalFixed)) == 10
+        @test length(all_agents(copy, AImm)) == 10
+
+        @test num_agents(copy, AMortalFixed) == 10
+        @test num_agents(copy, AImm) == 10
+
+        for i in 1:10
+            @test AMortalFixed(i) in all_agents(copy, AMortalFixed)
+            @test AImm(i) in all_agents(copy, AImm)
+        end
+
+        apply!(copy, AMortalFixed, AMortalFixed, AMortalFixed) do state, _, _
+            if state.foo < 6
+                state
+            else
+                nothing
+            end
+        end
+
+        @test length(all_agents(copy, AMortalFixed)) == 5
+        @test num_agents(copy, AMortalFixed) == 5
+        for i in 1:5
+            @test AMortalFixed(i) in all_agents(copy, AMortalFixed)
+        end
+        for i in 6:10
+            @test !(AMortalFixed(i) in all_agents(copy, AMortalFixed))
+        end
+
+        finish_simulation!(copy)
     end
 
     @testset "num_edges" begin

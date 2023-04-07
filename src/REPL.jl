@@ -420,7 +420,11 @@ function show_agent(sim,
     id
 end
 
+"""
+TODO DOC 
+"""
 function num_edges(sim, t::Type{T}; write = nothing) where T
+    # TODO: Implement correct version for parallel simulations
     if write === nothing
         _num_edges(sim, t, ! sim.initialized)
     else
@@ -428,15 +432,21 @@ function num_edges(sim, t::Type{T}; write = nothing) where T
     end
 end
 
+"""
+TODO DOC 
+"""
 function num_agents(sim, ::Type{T}) where T
+    # TODO: Implement correct version for parallel simulations
     field = getproperty(sim, Symbol(T))
     attr = sim.typeinfos.nodes_attr[T]
 
-    if ! (:Immortal in attr[:traits]) || :ConstantSize in attr[:traits]
-        died = sim.initialized ? readdied(sim, T) : writedied(sim, T)
-        count(i -> ! died[i], 1:field.nextid - 1)
-    else
+    if :Immortal in attr[:traits]
+        # we can not just access the length of read.state, as for
+        # types without field, we don't use the read.state vector
         field.nextid - 1
+    else
+        died = sim.initialized ? readdied(sim, T) : writedied(sim, T)
+        count(!, values(died))
     end 
 end
 
@@ -460,7 +470,17 @@ TODO DOC
 # add support for parallel runs (and move this away from repl). Or add
 # a function that return all agentstates
 function all_agents(sim, ::Type{T}) where T
-    values(getproperty(sim, Symbol(T)).read.state)
+    @assert fieldcount(T) > 0 """
+        all_agents can be only called for agent types that have a fields.
+        To get the number of agents, you can call num_agents instead.
+    """
+    states = getproperty(sim, Symbol(T)).read.state
+    if has_trait(sim, T, :Immortal, :Agent)
+        states
+    else
+        died = getproperty(sim, Symbol(T)).read.died
+        [ states[i] for i in 1:length(died) if died[i] == false ]
+    end
 end
 
 # TODO: all_edges. Call edges_iterator and send them to other processes

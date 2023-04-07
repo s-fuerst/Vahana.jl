@@ -127,11 +127,6 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     else
         nothing
     end
-    ATid = if singletype
-        typeinfos.nodes_type2id[AT]
-    else
-        0
-    end
 
     mpiactive = mpi.active
     multinode = mpi.size > mpi.shmsize

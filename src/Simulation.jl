@@ -100,8 +100,8 @@ same Julia session (as long as `name` is different).
 Returns a [`Model`](@ref) that can be used in
 [`create_simulation`](@ref) to create a concrete simulation.  
 """
-function create_model(typeinfos::ModelTypes, name::String) simsymbol =
-Symbol(name)
+function create_model(typeinfos::ModelTypes, name::String)
+    simsymbol = Symbol(name)
 
     edgefields = [
         Expr(Symbol("="),
@@ -114,6 +114,7 @@ Symbol(name)
                           0,0,false)))
         for T in typeinfos.edges_types ] 
 
+    @info edgefields
     
     nodefields = [
         Expr(Symbol("="),
