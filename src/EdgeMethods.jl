@@ -140,29 +140,32 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     construct_edges_iter_methods(T, attr, simsymbol, FT)
     #### Functions that helps to write generic versions of the edge functions
     #
+    # The traits can be different when different models are create using
+    # the same types, therefore we dispatch on $simsymbol 
+    #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
     # case that the container for the Edges is a Vector (which is the
     # case when the :SingleEdge trait is set.
     if singletype
-        @eval _to2idx(to::AgentID, ::Type{$T}) = agent_nr(to)
+        @eval _to2idx(_::$simsymbol, to::AgentID, ::Type{$T}) = agent_nr(to)
     else
-        @eval _to2idx(to::AgentID, ::Type{$T}) = to
+        @eval _to2idx(_::$simsymbol, to::AgentID, ::Type{$T}) = to
     end
 
     # _valuetostore is used to retrieve the value that should be stored
     # from an edge, or the (from, edgestate) combination
     if stateless && ignorefrom && singleedge
-        @eval _valuetostore(edge::Edge{$MT}) = true
-        @eval _valuetostore(from::AgentID, edgestate::$MT) = true
+        @eval _valuetostore(_::$simsymbol, edge::Edge{$MT}) = true
+        @eval _valuetostore(_::$simsymbol, from::AgentID, edgestate::$MT) = true
     elseif ignorefrom
-        @eval _valuetostore(edge::Edge{$MT}) = edge.state
-        @eval _valuetostore(::AgentID, edgestate::$MT) = edgestate
+        @eval _valuetostore(_::$simsymbol, edge::Edge{$MT}) = edge.state
+        @eval _valuetostore(_::$simsymbol, ::AgentID, edgestate::$MT) = edgestate
     elseif stateless
-        @eval _valuetostore(edge::Edge{$MT}) = edge.from
-        @eval _valuetostore(from::AgentID, ::$MT) = from
+        @eval _valuetostore(_::$simsymbol, edge::Edge{$MT}) = edge.from
+        @eval _valuetostore(_::$simsymbol, from::AgentID, ::$MT) = from
     else
-        @eval _valuetostore(edge::Edge{$MT}) = edge
-        @eval _valuetostore(from::AgentID, edgestate::$MT) = Edge(from, edgestate)
+        @eval _valuetostore(_::$simsymbol, edge::Edge{$MT}) = edge
+        @eval _valuetostore(_::$simsymbol, from::AgentID, edgestate::$MT) = Edge(from, edgestate)
     end
 
     # We must sometime construct the (per agent) containers, and those
@@ -266,7 +269,7 @@ by calling suppress_warnings(true) after importing Vahana.
                                      to::AgentID,
                                      ::Type{$T},
                                      field)
-            nr = _to2idx(to, $T)
+            nr = _to2idx(sim, to, $T)
 
             @mayassert begin
                 t = $T
@@ -293,7 +296,7 @@ by calling suppress_warnings(true) after importing Vahana.
                                       to::AgentID,
                                       ::Type{$T},
                                       field)
-            nr = _to2idx(to, $T)
+            nr = _to2idx(sim, to, $T)
 
             @mayassert begin
                 t = $T
@@ -343,7 +346,7 @@ by calling suppress_warnings(true) after importing Vahana.
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
-                nr = _to2idx(to, $T)
+                nr = _to2idx(sim, to, $T)
                 field = @edgewrite($T)
                 @inbounds field[nr] = _get_agent_container!(sim, to, $T,
                                                             field) + 1
@@ -359,7 +362,7 @@ by calling suppress_warnings(true) after importing Vahana.
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1], (to, 1))
             else
-                nr = _to2idx(to, $T)
+                nr = _to2idx(sim, to, $T)
                 field = @edgewrite($T)
                 @inbounds field[nr] = _get_agent_container!(sim, to, $T,
                                                             field) + 1
@@ -368,7 +371,7 @@ by calling suppress_warnings(true) after importing Vahana.
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
             @mayassert _can_add(@edgewrite($T), to,
-                                _valuetostore(edge), $T) """
+                                _valuetostore(sim, edge), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
@@ -379,12 +382,12 @@ by calling suppress_warnings(true) after importing Vahana.
             end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
-                      (to, _valuetostore(edge)))
+                      (to, _valuetostore(sim, edge)))
             else
-                nr = _to2idx(to, $T)
+                nr = _to2idx(sim, to, $T)
                 field = @edgewrite($T)
                 _check_size!(field, nr, $T)
-                @inbounds field[nr] = _valuetostore(edge)
+                @inbounds field[nr] = _valuetostore(sim, edge)
             end
         end
 
@@ -397,7 +400,7 @@ by calling suppress_warnings(true) after importing Vahana.
             `apply`.
             """
             @mayassert _can_add(@edgewrite($T), to,
-                                _valuetostore(from, edgestate), $T) """
+                                _valuetostore(sim, from, edgestate), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
             """
@@ -407,12 +410,12 @@ by calling suppress_warnings(true) after importing Vahana.
             end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
-                      (to, _valuetostore(from, edgestate)))
+                      (to, _valuetostore(sim, from, edgestate)))
             else
-                nr = _to2idx(to, $T)
+                nr = _to2idx(sim, to, $T)
                 field = @edgewrite($T)
                 _check_size!(field, nr, $T)
-                @inbounds field[nr] = _valuetostore(from, edgestate)
+                @inbounds field[nr] = _valuetostore(sim, from, edgestate)
             end
         end
     else
@@ -429,10 +432,10 @@ by calling suppress_warnings(true) after importing Vahana.
             end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
-                      (to, _valuetostore(edge)))
+                      (to, _valuetostore(sim, edge)))
             else
                 push!(_get_agent_container!(sim, to, $T, @edgewrite($T)),
-                      _valuetostore(edge))
+                      _valuetostore(sim, edge))
             end
         end
 
@@ -449,10 +452,10 @@ by calling suppress_warnings(true) after importing Vahana.
             end
             if $mpiactive && process_nr(to) != mpi.rank
                 push!(@storage($T)[process_nr(to) + 1],
-                      (to, _valuetostore(from, edgestate)))
+                      (to, _valuetostore(sim, from, edgestate)))
             else
                 push!(_get_agent_container!(sim, to, $T, @edgewrite($T)),
-                      _valuetostore(from, edgestate))
+                      _valuetostore(sim, from, edgestate))
             end
         end
     end

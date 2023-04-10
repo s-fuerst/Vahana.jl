@@ -13,6 +13,8 @@
 
 using Vahana, Statistics, BenchmarkTools
 
+enable_asserts(false)
+
 # We have a finite number $n$ of agents, where the state of
 # the agents are a real number $x_i(t)$ in the [0,1] interval which
 # represents the opinion of that agent. 
@@ -42,8 +44,13 @@ const hkmodel = ModelTypes() |>
     register_edgestatetype!(Knows) |>
     create_model("Hegselmann-Krause");
 
-const sim = create_simulation(hkmodel, HKParams(0.2), nothing);
+const model = ModelTypes() |>
+    register_agenttype!(HKAgent, :Immortal) |>
+    register_edgestatetype!(Knows, :Stateless, :SingleType; target = HKAgent) |>
+    create_model("Hegselmann-Krause-Traits");
 
+const sim = create_simulation(hkmodel, HKParams(0.2), nothing);
+const sim_traits = create_simulation(model, HKParams(0.2), nothing);
 
 
 # using SNAPDatasets
@@ -60,10 +67,17 @@ const agentids = add_graph!(sim,
                             _ -> HKAgent(rand()),
                             _ -> Knows());
 
+const agentids_traits = add_graph!(sim_traits,
+                            g,
+                            _ -> HKAgent(rand()),
+                            _ -> Knows());
+
 
 foreach(id -> add_edge!(sim, id, id, Knows()), agentids) 
+foreach(id -> add_edge!(sim_traits, id, id, Knows()), agentids_traits) 
 
 finish_init!(sim)
+finish_init!(sim_traits)
 
 @info mpi.rank sim
 # ## Transition Function
@@ -84,7 +98,7 @@ finish_init!(sim)
 function step(agent, id, sim)
     ε = param(sim, :ε)
 
-    accepted = filter(edgestates(sim, id, Knows, HKAgent)) do other
+    accepted = filter(neighborstates(sim, id, Knows, HKAgent)) do other
         abs(other.opinion - agent.opinion) < ε
     end
     HKAgent(mean(map(a -> a.opinion, accepted)))
@@ -94,8 +108,34 @@ end;
 
 copy = copy_simulation(sim)
 
-apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+@benchmark apply!(sim_traits, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
 
 #@time for _ in 1:50 apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
 
+### Without Vahana
+states = [ rand() for i in 1:1000 ]
 
+function calcnewstate(i::Int64, states)
+    own = states[i]
+    accepted = filter(states) do other
+        abs(other - own) < 0.2
+
+    end
+    mean(accepted)
+end
+
+function updateall(states)
+    new = fill(0.0, 1000)
+    for i in 1:1000
+        new[i] = calcnewstate(i, states)
+    end
+    new
+end
+    
+
+    
+    
+        
+
+        
+    

@@ -114,7 +114,6 @@ Symbol(name)
                           0,0,false)))
         for T in typeinfos.edges_types ] 
 
-    
     nodefields = [
         Expr(Symbol("="),
              :($(Symbol(T))::AgentFields{$T}),
