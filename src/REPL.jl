@@ -1,5 +1,5 @@
 export num_edges
-export show_agent, do_agents, do_edges, all_agents
+export show_agent
 
 using Printf
 
@@ -68,6 +68,9 @@ function construct_prettyprinting_methods(simsymbol)
             for t in nodes_types
                 print(io, "\n\t Type $t \
                            with $(num_agents(sim, t)) agent(s)")
+                if mpi.active
+                    print(io, " ($(num_agents(sim, t, false)) on rank $(mpi.rank))")
+                end
             end
         end
 
@@ -86,8 +89,12 @@ function construct_prettyprinting_methods(simsymbol)
                 else
                     print(io, "\n\t Type $t \
                                with $(num_edges(sim, t)) edge(s)")
+                    if mpi.active
+                        print(io, " ($(num_edges(sim, t, false)) on rank $(mpi.rank))")
+                        
+                    end
                     if ! (:SingleType in edgetypetraits)
-                        print(io, " for $(_show_num_a_with_e(sim, t)) agent(s)")
+                        print(io, " for $(_show_num_a_with_e(sim, t)) agent(s) on this rank")
                     end
                 end
             end
@@ -150,7 +157,7 @@ function _reconstruct_edge(sim, e, edgetypetraits, edgeT)
             #     aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e))
             #     Edge(aid, edgeT())
             # else
-                Edge(e, edgeT())
+            Edge(e, edgeT())
             # end
         end
     elseif :IgnoreFrom in edgetypetraits
@@ -173,7 +180,7 @@ function _show_edge(sim, e, neighborstate, edgeT)
             end
         end
     end
- 
+    
     
     edgetypetraits = sim.typeinfos.edges_attr[edgeT][:traits]
     e = _reconstruct_edge(sim, e, edgetypetraits, edgeT)
@@ -420,76 +427,28 @@ function show_agent(sim,
     id
 end
 
-"""
-TODO DOC 
-"""
-function num_edges(sim, t::Type{T}; write = nothing) where T
-    # TODO: Implement correct version for parallel simulations
-    if write === nothing
-        _num_edges(sim, t, ! sim.initialized)
-    else
-        _num_edges(sim, t, write)
-    end
-end
-
-"""
-TODO DOC 
-"""
-function num_agents(sim, ::Type{T}) where T
-    # TODO: Implement correct version for parallel simulations
-    field = getproperty(sim, Symbol(T))
-    attr = sim.typeinfos.nodes_attr[T]
-
-    if :Immortal in attr[:traits]
-        # we can not just access the length of read.state, as for
-        # types without field, we don't use the read.state vector
-        field.nextid - 1
-    else
-        died = sim.initialized ? readdied(sim, T) : writedied(sim, T)
-        count(!, values(died))
-    end 
-end
 
 
-"""
-TODO DOC 
-"""
-# TODO: for mortal agents we must filter the agent_ids list, also
-# add support for parallel runs (and move this away from repl). Or add
-# a function that return all agentstates
-function do_agents(g, f, sim, ::Type{T}) where T
-    agent_ids = [ agent_id(sim, AgentID(nr), T)
-                  for nr in keys(getproperty(sim, Symbol(T)).read.state) ]
-    f(g, agent_ids)
-end
+# """
+# TODO DOC 
+# """
+# # TODO: for mortal agents we must filter the agent_ids list, also
+# # add support for parallel runs (and move this away from repl). Or add
+# # a function that return all agentstates
+# function do_agents(g, f, sim, ::Type{T}) where T
+#     agent_ids = [ agent_id(sim, AgentID(nr), T)
+#                   for nr in keys(getproperty(sim, Symbol(T)).read.state) ]
+#     f(g, agent_ids)
+# end
 
-"""
-TODO DOC 
-"""
-# TODO: for mortal agents we must filter the agent_ids list, also
-# add support for parallel runs (and move this away from repl). Or add
-# a function that return all agentstates
-function all_agents(sim, ::Type{T}) where T
-    @assert fieldcount(T) > 0 """
-        all_agents can be only called for agent types that have a fields.
-        To get the number of agents, you can call num_agents instead.
-    """
-    states = getproperty(sim, Symbol(T)).read.state
-    if has_trait(sim, T, :Immortal, :Agent)
-        states
-    else
-        died = getproperty(sim, Symbol(T)).read.died
-        [ states[i] for i in 1:length(died) if died[i] == false ]
-    end
-end
 
 # TODO: all_edges. Call edges_iterator and send them to other processes
 
-"""
-TODO DOC 
-"""
-function do_edges(f, h, sim, t::Type{T}) where T
-    g = f ∘ (e -> e[2])
-    h(g, edges_iterator(sim, t) |> collect)
-end
+# """
+# TODO DOC 
+# """
+# function do_edges(f, h, sim, t::Type{T}) where T
+#     g = f ∘ (e -> e[2])
+#     h(g, edges_iterator(sim, t) |> collect)
+# end
 

@@ -9,9 +9,6 @@ struct DEdge end
 struct DSingleEdge end
 struct DEdgeST end # ST = SingleType
 
-count_num_edges(sim, E) = sum(Vahana.join([ num_edges(sim, E) +
-    num_edges(sim, DEdgeState) ]))
-
 model = ModelTypes() |>
     register_agenttype!(DAgent) |>
     register_agenttype!(DAgentRemove) |>
@@ -38,7 +35,8 @@ model = ModelTypes() |>
         
         finish_init!(sim; partition_algo = :EqualAgentNumbers)
 
-        @test count_num_edges(sim, E) == (mpi.size * 4) + 1
+        @test num_edges(sim, E) == (mpi.size * 3) + 1
+        @test num_edges(sim, DEdgeState) == mpi.size
 
         # we remove all ADefault edges, that should also remove the ESDict edges
         apply!(sim,
@@ -48,7 +46,7 @@ model = ModelTypes() |>
                               nothing
                           end
 
-        @test count_num_edges(sim, E) == (mpi.size * 3) + 1
+        @test num_edges(sim, E) == (mpi.size * 3) + 1
 
         apply!(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
             if num_edges(sim, id, E) == 0
@@ -59,7 +57,7 @@ model = ModelTypes() |>
         end
 
         # the remaining edges are ids[3]->ids[2],rids[3]->ids[2],ids[2]->ids[3]
-        @test count_num_edges(sim, E) == 3
+        @test num_edges(sim, E) == 3
         
         finish_simulation!(sim)
     end

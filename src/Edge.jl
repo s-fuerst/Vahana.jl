@@ -213,3 +213,19 @@ See also [`apply!`](@ref), [`edges`](@ref),
 and [`neighborstates`](@ref)
 """
 function has_edge(::__MODEL__, id::AgentID, edgetype::Type) end
+
+"""
+TODO DOC 
+"""
+function num_edges(sim, t::Type{T}, sum_ranks = true; write = nothing) where T
+    local_num = if write === nothing
+        _num_edges(sim, t, ! sim.initialized)
+    else
+        _num_edges(sim, t, write)
+    end
+    if sum_ranks
+        MPI.Allreduce(local_num, +, MPI.COMM_WORLD)
+    else
+        local_num
+    end
+end

@@ -173,3 +173,47 @@ using [`agentstate`](@ref) is preferable as it improves performance.
 agentstate_flexible(sim, id::AgentID) =
     agentstate(sim, id, sim.typeinfos.nodes_id2type[type_nr(id)])
 
+"""
+TODO DOC 
+"""
+function all_agents(sim, ::Type{T}, all_ranks = true) where T
+    @assert fieldcount(T) > 0 """
+        all_agents can be only called for agent types that have a fields.
+        To get the number of agents, you can call num_agents instead.
+    """
+    states = getproperty(sim, Symbol(T)).read.state
+    l = if has_trait(sim, T, :Immortal, :Agent)
+        states
+    else
+        died = getproperty(sim, Symbol(T)).read.died
+        [ states[i] for i in 1:length(died) if died[i] == false ]
+    end
+    if all_ranks
+        join(l)
+    else
+        l
+    end
+end
+
+"""
+TODO DOC 
+"""
+function num_agents(sim, ::Type{T}, sum_ranks = true) where T
+    field = getproperty(sim, Symbol(T))
+    attr = sim.typeinfos.nodes_attr[T]
+
+    local_num = if :Immortal in attr[:traits]
+        # we can not just access the length of read.state, as for
+        # types without field, we don't use the read.state vector
+        field.nextid - 1
+    else
+        died = sim.initialized ? readdied(sim, T) : writedied(sim, T)
+        count(!, values(died))
+    end
+    if sum_ranks 
+        MPI.Allreduce(local_num, +, MPI.COMM_WORLD)
+    else
+        local_num
+    end
+end
+

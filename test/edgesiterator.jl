@@ -129,9 +129,7 @@ end
 
         finish_init!(sim)
 
-        Vahana._log_time(sim, "first join") do
-            @test Vahana.join([ num_edges(sim, ET) ]) |> sum == 10
-        end
+        @test num_edges(sim, ET) == 10
 
         # first we test that edges to the agents are removed
         apply!(sim, [ Agent ], [], [ Agent ]) do _, id, sim
@@ -164,9 +162,7 @@ end
 
         finish_init!(sim)
 
-        Vahana._log_time(sim, "second join") do
-            @test Vahana.join([ num_edges(sim, ET) ]) |> sum == 8
-        end
+        @test num_edges(sim, ET) == 8
 
         # # first we test that edges to the agents are removed
         # apply!(sim, [ AgentB ], [], []) do state, id, sim

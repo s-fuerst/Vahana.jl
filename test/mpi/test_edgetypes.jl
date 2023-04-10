@@ -232,19 +232,26 @@ function testforedgetype(ET)
     # copy the simulation, so that we can test with an manual partition
     # so that we can test that the agents/edges are moved to the expected
     # nodes and also the partitioning via Metis later
-    @test num_agents(sim, AgentState1) == (mpi.isroot ? mpi.size : 0)
-    @test num_agents(sim, AgentState2) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState1, false) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState2, false) == (mpi.isroot ? mpi.size : 0)
+    @test num_agents(sim, AgentState1) == mpi.size 
+    @test num_agents(sim, AgentState2) == mpi.size 
 
     num_edges_per_PE = has_trait(sim, ET, :SingleType) ? 1 : 2
-    @test num_edges(sim, ET; write = true) == (mpi.isroot ? mpi.size * num_edges_per_PE : 0)
+    @test num_edges(sim, ET; write = true) == mpi.size * num_edges_per_PE 
 
+    
+    @info  mpi.rank sim
     finish_init!(sim; partition = part)
+    @info  mpi.rank sim
     
     apply!(sim, check_state(ET), [ AgentState1 ],
                       [ AgentState1, ET ], [])
     
-    @test num_agents(sim, AgentState1) == 1
-    @test num_agents(sim, AgentState2) == (mpi.rank < 2 ? mpi.size / 2 : 0)
+    @test num_agents(sim, AgentState1, false) == 1
+    @test num_agents(sim, AgentState2, false) == (mpi.rank < 2 ? mpi.size / 2 : 0)
+    @test num_agents(sim, AgentState1) == mpi.size
+    @test num_agents(sim, AgentState2) == mpi.size 
 
     # we are testing now that new edges in the transition functions are
     # send to the correct ranks
