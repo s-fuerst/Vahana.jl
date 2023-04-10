@@ -114,8 +114,6 @@ function create_model(typeinfos::ModelTypes, name::String)
                           0,0,false)))
         for T in typeinfos.edges_types ] 
 
-    @info edgefields
-    
     nodefields = [
         Expr(Symbol("="),
              :($(Symbol(T))::AgentFields{$T}),
