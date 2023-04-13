@@ -58,24 +58,24 @@ statefulMPIEdgeTypes = [ MPIEdgeD, MPIEdgeE, MPIEdgeT, MPIEdgeI, MPIEdgeEI, MPIE
 model = ModelTypes() |>
     register_agenttype!(AgentState1) |>
     register_agenttype!(AgentState2) |>
-    register_edgestatetype!(MPIEdgeD) |>
-    register_edgestatetype!(MPIEdgeS, :Stateless) |>
-    register_edgestatetype!(MPIEdgeE, :SingleEdge) |>
-    register_edgestatetype!(MPIEdgeT, :SingleType; target = AgentState1) |>
-    register_edgestatetype!(MPIEdgeI, :IgnoreFrom) |>
-    register_edgestatetype!(MPIEdgeSE, :Stateless, :SingleEdge) |>
-    register_edgestatetype!(MPIEdgeST, :Stateless, :SingleType; target = AgentState1) |>
-    register_edgestatetype!(MPIEdgeSI, :Stateless, :IgnoreFrom) |>
-    register_edgestatetype!(MPIEdgeEI, :SingleEdge, :IgnoreFrom) |>
-    register_edgestatetype!(MPIEdgeTI, :SingleType, :IgnoreFrom; target = AgentState1) |>
-    register_edgestatetype!(MPIEdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
-    register_edgestatetype!(MPIEdgeSTI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1) |>
-    register_edgestatetype!(MPIEdgeSETI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1) |>
-    register_edgestatetype!(MPIEdgeTs, :SingleType; target = AgentState1, size = mpi.size * 2) |>
-    register_edgestatetype!(MPIEdgeTsI, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size* 2) |>
-    register_edgestatetype!(MPIEdgeSTs, :Stateless, :SingleType; target = AgentState1, size = mpi.size * 2) |>
-    register_edgestatetype!(MPIEdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
-    register_edgestatetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeD) |>
+    register_edgetype!(MPIEdgeS, :Stateless) |>
+    register_edgetype!(MPIEdgeE, :SingleEdge) |>
+    register_edgetype!(MPIEdgeT, :SingleType; target = AgentState1) |>
+    register_edgetype!(MPIEdgeI, :IgnoreFrom) |>
+    register_edgetype!(MPIEdgeSE, :Stateless, :SingleEdge) |>
+    register_edgetype!(MPIEdgeST, :Stateless, :SingleType; target = AgentState1) |>
+    register_edgetype!(MPIEdgeSI, :Stateless, :IgnoreFrom) |>
+    register_edgetype!(MPIEdgeEI, :SingleEdge, :IgnoreFrom) |>
+    register_edgetype!(MPIEdgeTI, :SingleType, :IgnoreFrom; target = AgentState1) |>
+    register_edgetype!(MPIEdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    register_edgetype!(MPIEdgeSTI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1) |>
+    register_edgetype!(MPIEdgeSETI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1) |>
+    register_edgetype!(MPIEdgeTs, :SingleType; target = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeTsI, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size* 2) |>
+    register_edgetype!(MPIEdgeSTs, :Stateless, :SingleType; target = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
     create_model("MPI EdgeTypes");
 
 # We have the following edge setup (as an example for mpi.size of 3, but

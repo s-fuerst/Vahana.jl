@@ -32,9 +32,9 @@ begin
         register_agenttype!(AImmFixed, :Immortal) |>
         register_agenttype!(AImmFixedOversize, :Immortal) |>
         register_agenttype!(ADefault) |>
-        register_edgestatetype!(ESDict) |>
-        register_edgestatetype!(ESLDict1) |> 
-        register_edgestatetype!(ESLDict2, :SingleType; target = AImm) |>
+        register_edgetype!(ESDict) |>
+        register_edgetype!(ESLDict1) |> 
+        register_edgetype!(ESLDict2, :SingleType; target = AImm) |>
         create_model("Test Core")
 end
 

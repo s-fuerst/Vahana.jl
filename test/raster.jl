@@ -25,10 +25,10 @@ struct OnPosition  end
 raster_model = ModelTypes() |>
     register_agenttype!(GridA) |>
     register_agenttype!(Grid3D) |> 
-    register_edgestatetype!(GridE) |>
+    register_edgetype!(GridE) |>
     register_agenttype!(Position) |>
     register_agenttype!(MovingAgent) |>
-    register_edgestatetype!(OnPosition) |>
+    register_edgetype!(OnPosition) |>
     create_model("Raster_Test")
 
 @testset "Raster" begin

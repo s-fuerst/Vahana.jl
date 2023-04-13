@@ -12,10 +12,10 @@ struct DEdgeST end # ST = SingleType
 model = ModelTypes() |>
     register_agenttype!(DAgent) |>
     register_agenttype!(DAgentRemove) |>
-    register_edgestatetype!(DEdge) |>
-    register_edgestatetype!(DEdgeState) |>
-    register_edgestatetype!(DSingleEdge, :SingleEdge) |>
-    register_edgestatetype!(DEdgeST, :SingleType; target = DAgent) |>
+    register_edgetype!(DEdge) |>
+    register_edgetype!(DEdgeState) |>
+    register_edgetype!(DSingleEdge, :SingleEdge) |>
+    register_edgetype!(DEdgeST, :SingleType; target = DAgent) |>
     create_model("remove_agents") 
 
 @testset "Dying_Agents" begin

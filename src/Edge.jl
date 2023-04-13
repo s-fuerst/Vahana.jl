@@ -23,7 +23,7 @@ The AgentID of the agent at the head of the edge is not a field of
 `Edge` itself, since this information is already part of the
 containers in which the edges are stored.
 
-See also [`register_edgestatetype!`](@ref)
+See also [`register_edgetype!`](@ref)
 """
 struct Edge{T} 
     from::AgentID
@@ -43,9 +43,9 @@ from the agent with ID `from` to the agent with ID `to` and has the
 state `state`. 
 
 `T` must have been previously registered in the simulation by calling
-[`register_edgestatetype!`](@ref).
+[`register_edgetype!`](@ref).
 
-See also [`Edge`](@ref) [`register_edgestatetype!`](@ref) and [`add_edges!`](@ref)
+See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
 function add_edge!(::__MODEL__, to::AgentID, edge::Edge)  end
 
@@ -60,7 +60,7 @@ are directed to `to`.
 `edges` can be any iterable set of agents, or an arbitrary number of
 edges as arguments. 
 
-See also [`Edge`](@ref) [`register_edgestatetype!`](@ref) and [`add_edge!`](@ref)
+See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edge!`](@ref)
 """
 function add_edges!(sim, to::AgentID, edges::Vector{Edge{T}}) where T
     [ add_edge!(sim, to, e) for e in edges ]

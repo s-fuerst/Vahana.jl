@@ -83,7 +83,9 @@ detect_stateless_trait(true); #hide
 # contains no references to other values, only primitive types and
 # other isbitstype types. This also implies that the type of a struct
 # variables must be declared.
+#
 # 
+#
 # Since we want to calculate the average price of $y$ later, the seller
 # needs to store the quantity of the sold good $y$. So we have:
 
@@ -114,16 +116,34 @@ Seller() = Seller(rand() + 0.5, 0);
 
 # As for the agents we must define a struct for each type of network. The edges
 # of the `KnownSeller` network do not carry additional information, so
-# we define them just as a struct without any field.
+# we define them just as a struct without any field, and will use them as a
+# kind of a tag later to select only the edges of this type.
 
 struct KnownSellers end
 
-# The second network `Bought` will be constructed in the
-# transition function called `calc_demand` which will be the
-# implementation of equation (\ref{eqn:demand}). This network describes
-# from which seller a buyer bought something, so it edge will go from
-# the buyers to the sellers. And those edges come with additional state,
-# which provides the quantity of the bought goods:
+# As you can see, this type does not contain any information about the
+# source or target agent of the edge (we have always directed edges in
+# Vahana). Vahana declares the parametric type
+#
+# struct Edge{T} 
+#     from::AgentID
+#     state::T
+# end
+#
+# where T is in our case the KnownSeller. `from` is the agent on the
+# source of the edge, but the target of the edge is missing. The edges
+# are stored in containers like a Dict{AgentID, Vector{Edge{T}}} (the
+# concrete container depends on so called traits, see [Edge
+# Traits](./performance.md#Edge-Traits), where the keys are the target
+# agents, so adding the target also to the Edge struct is redundant and
+# would only consume memory and CPU cycles unnecessarily.
+
+# We continue now with the second network `Bought` that will be constructed in
+# the transition function called `calc_demand` which will be the
+# implementation of equation (\ref{eqn:demand}). This network
+# describes from which seller a buyer bought something, so it edge
+# will go from the buyers to the sellers. And those edges come with
+# additional state, which provides the quantity of the bought goods:
 
 struct Bought 
     x::Float64
@@ -164,14 +184,14 @@ end
 # We now have all the elements needed to construct an uninitialized
 # simulation. Therefore we combine first all the Agent- and Edgetypes
 # into a `ModelTypes` collection, via the `register_agenttype!` and
-# `register_edgestatetype!` functions, and then call `contruct_model` on this
+# `register_edgetype!` functions, and then call `contruct_model` on this
 # collection. 
 
 const model = ModelTypes() |>
     register_agenttype!(Buyer) |>
     register_agenttype!(Seller) |>
-    register_edgestatetype!(KnownSellers) |>
-    register_edgestatetype!(Bought) |>
+    register_edgetype!(KnownSellers) |>
+    register_edgetype!(Bought) |>
     create_model("Excess Demand");
 
 # `create_model` returns a blueprint for our simulation. Simulations
@@ -195,13 +215,25 @@ const sim = create_simulation(model,
 
 # Vahana therefore has the functions `add_agent!` or `add_agents!`,
 # where `add_agents` can be used to add multiple agents at once. These
-# functions return id(s) the agent(s), which can be used to create edges
-# between agents. Do not use the IDs for other purposes, they are not
-# guaranteed to be stable.
+# functions return ID(s) of the agent(s), which can be used to create
+# edges between agents. Do not use the IDs for other purposes, they
+# are not guaranteed to be stable, e.g. the ID of an agent may change
+# in the [`finish_init!`](@ref) call. in a parallel simulation
+# `finish_init!` may "moved" to another (MPI) rank, and as the ID
+# contains Vahana internal information like the rank, the agent will
+# have a different ID afterwards. It is also possible that the same ID
+# is used twice for different agents. So an ID returned by a call to a
+# Vahana function or passed as an argument to callback function (see
+# [Transition functions](./performance.md#Transition functions) below)
+# can only be used until finish_init! is called or the
+# callback/transition function is finished. In the case that you need
+# a stable ID, you need to add such an ID to the agent state and
+# create these IDs by yourself (e.g. using the UUIDs functions).
 
-# In our case, we use them to iterate over all buyer IDs, randomly select
-# `numSellers` seller IDs for each buyer ID, and then create edges
-# between them in the `KnownSellers` network.
+# In our case, we use the IDs returned by add_agents! to iterate over
+# all buyer IDs, randomly select `numSellers` seller IDs for each
+# buyer ID, and then create edges between them in the `KnownSellers`
+# network.
 
 # We can see in the following code fragment also how parameters of the
 # Simulation can be accessed via the `param` function.
@@ -220,10 +252,6 @@ sim
 
 # As you can see from the result of the code block above, Vahana has a
 # "pretty print" function for some of its data structures. 
-
-# For a parallel simulation it's important to aware that the given
-# numbers are only for the partition of the graph that is assigned to
-# the process.
 
 # To complete the initialization it is necessary to call
 # `finish_init!`. In the later MPI version this will be used e.g. to

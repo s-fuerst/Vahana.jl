@@ -74,7 +74,7 @@ end
     model = ModelTypes() |>
         register_agenttype!(ComputeAgent) |>
         register_agenttype!(ConstructedAgent) |>
-        register_edgestatetype!(Connection) |>
+        register_edgetype!(Connection) |>
         create_model("Test add_existing")
 
     test_model(model)
@@ -82,7 +82,7 @@ end
     model_imm_comp = ModelTypes() |>
         register_agenttype!(ComputeAgent, :Immortal) |>
         register_agenttype!(ConstructedAgent) |>
-        register_edgestatetype!(Connection) |>
+        register_edgetype!(Connection) |>
         create_model("Test add_existing vector")
 
     test_model(model_imm_comp)
@@ -90,7 +90,7 @@ end
     model_imm_cons = ModelTypes() |>
         register_agenttype!(ComputeAgent) |>
         register_agenttype!(ConstructedAgent, :Immortal) |>
-        register_edgestatetype!(Connection) |>
+        register_edgetype!(Connection) |>
         create_model("Test add_existing vector")
 
     test_assertion(model_imm_cons)

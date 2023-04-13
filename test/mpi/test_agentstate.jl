@@ -34,8 +34,8 @@ end
 
 sim = ModelTypes() |>
     register_agenttype!(Agent, :Immortal) |>
-    register_edgestatetype!(EdgeState, :SingleEdge) |>
-    register_edgestatetype!(NewEdge, :SingleEdge) |>
+    register_edgetype!(EdgeState, :SingleEdge) |>
+    register_edgetype!(NewEdge, :SingleEdge) |>
     create_model("agentstatetest") |>
     create_simulation()
 
@@ -105,8 +105,8 @@ finish_simulation!(sim)
 # Test the same for mortal agents
 sim = ModelTypes() |>
     register_agenttype!(Agent) |>
-    register_edgestatetype!(EdgeState, :SingleEdge) |>
-    register_edgestatetype!(NewEdge, :SingleEdge) |>
+    register_edgetype!(EdgeState, :SingleEdge) |>
+    register_edgetype!(NewEdge, :SingleEdge) |>
     create_model("agentstatetest-mortal") |>
     create_simulation()
 

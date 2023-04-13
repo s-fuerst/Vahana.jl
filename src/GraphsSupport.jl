@@ -22,7 +22,7 @@ the Graphs.vertix as argument. For each edge of `graph` the
 
 The agent types of agents created by the `agent_constructor` must be
 already registered via [`register_agenttype!`](@ref) and vis a vis the edge
-type via [`register_edgestatetype!`](@ref).
+type via [`register_edgetype!`](@ref).
 
 !!! info
 
@@ -88,7 +88,7 @@ types and whose both adjacent node types are in `agenttypes`.
 
 The default values for `agenttypes` and `edgetypes` are all registered
 agents/edgetypes (see [`register_agenttype!`](@ref) and
-[`register_edgestatetype!`](@ref)).
+[`register_edgetype!`](@ref)).
 
 This subgraphs implements the AbstractSimpleGraph interface from the
 Graphs.jl package.
@@ -191,7 +191,7 @@ types and whose both adjacent agents have are of a type in `agenttypes`.
 
 The default values for `agenttypes` and `edgetypes` are all registered
 agents/edgetypes (see [`register_agenttype!`](@ref) and
-[`register_edgestatetype!`](@ref)).
+[`register_edgetype!`](@ref)).
 
 This subgraphs implements the AbstractGraph interface from the
 Graphs.jl package, so that e.g. GraphMakie can be used to visualize

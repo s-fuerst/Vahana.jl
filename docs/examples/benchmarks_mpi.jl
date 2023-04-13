@@ -54,11 +54,11 @@ function prepare(name)
     if hastrait(name, "F")
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgestatetype!(EdgeState, traits...; target=AgentState, size=3)
+            register_edgetype!(EdgeState, traits...; target=AgentState, size=3)
     else
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgestatetype!(EdgeState, traits...; target=AgentState)
+            register_edgetype!(EdgeState, traits...; target=AgentState)
     end    
     create_model(mt, name)
 end
@@ -209,9 +209,9 @@ run_benchmark_agents(mt);
 # const sim = ModelTypes() |>
 #     register_agenttype!(GridNode) |>
 #     register_agenttype!(MovingAgent) |>
-#     register_edgestatetype!(GridEdge) |>
-#     register_edgestatetype!(OnPosition, :SingleEdge, :SingleType; target = GridNode) |>
-#     register_edgestatetype!(AgentsOnPoint, :SingleType; target = MovingAgent) |>
+#     register_edgetype!(GridEdge) |>
+#     register_edgetype!(OnPosition, :SingleEdge, :SingleType; target = GridNode) |>
+#     register_edgetype!(AgentsOnPoint, :SingleType; target = MovingAgent) |>
 #     create_model("Raster_Test") |>
 #     create_simulation(nothing, nothing)
 

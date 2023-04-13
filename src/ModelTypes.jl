@@ -1,5 +1,5 @@
 export ModelTypes
-export register_agenttype!, register_edgestatetype!
+export register_agenttype!, register_edgetype!
 
 """
     ModelTypes
@@ -10,7 +10,7 @@ definition.
 
 Call the ModelType constructor without parameters, and then use the
 created object as the first parameter in [`register_agenttype!`](@ref)
-and [`register_edgestatetype!`](@ref), whereby the |> operator can be used to
+and [`register_edgetype!`](@ref), whereby the |> operator can be used to
 concatenate these registrations.
 
 See also [`create_model`](@ref),
@@ -87,13 +87,16 @@ register_agenttype!(t::Type{T}, traits...; kwargs...) where T =
 
 
 """
-    register_edgestatetype!(types::ModelTypes, ::Type, traits..., kwargs...)  
+    register_edgetype!(types::ModelTypes, ::Type{T}, traits...; kwargs...)  
 
 Register an additional edge type to `types`. 
 
-An edge type is an struct that define the state for edges of type `T`.  These
-structs must be "bits types", meaning the type is immutable and
-contains only primitive types and other bits types.
+An edge type T is a structure that defines the state (field) of
+[`Edge{T}`](@ref).  These structs must be "bit types", that is, the
+type is immutable and contains only primitive types and other bit
+types. Often these types T are stateless, in which case they are used
+as a tag to distinguish between the existing types of edges of the
+model.
 
 The internal data structures used to store the graph in memory can be modified by 
 the traits parameters:
@@ -119,7 +122,7 @@ keyword `size`.
 See also [Edge Traits](./performance.md#Edge-Traits), [`add_edge!`](@ref) and 
 [`add_edges!`](@ref) 
 """
-function register_edgestatetype!(types::ModelTypes, ::Type{T}, traits...;
+function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
                      kwargs...)  where T
     @assert !(T in types.edges_types) "Type $T is already registered"
     @assert isbitstype(T) "Edgetypes $T must be bitstypes"
@@ -165,7 +168,7 @@ function register_edgestatetype!(types::ModelTypes, ::Type{T}, traits...;
 
         Edgetype $T is a struct without any field, so you can increase the
         performance by setting the :Stateless trait. You can also
-        calling detect_stateless_trait() before calling register_edgestatetype!, 
+        calling detect_stateless_trait() before calling register_edgetype!, 
         then the :Stateless trait will be set automatically for structs without
         a field.
 
@@ -184,8 +187,8 @@ function register_edgestatetype!(types::ModelTypes, ::Type{T}, traits...;
     types
 end
 
-register_edgestatetype!(t::Type{T}, props...; kwargs...) where T =
-    types -> register_edgestatetype!(types, t, props...; kwargs...) 
+register_edgetype!(t::Type{T}, props...; kwargs...) where T =
+    types -> register_edgetype!(types, t, props...; kwargs...) 
 
 has_trait(sim, T::DataType, trait::Symbol, ge = :Edge) =
     if ge == :Edge

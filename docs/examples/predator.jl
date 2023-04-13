@@ -137,13 +137,13 @@ const ppsim = ModelTypes() |>
     register_agenttype!(Predator) |>
     register_agenttype!(Prey) |>
     register_agenttype!(Cell) |>
-    register_edgestatetype!(PredatorPosition, :SingleType; target = Cell) |>
-    register_edgestatetype!(PreyPosition, :SingleType; target = Cell) |>
-    register_edgestatetype!(PredatorView) |>
-    register_edgestatetype!(PreyView) |>
-    register_edgestatetype!(VisiblePrey, :SingleType; target = Predator) |> 
-    register_edgestatetype!(Die, :HasEdgeOnly) |>
-    register_edgestatetype!(Eat, :HasEdgeOnly) |>
+    register_edgetype!(PredatorPosition, :SingleType; target = Cell) |>
+    register_edgetype!(PreyPosition, :SingleType; target = Cell) |>
+    register_edgetype!(PredatorView) |>
+    register_edgetype!(PreyView) |>
+    register_edgetype!(VisiblePrey, :SingleType; target = Predator) |> 
+    register_edgetype!(Die, :HasEdgeOnly) |>
+    register_edgetype!(Eat, :HasEdgeOnly) |>
     create_model("Predator Prey") |>
     create_simulation(AllParams(), PPGlobals())
 

@@ -42,13 +42,13 @@ end
 
 const model_withtraits = ModelTypes() |>
     register_agenttype!(HKAgent, :Immortal) |>
-    register_edgestatetype!(Knows, :Stateless, :SingleType; target=HKAgent, size = 1000) |>
+    register_edgetype!(Knows, :Stateless, :SingleType; target=HKAgent, size = 1000) |>
     create_model("Hegselmann-Krause-Traits");
 
 const sim = create_simulation(model_traitless, HKParams(0.2), nothing);
 const model = ModelTypes() |>
     register_agenttype!(HKAgent, :Immortal) |>
-    register_edgestatetype!(Knows, :Stateless, :SingleType; target = HKAgent) |>
+    register_edgetype!(Knows, :Stateless, :SingleType; target = HKAgent) |>
     create_model("Hegselmann-Krause-Traits");
 
 const sim_traits = create_simulation(model, HKParams(0.2), nothing);

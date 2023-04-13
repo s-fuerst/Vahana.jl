@@ -38,7 +38,7 @@ end
 
 const hkmodel = ModelTypes() |>
     register_agenttype!(HKAgent) |>
-    register_edgestatetype!(Knows) |>
+    register_edgetype!(Knows) |>
     create_model("Hegselmann-Krause");
 
 # # Add the graph 

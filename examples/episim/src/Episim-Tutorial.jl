@@ -302,11 +302,11 @@ end
 const sim = ModelTypes() |>
         register_agenttype!(Person) |>
         register_agenttype!(Location) |>
-        register_edgestatetype!(MovementEvent) |>
-        register_edgestatetype!(Contact) |>
-        register_edgestatetype!(EndOfDay) |>
-        register_edgestatetype!(Infection) |>
-        register_edgestatetype!(Inform) |>
+        register_edgetype!(MovementEvent) |>
+        register_edgetype!(Contact) |>
+        register_edgetype!(EndOfDay) |>
+        register_edgetype!(Infection) |>
+        register_edgetype!(Inform) |>
         create_model("Episim-Nutshell") |>
         create_simulation(Params(θ=-0.001, tracing=0.25),
                        Globals(reports = Vector(), day = 0))

@@ -24,7 +24,7 @@ struct EdgeState end
 
 const sim = ModelTypes() |>
     register_agenttype!(Agent) |>
-    register_edgestatetype!(EdgeState) |>
+    register_edgetype!(EdgeState) |>
     create_model("Minimal Example") |>
     create_simulation(nothing, nothing)
 ```
@@ -40,7 +40,7 @@ edge types.
 ```@docs
 ModelTypes
 register_agenttype!
-register_edgestatetype!
+register_edgetype!
 ```
 
 !!! tip

@@ -291,7 +291,7 @@ two algorithms are supported:
     ranks then 0 will be discarded. If this is not intended
     `distribute` must be set to false.
 
-See also [`register_agenttype!`](@ref), [`register_edgestatetype!`](@ref),
+See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 [`apply!`](@ref) and [`finish_simulation!`](@ref)
 """
 function finish_init!(sim;

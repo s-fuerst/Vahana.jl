@@ -42,24 +42,24 @@ allEdgeTypes = [ statelessEdgeTypes; statefulEdgeTypes ]
 model_edges = ModelTypes() |>
     register_agenttype!(Agent) |>
     register_agenttype!(AgentB) |>
-    register_edgestatetype!(EdgeD) |>
-    register_edgestatetype!(EdgeS, :Stateless) |>
-    register_edgestatetype!(EdgeE, :SingleEdge) |>
-    register_edgestatetype!(EdgeT, :SingleType; target = Agent) |>
-    register_edgestatetype!(EdgeI, :IgnoreFrom) |>
-    register_edgestatetype!(EdgeSE, :Stateless, :SingleEdge) |>
-    register_edgestatetype!(EdgeST, :Stateless, :SingleType; target = Agent) |>
-    register_edgestatetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
-    register_edgestatetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
-    register_edgestatetype!(EdgeTI, :SingleType, :IgnoreFrom; target = Agent) |>
-    register_edgestatetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
-    register_edgestatetype!(EdgeSTI, :Stateless, :SingleType, :IgnoreFrom; target = Agent) |>
-    register_edgestatetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = Agent) |>
-    register_edgestatetype!(EdgeTs, :SingleType; target = Agent, size = 10) |>
-    register_edgestatetype!(EdgeTsI, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
-    register_edgestatetype!(EdgeSTs, :Stateless, :SingleType; target = Agent, size = 10) |>
-    register_edgestatetype!(EdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
-    register_edgestatetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
+    register_edgetype!(EdgeD) |>
+    register_edgetype!(EdgeS, :Stateless) |>
+    register_edgetype!(EdgeE, :SingleEdge) |>
+    register_edgetype!(EdgeT, :SingleType; target = Agent) |>
+    register_edgetype!(EdgeI, :IgnoreFrom) |>
+    register_edgetype!(EdgeSE, :Stateless, :SingleEdge) |>
+    register_edgetype!(EdgeST, :Stateless, :SingleType; target = Agent) |>
+    register_edgetype!(EdgeSI, :Stateless, :IgnoreFrom) |>
+    register_edgetype!(EdgeEI, :SingleEdge, :IgnoreFrom) |>
+    register_edgetype!(EdgeTI, :SingleType, :IgnoreFrom; target = Agent) |>
+    register_edgetype!(EdgeSEI, :Stateless, :SingleEdge, :IgnoreFrom) |>
+    register_edgetype!(EdgeSTI, :Stateless, :SingleType, :IgnoreFrom; target = Agent) |>
+    register_edgetype!(EdgeSETI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = Agent) |>
+    register_edgetype!(EdgeTs, :SingleType; target = Agent, size = 10) |>
+    register_edgetype!(EdgeTsI, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
+    register_edgetype!(EdgeSTs, :Stateless, :SingleType; target = Agent, size = 10) |>
+    register_edgetype!(EdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
+    register_edgetype!(EdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = Agent, size = 10) |>
     create_model("Test Edges")
 
 

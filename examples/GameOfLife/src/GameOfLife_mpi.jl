@@ -58,7 +58,7 @@ end
 
 model = ModelTypes() |>
     register_agenttype!(Cell, :Immortal) |>
-    register_edgestatetype!(Neighbor; target = Cell) |>
+    register_edgetype!(Neighbor; target = Cell) |>
     create_model("Game of Life")
 
 

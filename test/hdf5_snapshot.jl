@@ -70,9 +70,9 @@ end
     model_default = ModelTypes() |>
         register_agenttype!(Agent) |>
         register_agenttype!(RasterAgent) |>
-        register_edgestatetype!(EdgeState) |>
-        register_edgestatetype!(RasterEdge) |>
-        register_edgestatetype!(StatelessEdge) |>
+        register_edgetype!(EdgeState) |>
+        register_edgetype!(RasterEdge) |>
+        register_edgetype!(StatelessEdge) |>
         create_model("hdf5_default")
 
     test_write_restore(model_default)
@@ -80,9 +80,9 @@ end
     model_immortal = ModelTypes() |>
         register_agenttype!(Agent, :Immortal) |>
         register_agenttype!(RasterAgent) |>
-        register_edgestatetype!(EdgeState, :IgnoreFrom) |>
-        register_edgestatetype!(RasterEdge) |>
-        register_edgestatetype!(StatelessEdge, :Stateless) |>
+        register_edgetype!(EdgeState, :IgnoreFrom) |>
+        register_edgetype!(RasterEdge) |>
+        register_edgetype!(StatelessEdge, :Stateless) |>
         create_model("hdf5_ignore_immortal")
 
     test_write_restore(model_immortal)
@@ -90,9 +90,9 @@ end
     model_neighbors = ModelTypes() |>
         register_agenttype!(Agent, :Immortal) |>
         register_agenttype!(RasterAgent) |>
-        register_edgestatetype!(EdgeState, :NumEdgesOnly) |>
-        register_edgestatetype!(RasterEdge) |>
-        register_edgestatetype!(StatelessEdge, :HasEdgeOnly, :SingleType; target = Agent) |>
+        register_edgetype!(EdgeState, :NumEdgesOnly) |>
+        register_edgetype!(RasterEdge) |>
+        register_edgetype!(StatelessEdge, :HasEdgeOnly, :SingleType; target = Agent) |>
                                create_model("hdf5_neighbors")
 
     test_write_restore(model_neighbors)

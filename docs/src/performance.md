@@ -52,7 +52,7 @@ version, so we ignore the agent type properties for now.
 ### Edge Traits
 
 There exist four possible traits for the edge types, that can be 
-set as optional [`register_edgestatetype!`](@ref) arguments:
+set as optional [`register_edgetype!`](@ref) arguments:
 
 - `:IgnoreFrom`: The ID of the source node is not stored. 
 - `:Stateless`: Store only the ID of the source node. 
@@ -83,13 +83,13 @@ example.
 	
 	If you combine `:SingleType` and `:SingleEdge` without
 	`:IgnoreFrom` and `:Stateless`, you will get a warning when
-	`register_edgestatetype!` is called . This warning can be suppressed by
+	`register_edgetype!` is called . This warning can be suppressed by
 	calling `suppress_warnings(true)` after importing Vahana.
 
 #### :SingleType `target` keyword argument 
 
 When `:SingleType` is set it is necessary to add to
-[`register_edgestatetype!`](@ref) the `target` keyword argument. The value of
+[`register_edgetype!`](@ref) the `target` keyword argument. The value of
 this argument must be the type of the target nodes. In the case that
 it's known how many agents of this type exists, this can be also given
 via the optional keyword `size`.
@@ -119,7 +119,7 @@ function from the list above.
 #### Special Trait Combinations
 
 Two property combinations can also be set in
-[`register_edgestatetype!`](@ref) via a single symbol that directly
+[`register_edgetype!`](@ref) via a single symbol that directly
 expresses the intent of the combination:
 
 - `:NumEdgesOnly`: This corresponds to the combination `:IgnoreFrom`

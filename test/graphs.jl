@@ -10,7 +10,7 @@ struct GraphE end
 
 model_graph = ModelTypes() |>
     register_agenttype!(GraphA) |>
-    register_edgestatetype!(GraphE) |>
+    register_edgetype!(GraphE) |>
     create_model("Test Graph")
 
 @testset "Graphs" begin

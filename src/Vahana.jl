@@ -105,7 +105,7 @@ This design decision was made so as not to confuse users, since then,
 for example, the [`edges`](@ref) is not available.
 
 This behaviour can be customized by calling `detect_stateless_trait` before
-calling [`register_edgestatetype!`](@ref).
+calling [`register_edgetype!`](@ref).
 """
 detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
 
