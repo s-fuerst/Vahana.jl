@@ -94,7 +94,10 @@ function construct_prettyprinting_methods(simsymbol)
                         
                     end
                     if ! (:SingleType in edgetypetraits)
-                        print(io, " for $(_show_num_a_with_e(sim, t)) agent(s) on this rank")
+                        print(io, " for $(_show_num_a_with_e(sim, t)) agent(s)")
+                        if mpi.active
+                            print(io, " on this rank")
+                        end
                     end
                 end
             end
