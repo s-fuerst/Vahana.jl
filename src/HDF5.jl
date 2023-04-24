@@ -2,11 +2,14 @@ using MPI
 
 using HDF5
 
+import NamedTupleTools: ntfromstruct, structfromnt
+
 export create_h5file!, open_h5file, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export list_snapshots
 export Pos, Pos2D, Pos3D
+export create_namedtuple_struct_converter
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
 # are using those. The Pos2D/3D types can be used to add a Cell position
 # to an agent state, with automatical conversion from an Cartesianindex.
@@ -818,3 +821,11 @@ function list_snapshots(name::String)
 end
 
 list_snapshots(sim::Simulation) = list_snapshots(sim.name)
+
+import Base.convert
+function create_namedtuple_struct_converter(T::DataType)
+    NT = NamedTuple{fieldnames(T), Tuple{fieldtypes(T)...}}
+    @eval convert(::Type{$NT}, st::$T) = ntfromstruct(st)
+    @eval convert(::Type{$T}, nt::$NT) = structfromnt($T, nt)
+end
+    

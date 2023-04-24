@@ -22,6 +22,7 @@ export agent_id
 
 export add_agent!, add_agents!
 export agentstate, agentstate_flexible
+export all_agents
 
 export num_agents
 
