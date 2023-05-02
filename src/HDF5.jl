@@ -759,7 +759,8 @@ end
 function read_snapshot!(sim::Simulation,
                  name::String = sim.name;
                  transition = typemax(Int64),
-                 writeable = false)
+                 writeable = false,
+                 ignore_params = false)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -773,7 +774,7 @@ function read_snapshot!(sim::Simulation,
     end
     foreach(close, fids)
 
-    if sim.params !== nothing
+    if ignore_params == false && sim.params !== nothing
         sim.params = read_params(name, typeof(sim.params))
     end
 
