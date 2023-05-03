@@ -63,12 +63,16 @@ edges as arguments.
 See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edge!`](@ref)
 """
 function add_edges!(sim, to::AgentID, edges::Vector{Edge{T}}) where T
-    [ add_edge!(sim, to, e) for e in edges ]
+    for e in edges
+        add_edge!(sim, to, e) 
+    end
     nothing
 end
 
 function add_edges!(sim, to::AgentID, edges::Edge{T}...) where T
-    [ add_edge!(sim, to, e) for e in edges ]
+    for e in edges
+        add_edge!(sim, to, e)
+    end
     nothing
 end
 

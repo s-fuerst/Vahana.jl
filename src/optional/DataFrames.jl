@@ -13,7 +13,7 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
         df.id = map(nr -> agent_id(tid, agent_nr(AgentID(nr))),
                      1:length(read.state))
         if fieldcount(T) > 0
-            df = hcat(df, DataFrame(read.state))
+            df = hcat(df, DataFrame(read.state); make_unique = true)
         end
         if ! has_trait(sim, T, :Immortal, :Agent)
             subset!(df, :id => id -> .! read.died[agent_nr.(id)])
@@ -47,9 +47,9 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
             if ! has_trait(sim, T, :Stateless)
                 if ! has_trait(sim, T, :IgnoreFrom)
                     states = map(e -> e.state, last.(edges))
-                    df = hcat(df, DataFrame(states))
+                    df = hcat(df, DataFrame(states); makeunique = true)
                 else
-                    df = hcat(df, DataFrame(last.(edges)))
+                    df = hcat(df, DataFrame(last.(edges)); makeunique = true)
                 end
             end
         end
@@ -59,9 +59,9 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
             totype = tinfos.edges_attr[T][:target]
             totypeid = tinfos.nodes_type2id[totype]
             df.to = map(id -> agent_id(totypeid, AgentNr(id)), df.to)
-            if ! has_trait(sim, T, :IgnoreFrom)
-                df.from = map(id -> agent_id(totypeid, AgentNr(id)), df.from)
-            end
+            # if ! has_trait(sim, T, :IgnoreFrom)
+            #     df.from = map(id -> agent_id(totypeid, AgentNr(id)), df.from)
+            # end
         end
         if show_types
             if ! has_trait(sim, T, :IgnoreFrom)

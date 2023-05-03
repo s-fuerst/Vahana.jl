@@ -135,8 +135,8 @@ function close_h5file!(sim::Simulation)
 end
 
 function write_globals(sim::Simulation,
-                fields = sim.globals === nothing ?
-                    nothing : fieldnames(typeof(sim.globals)))
+                       fields = sim.globals === nothing ?
+                           nothing : fieldnames(typeof(sim.globals)))
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -176,7 +176,7 @@ function write_globals(sim::Simulation,
 end
 
 function write_agents(sim::Simulation,
-               types::Vector{DataType} = sim.typeinfos.nodes_types)
+                      types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -255,7 +255,7 @@ _neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
     fieldcount(T) == 0) && has_trait(sim, T, :IgnoreFrom)
 
 function write_edges(sim::Simulation,
-              types::Vector{DataType} = sim.typeinfos.edges_types)
+                     types::Vector{DataType} = sim.typeinfos.edges_types)
     if sim.h5file === nothing
         create_h5file!(sim)
     end
@@ -578,9 +578,9 @@ function read_globals(name::String, T::DataType, transition = typemax(Int64))
 end
 
 function read_agents!(sim::Simulation,
-               name::String;
-               transition = typemax(Int64),
-               types::Vector{DataType} = sim.typeinfos.nodes_types)
+                      name::String;
+                      transition = typemax(Int64),
+                      types::Vector{DataType} = sim.typeinfos.nodes_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -631,10 +631,10 @@ end
 
 
 function read_edges!(sim::Simulation,
-              name::String;
-              idmapfunc = identity,
-              transition = typemax(Int64),
-              types::Vector{DataType} = sim.typeinfos.edges_types)
+                     name::String;
+                     idmapfunc = identity,
+                     transition = typemax(Int64),
+                     types::Vector{DataType} = sim.typeinfos.edges_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -684,7 +684,7 @@ function read_edges!(sim::Simulation,
 end
 
 
-function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
+function _read_edges!(sim::Simulation, peid, rank, idmapfunc, T)
     field = getproperty(sim, Symbol(T))
 
     numedges = length(peid[])
@@ -724,9 +724,20 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc,T)
             add_edge!(sim, dummy, idmapfunc(edge.to), edge.state)
         end
     else
-        for ce in HDF5.read(peid, CompleteEdge{T})
-            add_edge!(sim, idmapfunc(ce.edge.from), idmapfunc(ce.to),
-                      ce.edge.state)
+        if has_trait(sim, T, :SingleType)
+            totype = sim.typeinfos.edges_attr[T][:target]
+            totypeid = sim.typeinfos.nodes_type2id[totype]
+            for ce in HDF5.read(peid, CompleteEdge{T})
+                add_edge!(sim,
+                          idmapfunc(ce.edge.from),
+                          idmapfunc(agent_id(totypeid, ce.to)),
+                          ce.edge.state)
+            end   
+        else
+            for ce in HDF5.read(peid, CompleteEdge{T})
+                add_edge!(sim, idmapfunc(ce.edge.from), idmapfunc(ce.to),
+                          ce.edge.state)
+            end
         end
     end
 end
@@ -829,4 +840,4 @@ function create_namedtuple_struct_converter(T::DataType)
     @eval convert(::Type{$NT}, st::$T) = ntfromstruct(st)
     @eval convert(::Type{$T}, nt::$NT) = structfromnt($T, nt)
 end
-    
+

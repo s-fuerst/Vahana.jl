@@ -50,7 +50,7 @@ const SHIFT_RANK = BITS_AGENTNR
 function agent_id(typeID::TypeID, rank::Int64, agent_nr::AgentNr)::AgentID
     @mayassert typeID <= 2 ^ BITS_TYPE
     @mayassert rank <= 2 ^ BITS_PROCESS
-    @mayassert agent_nr <= 2 ^ BITS_AGENTNR
+    @mayassert agent_nr <= 2 ^ BITS_AGENTNR "agent_nr $(agent_nr) is too big"
     AgentID(typeID) << SHIFT_TYPE +
         rank << SHIFT_RANK +
         agent_nr
