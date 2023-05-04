@@ -135,8 +135,8 @@ function close_h5file!(sim::Simulation)
 end
 
 function write_globals(sim::Simulation,
-                       fields = sim.globals === nothing ?
-                           nothing : fieldnames(typeof(sim.globals)))
+                fields = sim.globals === nothing ?
+                    nothing : fieldnames(typeof(sim.globals)))
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -176,7 +176,7 @@ function write_globals(sim::Simulation,
 end
 
 function write_agents(sim::Simulation,
-                      types::Vector{DataType} = sim.typeinfos.nodes_types)
+               types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -255,7 +255,9 @@ _neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
     fieldcount(T) == 0) && has_trait(sim, T, :IgnoreFrom)
 
 function write_edges(sim::Simulation,
-                     types::Vector{DataType} = sim.typeinfos.edges_types)
+              types::Vector{DataType} = sim.typeinfos.edges_types)
+
+    @info types mpi.rank
     if sim.h5file === nothing
         create_h5file!(sim)
     end
@@ -355,7 +357,9 @@ function write_edges(sim::Simulation,
     nothing
 end
 
-function write_snapshot(sim::Simulation, comment::String = "")
+function write_snapshot(sim::Simulation, comment::String = ""; ignore = [])
+    ignore = applicable(iterate, ignore) ? ignore : [ ignore ]
+
     if sim.h5file === nothing
         create_h5file!(sim)
     end
@@ -363,15 +367,17 @@ function write_snapshot(sim::Simulation, comment::String = "")
     fid = sim.h5file
     gid = create_group(fid["snapshots"], transition_str(sim))
     attrs(gid)["comment"] = comment
+    attrs(gid)["ignored"] = string(ignore)
 
     attrs(fid)["last_snapshot"] = sim.num_transitions
 
     if sim.globals !== nothing
         write_globals(sim)
     end
-    
-    write_agents(sim)
-    write_edges(sim)
+
+    @info "write_snap" mpi.rank ignore filter(t -> !(t in ignore), sim.typeinfos.edges_types)
+    write_agents(sim, filter(t -> !(t in ignore), sim.typeinfos.nodes_types))
+    write_edges(sim, filter(t -> !(t in ignore), sim.typeinfos.edges_types))
 end
 
 # Returns a vector of fids (h5 file handles). The size of the vector
@@ -578,9 +584,9 @@ function read_globals(name::String, T::DataType, transition = typemax(Int64))
 end
 
 function read_agents!(sim::Simulation,
-                      name::String;
-                      transition = typemax(Int64),
-                      types::Vector{DataType} = sim.typeinfos.nodes_types)
+               name::String;
+               transition = typemax(Int64),
+               types::Vector{DataType} = sim.typeinfos.nodes_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -631,10 +637,10 @@ end
 
 
 function read_edges!(sim::Simulation,
-                     name::String;
-                     idmapfunc = identity,
-                     transition = typemax(Int64),
-                     types::Vector{DataType} = sim.typeinfos.edges_types)
+              name::String;
+              idmapfunc = identity,
+              transition = typemax(Int64),
+              types::Vector{DataType} = sim.typeinfos.edges_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -772,6 +778,10 @@ function read_snapshot!(sim::Simulation,
                  transition = typemax(Int64),
                  writeable = false,
                  ignore_params = false)
+    # First finish the current simulation, to free memory allocated
+    # via MPI
+    finish_simulation!(sim)
+
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return

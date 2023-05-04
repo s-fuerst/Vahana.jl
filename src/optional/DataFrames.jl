@@ -13,7 +13,7 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
         df.id = map(nr -> agent_id(tid, agent_nr(AgentID(nr))),
                      1:length(read.state))
         if fieldcount(T) > 0
-            df = hcat(df, DataFrame(read.state); make_unique = true)
+            df = hcat(df, DataFrame(read.state))
         end
         if ! has_trait(sim, T, :Immortal, :Agent)
             subset!(df, :id => id -> .! read.died[agent_nr.(id)])
