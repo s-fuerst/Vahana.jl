@@ -47,12 +47,32 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
+function add_number_to_file(filename)
+    i = 0
+    while true
+        i += 1
+        if i < 999999
+            numbered = filename * '-' * lpad(string(i), 6, "0")
+        else
+            numbered = filename * '-' * string(i)
+        end
+        if ! isfile(numbered * ".h5") && ! isfile(numbered * "_0.h5")
+            return numbered
+        end
+    end
+end
+
 function create_h5file!(sim::Simulation, filename = sim.filename)
     @assert sim.initialized "You can write only initialized simulations"
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
     end
+    
     filename = mkpath("h5") * "/" * filename
+
+    if ! sim.overwrite_file
+        filename = add_number_to_file(filename)
+    end
     
     fid = if parallel_write()
         _log_info(sim, "Create hdf5 file in parallel mode")

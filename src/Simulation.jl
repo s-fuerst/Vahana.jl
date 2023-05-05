@@ -124,6 +124,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(model::Model),
                   :(name::String),
                   :(filename::String),
+                  :(overwrite_file::Bool),
                   :(params::P),
                   :(globals::G),
                   :(globals_last_change::Int64),
@@ -165,7 +166,7 @@ end
 num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
 
 """
-    create_simulation(model::Model, params = nothing, globals = nothing; name = model.name, filename = name, logging = false, debug = false)
+    create_simulation(model::Model, params = nothing, globals = nothing; name = model.name, filename = name, overwrite_file = true, logging = false, debug = false)
 
 Creates and return a new simulation object, which stores the complete state 
 of a simulation. 
@@ -187,8 +188,14 @@ name of the model is used instead.
 
 The optional `filename` keyword is a string that will be used as the
 name of the h5 file when a simulation or a part of it is written via
-e.g. `write_snapshot`. The file is created in a `h5` subfolder. If
-`filename` is not provided, the `name` argument is used instead.
+e.g. `write_snapshot`. 
+
+The file is created when a `write...` function is called for the first time,
+and it is created in an `h5` subfolder. By default an existing file
+with the same `filename` will be overwritten, but this behavior can be
+disabled with the `overwrite_file` keyword, in which case the files
+will be numbered. If `filename` is not provided, the `name` argument
+is used instead.
 
 The keywords `logging` is a boolean flag that enables an automatical log file.
 The log file contains information such as the time spent in different functions. When also `debug` is set to true, the log file contains more details and the
@@ -207,13 +214,14 @@ function create_simulation(model::Model,
                  params::P = nothing,
                  globals::G = nothing;
                  name = model.name,
-                 filename = name,
+                 filename = name, overwrite_file = true,
                  logging = false, debug = false) where {P, G}
     
     sim::Simulation = @eval $(Symbol(model.name))(
         model = $model,
         name = $name,
         filename = $filename,
+        overwrite_file = $overwrite_file,
         params = $params,
         globals = $globals,
         globals_last_change = 0,
