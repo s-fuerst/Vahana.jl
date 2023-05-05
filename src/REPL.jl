@@ -154,14 +154,7 @@ function _reconstruct_edge(sim, e, edgetypetraits, edgeT)
         if :IgnoreFrom in edgetypetraits
             Edge(AgentID(0), edgeT())
         else
-            # if :SingleEdge in edgetypetraits
-            #     @info edgeT sim.typeinfos.edges_attr[edgeT] e
-            #     agentT = sim.typeinfos.edges_attr[edgeT][:target]
-            #     aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e))
-            #     Edge(aid, edgeT())
-            # else
             Edge(e, edgeT())
-            # end
         end
     elseif :IgnoreFrom in edgetypetraits
         Edge(AgentID(0), e)
@@ -173,8 +166,6 @@ end
 function _show_edge(sim, e, neighborstate, edgeT)
     function show_struct(s)
         if nfields(s) >= 1
-            first = true
-            # printstyled("\n$(name)(s):"; color = :cyan)
             for k in typeof(s) |> fieldnames
                 if k in neighborstate
                     f = getfield(s, k)

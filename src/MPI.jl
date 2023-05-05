@@ -330,6 +330,17 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         with_logger(sim) do
             @debug "<Begin> edges_alltoall!" edgetype=$T
         end
+        # we call add_edge! but add_edge! has an check that we
+        # are in the initialization phase or in a transition function.
+        # So we set the intranstion flag, is necessary
+        wasintransition = sim.intransition
+        sim.intransition = true
+
+        # see comments for prepare_read/write
+        if sim.initialized
+            @assert @edgeread($T) === @edgewrite($T)
+        end
+
         # for sending them via AllToAll we flatten the perPE structure
         longvec = reduce(vcat, perPE)
         sendbuf = if length(longvec) > 0
@@ -388,6 +399,8 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
 
         @edge($T).last_transmit = sim.num_transitions
 
+        sim.intransition = wasintransition 
+        
         _log_debug(sim, "<End> edges_alltoall!")
 
         nothing

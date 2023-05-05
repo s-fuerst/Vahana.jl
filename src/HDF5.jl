@@ -257,7 +257,6 @@ _neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
 function write_edges(sim::Simulation,
               types::Vector{DataType} = sim.typeinfos.edges_types)
 
-    @info types mpi.rank
     if sim.h5file === nothing
         create_h5file!(sim)
     end
@@ -375,7 +374,6 @@ function write_snapshot(sim::Simulation, comment::String = ""; ignore = [])
         write_globals(sim)
     end
 
-    @info "write_snap" mpi.rank ignore filter(t -> !(t in ignore), sim.typeinfos.edges_types)
     write_agents(sim, filter(t -> !(t in ignore), sim.typeinfos.nodes_types))
     write_edges(sim, filter(t -> !(t in ignore), sim.typeinfos.edges_types))
 end

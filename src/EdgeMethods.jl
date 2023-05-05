@@ -512,6 +512,10 @@ by calling suppress_warnings(true) after importing Vahana.
         @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
     end
     
+    # It is important that prepare_read! is called before prepare_write!,
+    # as in edges_alltoall! the edges are added via add_edge! to the
+    # @edgewrite collection. But between finish_write! and prepare_write!
+    # @edgeread == @edgewrite.
     @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, t::Type{$MT})
         if add_existing
             @edgewrite($T) = deepcopy(@edgeread($T))
@@ -527,6 +531,8 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
+    # It is important that prepare_read! is called before prepare_write!,
+    # (the reasoning behind this is mentioned already above).
     @eval function prepare_read!(sim::$simsymbol, _::Vector{DataType}, ::Type{$MT})
         # finish_init! already transmit the edges, so we check last_change > 0
         if @edge($T).last_transmit <= @edge($T).last_change &&
