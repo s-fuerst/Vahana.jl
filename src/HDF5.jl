@@ -1,6 +1,7 @@
 using MPI
 
 using HDF5
+using H5Zblosc
 
 import NamedTupleTools: ntfromstruct, structfromnt
 
@@ -47,15 +48,19 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
+function add_number_to_file(filename, i)
+    if i < 999999
+        filename * '-' * lpad(string(i), 6, "0")
+    else
+        filename * '-' * string(i)
+    end
+end
+
 function add_number_to_file(filename)
     i = 0
     while true
         i += 1
-        if i < 999999
-            numbered = filename * '-' * lpad(string(i), 6, "0")
-        else
-            numbered = filename * '-' * string(i)
-        end
+        numbered = add_number_to_file(filename, i)
         if ! isfile(numbered * ".h5") && ! isfile(numbered * "_0.h5")
             return numbered
         end
@@ -225,7 +230,9 @@ function write_agents(sim::Simulation,
                 end
                 peid = create_group(tid, "pe_" * string(pe))
                 if ! has_trait(sim, T, :Immortal, :Agent)
-                    create_dataset(peid, "died", Bool, vec_num_agents[pe+1])
+                    create_dataset(peid, "died", Bool, vec_num_agents[pe+1],
+                                   chunk=(vec_num_agents[pe+1],),
+                                   shuffle=(), blosc=config.compression_level)
                     if pe == mpi.rank 
                         peid["died"][:] = field.read.died
                     end
@@ -233,7 +240,9 @@ function write_agents(sim::Simulation,
                 if fieldcount(T) > 0
                     create_dataset(peid, "state",
                                    HDF5.Datatype(HDF5.hdf5_type_id(T)),
-                                   dataspace((Int64(vec_num_agents[pe+1]),)))
+                                   dataspace((Int64(vec_num_agents[pe+1]),)),
+                                   chunk=(vec_num_agents[pe+1],),
+                                   shuffle=(), blosc=config.compression_level)
                     if pe == mpi.rank 
                         peid["state"][:] = field.read.state
                     end
@@ -313,33 +322,58 @@ function write_edges(sim::Simulation,
                     continue
                 end
                 pename = "pe_" * string(pe)
-                # what we write depends on :Stateless and :IgnoreFrom,
-                # so we have four different cases 
-                if _neighbors_only(sim, T)
-                    if has_trait(sim, T, :SingleType)
-                        create_dataset(tid, pename, eltype(edges),
-                                       vec_num_edges[pe+1])
+                # when the number of edges are 0, we still create an
+                # empty dataset, the exact Datatype is not important
+                # in this case (Nothing would make more sense, but is
+                # not allowed)
+                if vec_num_edges[pe+1] == 0
+                    create_dataset(tid, pename,
+                                   HDF5.Datatype(HDF5.hdf5_type_id(Int64)),
+                                   dataspace(nothing))
+                else
+                    # what we write depends on :Stateless and :IgnoreFrom,
+                    # so we have four different cases
+                    if _neighbors_only(sim, T)
+                        if has_trait(sim, T, :SingleType)
+                            create_dataset(tid, pename, eltype(edges),
+                                           vec_num_edges[pe+1];
+                                           chunk=(vec_num_edges[pe+1],),
+                                           shuffle=(),
+                                           blosc=config.compression_level)
+                        else
+                            create_dataset(tid, pename,
+                                           HDF5.Datatype(HDF5.hdf5_type_id(
+                                               EdgeCount)),
+                                           dataspace((Int64(vec_num_edges[pe+1]),));
+                                           chunk=(vec_num_edges[pe+1],),
+                                           shuffle=(),
+                                           blosc=config.compression_level)
+                        end
+                    elseif fieldcount(T) == 0
+                        create_dataset(tid, pename,
+                                       HDF5.Datatype(HDF5.hdf5_type_id(
+                                           StatelessEdge)),
+                                       dataspace((Int64(vec_num_edges[pe+1]),));
+                                       chunk=(vec_num_edges[pe+1],),
+                                       shuffle=(),
+                                       blosc=config.compression_level)
+                    elseif has_trait(sim, T, :IgnoreFrom)
+                        create_dataset(tid, pename,
+                                       HDF5.Datatype(HDF5.hdf5_type_id(
+                                           IgnoreFromEdge{T})),
+                                       dataspace((Int64(vec_num_edges[pe+1]),));
+                                       chunk=(vec_num_edges[pe+1],),
+                                       shuffle=(),
+                                       blosc=config.compression_level)
                     else
                         create_dataset(tid, pename,
                                        HDF5.Datatype(HDF5.hdf5_type_id(
-                                           EdgeCount)),
-                                       dataspace((Int64(vec_num_edges[pe+1]),)))
+                                           CompleteEdge{T})),
+                                       dataspace((Int64(vec_num_edges[pe+1]),));
+                                       chunk=(vec_num_edges[pe+1],),
+                                       shuffle=(),
+                                       blosc=config.compression_level)
                     end
-                elseif fieldcount(T) == 0
-                    create_dataset(tid, pename,
-                                   HDF5.Datatype(HDF5.hdf5_type_id(
-                                       StatelessEdge)),
-                                   dataspace((Int64(vec_num_edges[pe+1]),)))
-                elseif has_trait(sim, T, :IgnoreFrom)
-                    create_dataset(tid, pename,
-                                   HDF5.Datatype(HDF5.hdf5_type_id(
-                                       IgnoreFromEdge{T})),
-                                   dataspace((Int64(vec_num_edges[pe+1]),)))
-                else     
-                    create_dataset(tid, pename,
-                                   HDF5.Datatype(HDF5.hdf5_type_id(
-                                       CompleteEdge{T})),
-                                   dataspace((Int64(vec_num_edges[pe+1]),)))
                 end
 
                 if pe == mpi.rank 
@@ -588,7 +622,13 @@ function read_params(name::String, T::DataType)
     T(values...)
 end
 
-function read_globals(name::String, T::DataType, transition = typemax(Int64))
+read_params(sim, T::DataType) =
+    read_params(sim.filename, T)
+
+read_params(sim, nr::Int64, T::DataType) =
+    read_params(add_number_to_file(sim.filename, nr), T)
+
+function read_globals(name::String, T::DataType; transition = typemax(Int64))
     fids = open_h5file(nothing, name)
     if length(fids) == 0
         return
@@ -601,8 +641,14 @@ function read_globals(name::String, T::DataType, transition = typemax(Int64))
     T(values...)
 end
 
+read_globals(sim, T::DataType; transition = typemax(Int64)) =
+    read_globals(sim.filename, T; transition)
+
+read_globals(sim, nr::Int64, T::DataType; transition = typemax(Int64)) =
+    read_globals(add_number_to_file(sim.filename, nr), T; transition)
+
 function read_agents!(sim::Simulation,
-               name::String;
+               name::String = sim.filename;
                transition = typemax(Int64),
                types::Vector{DataType} = sim.typeinfos.nodes_types)
     fids = open_h5file(sim, name)
@@ -653,9 +699,15 @@ function read_agents!(sim::Simulation,
     idmapping
 end
 
+read_agents!(sim::Simulation,
+             nr::Int64;
+             transition = typemax(Int64),
+             types::Vector{DataType} = sim.typeinfos.nodes_types) = 
+                 read_agents!(sim, add_number_to_file(sim.filename, nr);
+                              transition, types)
 
 function read_edges!(sim::Simulation,
-              name::String;
+              name::String = sim.filename;
               idmapfunc = identity,
               transition = typemax(Int64),
               types::Vector{DataType} = sim.typeinfos.edges_types)
@@ -706,6 +758,14 @@ function read_edges!(sim::Simulation,
     
     foreach(close, fids)
 end
+
+read_edges!(sim::Simulation,
+            nr::Int64;
+            idmapfunc = identity,
+            transition = typemax(Int64),
+            types::Vector{DataType} = sim.typeinfos.nodes_types) = 
+                read_edges!(sim, add_number_to_file(sim.filename, nr);
+                            idmapfunc, transition, types)
 
 
 function _read_edges!(sim::Simulation, peid, rank, idmapfunc, T)
@@ -767,7 +827,7 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc, T)
 end
 
 function read_rasters!(sim::Simulation,
-                name::String;
+                name::String = sim.filename;
                 idmapping)
     # the rasters are immutable arrays of agents_ids. So there
     # is no need to read them more then once
@@ -791,8 +851,14 @@ function read_rasters!(sim::Simulation,
     foreach(close, fids)
 end
 
+read_rasters!(sim::Simulation,
+              nr::Int64;
+              idmapping) = 
+                  read_rasters!(sim, add_number_to_file(sim.filename, nr);
+                                idmapping)
+
 function read_snapshot!(sim::Simulation,
-                 name::String = sim.name;
+                 name::String = sim.filename;
                  transition = typemax(Int64),
                  writeable = false,
                  ignore_params = false)
@@ -845,6 +911,15 @@ function read_snapshot!(sim::Simulation,
     sim
 end
 
+read_snapshot!(sim::Simulation,
+               nr::Int64;
+               transition = typemax(Int64),
+               writeable = false,
+               ignore_params = false) =
+                   read_snapshot!(sim, add_number_to_file(sim.filename, nr);
+                                  transition, writeable, ignore_params)
+
+
 function list_snapshots(name::String)
     fids = open_h5file(nothing, name)
     sid = fids[1]["snapshots"]
@@ -860,7 +935,11 @@ function list_snapshots(name::String)
     snapshots
 end
 
-list_snapshots(sim::Simulation) = list_snapshots(sim.name)
+list_snapshots(sim::Simulation) = list_snapshots(sim.filename)
+
+list_snapshots(sim::Simulation, nr::Int64) =
+    list_snapshots(add_number_to_file(sim.filename, nr))
+
 
 import Base.convert
 function create_namedtuple_struct_converter(T::DataType)

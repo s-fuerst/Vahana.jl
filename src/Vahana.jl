@@ -81,6 +81,7 @@ Base.@kwdef mutable struct VahanaConfig
     detect_stateless = false
     check_readable = true
     asserts_enabled = true
+    compression_level = 3
 end
 
 const config = VahanaConfig()
