@@ -80,6 +80,30 @@ function val4empty(op; kwargs...)
     emptyval
 end
 
+##################### add_number_to_file
+# when sim.overwrite is false, we automatically create filenames with
+# appended numbers (for the h5 files and also the logs)
+
+function add_number_to_file(filename, i)
+    if i < 999999
+        filename * '-' * lpad(string(i), 6, "0")
+    else
+        filename * '-' * string(i)
+    end
+end
+
+function add_number_to_file(filename)
+    i = 0
+    while true
+        i += 1
+        numbered = add_number_to_file(filename, i)
+        if ! isfile(numbered * ".h5") && ! isfile(numbered * "_0.h5") &&
+            ! isfile(numbered * "_0.log")
+            return numbered
+        end
+    end
+end
+
 #################### field symbols
 # create symbol for the different fields of an agent/edgetype
 

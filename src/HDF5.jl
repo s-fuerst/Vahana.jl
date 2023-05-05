@@ -48,25 +48,6 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
-function add_number_to_file(filename, i)
-    if i < 999999
-        filename * '-' * lpad(string(i), 6, "0")
-    else
-        filename * '-' * string(i)
-    end
-end
-
-function add_number_to_file(filename)
-    i = 0
-    while true
-        i += 1
-        numbered = add_number_to_file(filename, i)
-        if ! isfile(numbered * ".h5") && ! isfile(numbered * "_0.h5")
-            return numbered
-        end
-    end
-end
-
 function create_h5file!(sim::Simulation, filename = sim.filename)
     @assert sim.initialized "You can write only initialized simulations"
     if endswith(filename, ".h5")
@@ -230,21 +211,36 @@ function write_agents(sim::Simulation,
                 end
                 peid = create_group(tid, "pe_" * string(pe))
                 if ! has_trait(sim, T, :Immortal, :Agent)
-                    create_dataset(peid, "died", Bool, vec_num_agents[pe+1],
-                                   chunk=(vec_num_agents[pe+1],),
-                                   shuffle=(), blosc=config.compression_level)
-                    if pe == mpi.rank 
-                        peid["died"][:] = field.read.died
+                    # see comment for zero edges
+                    if vec_num_agents[pe+1] == 0
+                        create_dataset(peid, "died",
+                                       HDF5.Datatype(HDF5.hdf5_type_id(Bool)),
+                                       dataspace(nothing))
+                    else
+                        create_dataset(peid, "died", Bool, vec_num_agents[pe+1],
+                                       chunk=(vec_num_agents[pe+1],),
+                                       shuffle=(),
+                                       blosc=config.compression_level)
+                        if pe == mpi.rank 
+                            peid["died"][:] = field.read.died
+                        end
                     end
                 end
                 if fieldcount(T) > 0
-                    create_dataset(peid, "state",
-                                   HDF5.Datatype(HDF5.hdf5_type_id(T)),
-                                   dataspace((Int64(vec_num_agents[pe+1]),)),
-                                   chunk=(vec_num_agents[pe+1],),
-                                   shuffle=(), blosc=config.compression_level)
-                    if pe == mpi.rank 
-                        peid["state"][:] = field.read.state
+                    if vec_num_agents[pe+1] == 0
+                        create_dataset(peid, "state",
+                                       HDF5.Datatype(HDF5.hdf5_type_id(Int64)),
+                                       dataspace(nothing))
+                    else
+                        create_dataset(peid, "state",
+                                       HDF5.Datatype(HDF5.hdf5_type_id(T)),
+                                       dataspace((Int64(vec_num_agents[pe+1]),)),
+                                       chunk=(vec_num_agents[pe+1],),
+                                       shuffle=(),
+                                       blosc=config.compression_level)
+                        if pe == mpi.rank 
+                            peid["state"][:] = field.read.state
+                        end
                     end
                 end
                 attrs(peid)["array_size"] = vec_num_agents[pe+1]

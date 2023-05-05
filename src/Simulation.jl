@@ -187,7 +187,7 @@ accessible in the transition functions. If `name` is not given, the
 name of the model is used instead.
 
 The optional `filename` keyword is a string that will be used as the
-name of the h5 file when a simulation or a part of it is written via
+name of the hdf5 file when a simulation or a part of it is written via
 e.g. `write_snapshot`. 
 
 The file is created when a `write...` function is called for the first time,
@@ -197,9 +197,14 @@ disabled with the `overwrite_file` keyword, in which case the files
 will be numbered. If `filename` is not provided, the `name` argument
 is used instead.
 
-The keywords `logging` is a boolean flag that enables an automatical log file.
-The log file contains information such as the time spent in different functions. When also `debug` is set to true, the log file contains more details and the
-stream will be flushed after each write.
+The keywords `logging` is a boolean flag that enables an automatical
+log file.  The log file contains information such as the time spent in
+different functions. When also `debug` is set to true, the log file
+contains more details and the stream will be flushed after each write.
+
+As with the hdf5 files, the `overwrite_file` keyword determines
+whether the log files are overwritten or numbered. The numbering is
+set independently from the numbering of the hdf5 files.
 
 The simulation starts in an uninitialized state. After adding the
 agents and edges for the initial state, it is necessary to call
@@ -230,7 +235,7 @@ function create_simulation(model::Model,
         initialized = false,
         intransition = false,
         num_transitions = 0,
-        logger = create_logger($name, $logging, $debug),
+        logger = create_logger($name, $logging, $debug, $overwrite_file),
         h5file = nothing # we need the sim instance to create the h5file
     )
 
@@ -410,7 +415,7 @@ function copy_simulation(sim)
     foreach(T -> copy_shm!(copy, T), sim.typeinfos.nodes_types)
     copy.h5file = nothing
     # disable logging for the copy
-    copy.logger = create_logger(sim.name, false, false)
+    copy.logger = create_logger(sim.name, false, false, sim.overwrite_file)
 
     copy
 end

@@ -37,7 +37,7 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
     msg1, rest = Iterators.peel(msglines)
     # check for <Begin> or <End> tags
     msg1split = split(msg1, ">")
-        
+    
     if msg1split[1] == "<End"
         if logger.debug
             println(iob, "Time (sec): ", now - logger.starttime)
@@ -72,10 +72,16 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
     nothing
 end
 
-function create_logger(name, logging, debug)
-    logfile = logging ? open("""$(mkpath("logs"))/$(name)_$(mpi.rank).log""";
+function create_logger(name, logging, debug, overwrite_file)
+    filename = if ! overwrite_file
+        add_number_to_file(mkpath("logs") * "/" * name)
+    else
+        name
+    end
+
+    logfile = logging ? open("""$(filename)_$(mpi.rank).log""";
                              write = true) :
-        nothing
+                                 nothing
     logger = logging ?
         VahanaLogger(logfile,
                      debug ? Logging.Debug : Logging.Info,
@@ -83,7 +89,7 @@ function create_logger(name, logging, debug)
                      time(),
                      Dict{String, Float64}(),
                      Dict{String, Dict}()) :
-        nothing
+                         nothing
 
     Log(logfile, logger, debug)
 end
@@ -92,7 +98,7 @@ end
 TODO: DOC
 """
 function create_logger!(sim, debug = false, name = sim.name)
-    sim.logger = create_logger(name, true, debug)
+    sim.logger = create_logger(name, true, debug, sim.overwrite_file)
 end
 
 
