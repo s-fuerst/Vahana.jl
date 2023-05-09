@@ -216,11 +216,11 @@ See also [`create_model`](@ref), [`param`](@ref),
 and [`finish_init!`](@ref)
 """
 function create_simulation(model::Model,
-                 params::P = nothing,
-                 globals::G = nothing;
-                 name = model.name,
-                 filename = name, overwrite_file = true,
-                 logging = false, debug = false) where {P, G}
+                           params::P = nothing,
+                           globals::G = nothing;
+                           name = model.name,
+                           filename = name, overwrite_file = true,
+                           logging = false, debug = false) where {P, G}
     
     sim::Simulation = @eval $(Symbol(model.name))(
         model = $model,
@@ -261,9 +261,9 @@ end
 create_model(name::String) = types -> create_model(types, name)
 
 create_simulation(params::P = nothing,
-               globals::G = nothing;
-               kwargs...) where {P, G} =
-                   model -> create_simulation(model, params, globals; kwargs...)
+                  globals::G = nothing;
+                  kwargs...) where {P, G} =
+                      model -> create_simulation(model, params, globals; kwargs...)
 
 function _create_equal_partition(d, ids)
     l = length(ids)
@@ -317,73 +317,64 @@ function finish_init!(sim;
     foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
-    if ! distribute
-        sim.initialized = true
-        return nothing
-    end
-
-    if mpi.rank > 0
-        partition = Dict{AgentID, ProcessID}()
-    end
-    
-    idmapping = if mpi.size > 1
-        # we are creating an own partition only when no partition is given
-        if length(partition) == 0 && mpi.isroot
-            if partition_algo == :Metis
-                _log_info(sim, ">>> Partitioning the Simulation with Metis")
-                vsg = _log_time(sim, "create simple graph", true) do 
-                    vahanasimplegraph(sim; show_ignorefrom_warning = false)
-                end
-                part = _log_time(sim, "call Metis.partition", true) do
-                    Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
-                end
-                _log_debug(sim, "<Begin> remap ids")
-                for (i, p) in enumerate(part)
-                    partition[vsg.g2v[i]] = p
-                end
-                _log_debug(sim, "<End> remap ids")
-            elseif partition_algo == :EqualAgentNumbers
-                _log_info(sim, ">>> Partitioning the Simulation / equal number of nodes per type")
-                _log_debug(sim, "<Begin> create equal partitions")
-                for T in sim.typeinfos.nodes_types
-                    ids = map(i -> agent_id(sim, AgentNr(i), T), keys(readstate(sim, T)))
-                    _create_equal_partition(partition, ids)
-                end
-                _log_debug(sim, "<End> create equal partitions")
-            else
-                @error "the partition_algo given is unknown"
-            end
-        end
-        if mpi.isroot
-            _log_info(sim, ">>> Distributing the Simulation")
-        end
-        _log_time(sim, "distribute!") do
-            distribute!(sim, partition) end
-    else
-        if return_idmapping
-            idmapping = Dict{AgentID, AgentID}()
-            for T in sim.typeinfos.nodes_types
-                for id in keys(readstate(sim, T))
-                    aid = agent_id(sim, AgentNr(id), T)
-                    idmapping[aid] = aid
+    if distribute
+        idmapping = if mpi.size > 1
+            # we are creating an own partition only when no partition is given
+            if length(partition) == 0 && mpi.isroot
+                if partition_algo == :Metis
+                    _log_info(sim, ">>> Partitioning the Simulation with Metis")
+                    vsg = _log_time(sim, "create simple graph", true) do 
+                        vahanasimplegraph(sim; show_ignorefrom_warning = false)
+                    end
+                    part = _log_time(sim, "call Metis.partition", true) do
+                        Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+                    end
+                    _log_debug(sim, "<Begin> remap ids")
+                    for (i, p) in enumerate(part)
+                        partition[vsg.g2v[i]] = p
+                    end
+                    _log_debug(sim, "<End> remap ids")
+                elseif partition_algo == :EqualAgentNumbers
+                    _log_info(sim, ">>> Partitioning the Simulation / equal number of nodes per type")
+                    _log_debug(sim, "<Begin> create equal partitions")
+                    for T in sim.typeinfos.nodes_types
+                        ids = map(i -> agent_id(sim, AgentNr(i), T),
+                                  keys(readstate(sim, T)))
+                        _create_equal_partition(partition, ids)
+                    end
+                    _log_debug(sim, "<End> create equal partitions")
+                else
+                    @error "the partition_algo given is unknown"
                 end
             end
-            idmapping
+            if mpi.isroot
+                _log_info(sim, ">>> Distributing the Simulation")
+            end
+            _log_time(sim, "distribute!") do
+                distribute!(sim, partition)
+            end
         else
-            nothing
+            if return_idmapping
+                idmapping = Dict{AgentID, AgentID}()
+                for T in sim.typeinfos.nodes_types
+                    for id in keys(readstate(sim, T))
+                        aid = agent_id(sim, AgentNr(id), T)
+                        idmapping[aid] = aid
+                    end
+                end
+                idmapping
+            else
+                nothing
+            end
         end
+        foreach(finish_write!(sim), sim.typeinfos.nodes_types)
+        foreach(finish_write!(sim), sim.typeinfos.edges_types)
     end
-
-    foreach(finish_write!(sim), sim.typeinfos.nodes_types)
-    foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
     sim.initialized = true
-
     sim.num_transitions = 1
-
     _log_info(sim, "<End> finish_init!")
-
-    return_idmapping ? idmapping : nothing
+    distribute && return_idmapping ? idmapping : nothing
 end 
 
 # this function is not exported and should be only used for unit tests
@@ -535,11 +526,11 @@ optional `add_existing` collection.
 See also [`apply`](@ref)
 """
 function apply!(sim,
-         func::Function,
-         call,
-         read,
-         write;
-         add_existing = [])
+                func::Function,
+                call,
+                read,
+                write;
+                add_existing = [])
     @assert sim.initialized "You must call finish_init! before apply!"
     with_logger(sim) do
         @info "<Begin> apply!" func transition=sim.num_transitions+1
@@ -605,11 +596,11 @@ function apply!(sim,
 end
 
 function apply!(func::Function,
-                    sim,
-                    call,
-                    read,
-                    write;
-                    kwargs ...)
+                sim,
+                call,
+                read,
+                write;
+                kwargs ...)
     apply!(sim, func, call, read, write; kwargs ...)
 end
 
@@ -629,22 +620,22 @@ Returns the copy of the simulation.
 See also [`apply!`](@ref)
 """
 function apply(sim,
-        func::Function,
-        call,
-        read,
-        write;
-        kwargs ...) 
+               func::Function,
+               call,
+               read,
+               write;
+               kwargs ...) 
     newsim = copy_simulation(sim)
     apply!(newsim, func, call, read, write; kwargs ...)
     newsim
 end
 
 function apply(func::Function,
-                   sim,
-                   call,
-                   read,
-                   write;
-                   kwargs ...)
+               sim,
+               call,
+               read,
+               write;
+               kwargs ...)
     apply(sim, func, call, read, write; kwargs ...)
 end
 

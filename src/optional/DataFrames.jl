@@ -8,7 +8,10 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
     df = DataFrame()
     tinfos = sim.typeinfos
     if T in tinfos.nodes_types # Agents
-        read = getproperty(sim, Symbol(T)).read
+        read = sim.initialized ?
+            getproperty(sim, Symbol(T)).read :
+            getproperty(sim, Symbol(T)).write 
+            
         tid = tinfos.nodes_type2id[T]
         df.id = map(nr -> agent_id(tid, agent_nr(AgentID(nr))),
                      1:length(read.state))
@@ -22,7 +25,9 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
             df.id = map(agent_nr, df.id)
         end
     elseif T in sim.typeinfos.edges_types # Networks
-        read = getproperty(sim, Symbol(T)).read
+        read = sim.initialized ?
+            getproperty(sim, Symbol(T)).read :
+            getproperty(sim, Symbol(T)).write 
         # First check the Num/HasNeighborsOnly case
         if has_trait(sim, T, :IgnoreFrom) && has_trait(sim, T, :Stateless)
             df.to = collect(keys(read))
@@ -35,7 +40,7 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
             end
         else
             # for the remaining traits we can use the edges iterator
-            edges = collect(edges_iterator(sim, T))
+            edges = collect(edges_iterator(sim, T, sim.initialized))
             if ! has_trait(sim, T, :IgnoreFrom)
                 if has_trait(sim, T, :Stateless)
                     df.from = last.(edges)
