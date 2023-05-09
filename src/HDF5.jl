@@ -508,8 +508,14 @@ function find_transition_nr(ids, transition::Int)
     maximum(ts)
 end
 
-find_transition_group(ids, transition::Int) =
-    ids["t_$(find_transition_nr(ids, transition))"]
+function find_transition_group(ids, transition::Int)
+    trnr = find_transition_nr(ids, transition)
+    if trnr === nothing
+        nothing
+    else
+        ids["t_$(trnr)"]
+    end
+end
 
 function find_peid(gid, transition::Int, rank, T::DataType)
     trid = find_transition_group(gid[string(T)], transition)
@@ -738,17 +744,24 @@ function read_edges!(sim::Simulation,
             peid = find_peid(fids[rank + 1]["edges"], transition, rank, T)
 
             if peid === nothing
-                @info """
-            Found no data for $T which was written before transition $(transition)
-                """
+                if rank == 0
+                    @info """
+                    Didn't read any edge of type $T 
+                    """
+                end
             else
                 _read_edges!(sim, peid, rank, idmapfunc, T)
             end
         end
         finish_write!(sim, T)
 
-        getproperty(sim, Symbol(T)).last_change =
-            find_transition_nr(fids[mpi.rank+1]["edges"][string(T)], transition)
+        trnr = find_transition_nr(fids[mpi.rank+1]["edges"][string(T)], transition)
+        if trnr === nothing
+            getproperty(sim, Symbol(T)).last_change = 0
+        else
+            getproperty(sim, Symbol(T)).last_change = trnr
+        end
+            
 
         _log_info(sim, "<End> read edges")
     end
@@ -813,7 +826,9 @@ function _read_edges!(sim::Simulation, peid, rank, idmapfunc, T)
             for ce in HDF5.read(peid, CompleteEdge{T})
                 add_edge!(sim,
                           idmapfunc(ce.edge.from),
-                          idmapfunc(agent_id(totypeid, ce.to)),
+                          idmapfunc(agent_id(totypeid,
+                                             rank,
+                                             ce.to)),
                           ce.edge.state)
             end   
         else
@@ -887,7 +902,7 @@ function read_snapshot!(sim::Simulation,
     end
     
     idmapping = read_agents!(sim, name; transition = transition)
-    
+
     if length(idmapping) > 0
         read_edges!(sim, name; transition = transition,
                     idmapfunc = (key) -> idmapping[key])
