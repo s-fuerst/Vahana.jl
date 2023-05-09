@@ -421,18 +421,7 @@ function copy_simulation(sim)
 end
 
 
-"""
-    finish_simulation!(sim)
-
-Remove all agents/edges and rasters from the simulation to minimize
-the memory footprint. The `parameters` and `globals` of the simulation
-are still available, the remaining state of the simulation is
-undefined.
-
-Returns the globals of the simulation.
-"""
-function finish_simulation!(sim)
-    _log_info(sim, "<Begin> finish_simulation!")
+function _free_memory!(sim)
     for T in sim.typeinfos.nodes_types
         shmstatewin = getproperty(sim, Symbol(T)).mpiwindows.shmstate
         if ! isnothing(shmstatewin)
@@ -449,7 +438,22 @@ function finish_simulation!(sim)
         empty!(edgewrite(sim, T))
     end
     empty!(sim.rasters)
+end
 
+"""
+    finish_simulation!(sim)
+
+Remove all agents/edges and rasters from the simulation to minimize
+the memory footprint. The `parameters` and `globals` of the simulation
+are still available, the remaining state of the simulation is
+undefined.
+
+Returns the globals of the simulation.
+"""
+function finish_simulation!(sim)
+    _log_info(sim, "<Begin> finish_simulation!")
+    _free_memory!(sim)
+    
     close_h5file!(sim)
 
     _log_info(sim, "<End> finish_simulation!")

@@ -48,7 +48,10 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
-function create_h5file!(sim::Simulation, filename = sim.filename)
+function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = sim.overwrite_file)
+    #in the case that the simulation is already attached to a h5file, we relase it first
+    close_h5file!(sim)
+    
     @assert sim.initialized "You can write only initialized simulations"
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
@@ -56,7 +59,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename)
     
     filename = mkpath("h5") * "/" * filename
 
-    if ! sim.overwrite_file
+    if ! overwrite
         filename = add_number_to_file(filename)
     end
     
@@ -853,18 +856,18 @@ read_rasters!(sim::Simulation,
                   read_rasters!(sim, add_number_to_file(sim.filename, nr);
                                 idmapping)
 
+# returns false when snapshot not found
 function read_snapshot!(sim::Simulation,
                  name::String = sim.filename;
                  transition = typemax(Int64),
                  writeable = false,
                  ignore_params = false)
-    # First finish the current simulation, to free memory allocated
-    # via MPI
-    finish_simulation!(sim)
+    # First we free the memory allocated by the current state of sim
+    _free_memory!(sim)
 
     fids = open_h5file(sim, name)
     if length(fids) == 0
-        return
+        return false
     end
     sim.initialized = attrs(fids[1])["initialized"]
     sim.num_transitions = transition == typemax(Int64) ?
@@ -880,15 +883,10 @@ function read_snapshot!(sim::Simulation,
     end
 
     if sim.globals !== nothing
-        sim.globals = read_globals(name, typeof(sim.globals), transition)
+        sim.globals = read_globals(name, typeof(sim.globals); transition)
     end
     
     idmapping = read_agents!(sim, name; transition = transition)
-    
-    # read_agents! returns `nothing` when no file was found
-    if idmapping === nothing
-        return sim
-    end
     
     if length(idmapping) > 0
         read_edges!(sim, name; transition = transition,
@@ -904,7 +902,7 @@ function read_snapshot!(sim::Simulation,
         sim.h5file = fids[mpi.rank+1]
     end
     
-    sim
+    true
 end
 
 read_snapshot!(sim::Simulation,

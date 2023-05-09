@@ -3,7 +3,7 @@ using Logging, Dates
 using Base: debug_color
 import Logging: with_logger, shouldlog, min_enabled_level, catch_exceptions, handle_message
 
-export with_logger, create_logger!
+export with_logger, create_logger!, log_overview
 
 struct VahanaLogger <: Logging.AbstractLogger
     stream::IO
@@ -122,3 +122,12 @@ function _log_time(f, sim, text, debug = false)
     lf(sim, "<End> " * text)
     r
 end
+
+
+"""
+TODO: DOC
+"""
+function log_overview(sim)
+    show(sim.logger.logger.stream, MIME("text/plain"), sim)
+end
+    
