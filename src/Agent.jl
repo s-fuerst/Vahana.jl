@@ -17,7 +17,7 @@
 # development, but the implementation found here had most time a noticeable
 # performance advantage and a better memory usage).
 
-export AgentID#, AgentNr, ProcessID
+export AgentID, ProcessID#, AgentNr
 export agent_id
 
 export add_agent!, add_agents!
@@ -30,12 +30,14 @@ const TypeID = UInt8
 const BITS_TYPE = 8
 const MAX_TYPES = 2 ^ BITS_TYPE
 
+# TODO Doc
 const ProcessID = UInt32
 const BITS_PROCESS = 20
 
 const AgentNr = UInt64
 const BITS_AGENTNR = 36
 
+# TODO Doc
 const AgentID = UInt64
 
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE

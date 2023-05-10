@@ -3,7 +3,9 @@ import DataFrames: DataFrame, subset!, nrow
 export DataFrame
 
 function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentnr = false)
-    @assert mpi.size == 1 "You can not use dataframes in a parallel run"
+    if mpi.size > 1
+        @info "The created dataframe contains only data from rank $(mpi.rank)"
+    end
 
     df = DataFrame()
     tinfos = sim.typeinfos
