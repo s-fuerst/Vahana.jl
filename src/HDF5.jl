@@ -52,7 +52,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     #in the case that the simulation is already attached to a h5file, we relase it first
     close_h5file!(sim)
     
-    @assert sim.initialized "You can write only initialized simulations"
+    @assert sim.initialized "You can only write initialized simulations"
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
     end
@@ -61,6 +61,8 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
 
     if ! overwrite
         filename = add_number_to_file(filename)
+        # to avoid that rank 0 creates a file before other ranks check this
+        MPI.Barrier(MPI.COMM_WORLD)
     end
     
     fid = if parallel_write()

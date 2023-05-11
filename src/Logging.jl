@@ -72,16 +72,17 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
     nothing
 end
 
-function create_logger(name, logging, debug, overwrite_file)
-    filename = if ! overwrite_file
-        add_number_to_file(mkpath("logs") * "/" * name)
-    else
-        name
+function create_logger(filename, logging, debug, overwrite_file)
+    if ! overwrite_file
+        filename = add_number_to_file(mkpath("logs") * "/" * filename)
+        # to avoid that rank 0 creates a file before other ranks check this
+        MPI.Barrier(MPI.COMM_WORLD)
     end
 
     logfile = logging ? open("""$(filename)_$(mpi.rank).log""";
                              write = true) :
                                  nothing
+
     logger = logging ?
         VahanaLogger(logfile,
                      debug ? Logging.Debug : Logging.Info,
