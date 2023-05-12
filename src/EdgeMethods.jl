@@ -95,7 +95,6 @@ end
 # the "fallback" functions for the case that no specialized versions are needed.
 _check_size!(_, _, _) = nothing
 init_field!(_, _) = nothing
-_can_add(_, _, _, _) = true
 
 show_second_edge_warning = true
 
@@ -225,8 +224,17 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     # support the has_edge function, and as true && true = true, we allow multiple
     # add_edge calls in this case. For the singletype case we can not
     # check if add_edge! was already called reliably.
-    if singleedge && !singletype && !(ignorefrom && stateless)
-        @eval function _can_add(field, to::AgentID, value, ::Type{$T})
+    @eval function _can_add(sim, field, to::AgentID, value, ::Type{$T})
+        @mayassert begin
+            T = $T
+            ! config.check_readable ||
+                ! sim.initialized ||
+                $attr[:writeable] == true 
+        end """
+          $T must be in the `write` argument of the transition function.
+        """
+        
+        if $singleedge && !$singletype && !($ignorefrom && $stateless)
             if haskey(field, to)
                 if field[to] === value && ! config.quiet
                     if show_second_edge_warning
@@ -249,6 +257,8 @@ by calling suppress_warnings(true) after importing Vahana.
             else
                 true
             end
+        else
+            true
         end
     end
 
@@ -333,6 +343,7 @@ by calling suppress_warnings(true) after importing Vahana.
     #- add_edge!
     if stateless && ignorefrom && !singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, _::Edge{$MT})
+            @mayassert _can_add(sim, @edgewrite($T), to, nothing, $T)
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -349,6 +360,7 @@ by calling suppress_warnings(true) after importing Vahana.
         end
 
         @eval function add_edge!(sim::$simsymbol, _::AgentID, to::AgentID, _::$MT)
+            @mayassert _can_add(sim, @edgewrite($T), to, nothing, $T)
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -365,7 +377,7 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
-            @mayassert _can_add(@edgewrite($T), to,
+            @mayassert _can_add(sim, @edgewrite($T), to,
                                 _valuetostore(sim, edge), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
@@ -388,13 +400,13 @@ by calling suppress_warnings(true) after importing Vahana.
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID,
                           to::AgentID, edgestate::$MT)
-            # TODO: test the assertion in edgetypes.jl
+            @mayassert _can_add(sim, @edgewrite($T), to, nothing, $T)
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply`.
             """
-            @mayassert _can_add(@edgewrite($T), to,
+            @mayassert _can_add(sim, @edgewrite($T), to,
                                 _valuetostore(sim, from, edgestate), $T) """
             An edge has already been added to the agent with the id $to (and the
             edgetype traits containing the :SingleEdge trait).
@@ -415,6 +427,7 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
+            @mayassert _can_add(sim, @edgewrite($T), to, nothing, $T)
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -436,6 +449,7 @@ by calling suppress_warnings(true) after importing Vahana.
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
                           edgestate::$MT)
+            @mayassert _can_add(sim, @edgewrite($T), to, nothing, $T)
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -530,6 +544,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 end
             end
         end
+        $attr[:writeable] = true
     end
 
     # It is important that prepare_read! is called before prepare_write!,
@@ -554,6 +569,7 @@ by calling suppress_warnings(true) after importing Vahana.
     @eval function finish_write!(sim::$simsymbol, ::Type{$MT})
         @edgeread($T) = @edgewrite($T)
         @edge($T).last_change = sim.num_transitions
+        $attr[:writeable] = false
     end
 
     # Rules for the edge functions:

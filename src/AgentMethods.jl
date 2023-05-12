@@ -71,7 +71,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             T = $T
             @windows($T).prepared || ! config.check_readable
         end """
-          $T must be in the `accessible` argument of the transition function.
+          $T must be in the `read` argument of the transition function.
         """
 
         idrank = process_nr(id)
@@ -367,7 +367,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             transmit_agents!(sim, readableET, $T)
         end
         
-        # we use this as a check that the types are in the accessible
+        # we use this as a check that the types are in the read
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = true
     end 
@@ -375,7 +375,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     # some mpi parts are in prepare_write, as we always use the shared_memory
     # mpi calls, even in single process runs.
     @eval function finish_read!(sim::$simsymbol, ::Type{$T})
-        # we use this as a check that the types are in the accessible
+        # we use this as a check that the types are in the read
         # vector, and this check should also done in an nompi run
         @windows($T).prepared = false
     end
