@@ -241,6 +241,21 @@ function runedgestest()
             end
         end
 
+        @testset "check edgetype in write" begin
+            Vahana.config.check_readable = true
+            enable_asserts(true)
+            for t in statelessEdgeTypes
+                @test_throws AssertionError apply(sim, Agent, [], []) do _, id, sim
+                    add_edge!(sim, id, id, t())
+                end
+            end
+            for t in statefulEdgeTypes
+                @test_throws AssertionError apply(sim, Agent, [], []) do _, id, sim
+                    add_edge!(sim, id, id, t(0))
+                end
+            end
+        end
+
         finish_simulation!(sim)
     end
 
