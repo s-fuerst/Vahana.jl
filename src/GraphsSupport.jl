@@ -34,7 +34,7 @@ Returns a vector with the IDs of the created agents.
 """
 function add_graph!(sim, graph, agent_constructor, edge_constructor)
     with_logger(sim) do
-        @info "<Begin> add_graph!" graph
+        @info "<Begin> add_graph!" 
     end
     agents = add_agents!(sim,
                          [ agent_constructor(v) for v in Graphs.vertices(graph) ])

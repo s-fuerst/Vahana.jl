@@ -511,7 +511,8 @@ by calling suppress_warnings(true) after importing Vahana.
     @eval function init_storage!(sim::$simsymbol, ::Type{$MT})
         @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
     end
-    
+
+
     # It is important that prepare_read! is called before prepare_write!,
     # as in edges_alltoall! the edges are added via add_edge! to the
     # @edgewrite collection. But between finish_write! and prepare_write!
@@ -522,7 +523,7 @@ by calling suppress_warnings(true) after importing Vahana.
         else
             @edgewrite($T) = $FT()
             init_field!(sim, t)
-            init_storage!(sim, t)
+            foreach(empty!, @storage($T))
             for tnr in 1:length(sim.typeinfos.nodes_types)
                 for i in 1:mpi.size
                     empty!(@edge($T).accessible[tnr][i])
@@ -539,7 +540,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @edge($T).last_change > 0
 
             edges_alltoall!(sim, @storage($T), $T)
-            init_storage!(sim, $T)
+            foreach(empty!, @storage($T))
         end
 
         @edge($T).readable = true
