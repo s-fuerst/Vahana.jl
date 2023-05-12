@@ -543,7 +543,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 end
             end
         end
-        sim.typeinfos.edges_attr[$T][:writeable] = true
+        $attr[:writeable] = true
     end
 
     # It is important that prepare_read! is called before prepare_write!,
@@ -568,7 +568,7 @@ by calling suppress_warnings(true) after importing Vahana.
     @eval function finish_write!(sim::$simsymbol, ::Type{$MT})
         @edgeread($T) = @edgewrite($T)
         @edge($T).last_change = sim.num_transitions
-        sim.typeinfos.edges_attr[$T][:writeable] = false
+        $attr[:writeable] = false
     end
 
     # Rules for the edge functions:
