@@ -129,6 +129,7 @@ end
 TODO: DOC
 """
 function log_overview(sim)
-    show(sim.logger.logger.stream, MIME("text/plain"), sim)
-end
-    
+    if sim.logger.logger !== nothing
+        show(sim.logger.logger.stream, MIME("text/plain"), sim)
+    end
+end    

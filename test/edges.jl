@@ -248,9 +248,15 @@ function runedgestest()
                 @test_throws AssertionError apply(sim, Agent, [], []) do _, id, sim
                     add_edge!(sim, id, id, t())
                 end
+                apply(sim, Agent, [], t) do _, id, sim
+                    add_edge!(sim, id, id, t())
+                end
             end
             for t in statefulEdgeTypes
                 @test_throws AssertionError apply(sim, Agent, [], []) do _, id, sim
+                    add_edge!(sim, id, id, t(0))
+                end
+                apply(sim, Agent, [], t) do _, id, sim
                     add_edge!(sim, id, id, t(0))
                 end
             end

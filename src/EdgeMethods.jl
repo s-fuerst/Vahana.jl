@@ -235,7 +235,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
         """
         
         if $singleedge && !$singletype && !($ignorefrom && $stateless)
-            if haskey(field, to)
+            if haskey(field, to) && value !== nothing
                 if field[to] === value && ! config.quiet
                     if show_second_edge_warning
                         global show_second_edge_warning = false

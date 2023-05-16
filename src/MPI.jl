@@ -335,6 +335,8 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         # So we set the intranstion flag, is necessary
         wasintransition = sim.intransition
         sim.intransition = true
+        waswriteable = $attr[:writeable]
+        $attr[:writeable] = true
 
         # see comments for prepare_read/write
         if sim.initialized
@@ -400,7 +402,8 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         @edge($T).last_transmit = sim.num_transitions
 
         sim.intransition = wasintransition 
-        
+        $attr[:writeable] = waswriteable
+       
         _log_debug(sim, "<End> edges_alltoall!")
 
         nothing
