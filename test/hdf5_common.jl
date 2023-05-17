@@ -118,5 +118,6 @@ function restore(model, sim; kwargs...)
                               Params(0, [0, 0], Pos(0, 0, 0)),
                               Globals(Pos(0, 0), 0, [0], [0]))
     read_snapshot!(restored, sim.name; kwargs...)
+    restored
 end
 
