@@ -188,6 +188,39 @@ function write_globals(sim::Simulation,
     nothing
 end
 
+function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
+    dt = if create_datatype
+        HDF5.Datatype(HDF5.hdf5_type_id(T))
+    else
+        T
+    end
+
+    ds = if create_datatype
+        dataspace((sum_size,))
+    else
+        sum_size
+    end
+
+    if config.compression_level == 0 || config.no_parallel_compression
+        create_dataset(gid, name, dt, ds; mpio_mode()...)
+    else
+        chunk_size = if length(converted) == 0
+            1
+        else
+            Int(ceil(HDF5.heuristic_chunk(converted)[1]/2))
+        end
+
+        create_dataset(gid,
+                       name,
+                       dt,
+                       ds;
+                       chunk=(chunk_size,),
+                       shuffle=(),
+                       compress=config.compression_level,
+                       mpio_mode()...)
+    end
+end
+
 function write_agents(sim::Simulation,
                types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
@@ -222,22 +255,14 @@ function write_agents(sim::Simulation,
                 start = vec_displace[mpi.rank + 1] + 1
                 last = start + vec_num_agents[mpi.rank + 1] - 1
                 if ! has_trait(sim, T, :Immortal, :Agent)
-                    create_dataset(tid, "died", Bool, sum_num_agents,
-                                   chunk=(sum_num_agents,),
-                                   shuffle=(),
-                                   compress=config.compression_level;
-                                   mpio_mode()...)
-                    tid["died"][start:last] = field.read.died
+                    dset = new_dset(tid, "died", Bool,
+                                    sum_num_agents, field.read.died, false)
+                    dset[start:last] = field.read.died
                 end
                 if fieldcount(T) > 0
-                    create_dataset(tid, "state",
-                                   HDF5.Datatype(HDF5.hdf5_type_id(T)),
-                                   dataspace((sum_num_agents,)),
-                                   chunk=(sum_num_agents,),
-                                   shuffle=(),
-                                   blosc=config.compression_level;
-                                   mpio_mode()...)
-                    tid["state"][start:last] = field.read.state
+                    dset = new_dset(tid, "state", T,
+                                    sum_num_agents, field.read.state)
+                    dset[start:last] = field.read.state
                 end
             end
         end
@@ -273,6 +298,7 @@ end
 
 _neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
     fieldcount(T) == 0) && has_trait(sim, T, :IgnoreFrom)
+
 
 function write_edges(sim::Simulation,
               types::Vector{DataType} = sim.typeinfos.edges_types)
@@ -311,78 +337,47 @@ function write_edges(sim::Simulation,
             
             pop!(vec_displace)
 
-            # what we write depends on :Stateless and :IgnoreFrom,
-            # so we have four different cases
-            tid = if _neighbors_only(sim, T)
+            # what we write depends on :Stateless, :IgnoreFrom
+            # and :SingleType
+            (converted, DT, create_dt) = if _neighbors_only(sim, T)
                 if has_trait(sim, T, :SingleType)
-                    create_dataset(gid, t, eltype(edges),
-                                   sum_num_edges;
-                                   chunk=(sum_num_edges,),
-                                   shuffle=(),
-                                   compress=config.compression_level,
-                                   mpio_mode()...)
+                    (edges, eltype(edges), false)
                 else
-                    create_dataset(gid, t,
-                                   HDF5.Datatype(HDF5.hdf5_type_id(
-                                       EdgeCount)),
-                                   dataspace((sum_num_edges,));
-                                   chunk=(sum_num_edges,),
-                                   shuffle=(),
-                                   compress=config.compression_level)
+                    ([EdgeCount(to, count) for (to, count) in edges], EdgeCount, true)
                 end
             elseif fieldcount(T) == 0
-                create_dataset(gid, t,
-                               HDF5.Datatype(HDF5.hdf5_type_id(
-                                   StatelessEdge)),
-                               dataspace((sum_num_edges,));
-                               chunk=(sum_num_edges,),
-                               shuffle=(),
-                               compress=config.compression_level)
+                if has_trait(sim, T, :Stateless)
+                    (map(e -> StatelessEdge(e[1], e[2]), edges),
+                     StatelessEdge, true)
+                else
+                    (map(e -> StatelessEdge(e[1], e[2].from), edges),
+                     StatelessEdge, true)
+                end
             elseif has_trait(sim, T, :IgnoreFrom)
-                create_dataset(gid, t,
-                               HDF5.Datatype(HDF5.hdf5_type_id(
-                                   IgnoreFromEdge{T})),
-                               dataspace((sum_num_edges,));
-                               chunk=(sum_num_edges,),
-                               shuffle=(),
-                               compress=config.compression_level)
+                (map(e -> IgnoreFromEdge(e[1], e[2]), edges),
+                 IgnoreFromEdge{T}, true)
+            else     
+                (map(e -> CompleteEdge(e[1], e[2]), edges),
+                 CompleteEdge{T}, true)
+            end
+
+            tid = if length(converted) > 0
+                new_dset(gid, t, DT, sum_num_edges, converted, create_dt)
             else
-                create_dataset(gid, t,
-                               HDF5.Datatype(HDF5.hdf5_type_id(
-                                   CompleteEdge{T})),
-                               dataspace((sum_num_edges,));
-                               chunk=(sum_num_edges,),
-                               shuffle=(),
-                               compress=config.compression_level)
+                new_dset(gid, t, DT, sum_num_edges, Vector{DT}(), create_dt)
             end
             
             attrs(tid)["last_change"] = field.last_change
             attrs(tid)["size_per_rank"] = vec_num_edges
             attrs(tid)["displace"] = vec_displace
 
-            converted = if _neighbors_only(sim, T)
-                if has_trait(sim, T, :SingleType)
-                    edges
-                else
-                    [ EdgeCount(to, count) for (to, count) in edges ]
-                end
-            elseif fieldcount(T) == 0
-                if has_trait(sim, T, :Stateless)
-                    map(e -> StatelessEdge(e[1], e[2]), edges)
-                else
-                    map(e -> StatelessEdge(e[1], e[2].from), edges)
-                end
-            elseif has_trait(sim, T, :IgnoreFrom)
-                map(e -> IgnoreFromEdge(e[1], e[2]), edges)
-            else     
-                map(e -> CompleteEdge(e[1], e[2]), edges)
-            end
+            start = vec_displace[mpi.rank + 1] + 1
+            last = start + vec_num_edges[mpi.rank + 1] - 1
 
             if length(converted) > 0
-                start = vec_displace[mpi.rank + 1] + 1
-                last = start + vec_num_edges[mpi.rank + 1] - 1
-
                 tid[start:last] = converted
+            else
+                tid[start:last] = Vector{DT}()
             end
 
             finish_read!(sim, T)
@@ -501,16 +496,11 @@ function find_transition_group(ids, transition::Int)
     end
 end
 
-# function find_peid(gid, transition::Int, rank, T::DataType)
-#     trid = find_transition_group(gid[string(T)], transition)
-#     if trid === nothing
-#         nothing
-#     else
-#         trid["pe_$(rank)"]
-#     end
-# end
-
 function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
+    with_logger(sim) do
+        @debug("<Begin> _read_agents_restore!", agenttype=T)
+    end
+    
     vec_num_agents = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
     size = vec_num_agents[mpi.rank + 1]
@@ -523,8 +513,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
         if size > 0
             field.write.died = HDF5.read(tid["died"],
                                          Bool,
-                                         start:last;
-                                         mpio_mode()...)
+                                         start:last)
         else
             field.write.died = Vector{Bool}()
         end
@@ -533,8 +522,9 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
         if size > 0
             field.write.state = HDF5.read(tid["state"],
                                           T,
-                                          start:last;
-                                          mpio_mode()...)
+                                          start:last)
+        else
+            field.write.state = Vector{T}()
         end    
     else
         field.write.state = fill(T(), size)
@@ -551,10 +541,15 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
             end
         end
     end
+    
+    _log_debug(sim, "<End> _read_agents_restore!")
 end
 
 # merge distributed graph into a single one.
 function _read_agents_merge!(sim::Simulation, field, tid, T::DataType)
+    with_logger(sim) do
+        @debug("<Begin> _read_agents_merge!", agenttype=T)
+    end
     idmapping = Dict{AgentID, AgentID}()
 
     typeid = sim.typeinfos.nodes_type2id[T]
@@ -589,6 +584,8 @@ function _read_agents_merge!(sim::Simulation, field, tid, T::DataType)
     end
 
     finish_write!(sim, T)
+
+    _log_debug(sim, "<End> _read_agents_merge!")
     
     idmapping
 end
@@ -670,11 +667,6 @@ function read_agents!(sim::Simulation,
                 @rootonly @info "Found no data for $T which was written before transition $(transition)"
                 continue
             end
-            
-            with_logger(sim) do
-                @debug("<Begin> _read_agents_restore!",
-                       agenttype=T, transition=transition)
-            end
 
             field = getproperty(sim, Symbol(T))
             
@@ -688,8 +680,6 @@ function read_agents!(sim::Simulation,
             for ET in sim.typeinfos.edges_types
                 field.last_transmit[ET] = -1
             end
-
-            _log_debug(sim, "<End> _read_agents_restore!")
         end
     end
 
@@ -777,9 +767,9 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T)
             AT = sim.typeinfos.edges_attr[T][:target]
             typeid = sim.typeinfos.nodes_type2id[AT]
             data = if has_trait(sim, T, :SingleEdge)
-                HDF5.read(tid, Bool, start:last; mpio_mode()...)
+                HDF5.read(tid, Bool, start:last)
             else
-                HDF5.read(tid, Int64, start:last; mpio_mode()...)
+                HDF5.read(tid, Int64, start:last)
             end
             for (idx, num_edges) in enumerate(data)
                 # agent_id needs the correct rank
@@ -793,27 +783,27 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T)
             end
         else
             # EdgeCount struct
-            for ec in HDF5.read(tid, EdgeCount, start:last; mpio_mode()...)
+            for ec in HDF5.read(tid, EdgeCount, start:last)
                 field.write[idmapfunc(ec.to)] = ec.count
             end
         end
     elseif fieldcount(T) == 0
         # StatelessEdge struct
-        for se in HDF5.read(tid, StatelessEdge, start:last; mpio_mode()...)
+        for se in HDF5.read(tid, StatelessEdge, start:last)
             add_edge!(sim, idmapfunc(se.from), idmapfunc(se.to), T())
         end
     elseif has_trait(sim, T, :IgnoreFrom)
         # T struct
         # for add_edge! we need always a from id, even when it's ignored
         dummy = AgentID(0)
-        for edge in HDF5.read(tid, IgnoreFromEdge{T}, start:last; mpio_mode()...)
+        for edge in HDF5.read(tid, IgnoreFromEdge{T}, start:last)
             add_edge!(sim, dummy, idmapfunc(edge.to), edge.state)
         end
     else
         if has_trait(sim, T, :SingleType)
             totype = sim.typeinfos.edges_attr[T][:target]
             totypeid = sim.typeinfos.nodes_type2id[totype]
-            for ce in HDF5.read(tid, CompleteEdge{T}, start:last; mpio_mode()...)
+            for ce in HDF5.read(tid, CompleteEdge{T}, start:last)
                 add_edge!(sim,
                           idmapfunc(ce.edge.from),
                           # agent_id needs the correct rank
@@ -823,7 +813,7 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T)
                           ce.edge.state)
             end   
         else
-            for ce in HDF5.read(tid, CompleteEdge{T}, start:last; mpio_mode()...)
+            for ce in HDF5.read(tid, CompleteEdge{T}, start:last)
                 add_edge!(sim, idmapfunc(ce.edge.from), idmapfunc(ce.to),
                           ce.edge.state)
             end
@@ -947,4 +937,3 @@ function create_namedtuple_struct_converter(T::DataType)
     @eval convert(::Type{$NT}, st::$T) = ntfromstruct(st)
     @eval convert(::Type{$T}, nt::$NT) = structfromnt($T, nt)
 end
-

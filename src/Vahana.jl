@@ -82,6 +82,11 @@ Base.@kwdef mutable struct VahanaConfig
     check_readable = true
     asserts_enabled = true
     compression_level = 3
+    # compression is implemented (see HDF5.jl/new_dset), but causes a lot of
+    # strange problem in combination with HDF5 Parallel. So this is disabled
+    # by default. Activate this only after careful testing (e.g.
+    # run the run_mpitests script in Vahana's test folder.
+    no_parallel_compression = true
 end
 
 const config = VahanaConfig()
