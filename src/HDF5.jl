@@ -195,6 +195,12 @@ function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
         T
     end
 
+    # We have seperate files, so we don't need the size of all agents/edges
+    # but only the size of the array we want to write into this file
+    if ! parallel_write()
+        sum_size = length(converted)
+    end
+    
     ds = if create_datatype
         dataspace((sum_size,))
     else
@@ -207,7 +213,13 @@ function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
         chunk_size = if length(converted) == 0
             1
         else
-            Int(ceil(HDF5.heuristic_chunk(converted)[1]/2))
+            HDF5.heuristic_chunk(converted)[1]
+            # On a parallel system I did run into problems with the
+            # heuristic chunk but for whatever reason it worked with
+            # half the size. As I had additional esoteric problems
+            # like this I disabled the compression by default,
+            # see also VahanaConfig.no_parallel_compression.
+            # Int(ceil(HDF5.heuristic_chunk(converted)[1]/2))
         end
 
         create_dataset(gid,
@@ -243,8 +255,16 @@ function write_agents(sim::Simulation,
             num_agents = Int64(field.nextid - 1)
             vec_num_agents = MPI.Allgather(num_agents, mpi.comm)
             sum_num_agents = sum(vec_num_agents)
-            vec_displace = [0; cumsum(vec_num_agents)]
-            pop!(vec_displace)
+            vec_displace = 
+                if parallel_write()
+                    # we use pop to remove the overall sum of agents, which
+                    # is not used as an offset
+                    pop!([0; cumsum(vec_num_agents)])
+                else
+                    # in the non parallel case there are no offsets at all
+                    # as each rank write into an own file
+                    fill(0, mpi.size)
+                end
 
             tid = create_group(gid, t)
             attrs(tid)["last_change"] = field.last_change
@@ -252,8 +272,13 @@ function write_agents(sim::Simulation,
             attrs(tid)["displace"] = vec_displace
 
             if sum_num_agents > 0
-                start = vec_displace[mpi.rank + 1] + 1
-                last = start + vec_num_agents[mpi.rank + 1] - 1
+                if parallel_write()
+                    start = vec_displace[mpi.rank + 1] + 1
+                    last = start + vec_num_agents[mpi.rank + 1] - 1
+                else
+                    start = 1
+                    last = num_agents
+                end
                 if ! has_trait(sim, T, :Immortal, :Agent)
                     dset = new_dset(tid, "died", Bool,
                                     sum_num_agents, field.read.died, false)
@@ -333,9 +358,16 @@ function write_edges(sim::Simulation,
             num_edges = length(edges)
             vec_num_edges = MPI.Allgather(num_edges, mpi.comm)
             sum_num_edges = sum(vec_num_edges)
-            vec_displace = [0; cumsum(vec_num_edges)]
-            
-            pop!(vec_displace)
+            vec_displace = 
+                if parallel_write()
+                    # we use pop to remove the overall sum of agents, which
+                    # is not used as an offset
+                    pop!([0; cumsum(vec_num_edges)])
+                else
+                    # in the non parallel case there are no offsets at all
+                    # as each rank write into an own file
+                    fill(0, mpi.size)
+                end
 
             # what we write depends on :Stateless, :IgnoreFrom
             # and :SingleType
@@ -371,8 +403,13 @@ function write_edges(sim::Simulation,
             attrs(tid)["size_per_rank"] = vec_num_edges
             attrs(tid)["displace"] = vec_displace
 
-            start = vec_displace[mpi.rank + 1] + 1
-            last = start + vec_num_edges[mpi.rank + 1] - 1
+            if parallel_write()
+                start = vec_displace[mpi.rank + 1] + 1
+                last = start + vec_num_edges[mpi.rank + 1] - 1
+            else
+                start = 1
+                last = num_edges
+            end
 
             if length(converted) > 0
                 tid[start:last] = converted
@@ -463,9 +500,9 @@ function open_h5file(sim::Union{Simulation, Nothing}, filename)
     end
 
     # TODO improve hash function
-    #    @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
-    #    The file was written for a different model than that of the given simulation.
-    #    """
+    # @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
+    # The file was written for a different model than that of the given simulation.
+    # """
     h5mpisize = attrs(fids[1])["mpisize"]
     if mpi.size > 1
         @assert mpi.size == h5mpisize """
@@ -533,6 +570,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
     # this move the state to the shared memory (and to read) 
     finish_write!(sim, T)
 
+    # We must also refresh the list of reuseable ids
     empty!(field.read.reuseable)
     if ! has_trait(sim, T, :Immortal, :Agent)
         for i in 1:size
@@ -546,44 +584,53 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
 end
 
 # merge distributed graph into a single one.
-function _read_agents_merge!(sim::Simulation, field, tid, T::DataType)
+function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     with_logger(sim) do
-        @debug("<Begin> _read_agents_merge!", agenttype=T)
+        @debug("<Begin> _read_agents_merge!", agenttype=T, fidx)
     end
     idmapping = Dict{AgentID, AgentID}()
 
     typeid = sim.typeinfos.nodes_type2id[T]
 
-    # in prepare_write we have an immutable check that we must disable
-    # by setting sim.initialized temporary to false
-    was_initialized = sim.initialized
-    sim.initialized = false
-    prepare_write!(sim, false, T) 
-    sim.initialized = was_initialized
-
     vec_num_agents = attrs(tid)["size_per_rank"]
-    size = sum(vec_num_agents)
+    vec_displace = attrs(tid)["displace"]
+    
+    size = vec_num_agents[fidx]
 
-    died = if has_trait(sim, T, :Immortal, :Agent) 
-        HDF5.read(tid["died"], Bool; mpio_mode()...)
+    died = if ! has_trait(sim, T, :Immortal, :Agent) 
+        HDF5.read(tid["died"], Bool)
     else
         fill(false, size)
     end
     state = if fieldcount(T) > 0
-        HDF5.read(tid["state"], T; mpio_mode()...)
+        HDF5.read(tid["state"], T)
     else
         fill(T(), size)
     end
 
-    for i in 1:size
-        if !died[i]
-            newid = add_agent!(sim, state[i])
-            push!(idmapping,
-                  agent_id(typeid, rank, AgentNr(i)) => newid)
+    if parallel
+        # we must reconstruct the original indices of the agents as we
+        # have them now in a long list.
+        for rank in 1:mpi.size
+            agents_on_rank = vec_num_agents[rank]
+            offset = vec_displace[rank]
+            for i in 1:agents_on_rank
+                if !died[i]
+                    newid = add_agent!(sim, state[i])
+                    push!(idmapping,
+                          agent_id(typeid, rank-1, AgentNr(i - offset)) => newid)
+                end
+            end
+        end
+    else
+        for i in 1:size
+            if !died[i]
+                newid = add_agent!(sim, state[i])
+                push!(idmapping,
+                      agent_id(typeid, fidx-1, AgentNr(i)) => newid)
+            end
         end
     end
-
-    finish_write!(sim, T)
 
     _log_debug(sim, "<End> _read_agents_merge!")
     
@@ -651,40 +698,68 @@ function read_agents!(sim::Simulation,
         return
     end
 
-    gid = fids[mpi.rank+1]["agents"]
+    original_size = attrs(fids[1])["mpisize"]
+    parallel = attrs(fids[1])["HDF5parallel"]
+    merge = original_size > mpi.size
+    @assert !merge || mpi.size == 1
+    
+    fidxs = merge ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
+
+    sim.intransition = true
 
     idmapping = Dict{AgentID, AgentID}()
-    sim.intransition = true
-    
+
+
     _log_time(sim, "read agents") do
-        merge::Bool = length(fids) > mpi.size
-        @assert !merge || mpi.size == 1
-
         for T in types
-            tid = find_transition_group(gid[string(T)], transition)
-
-            if tid === nothing
-                @rootonly @info "Found no data for $T which was written before transition $(transition)"
-                continue
-            end
-
             field = getproperty(sim, Symbol(T))
-            
+
             if merge
-                merge!(idmapping, _read_agents_merge!(sim, field, tid, T))
-            else
-                _read_agents_restore!(sim, field, tid, T)
+                # in prepare_write we have an immutable check that we
+                # must disable by setting sim.initialized temporary to false
+                was_initialized = sim.initialized
+                sim.initialized = false
+                prepare_write!(sim, false, T) 
+                sim.initialized = was_initialized
             end
-            field.last_change = find_transition_nr(fids[mpi.rank+1]["agents"][string(T)],
+
+            for fidx in fidxs
+                gid = fids[fidx]["agents"]
+                
+                tid = find_transition_group(gid[string(T)], transition)
+
+                if tid === nothing && fidx == 1
+                    @rootonly @info """
+                        for $T nothing was written before transition $(transition)
+                    """ 
+                    continue
+                end
+                
+                if merge
+                    merge!(idmapping,
+                           _read_agents_merge!(sim, tid, T, fidx, parallel))
+                else
+                    _read_agents_restore!(sim, field, tid, T)
+                end
+            end
+
+            if merge
+                finish_write!(sim, T)
+            end
+            
+            # must be after the _read calls, as they are modifying this also
+            field.last_change = find_transition_nr(fids[1]["agents"][string(T)],
                                                    transition)
             for ET in sim.typeinfos.edges_types
                 field.last_transmit[ET] = -1
             end
         end
     end
-
+    
     foreach(close, fids)
     sim.intransition = false
+
+    
     idmapping
 end
 
@@ -708,25 +783,36 @@ function read_edges!(sim::Simulation,
       read_edges! can be only merging a distributed graph when an idmap is given
     """
 
+    original_size = attrs(fids[1])["mpisize"]
+    parallel = attrs(fids[1])["HDF5parallel"]
+    merge = original_size > mpi.size
+    @assert !merge || mpi.size == 1
+    
+    fidxs = merge ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
+    
     # we call add_edge! but there is a check that this is only done
     # at initialization time or in a transition function
     sim.intransition = true
     
+    with_logger(sim) do
+        @info("<Begin> read edges", edgetype = T, transition = transition)
+    end
     for T in types
-        with_logger(sim) do
-            @info("<Begin> read edges", edgetype = T, transition = transition)
-        end
-
-        tid = find_transition_group(fids[mpi.rank + 1]["edges"][string(T)],
-                                    transition)
-        
-        if tid === nothing
-            @rootonly @info "Found no data for $T which was written before transition $(transition)"
-            continue
-        end
-
         prepare_write!(sim, false, T)
-        _read_edges!(sim, tid, idmapfunc, T)
+
+        for fidx in fidxs
+            tid = find_transition_group(fids[fidx]["edges"][string(T)],
+                                        transition)
+            
+            if tid === nothing
+                @rootonly @info """
+                for $T nothing was written before transition $(transition)
+            """ 
+                continue
+            end
+
+            _read_edges!(sim, tid, idmapfunc, T, fidx)
+        end
         finish_write!(sim, T)
 
         trnr = find_transition_nr(fids[mpi.rank+1]["edges"][string(T)], transition)
@@ -735,10 +821,9 @@ function read_edges!(sim::Simulation,
         else
             getproperty(sim, Symbol(T)).last_change = trnr
         end
-        
-
-        _log_info(sim, "<End> read edges")
     end
+    
+    _log_info(sim, "<End> read edges")
 
     sim.intransition = false
     
@@ -754,13 +839,13 @@ read_edges!(sim::Simulation,
                             idmapfunc, transition, types)
 
 
-function _read_edges!(sim::Simulation, tid, idmapfunc, T)
+function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
     field = getproperty(sim, Symbol(T))
-    vec_num_agents = attrs(tid)["size_per_rank"]
+    vec_num_edges = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
-    size = sum(vec_num_agents)
-    start = vec_displace[mpi.rank + 1] + 1
-    last = start + vec_num_agents[mpi.rank + 1] - 1
+    size = sum(vec_num_edges)
+    start = vec_displace[fidx] + 1
+    last = start + vec_num_edges[fidx] - 1
 
     if _neighbors_only(sim, T)
         if has_trait(sim, T, :SingleType)

@@ -26,6 +26,8 @@ function test_merge(model)
     function checkedges(sim_edges, restored_edges, T)
         @test getproperty(sim, Symbol(T)).last_change ==
             getproperty(restored, Symbol(T)).last_change
+
+        @test num_edges(sim, T) == num_edges(restored, T)
         
         for to in keys(sim_edges)
             to = AgentID(to)
