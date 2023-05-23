@@ -233,6 +233,23 @@ function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
     end
 end
 
+function calc_displace(num)
+    vec_num = MPI.Allgather(num, mpi.comm)
+    vec_displace = 
+        if parallel_write()
+            # we use pop to remove the overall sum of agents, which
+            # is not used as an offset
+            d = [0; cumsum(vec_num)]
+            pop!(d)
+            d
+        else
+            # in the non parallel case there are no offsets at all
+            # as each rank write into an own file
+            fill(0, mpi.size)
+        end
+    (vec_num, vec_displace)
+end
+
 function write_agents(sim::Simulation,
                types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
@@ -253,18 +270,8 @@ function write_agents(sim::Simulation,
             attrs(gid)["last_change"] = field.last_change
 
             num_agents = Int64(field.nextid - 1)
-            vec_num_agents = MPI.Allgather(num_agents, mpi.comm)
+            (vec_num_agents, vec_displace) = calc_displace(num_agents)
             sum_num_agents = sum(vec_num_agents)
-            vec_displace = 
-                if parallel_write()
-                    # we use pop to remove the overall sum of agents, which
-                    # is not used as an offset
-                    pop!([0; cumsum(vec_num_agents)])
-                else
-                    # in the non parallel case there are no offsets at all
-                    # as each rank write into an own file
-                    fill(0, mpi.size)
-                end
 
             tid = create_group(gid, t)
             attrs(tid)["last_change"] = field.last_change
@@ -356,18 +363,8 @@ function write_edges(sim::Simulation,
             end
 
             num_edges = length(edges)
-            vec_num_edges = MPI.Allgather(num_edges, mpi.comm)
+            (vec_num_edges, vec_displace) = calc_displace(num_edges)
             sum_num_edges = sum(vec_num_edges)
-            vec_displace = 
-                if parallel_write()
-                    # we use pop to remove the overall sum of agents, which
-                    # is not used as an offset
-                    pop!([0; cumsum(vec_num_edges)])
-                else
-                    # in the non parallel case there are no offsets at all
-                    # as each rank write into an own file
-                    fill(0, mpi.size)
-                end
 
             # what we write depends on :Stateless, :IgnoreFrom
             # and :SingleType
@@ -595,7 +592,7 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     vec_num_agents = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
     
-    size = vec_num_agents[fidx]
+    size = parallel ? sum(vec_num_agents) : vec_num_agents[fidx]
 
     died = if ! has_trait(sim, T, :Immortal, :Agent) 
         HDF5.read(tid["died"], Bool)
@@ -611,14 +608,14 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     if parallel
         # we must reconstruct the original indices of the agents as we
         # have them now in a long list.
-        for rank in 1:mpi.size
+        for rank in 1:length(vec_num_agents)
             agents_on_rank = vec_num_agents[rank]
             offset = vec_displace[rank]
             for i in 1:agents_on_rank
-                if !died[i]
-                    newid = add_agent!(sim, state[i])
+                if !died[i + offset]
+                    newid = add_agent!(sim, state[i + offset])
                     push!(idmapping,
-                          agent_id(typeid, rank-1, AgentNr(i - offset)) => newid)
+                          agent_id(typeid, rank-1, AgentNr(i)) => newid)
                 end
             end
         end
@@ -703,12 +700,11 @@ function read_agents!(sim::Simulation,
     merge = original_size > mpi.size
     @assert !merge || mpi.size == 1
     
-    fidxs = merge ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
+    fidxs = merge && ! parallel ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
 
     sim.intransition = true
 
     idmapping = Dict{AgentID, AgentID}()
-
 
     _log_time(sim, "read agents") do
         for T in types
@@ -806,8 +802,8 @@ function read_edges!(sim::Simulation,
             
             if tid === nothing
                 @rootonly @info """
-                for $T nothing was written before transition $(transition)
-            """ 
+                    for $T nothing was written before transition $(transition)
+                """ 
                 continue
             end
 
@@ -857,8 +853,7 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
                 HDF5.read(tid, Int64, start:last)
             end
             for (idx, num_edges) in enumerate(data)
-                # agent_id needs the correct rank
-                newid = idmapfunc(agent_id(typeid, mpi.rank, AgentNr(idx)))
+                newid = idmapfunc(agent_id(typeid, fidx - 1, AgentNr(idx)))
                 newidx = agent_nr(newid)
                 # TODO: we know the size at the beginning, or?
                 if length(field.read) < newidx
@@ -891,9 +886,8 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
             for ce in HDF5.read(tid, CompleteEdge{T}, start:last)
                 add_edge!(sim,
                           idmapfunc(ce.edge.from),
-                          # agent_id needs the correct rank
                           idmapfunc(agent_id(totypeid,
-                                             mpi.rank,
+                                             fidx - 1,
                                              ce.to)),
                           ce.edge.state)
             end   
