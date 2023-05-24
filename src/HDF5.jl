@@ -790,10 +790,10 @@ function read_edges!(sim::Simulation,
     # at initialization time or in a transition function
     sim.intransition = true
     
-    with_logger(sim) do
-        @info("<Begin> read edges", edgetype = T, transition = transition)
-    end
     for T in types
+        with_logger(sim) do
+            @info("<Begin> read edges", edgetype = T, transition = transition)
+        end
         prepare_write!(sim, false, T)
 
         for fidx in fidxs
@@ -817,9 +817,9 @@ function read_edges!(sim::Simulation,
         else
             getproperty(sim, Symbol(T)).last_change = trnr
         end
+        _log_info(sim, "<End> read edges")
     end
     
-    _log_info(sim, "<End> read edges")
 
     sim.intransition = false
     
