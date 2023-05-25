@@ -30,11 +30,11 @@ convert(::Type{CartesianIndex{2}}, pos::Pos2D) = CartesianIndex(pos[1], pos[2])
 convert(::Type{CartesianIndex{3}}, pos::Pos3D) = CartesianIndex(pos[1], pos[2], pos[3])
 
 # HDF5.jl does not support enumerations. We convert them to their
-# integer type. As we (unsafe) cast the read data to the struct while
-# reading, it is not necessary to convert the integer back to an
-# enumeration explicitly.
+# integer type (and back).
 import HDF5.hdf5_type_id
 hdf5_type_id(::Type{T}, ::Val{false}) where {I, T <: Enum{I}} = hdf5_type_id(I)
+
+convert(::Type{T}, i::Int32) where { T <: Enum } = T(i)
 
 # TODO: this does not work as expected, write a stable hash function
 import Base.hash
@@ -47,6 +47,8 @@ hash(model::Model) = hash(model.types.edges_attr) +
 transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
+
+# parallel_write() = false
 
 mpio_mode() = parallel_write() ? Dict(:dxpl_mpio => :collective) : Dict()
 
@@ -84,10 +86,15 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     attrs(fid)["fileformat"] = 1
     attrs(fid)["mpisize"] = mpi.size
     attrs(fid)["mpirank"] = mpi.rank
-    attrs(fid)["HDF5parallel"] = HDF5.has_parallel()
+    attrs(fid)["HDF5parallel"] = parallel_write() 
     attrs(fid)["initialized"] = sim.initialized
     
     pid = create_group(fid, "params")
+    # See comment in write_globals. We use a unified function to read params and
+    # globals, therefore we also create this unused group for params (and
+    # hope that nobody fill have an empty vector as a parameter)
+    create_group(pid, "empty_array")
+
     if sim.params !== nothing
         for k in fieldnames(typeof(sim.params))
             field = getfield(sim.params, k)
@@ -168,13 +175,23 @@ function write_globals(sim::Simulation,
     _log_time(sim, "write globals") do
         t = transition_str(sim)
         tid = create_group(gid, t)
+        # for whatever reason parallel mpi does not like to write (and read)
+        # nothing and throws a "unable to modify constant message"
+        # in this case. Even worse, we can not access attributes of the emtpy
+        # dataset. So we need an additional group to store this information.
+        # Don't know what to say about this.
+        eid = create_group(tid, "empty_array")
 
         for k in fieldnames(typeof(sim.globals))
             if k in fields
                 field = getfield(sim.globals, k)
                 if typeof(field) <: Array
-                    tid[string(k)] = field
-                    attrs(tid[string(k)])["array"] = true
+                    if length(field) > 0
+                        tid[string(k)] = field
+                        attrs(tid[string(k)])["array"] = true
+                    else
+                        attrs(eid)[string(k)] = true
+                    end
                 else
                     tid[string(k)] = [ field ]
                     attrs(tid[string(k)])["array"] = false
@@ -207,7 +224,8 @@ function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
         sum_size
     end
 
-    if config.compression_level == 0 || config.no_parallel_compression
+    if config.compression_level == 0 ||
+        (parallel_write() && config.no_parallel_compression)
         create_dataset(gid, name, dt, ds; mpio_mode()...)
     else
         chunk_size = if length(converted) == 0
@@ -408,10 +426,12 @@ function write_edges(sim::Simulation,
                 last = num_edges
             end
 
-            if length(converted) > 0
-                tid[start:last] = converted
-            else
-                tid[start:last] = Vector{DT}()
+            if sum_num_edges > 0
+                if length(converted) > 0
+                    tid[start:last] = converted
+                else
+                    tid[start:last] = Vector{DT}()
+                end
             end
 
             finish_read!(sim, T)
@@ -635,8 +655,14 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
 end
 
 function _read_globals_or_params(hid, T)
-    unsorted = Dict(map(keys(hid)) do k
-                        k => if attrs(hid[k])["array"]
+    eid = hid["empty_array"]
+    all_keys = map(string,
+                   filter(k -> k != "empty_array", [keys(hid); keys(attrs(eid))]))
+
+    unsorted = Dict(map(all_keys) do k
+                        k => if haskey(attributes(eid), k)
+                            Vector{fieldtype(T, Symbol(k))}()
+                        elseif attrs(hid[k])["array"] 
                             hid[k][]
                         else
                             hid[k][1]

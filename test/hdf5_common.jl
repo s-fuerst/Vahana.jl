@@ -32,6 +32,7 @@ struct Globals
     ga::Int64
     gb::Vector{Float64}
     gc::Vector{Int64}
+    empty::Vector{Int64}
 end
 
 struct Params
@@ -50,7 +51,7 @@ end
 function createsim(model, distribute = true)
     sim = model |>
         create_simulation(Params(1, [2.0, 2.1], (x = 3, y = 4, z = 5)),
-                       Globals(Pos(1, 2), 3, [4.0, 4.1], [5, 6, 7]);
+                       Globals(Pos(1, 2), 3, [4.0, 4.1], [5, 6, 7], []);
                        logging = true, debug = true)
 
     ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:16 ])
@@ -116,7 +117,7 @@ end
 function restore(model, sim; kwargs...)
     restored = create_simulation(model,
                               Params(0, [0, 0], Pos(0, 0, 0)),
-                              Globals(Pos(0, 0), 0, [0], [0]))
+                              Globals(Pos(0, 0), 0, [0], [0], []))
     read_snapshot!(restored, sim.name; kwargs...)
     restored
 end
