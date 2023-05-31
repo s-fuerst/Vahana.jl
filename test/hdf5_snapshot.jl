@@ -73,6 +73,8 @@ end
         register_edgetype!(EdgeState) |>
         register_edgetype!(RasterEdge) |>
         register_edgetype!(StatelessEdge) |>
+        register_agenttype!(EmptyAgentVector) |>
+        register_edgetype!(EmptyEdgeVector) |> 
         create_model("hdf5_default")
 
     test_write_restore(model_default)

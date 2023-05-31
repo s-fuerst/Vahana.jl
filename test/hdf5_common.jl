@@ -16,6 +16,8 @@ end
 
 struct RasterAgent end
 
+struct EmptyAgentVector end
+
 struct EdgeState
     f::AgentID
     t::AgentID
@@ -26,6 +28,8 @@ struct StatelessEdge end
 struct RasterEdge
     a::Int64
 end
+
+struct EmptyEdgeVector end
 
 struct Globals
     pos::Pos2D

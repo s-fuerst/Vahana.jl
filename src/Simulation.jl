@@ -453,6 +453,8 @@ function finish_simulation!(sim)
         close(sim.logger.file)
     end
 
+    MPI.Barrier(MPI.COMM_WORLD)
+
     sim.globals
 end
 ######################################## Transition

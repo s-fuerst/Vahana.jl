@@ -81,7 +81,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
 
     attrs(fid)["simulationname"] = sim.name
     attrs(fid)["modelname"] = sim.model.name
-    attrs(fid)["modelhash"] = hash(sim.model)
+    # attrs(fid)["modelhash"] = hash(sim.model)
     # @info "wrote hash" attrs(fid)["modelhash"] hash(sim.model)
     attrs(fid)["fileformat"] = 1
     attrs(fid)["mpisize"] = mpi.size
@@ -118,12 +118,19 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     end       
 
     aid = create_group(fid, "agents")
+    # also here we have the problem that the hdf5 library doesn't like
+    # vectors of size 0 in parallel mode and we must track those.
+    # The group have a subgroup for each transition, and this subgroup
+    # the agent types as attributes with a boolean value.
+    create_group(aid, "empty_array")
     foreach(sim.typeinfos.nodes_types) do T
         tid = create_group(aid, string(T))
         attrs(tid)[":Immortal"] = has_trait(sim, T, :Immortal, :Agent)
     end    
 
     eid = create_group(fid, "edges")
+    # see comment for agent
+    create_group(eid, "empty_array")
     foreach(sim.typeinfos.edges_types) do T
         tid = create_group(eid, string(T))
         attrs(tid)[":Stateless"] = has_trait(sim, T, :Stateless)
@@ -276,10 +283,11 @@ function write_agents(sim::Simulation,
 
     _log_time(sim, "write agents") do
         t = transition_str(sim)
+        eid = create_group(sim.h5file["agents"]["empty_array"], t)
 
         for T in types
             gid = sim.h5file["agents"][string(T)]
-
+            
             field = getproperty(sim, Symbol(T))
             if haskey(attrs(gid), "last_change") &&
                 field.last_change == attrs(gid)["last_change"]
@@ -295,6 +303,8 @@ function write_agents(sim::Simulation,
             attrs(tid)["last_change"] = field.last_change
             attrs(tid)["size_per_rank"] = vec_num_agents
             attrs(tid)["displace"] = vec_displace
+
+            attrs(eid)[string(T)] = sum_num_agents == 0
 
             if sum_num_agents > 0
                 if parallel_write()
@@ -359,6 +369,7 @@ function write_edges(sim::Simulation,
 
     _log_time(sim, "write edges") do
         t = transition_str(sim)
+        eid = create_group(sim.h5file["edges"]["empty_array"], t)
 
         for T in types
             gid = sim.h5file["edges"][string(T)]
@@ -426,6 +437,8 @@ function write_edges(sim::Simulation,
                 last = num_edges
             end
 
+            attrs(eid)[string(T)] = sum_num_edges == 0
+            
             if sum_num_edges > 0
                 if length(converted) > 0
                     tid[start:last] = converted
@@ -736,6 +749,17 @@ function read_agents!(sim::Simulation,
         for T in types
             field = getproperty(sim, Symbol(T))
 
+            t = find_transition_nr(fids[1]["agents"][string(T)], transition)
+            if attrs(fids[1]["agents"]["empty_array"]["t_$t"])[string(T)]
+                if ! has_trait(sim, T, :Immortal, :Agent)
+                    field.write.died = Vector{Bool}()
+                end
+                if fieldcount(T) > 0
+                    field.write.state = Vector{T}()
+                end
+                continue
+            end
+
             if merge
                 # in prepare_write we have an immutable check that we
                 # must disable by setting sim.initialized temporary to false
@@ -822,6 +846,13 @@ function read_edges!(sim::Simulation,
         end
         prepare_write!(sim, false, T)
 
+        trnr = find_transition_nr(fids[1]["edges"][string(T)], transition)
+        if attrs(fids[1]["edges"]["empty_array"]["t_$(trnr)"])[string(T)]
+            _log_info(sim, "<End> read edges")
+            finish_write!(sim, T)
+            continue
+        end
+        
         for fidx in fidxs
             tid = find_transition_group(fids[fidx]["edges"][string(T)],
                                         transition)
@@ -837,7 +868,6 @@ function read_edges!(sim::Simulation,
         end
         finish_write!(sim, T)
 
-        trnr = find_transition_nr(fids[mpi.rank+1]["edges"][string(T)], transition)
         if trnr === nothing
             getproperty(sim, Symbol(T)).last_change = 0
         else

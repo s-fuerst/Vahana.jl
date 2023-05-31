@@ -45,7 +45,7 @@ for to in 2:mpi.size
     add_edge!(sim, ids[to-1], ids[to], EdgeState(to-1))
 end
 
-newids = finish_init!(sim; partition_algo = :SameSize)
+newids = finish_init!(sim; partition_algo = :EqualAgentNumbers)
 
 # first a check that we can read the state after initialization
 apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim
@@ -116,7 +116,7 @@ for to in 2:mpi.size
     add_edge!(sim, ids[to-1], ids[to], EdgeState(to-1))
 end
 
-newids = finish_init!(sim; partition_algo = :SameSize)
+newids = finish_init!(sim; partition_algo = :EqualAgentNumbers)
 
 # first a check that we can read the state after initialization
 apply!(sim, [ Agent ], [ Agent, EdgeState ], []) do _, id, sim

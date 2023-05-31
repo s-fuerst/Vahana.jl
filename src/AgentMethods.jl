@@ -113,7 +113,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
                 @inbounds @agent($T).shmstate[sr + 1][nr]
             else
-                # same procedure as above, but with access to shared memory
+                # same procedure as above, but with access to foreign nodes
                 if $mortal
                     if @agent($T).foreigndied[id]
                         return nothing
