@@ -162,8 +162,8 @@ function close_h5file!(sim::Simulation)
 end
 
 function write_globals(sim::Simulation,
-                fields = sim.globals === nothing ?
-                    nothing : fieldnames(typeof(sim.globals)))
+                       fields = sim.globals === nothing ?
+                           nothing : fieldnames(typeof(sim.globals)))
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -276,7 +276,7 @@ function calc_displace(num)
 end
 
 function write_agents(sim::Simulation,
-               types::Vector{DataType} = sim.typeinfos.nodes_types)
+                      types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -361,7 +361,7 @@ _neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
 
 
 function write_edges(sim::Simulation,
-              types::Vector{DataType} = sim.typeinfos.edges_types)
+                     types::Vector{DataType} = sim.typeinfos.edges_types)
 
     if sim.h5file === nothing
         create_h5file!(sim)
@@ -726,9 +726,9 @@ read_globals(sim, nr::Int64, T::DataType; transition = typemax(Int64)) =
     read_globals(add_number_to_file(sim.filename, nr), T; transition)
 
 function read_agents!(sim::Simulation,
-               name::String = sim.filename;
-               transition = typemax(Int64),
-               types::Vector{DataType} = sim.typeinfos.nodes_types)
+                      name::String = sim.filename;
+                      transition = typemax(Int64),
+                      types::Vector{DataType} = sim.typeinfos.nodes_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -817,10 +817,10 @@ read_agents!(sim::Simulation,
                               transition, types)
 
 function read_edges!(sim::Simulation,
-              name::String = sim.filename;
-              idmapfunc = identity,
-              transition = typemax(Int64),
-              types::Vector{DataType} = sim.typeinfos.edges_types)
+                     name::String = sim.filename;
+                     idmapfunc = identity,
+                     transition = typemax(Int64),
+                     types::Vector{DataType} = sim.typeinfos.edges_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -847,6 +847,12 @@ function read_edges!(sim::Simulation,
         prepare_write!(sim, false, T)
 
         trnr = find_transition_nr(fids[1]["edges"][string(T)], transition)
+        if trnr === nothing
+            @rootonly @info """
+                    for $T nothing was written before transition $(transition)
+                """ 
+            continue
+        end
         if attrs(fids[1]["edges"]["empty_array"]["t_$(trnr)"])[string(T)]
             _log_info(sim, "<End> read edges")
             finish_write!(sim, T)
@@ -856,13 +862,6 @@ function read_edges!(sim::Simulation,
         for fidx in fidxs
             tid = find_transition_group(fids[fidx]["edges"][string(T)],
                                         transition)
-            
-            if tid === nothing
-                @rootonly @info """
-                    for $T nothing was written before transition $(transition)
-                """ 
-                continue
-            end
 
             _read_edges!(sim, tid, idmapfunc, T, fidx)
         end
@@ -957,8 +956,8 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
 end
 
 function read_rasters!(sim::Simulation,
-                name::String = sim.filename;
-                idmapping)
+                       name::String = sim.filename;
+                       idmapping)
     # the rasters are immutable arrays of agents_ids. So there
     # is no need to read them more then once
     if length(sim.rasters) > 0
@@ -989,10 +988,10 @@ read_rasters!(sim::Simulation,
 
 # returns false when snapshot not found
 function read_snapshot!(sim::Simulation,
-                 name::String = sim.filename;
-                 transition = typemax(Int64),
-                 writeable = false,
-                 ignore_params = false)
+                        name::String = sim.filename;
+                        transition = typemax(Int64),
+                        writeable = false,
+                        ignore_params = false)
     # First we free the memory allocated by the current state of sim
     _free_memory!(sim)
 
