@@ -194,13 +194,33 @@ function write_globals(sim::Simulation,
                 field = getfield(sim.globals, k)
                 if typeof(field) <: Array
                     if length(field) > 0
-                        tid[string(k)] = field
+                        dset = new_dset(tid,
+                                        string(k),
+                                        eltype(field),
+                                        length(field),
+                                        field)
+                        
+                        if mpi.isroot || ! parallel_write() 
+                            dset[:] = field
+                        else
+                            dset[1:0] = Vector{eltype(field)}()
+                        end
                         attrs(tid[string(k)])["array"] = true
                     else
                         attrs(eid)[string(k)] = true
                     end
                 else
-                    tid[string(k)] = [ field ]
+                    dset = new_dset(tid,
+                                    string(k),
+                                    typeof(field),
+                                    1,
+                                    [ field ])
+                    
+                    if mpi.isroot || ! parallel_write() 
+                        dset[:] = [ field ]
+                    else
+                        dset[1:0] = Vector{typeof(field)}()
+                    end
                     attrs(tid[string(k)])["array"] = false
                 end
             end
@@ -212,7 +232,7 @@ function write_globals(sim::Simulation,
     nothing
 end
 
-function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
+function new_dset(gid, name, T, sum_size, data, create_datatype = true)
     dt = if create_datatype
         HDF5.Datatype(HDF5.hdf5_type_id(T))
     else
@@ -222,7 +242,7 @@ function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
     # We have seperate files, so we don't need the size of all agents/edges
     # but only the size of the array we want to write into this file
     if ! parallel_write()
-        sum_size = length(converted)
+        sum_size = length(data)
     end
     
     ds = if create_datatype
@@ -235,16 +255,16 @@ function new_dset(gid, name, T, sum_size, converted, create_datatype = true)
         (parallel_write() && config.no_parallel_compression)
         create_dataset(gid, name, dt, ds; mpio_mode()...)
     else
-        chunk_size = if length(converted) == 0
+        chunk_size = if length(data) == 0
             1
         else
-            HDF5.heuristic_chunk(converted)[1]
+            HDF5.heuristic_chunk(data)[1]
             # On a parallel system I did run into problems with the
             # heuristic chunk but for whatever reason it worked with
             # half the size. As I had additional esoteric problems
             # like this I disabled the compression by default,
             # see also VahanaConfig.no_parallel_compression.
-            # Int(ceil(HDF5.heuristic_chunk(converted)[1]/2))
+            # Int(ceil(HDF5.heuristic_chunk(data)[1]/2))
         end
 
         create_dataset(gid,
