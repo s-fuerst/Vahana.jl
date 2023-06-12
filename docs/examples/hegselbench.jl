@@ -42,16 +42,16 @@ end
 
 const model_withhints = ModelTypes() |>
     register_agenttype!(HKAgent, :Immortal) |>
-    register_edgetype!(Knows, :Stateless, :SingleType; target=HKAgent, size = 1000) |>
+    register_edgetype!(Knows, :Stateless, :SingleType; target=HKAgent) |>
     create_model("Hegselmann-Krause-Hints");
 
-const sim = create_simulation(model_hintless, HKParams(0.2), nothing);
 const model = ModelTypes() |>
-    register_agenttype!(HKAgent, :Immortal) |>
-    register_edgetype!(Knows, :Stateless, :SingleType; target = HKAgent) |>
-    create_model("Hegselmann-Krause-Hints");
+    register_agenttype!(HKAgent) |>
+    register_edgetype!(Knows) |>
+    create_model("Hegselmann-Krause");
 
-const sim_hints = create_simulation(model, HKParams(0.2), nothing);
+
+const sim = create_simulation(model_withhints, HKParams(0.2), nothing);
 
 
 # using SNAPDatasets
@@ -62,27 +62,19 @@ const sim_hints = create_simulation(model, HKParams(0.2), nothing);
 
 
 import Graphs.SimpleGraphs
-g = SimpleGraphs.complete_graph(1000)
+g = SimpleGraphs.complete_graph(100)
 const agentids = add_graph!(sim,
-                            g,
-                            _ -> HKAgent(rand()),
-                            _ -> Knows());
-
-const agentids_hints = add_graph!(sim_hints,
                             g,
                             _ -> HKAgent(rand()),
                             _ -> Knows());
 
 
 foreach(id -> add_edge!(sim, id, id, Knows()), agentids) 
-foreach(id -> add_edge!(sim_hints, id, id, Knows()), agentids_hints) 
 
-finish_init!(sim)
-finish_init!(sim_hints)
+@rootonly @info "finish_init!"
+finish_init!(sim; partition_algo = :EqualAgentNumbers)
 
 @info mpi.rank sim
-# ## Transition Function
-
 
 # Opinions are updated synchronously according to 
 # ```math
@@ -107,32 +99,56 @@ end;
 
 # We can now apply the transition function to the complete graph simulation
 
-copy = copy_simulation(sim)
 
 #@benchmark apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
-
-#@time for _ in 1:50 apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ]) end
-
-### Without Vahana
-states = [ rand() for i in 1:1000 ]
-
-function calcnewstate(i::Int64, states)
-    own = states[i]
-    accepted = filter(states) do other
-        abs(other - own) < 0.2
-
+@rootonly @info "start"
+if mpi.isroot
+    apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+    @time for _ in 1:10
+        apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
     end
-    mean(accepted)
+else
+    apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+    for _ in 1:10
+        apply!(sim, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+    end
 end
 
-function updateall(states)
-    new = fill(0.0, 1000)
-    for i in 1:1000
-        new[i] = calcnewstate(i, states)
-    end
-    new
-end
-    
+# @rootonly @info "with hints"
+# if mpi.isroot
+#     apply!(sim_hints, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+#     @time for _ in 1:10
+#         apply!(sim_hints, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+#     end
+# else
+#     apply!(sim_hints, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+#     for _ in 1:10
+#         apply!(sim_hints, step, [ HKAgent ], [ HKAgent, Knows ], [ HKAgent ])
+#     end
+# end
+
+# ### Without Vahana
+# num_agents = 20000
+# states = [ rand() for i in 1:num_agents ]
+
+# function calcnewstate(i::Int64, states)
+#     own = states[i]
+#     accepted = filter(states) do other
+#         abs(other - own) < 0.2
+
+#     end
+#     mean(accepted)
+# end
+
+# function updateall(states)
+#     new = fill(0.0, num_agents)
+#     for i in 1:num_agents
+#         new[i] = calcnewstate(i, states)
+#     end
+#     new
+# end
+
+# @benchmark states = updateall($states)
 
     
     

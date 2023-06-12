@@ -98,6 +98,8 @@ init_field!(_, _) = nothing
 
 show_second_edge_warning = true
 
+attrs(sim, T::DataType) = sim.typeinfos.edges_attr[T]
+
 function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.edges_attr[T]
     
@@ -229,7 +231,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
             T = $T
             ! config.check_readable ||
                 ! sim.initialized ||
-                $attr[:writeable] == true 
+                attrs(sim, $T)[:writeable] == true 
         end """
           $T must be in the `write` argument of the transition function.
         """
@@ -544,7 +546,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 end
             end
         end
-        $attr[:writeable] = true
+        attrs(sim, $T)[:writeable] = true
     end
 
     # It is important that prepare_read! is called before prepare_write!,
@@ -569,7 +571,7 @@ by calling suppress_warnings(true) after importing Vahana.
     @eval function finish_write!(sim::$simsymbol, ::Type{$MT})
         @edgeread($T) = @edgewrite($T)
         @edge($T).last_change = sim.num_transitions
-        $attr[:writeable] = false
+        attrs(sim, $T)[:writeable] = false
     end
 
     # Rules for the edge functions:

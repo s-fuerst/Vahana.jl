@@ -51,7 +51,7 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
                 end
             end
             df.to = first.(edges)
-            if ! has_hint(sim, T, :Stateless)
+            if fieldcount(T) > 0
                 if ! has_hint(sim, T, :IgnoreFrom)
                     states = map(e -> e.state, last.(edges))
                     df = hcat(df, DataFrame(states); makeunique = true)
