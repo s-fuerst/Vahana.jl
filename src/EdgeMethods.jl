@@ -1,10 +1,10 @@
 import Base.zero
 
 # In the following comment:
-# SType stands for the :SingleType trait
-# SEdge stands for the :SingleEdge trait
+# SType stands for the :SingleType hint
+# SEdge stands for the :SingleEdge hint
 # and
-# Ignore stands for the :IgnoreFrom trait
+# Ignore stands for the :IgnoreFrom hint
 #
 # The overall form of the type for the edgefield is the string: A*C(B)}, where
 #
@@ -45,10 +45,10 @@ import Base.zero
 # case that the agent/node doesn't had any incoming edge before. So we
 # return also C(B) from the construct_types function.
 function construct_types(T, attr::Dict{Symbol, Any})
-    ignorefrom = :IgnoreFrom in attr[:traits]
-    singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleType in attr[:traits]
-    stateless = :Stateless in attr[:traits]
+    ignorefrom = :IgnoreFrom in attr[:hints]
+    singleedge = :SingleEdge in attr[:hints]
+    singletype = :SingleType in attr[:hints]
+    stateless = :Stateless in attr[:hints]
     
     A = if singletype
         "Vector{"
@@ -90,7 +90,7 @@ function edgestorage_type(T, info)
     Vector{Vector{Tuple{AgentID, CE}}}
 end
 
-# We have some functions that are do only something when some edge traits
+# We have some functions that are do only something when some edge hints
 # are set and are in this case specialized for the edgetype. Here we define
 # the "fallback" functions for the case that no specialized versions are needed.
 _check_size!(_, _, _) = nothing
@@ -101,10 +101,10 @@ show_second_edge_warning = true
 function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.edges_attr[T]
     
-    ignorefrom = :IgnoreFrom in attr[:traits]
-    singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleType in attr[:traits]
-    stateless = :Stateless in attr[:traits]
+    ignorefrom = :IgnoreFrom in attr[:hints]
+    singleedge = :SingleEdge in attr[:hints]
+    singletype = :SingleType in attr[:hints]
+    stateless = :Stateless in attr[:hints]
 
     singletype_size = get(attr, :size, 0)
 
@@ -134,12 +134,12 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     construct_edges_iter_methods(T, attr, simsymbol, FT)
     #### Functions that helps to write generic versions of the edge functions
     #
-    # The traits can be different when different models are create using
+    # The hints can be different when different models are create using
     # the same types, therefore we dispatch on $simsymbol 
     #
     # _to2idx is used to convert the AgentID to the AgentNr, in the
     # case that the container for the Edges is a Vector (which is the
-    # case when the :SingleEdge trait is set.
+    # case when the :SingleEdge hint is set.
     if singletype
         @eval _to2idx(_::$simsymbol, to::AgentID, ::Type{$T}) = agent_nr(to)
     else
@@ -163,7 +163,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     end
 
     # We must sometime construct the (per agent) containers, and those
-    # can be also a primitivetype when the SingleEdge trait is
+    # can be also a primitivetype when the SingleEdge hint is
     # set. To have a uniform construction schema, we define zero
     # methods also for the other cases, and call the constructor in this
     # case.
@@ -242,7 +242,7 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
                         print("""
     
 An edge with agent $to as target was added the second time. Since the value of
-the edge (after applying traits like :IgnoreFrom) is identical to that of
+the edge (after applying hints like :IgnoreFrom) is identical to that of
 the first edge, this can be indented and is allowed. 
 
 This warning is only shown once is a Julia session and can be disabled
@@ -289,7 +289,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:target])
             end """
-            The :SingleType trait is set for $t, and the agent type is 
+            The :SingleType hint is set for $t, and the agent type is 
             specified as $(at).
             But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
@@ -309,7 +309,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 tnr = type_nr(to)
                 sim.typeinfos.nodes_id2type[tnr] == $(attr[:target])
             end """
-            The :SingleType trait is set for $t, and the agent type is 
+            The :SingleType hint is set for $t, and the agent type is 
             specified as $(at).
             But the type for the given agent is $(sim.typeinfos.nodes_id2type[tnr]).
             """
@@ -380,7 +380,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert _can_add(sim, @edgewrite($T), to,
                                 _valuetostore(sim, edge), $T) """
             An edge has already been added to the agent with the id $to (and the
-            edgetype traits containing the :SingleEdge trait).
+            edgetype hints containing the :SingleEdge hint).
             """
             if $multinode && ! $ignorefrom && node_nr(edge.from) != mpi.node
                 push!(@edge($T).
@@ -409,7 +409,7 @@ by calling suppress_warnings(true) after importing Vahana.
             @mayassert _can_add(sim, @edgewrite($T), to,
                                 _valuetostore(sim, from, edgestate), $T) """
             An edge has already been added to the agent with the id $to (and the
-            edgetype traits containing the :SingleEdge trait).
+            edgetype hints containing the :SingleEdge hint).
             """
             if $multinode && ! $ignorefrom && node_nr(from) != mpi.node
                 push!(@edge($T).
@@ -585,7 +585,7 @@ by calling suppress_warnings(true) after importing Vahana.
     else
         @eval function edges(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            edges is not defined for the trait combination of $t
+            edges is not defined for the hint combination of $t
             """
         end
     end
@@ -612,7 +612,7 @@ by calling suppress_warnings(true) after importing Vahana.
     else
         @eval function edgeids(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            edgeids is not defined for the trait combination of $t
+            edgeids is not defined for the hint combination of $t
             """
         end
     end
@@ -656,7 +656,7 @@ if !stateless
 else
     @eval function edgestates(::$simsymbol, ::AgentID, t::Type{$MT})
         @assert false """
-            edgestates is not defined for the trait combination of $t
+            edgestates is not defined for the hint combination of $t
             """
     end
 end
@@ -677,7 +677,7 @@ if !singleedge
 else
     @eval function num_edges(::$simsymbol, ::AgentID, t::Type{$MT})
         @assert false """
-            num_edges is not defined for the trait combination of $t
+            num_edges is not defined for the hint combination of $t
             """
     end
 end
@@ -700,7 +700,7 @@ elseif !singletype
 else
     @eval function has_edge(::$simsymbol, ::AgentID, t::Type{$MT})
         @assert false """
-            has_edge is not defined for the trait combination of $t
+            has_edge is not defined for the hint combination of $t
             """
     end
 end
@@ -800,7 +800,7 @@ if ! stateless
 else
     @eval function mapreduce(::$simsymbol, f, op, t::Type{$MT}; kwargs...)
         @assert false """
-            mapreduce is not defined for the trait combination of $t
+            mapreduce is not defined for the hint combination of $t
             """
     end
 end

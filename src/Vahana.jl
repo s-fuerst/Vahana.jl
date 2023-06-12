@@ -2,7 +2,7 @@ module Vahana
 
 using MPI, Metis, Requires
 
-export enable_asserts, suppress_warnings, detect_stateless_trait
+export enable_asserts, suppress_warnings, detect_stateless
 
 function __init__()
     @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
@@ -103,17 +103,17 @@ suppress_warnings = (suppress::Bool) -> config.quiet = suppress
 ####################
 
 """
-    detect_stateless_trait(detect::Bool)
+    detect_stateless(detect::Bool)
 
-Per default, Vahana expects that the :Stateless trait is set manually.
+Per default, Vahana expects that the :Stateless hint is set manually.
 
 This design decision was made so as not to confuse users, since then,
 for example, the [`edges`](@ref) is not available.
 
-This behaviour can be customized by calling `detect_stateless_trait` before
+This behaviour can be customized by calling `detect_stateless` before
 calling [`register_edgetype!`](@ref).
 """
-detect_stateless_trait = (detect::Bool) -> config.detect_stateless = detect
+detect_stateless = (detect::Bool) -> config.detect_stateless = detect
 
 ######################################## include all other files
 

@@ -2,17 +2,17 @@ import Vahana: disable_transition_checks
 
 import Graphs: SimpleGraphs
 
-# We need a lot of edgetypes to test all the edge trait combinations
-# The traits are
+# We need a lot of edgetypes to test all the edge hint combinations
+# The hints are
 # (S) Stateless
 # (E) SingleEdge
 # (T) SingleType, which can also have a size information (Ts)
 # (I) IgnoreFrom
-# so EdgeET means an Edge(State) with the SingleEdge and SingleType traits
+# so EdgeET means an Edge(State) with the SingleEdge and SingleType hints
 
 struct Agent foo::Int64 end
 struct AgentB foo::Int64 end # this is used to test the removal of "dead" edges (in edgesiterator)
-struct EdgeD foo::Int64 end # D for default (no trait is set)
+struct EdgeD foo::Int64 end # D for default (no hint is set)
 struct EdgeS end
 struct EdgeE foo::Int64 end
 struct EdgeT foo::Int64 end
@@ -63,7 +63,7 @@ model_edges = ModelTypes() |>
     create_model("Test Edges")
 
 
-hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
+hashint(type, hint::String) = occursin(hint, SubString(String(Symbol(type)), 5))
 
 
 function runedgestest()
@@ -73,7 +73,7 @@ function runedgestest()
         (a1id, a2id, a3id) = add_agents!(sim, Agent(1), Agent(2), Agent(3))
 
 
-        # Lets add some edges for each of the different trait combinations
+        # Lets add some edges for each of the different hint combinations
         # For each combination we will have
         # 2 -> 3 (with state 1 for stateful edges)
         # 3 -> 1 (with state 3 for stateful edges)
@@ -84,12 +84,12 @@ function runedgestest()
             add_edge!(sim, a2id, a3id, t())
             # we can not check the "ET" combination, instead a warning
             # is given when register_edgetype is called
-            if hastrait(nameof(t), "E") && !hastrait(nameof(t), "T") && !(hastrait(nameof(t), "S") && hastrait(nameof(t), "I"))
+            if hashint(nameof(t), "E") && !hashint(nameof(t), "T") && !(hashint(nameof(t), "S") && hashint(nameof(t), "I"))
                 # and check in the case that a second edge can not be added to
                 # the same agent (and that this can be checked),
                 # that this throws an assertion
                 @test_throws AssertionError add_edge!(sim, a1id, a3id, t())
-            elseif !hastrait(nameof(t), "E")
+            elseif !hashint(nameof(t), "E")
                 add_edge!(sim, a1id, a3id, t())
             end
             edge = Edge(a3id, t())
@@ -104,9 +104,9 @@ function runedgestest()
             add_edge!(sim, a2id, a3id, t(1))
             # we can not check the "ET" combination, instead a warning
             # is given when register_edgetype is called
-            if hastrait(nameof(t), "E") && !hastrait(nameof(t), "T") && !(hastrait(nameof(t), "S") && hastrait(nameof(t), "I"))
+            if hashint(nameof(t), "E") && !hashint(nameof(t), "T") && !(hashint(nameof(t), "S") && hashint(nameof(t), "I"))
                 @test_throws AssertionError add_edge!(sim, a1id, a3id, t(2))
-            elseif !hastrait(nameof(t), "E")
+            elseif !hashint(nameof(t), "E")
                 add_edge!(sim, a1id, a3id, t(2))
             end
             edge = Edge(a3id, t(3))
@@ -317,7 +317,7 @@ end
     for ET in [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI ]
         sim = create_simulation(model_edges)
 
-        if Vahana.has_trait(sim, ET, :SingleEdge)
+        if Vahana.has_hint(sim, ET, :SingleEdge)
             finish_simulation!(sim)
             continue
         end

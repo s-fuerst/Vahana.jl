@@ -47,7 +47,7 @@ function test(sim, restored)
     function checkedges(sim_edges, restored_edges, T)
         @test getproperty(sim, Symbol(T)).last_change ==
             getproperty(restored, Symbol(T)).last_change
-        if Vahana.has_trait(sim, T, :SingleType)
+        if Vahana.has_hint(sim, T, :SingleType)
             @test sim_edges == restored_edges
         else
             for to in keys(sim_edges)

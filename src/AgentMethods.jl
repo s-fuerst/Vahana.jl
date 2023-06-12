@@ -3,7 +3,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     # in the case that the AgentType is stateless, we only check
     # in mpi calls the value of the died entry
     stateless = fieldcount(T) == 0
-    immortal = :Immortal in attr[:traits]
+    immortal = :Immortal in attr[:hints]
     mortal = ! immortal
 
     nompi = ! mpi.active
@@ -359,10 +359,10 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         if $multinode
             # we check in the function itself, if it's really necessary to
             # transmit agentstate, but we need therefore all readable
-            # edgetypes without the :IgnoreFrom trait
+            # edgetypes without the :IgnoreFrom hint
             readableET = filter(readable) do r
                 r in sim.typeinfos.edges_types &&
-                    ! has_trait(sim, r, :IgnoreFrom)   
+                    ! has_hint(sim, r, :IgnoreFrom)   
             end
             transmit_agents!(sim, readableET, $T)
         end

@@ -2,7 +2,7 @@ using Revise
 
 include("hdf5_common.jl")
 
-import Vahana: has_trait, type_nr, agent_id, agent_nr, AgentID, AgentNr
+import Vahana: has_hint, type_nr, agent_id, agent_nr, AgentID, AgentNr
 
 function test_merge(model)
     sim = runsim(model, false)
@@ -31,7 +31,7 @@ function test_merge(model)
         
         for to in keys(sim_edges)
             to = AgentID(to)
-            AT = has_trait(sim, T, :SingleType) ?
+            AT = has_hint(sim, T, :SingleType) ?
                 Agent :
                 sim.typeinfos.nodes_id2type[type_nr(to)]
             if AT == Agent
@@ -40,17 +40,17 @@ function test_merge(model)
                         state.f == sim.Agent.read.state[agent_nr(to)].f 
                     end |> first |> first
                 rto = agent_id(sim, AgentNr(rto), Agent)
-                if has_trait(sim, T, :IgnoreFrom) &&
-                    has_trait(sim, T, :Stateless)
-                    if has_trait(sim, T, :SingleType)
+                if has_hint(sim, T, :IgnoreFrom) &&
+                    has_hint(sim, T, :Stateless)
+                    if has_hint(sim, T, :SingleType)
                         @test sim_edges[agent_nr(to)] ==
                             restored_edges[agent_nr(rto)]
                     else
                         @test sim_edges[to] == restored_edges[rto]
                     end      
-                elseif ! has_trait(sim, T, :Stateless)
+                elseif ! has_hint(sim, T, :Stateless)
                     for edge in sim_edges[to]
-                        if has_trait(sim, T, :IgnoreFrom)
+                        if has_hint(sim, T, :IgnoreFrom)
                             @test edge in restored_edges[rto]
                         else
                             states = map(e -> e.state, restored_edges[rto])

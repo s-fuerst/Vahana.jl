@@ -36,7 +36,7 @@ struct Model
 end
 
 """
-    register_agenttype!(types::ModelTypes, ::Type{T}, traits...) 
+    register_agenttype!(types::ModelTypes, ::Type{T}, hints...) 
 
 Register an additional agent type to `types`. 
 
@@ -47,12 +47,12 @@ contains only primitive types and other bits types.
 Per default it is assumed, that an agent can die (removed from the
 simulation), by returning `nothing` in the transition function (see
 [`apply!`](@ref). In the case that agents are never
-removed, the trait :Immortal can be given to improve the performance
+removed, the hint :Immortal can be given to improve the performance
 of the simulation. When the size of the population is constant
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
-function register_agenttype!(types::ModelTypes, ::Type{T}, traits...) where T
+function register_agenttype!(types::ModelTypes, ::Type{T}, hints...) where T
     @assert !(Symbol(T) in types.nodes_types) "Type $T is already registered"
     @assert isbitstype(T) "Agenttypes $T must be bitstypes"
     type_number = length(types.nodes_type2id) + 1
@@ -64,30 +64,30 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, traits...) where T
 
     types.nodes_attr[T] = Dict{Symbol,Any}()
 
-    traits = Set{Symbol}(traits)
-    for trait in traits
-        @assert trait in [:Immortal] """
+    hints = Set{Symbol}(hints)
+    for hint in hints
+        @assert hint in [:Immortal] """
 
-        The agent type trait $trait is unknown for type $T. The following traits are
+        The agent type hint $hint is unknown for type $T. The following hints are
         supported: 
             :Immortal
 
         """
     end
 
-    types.nodes_attr[T][:traits] = traits
+    types.nodes_attr[T][:hints] = hints
     
     types
 end
 
 register_agenttype!(t::Type{T}) where T = types -> register_agenttype!(types, t) 
 
-register_agenttype!(t::Type{T}, traits...; kwargs...) where T =
-    types -> register_agenttype!(types, t, traits...; kwargs...) 
+register_agenttype!(t::Type{T}, hints...; kwargs...) where T =
+    types -> register_agenttype!(types, t, hints...; kwargs...) 
 
 
 """
-    register_edgetype!(types::ModelTypes, ::Type{T}, traits...; kwargs...)  
+    register_edgetype!(types::ModelTypes, ::Type{T}, hints...; kwargs...)  
 
 Register an additional edge type to `types`. 
 
@@ -99,7 +99,7 @@ as a tag to distinguish between the existing types of edges of the
 model.
 
 The internal data structures used to store the graph in memory can be modified by 
-the traits parameters:
+the hints parameters:
 
 - `:IgnoreFrom`: The ID of the source agent is not stored. This
   implies that the state of the agents on the source of the edge is
@@ -119,21 +119,21 @@ the type of the target nodes. In the case that it's known how many
 agents of this type exists, this can be also given via the optional
 keyword `size`.
 
-See also [Edge Traits](./performance.md#Edge-Traits), [`add_edge!`](@ref) and 
+See also [Edge Hints](./performance.md#Edge-Hints), [`add_edge!`](@ref) and 
 [`add_edges!`](@ref) 
 """
-function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
+function register_edgetype!(types::ModelTypes, ::Type{T}, hints...;
                      kwargs...)  where T
     @assert !(T in types.edges_types) "Type $T is already registered"
     @assert isbitstype(T) "Edgetypes $T must be bitstypes"
     push!(types.edges_types, T)
     types.edges_attr[T] = kwargs
-    traits = Set{Symbol}(traits)
-    for trait in traits
-        @assert trait in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleType,
+    hints = Set{Symbol}(hints)
+    for hint in hints
+        @assert hint in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleType,
                          :NumEdgesOnly, :HasEdgeOnly, :IgnoreSourceState] """
 
-        The edge type trait $trait is unknown for type $T. The following traits are
+        The edge type hint $hint is unknown for type $T. The following hints are
         supported: 
             :Stateless
             :IgnoreFrom
@@ -145,56 +145,56 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, traits...;
     
         """
     end
-    if :NumEdgesOnly in traits
-        union!(traits, Set([:Stateless, :IgnoreFrom]))
+    if :NumEdgesOnly in hints
+        union!(hints, Set([:Stateless, :IgnoreFrom]))
     end
-    if :HasEdgeOnly in traits
-        union!(traits, Set([:Stateless, :IgnoreFrom, :SingleEdge]))
+    if :HasEdgeOnly in hints
+        union!(hints, Set([:Stateless, :IgnoreFrom, :SingleEdge]))
     end
-    if :SingleType in traits
+    if :SingleType in hints
         @assert haskey(kwargs, :target) """
 
-        For type $T the :SingleType trait is set, but in this
+        For type $T the :SingleType hint is set, but in this
         case the agent type must also be specified via the
         target keyword.
 
         """
     end
-    if fieldcount(T) == 0 && !(:Stateless in traits)
+    if fieldcount(T) == 0 && !(:Stateless in hints)
         if config.detect_stateless
-            union!(traits, Set([:Stateless]))
+            union!(hints, Set([:Stateless]))
         elseif !config.quiet
             printstyled("""
 
         Edgetype $T is a struct without any field, so you can increase the
-        performance by setting the :Stateless trait. You can also
-        calling detect_stateless_trait() before calling register_edgetype!, 
-        then the :Stateless trait will be set automatically for structs without
+        performance by setting the :Stateless hint. You can also
+        calling detect_stateless() before calling register_edgetype!, 
+        then the :Stateless hint will be set automatically for structs without
         a field.
 
         """; color = :red)
         end
     end
-    @assert !(:SingleType in traits && :SingleEdge in traits &&
-        !(:Stateless in traits && :IgnoreFrom in traits)) """
+    @assert !(:SingleType in hints && :SingleEdge in hints &&
+        !(:Stateless in hints && :IgnoreFrom in hints)) """
 
-        The traits :SingleEdge and :SingleType can be only combined
-        when the type $T has also the traits :Stateless and :IgnoreFrom.
+        The hints :SingleEdge and :SingleType can be only combined
+        when the type $T has also the hints :Stateless and :IgnoreFrom.
         
         """
     
-    types.edges_attr[T][:traits] = traits
+    types.edges_attr[T][:hints] = hints
     types
 end
 
 register_edgetype!(t::Type{T}, props...; kwargs...) where T =
     types -> register_edgetype!(types, t, props...; kwargs...) 
 
-has_trait(sim, T::DataType, trait::Symbol, ge = :Edge) =
+has_hint(sim, T::DataType, hint::Symbol, ge = :Edge) =
     if ge == :Edge
-        trait in sim.typeinfos.edges_attr[T][:traits]
+        hint in sim.typeinfos.edges_attr[T][:hints]
     elseif ge == :Agent 
-        trait in sim.typeinfos.nodes_attr[T][:traits]
+        hint in sim.typeinfos.nodes_attr[T][:hints]
     else
         @error "Unknown graph element, use :Agent or :Edge"
     end

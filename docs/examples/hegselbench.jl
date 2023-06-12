@@ -40,18 +40,18 @@ end
 # We have now all elements to create an uninitialized simulation.
 
 
-const model_withtraits = ModelTypes() |>
+const model_withhints = ModelTypes() |>
     register_agenttype!(HKAgent, :Immortal) |>
     register_edgetype!(Knows, :Stateless, :SingleType; target=HKAgent, size = 1000) |>
-    create_model("Hegselmann-Krause-Traits");
+    create_model("Hegselmann-Krause-Hints");
 
-const sim = create_simulation(model_traitless, HKParams(0.2), nothing);
+const sim = create_simulation(model_hintless, HKParams(0.2), nothing);
 const model = ModelTypes() |>
     register_agenttype!(HKAgent, :Immortal) |>
     register_edgetype!(Knows, :Stateless, :SingleType; target = HKAgent) |>
-    create_model("Hegselmann-Krause-Traits");
+    create_model("Hegselmann-Krause-Hints");
 
-const sim_traits = create_simulation(model, HKParams(0.2), nothing);
+const sim_hints = create_simulation(model, HKParams(0.2), nothing);
 
 
 # using SNAPDatasets
@@ -68,17 +68,17 @@ const agentids = add_graph!(sim,
                             _ -> HKAgent(rand()),
                             _ -> Knows());
 
-const agentids_traits = add_graph!(sim_traits,
+const agentids_hints = add_graph!(sim_hints,
                             g,
                             _ -> HKAgent(rand()),
                             _ -> Knows());
 
 
 foreach(id -> add_edge!(sim, id, id, Knows()), agentids) 
-foreach(id -> add_edge!(sim_traits, id, id, Knows()), agentids_traits) 
+foreach(id -> add_edge!(sim_hints, id, id, Knows()), agentids_hints) 
 
 finish_init!(sim)
-finish_init!(sim_traits)
+finish_init!(sim_hints)
 
 @info mpi.rank sim
 # ## Transition Function

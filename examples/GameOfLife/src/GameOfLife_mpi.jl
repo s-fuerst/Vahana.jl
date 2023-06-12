@@ -9,7 +9,7 @@
 using Vahana, Random, SparseArrays, BenchmarkTools
 
 
-detect_stateless_trait(true)
+detect_stateless(true)
 
 import Graphs
 

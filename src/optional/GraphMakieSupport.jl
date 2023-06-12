@@ -80,7 +80,7 @@ function _set_edge_plot_properties!(f, vp)
         if isnothing(es) # this can happen after a state change of sim
             continue
         end
-        es = has_trait(vp.sim, T, :Stateless) ? T() : (filter(es) do edge
+        es = has_hint(vp.sim, T, :Stateless) ? T() : (filter(es) do edge
                                                            edge.from == from
                                                        end |> only).state
         new = f(es, from, to, vp)
@@ -245,7 +245,7 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
     to = vg.g2v[vedge.dst]
     totype = vg.edgetypes[vg.edgetypeidx[idx]]
 
-    if :Stateless in vg.sim.typeinfos.edges_attr[totype][:traits]
+    if :Stateless in vg.sim.typeinfos.edges_attr[totype][:hints]
         return string(totype)
     end
     disable_transition_checks(true)

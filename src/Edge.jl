@@ -5,7 +5,7 @@ export neighborstates, neighborstates_flexible
 export edgeids
 
 # For many function declared in this file, the concrete impementation depends
-# the the traits of the edge type and the function itself is build via
+# on the hints of the edge type and the function itself is build via
 # the construct_edge_methods function. The declaration here
 # are only used for the documentation, that they come with parameters
 # improves the experience with tools like LSP.
@@ -80,11 +80,11 @@ end
     edges(sim, id::AgentID, ::Type{E}) 
 
 Returns the edge of type `E` with agent `id` as target if `E` has
-the trait :SingleEdge, or a vector of these edges otherwise.
+the hint :SingleEdge, or a vector of these edges otherwise.
 
 If there is no edge with agent `id` as target, `edges` returns `nothing`.
 
-edges is not defined if `E` has the trait :IgnoreFrom or :Stateless.
+edges is not defined if `E` has the hint :IgnoreFrom or :Stateless.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`neighborids`](@ref),
 [`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
@@ -96,12 +96,12 @@ function edges(::__MODEL__, id::AgentID, edgetype::Type) end
     edgeids(sim, id::AgentID, ::Type{E}) 
 
 Returns the ID of the agent on the source side of the edge of type `E`
-with agent `id` as target if `E` has the trait :SingleEdge, or otherwise
+with agent `id` as target if `E` has the hint :SingleEdge, or otherwise
 a vector of the IDs of the agents on the source side of those edges.
 
 If there is no edge with agent `id` as target, `edgeids` returns `nothing`.
 
-`edgeids` is not defined if `E` has the trait :IgnoreFrom.
+`edgeids` is not defined if `E` has the hint :IgnoreFrom.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
@@ -113,11 +113,11 @@ function edgeids(::__MODEL__, id::AgentID, edgetype::Type) end
     edgestates(sim, id::AgentID, ::Type{E}) 
 
 Returns the state of the edge of type `E` with agent `id` as target if `E` has
-the trait :SingleEdge, or a vector of these states otherwise.
+the hint :SingleEdge, or a vector of these states otherwise.
 
 If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 
-`edgestates` is not defined if `E` has the trait :Stateless.
+`edgestates` is not defined if `E` has the hint :Stateless.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
@@ -129,7 +129,7 @@ function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
     neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
 
 Returns the state of the agent with type `A` on the source side of the
-edge of type `E` with agent `id` as target if `E` has the trait
+edge of type `E` with agent `id` as target if `E` has the hint
 :SingleEdge, or a vector of these agent states otherwise.
 
 If there is no edge with agent `id` as target, `neighborstates`
@@ -139,7 +139,7 @@ When the agents on the source side of the edges can have different
 types, and it is impossible to determine the Type{A} you can use
 [`neighborstates_flexible`](@ref) instead.
 
-`neighborstates` is not defined if T has the trait :IgnoreFrom 
+`neighborstates` is not defined if T has the hint :IgnoreFrom 
 
 In a parallel run, this function can trigger communication between
 processes. In the case that the state of ALL agents is not needed in
@@ -159,7 +159,7 @@ function neighborstates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Typ
     neighborstates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 
 
 Returns the state of the agent on the source side of the
-edge of type `E` with agent `id` as target if `E` has the trait
+edge of type `E` with agent `id` as target if `E` has the hint
 :SingleEdge, or a vector of these agent states otherwise.
 
 If there is no edge with agent `id` as target, `neighborstates_flexible`
@@ -169,7 +169,7 @@ returns `nothing`.
 [`neighborstates`](@ref) and should be only used in the case that the
 type of agent can not be determined.
 
-`neighborstates_flexible` is not defined if T has the trait :IgnoreFrom.
+`neighborstates_flexible` is not defined if T has the hint :IgnoreFrom.
 
 In a parallel run, this function can trigger communication between
 processes. In the case that the state of ALL agents is not needed in
@@ -194,7 +194,7 @@ end
 
 Returns the number of edges of type `E` with agent `id` as target.
 
-`num_edges` is not defined if T has the trait :SingleEdge
+`num_edges` is not defined if T has the hint :SingleEdge
 
 See also [`apply!`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`edgestates`](@ref), [`has_edge`](@ref)
@@ -209,8 +209,8 @@ Returns true if there is at least one edge of type `E` with agent `id` as
 target.
 
 `has_edge` is not defined if T has the :SingleEdge and :SingleType
-traits, with the exception that it has also the :IgnoreFrom and
-:Stateless traits.
+hints, with the exception that it has also the :IgnoreFrom and
+:Stateless hints.
 
 See also [`apply!`](@ref), [`edges`](@ref),
 [`edgeids`](@ref), [`edgestates`](@ref), [`num_edges`](@ref)

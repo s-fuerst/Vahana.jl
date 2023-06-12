@@ -73,7 +73,7 @@ and to select a seller from the list of known sellers.
 using Vahana
 using Random
 
-detect_stateless_trait(true); #hide
+detect_stateless(true); #hide
 
 # We have two types of agents, `Buyer` and `Seller`. In Vahana, agents
 # are defined as (immutable) structs. The structs define the state of
@@ -133,8 +133,8 @@ struct KnownSellers end
 # where T is in our case the KnownSeller. `from` is the agent on the
 # source of the edge, but the target of the edge is missing. The edges
 # are stored in containers like a Dict{AgentID, Vector{Edge{T}}} (the
-# concrete container depends on so called traits, see [Edge
-# Traits](./performance.md#Edge-Traits), where the keys are the target
+# concrete container depends on so called hints, see [Edge
+# Hints](./performance.md#Edge-Hints), where the keys are the target
 # agents, so adding the target also to the Edge struct is redundant and
 # would only consume memory and CPU cycles unnecessarily.
 

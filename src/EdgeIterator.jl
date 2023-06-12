@@ -23,10 +23,10 @@ function length(iw::IterEdgesWrapper{SIM, FT, T}) where {SIM, FT, T}
 end
 
 function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
-    ignorefrom = :IgnoreFrom in attr[:traits]
-    singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleType in attr[:traits]
-    stateless = :Stateless in attr[:traits]
+    ignorefrom = :IgnoreFrom in attr[:hints]
+    singleedge = :SingleEdge in attr[:hints]
+    singletype = :SingleType in attr[:hints]
+    stateless = :Stateless in attr[:hints]
 
     # for whatever reason, we cannot just use the field type in the
     # :SingleType case
@@ -79,7 +79,7 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
 
     @eval function iterate(iw::IterEdgesWrapper{$simsymbol, $FT, $T}, is::IterEdgesState{$IT})
         field = iw.field
-        # innerisvec is false, if the edgetyspe has the trait :SingleEdge
+        # innerisvec is false, if the edgetyspe has the hint :SingleEdge
         if is.nextedgeidx <= is.length
             if $singleedge
                 return ((is.currentagentid, field[is.currentagentid]),

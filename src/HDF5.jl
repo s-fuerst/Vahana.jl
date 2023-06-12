@@ -125,7 +125,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     create_group(aid, "empty_array")
     foreach(sim.typeinfos.nodes_types) do T
         tid = create_group(aid, string(T))
-        attrs(tid)[":Immortal"] = has_trait(sim, T, :Immortal, :Agent)
+        attrs(tid)[":Immortal"] = has_hint(sim, T, :Immortal, :Agent)
     end    
 
     eid = create_group(fid, "edges")
@@ -133,13 +133,13 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     create_group(eid, "empty_array")
     foreach(sim.typeinfos.edges_types) do T
         tid = create_group(eid, string(T))
-        attrs(tid)[":Stateless"] = has_trait(sim, T, :Stateless)
-        attrs(tid)[":IgnoreFrom"] = has_trait(sim, T, :IgnoreFrom)
-        attrs(tid)[":SingleEdge"] = has_trait(sim, T, :SingleEdge)
+        attrs(tid)[":Stateless"] = has_hint(sim, T, :Stateless)
+        attrs(tid)[":IgnoreFrom"] = has_hint(sim, T, :IgnoreFrom)
+        attrs(tid)[":SingleEdge"] = has_hint(sim, T, :SingleEdge)
         attrs(tid)[":SingleType"] =
-            has_trait(sim, T, :SingleType)
+            has_hint(sim, T, :SingleType)
         attrs(tid)[":IgnoreSourceState"] =
-            has_trait(sim, T, :IgnoreSourceState)
+            has_hint(sim, T, :IgnoreSourceState)
     end
 
     create_group(fid, "snapshots")
@@ -334,7 +334,7 @@ function write_agents(sim::Simulation,
                     start = 1
                     last = num_agents
                 end
-                if ! has_trait(sim, T, :Immortal, :Agent)
+                if ! has_hint(sim, T, :Immortal, :Agent)
                     dset = new_dset(tid, "died", Bool,
                                     sum_num_agents, field.read.died, false)
                     dset[start:last] = field.read.died
@@ -353,7 +353,7 @@ function write_agents(sim::Simulation,
     nothing
 end
 
-# We need to convert the Edges depending of the edge traits to
+# We need to convert the Edges depending of the edge hints to
 # different structs that will be then saved to the HDF5 file
 
 struct CompleteEdge{T}
@@ -376,8 +376,8 @@ struct IgnoreFromEdge{T}
     state::T
 end
 
-_neighbors_only(sim, T) = (has_trait(sim, T, :Stateless) ||
-    fieldcount(T) == 0) && has_trait(sim, T, :IgnoreFrom)
+_neighbors_only(sim, T) = (has_hint(sim, T, :Stateless) ||
+    fieldcount(T) == 0) && has_hint(sim, T, :IgnoreFrom)
 
 
 function write_edges(sim::Simulation,
@@ -418,20 +418,20 @@ function write_edges(sim::Simulation,
             # what we write depends on :Stateless, :IgnoreFrom
             # and :SingleType
             (converted, DT, create_dt) = if _neighbors_only(sim, T)
-                if has_trait(sim, T, :SingleType)
+                if has_hint(sim, T, :SingleType)
                     (edges, eltype(edges), false)
                 else
                     ([EdgeCount(to, count) for (to, count) in edges], EdgeCount, true)
                 end
             elseif fieldcount(T) == 0
-                if has_trait(sim, T, :Stateless)
+                if has_hint(sim, T, :Stateless)
                     (map(e -> StatelessEdge(e[1], e[2]), edges),
                      StatelessEdge, true)
                 else
                     (map(e -> StatelessEdge(e[1], e[2].from), edges),
                      StatelessEdge, true)
                 end
-            elseif has_trait(sim, T, :IgnoreFrom)
+            elseif has_hint(sim, T, :IgnoreFrom)
                 (map(e -> IgnoreFromEdge(e[1], e[2]), edges),
                  IgnoreFromEdge{T}, true)
             else     
@@ -596,7 +596,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
     
     field.nextid = size + 1
 
-    if ! has_trait(sim, T, :Immortal, :Agent)
+    if ! has_hint(sim, T, :Immortal, :Agent)
         if size > 0
             field.write.died = HDF5.read(tid["died"],
                                          Bool,
@@ -622,7 +622,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
 
     # We must also refresh the list of reuseable ids
     empty!(field.read.reuseable)
-    if ! has_trait(sim, T, :Immortal, :Agent)
+    if ! has_hint(sim, T, :Immortal, :Agent)
         for i in 1:size
             if field.read.died[i]
                 push!(field.read.reuseable, i)
@@ -647,7 +647,7 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     
     size = parallel ? sum(vec_num_agents) : vec_num_agents[fidx]
 
-    died = if ! has_trait(sim, T, :Immortal, :Agent) 
+    died = if ! has_hint(sim, T, :Immortal, :Agent) 
         HDF5.read(tid["died"], Bool)
     else
         fill(false, size)
@@ -771,7 +771,7 @@ function read_agents!(sim::Simulation,
 
             t = find_transition_nr(fids[1]["agents"][string(T)], transition)
             if attrs(fids[1]["agents"]["empty_array"]["t_$t"])[string(T)]
-                if ! has_trait(sim, T, :Immortal, :Agent)
+                if ! has_hint(sim, T, :Immortal, :Agent)
                     field.write.died = Vector{Bool}()
                 end
                 if fieldcount(T) > 0
@@ -919,10 +919,10 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
     last = start + vec_num_edges[fidx] - 1
 
     if _neighbors_only(sim, T)
-        if has_trait(sim, T, :SingleType)
+        if has_hint(sim, T, :SingleType)
             AT = sim.typeinfos.edges_attr[T][:target]
             typeid = sim.typeinfos.nodes_type2id[AT]
-            data = if has_trait(sim, T, :SingleEdge)
+            data = if has_hint(sim, T, :SingleEdge)
                 HDF5.read(tid, Bool, start:last)
             else
                 HDF5.read(tid, Int64, start:last)
@@ -947,7 +947,7 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
         for se in HDF5.read(tid, StatelessEdge, start:last)
             add_edge!(sim, idmapfunc(se.from), idmapfunc(se.to), T())
         end
-    elseif has_trait(sim, T, :IgnoreFrom)
+    elseif has_hint(sim, T, :IgnoreFrom)
         # T struct
         # for add_edge! we need always a from id, even when it's ignored
         dummy = AgentID(0)
@@ -955,7 +955,7 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
             add_edge!(sim, dummy, idmapfunc(edge.to), edge.state)
         end
     else
-        if has_trait(sim, T, :SingleType)
+        if has_hint(sim, T, :SingleType)
             totype = sim.typeinfos.edges_attr[T][:target]
             totypeid = sim.typeinfos.nodes_type2id[totype]
             for ce in HDF5.read(tid, CompleteEdge{T}, start:last)

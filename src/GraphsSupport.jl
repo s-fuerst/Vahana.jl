@@ -128,11 +128,11 @@ function vahanasimplegraph(sim;
 
     ne = 0
     for t in edgetypes
-        if has_trait(sim, t, :IgnoreFrom)
+        if has_hint(sim, t, :IgnoreFrom)
             if show_ignorefrom_warning
                 printstyled("""
     
-                Edgetype $t has the :IgnoreFrom trait, therefore edges of this 
+                Edgetype $t has the :IgnoreFrom hint, therefore edges of this 
                 type can not added those edges to the created subgraph
 
                 """; color = :red)
@@ -140,7 +140,7 @@ function vahanasimplegraph(sim;
             continue
         end
         for (to, e) in edges_iterator(sim, t)
-            if has_trait(sim, t, :Stateless)
+            if has_hint(sim, t, :Stateless)
                 fid = get(v2g, e, nothing)
             else
                 fid = get(v2g, e.from, nothing)
@@ -236,11 +236,11 @@ function vahanagraph(sim;
     edges = Vector{Graphs.Edge}()
     edgetypeidx = 1
     for T in edgetypes
-        if has_trait(sim, T, :IgnoreFrom)
+        if has_hint(sim, T, :IgnoreFrom)
             if show_ignorefrom_warning
                 printstyled("""
     
-                Edgetype $T has the :IgnoreFrom trait, therefore edges of this 
+                Edgetype $T has the :IgnoreFrom hint, therefore edges of this 
                 type can not added those edges to the created subgraph
 
                 """; color = :red)

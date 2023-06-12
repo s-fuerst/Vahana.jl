@@ -5,7 +5,7 @@ enable_asserts(false)
 
 suppress_warnings(true)
 
-detect_stateless_trait(true)
+detect_stateless(true)
 
 struct AgentState end
 
@@ -24,7 +24,7 @@ allEdgeTypes = vcat(statefulEdgeTypes, statelessEdgeTypes)
 #allEdgeTypes = [ "EdgeT", "EdgeTF" ]
 
 
-hastrait(type, trait::String) = occursin(trait, SubString(String(Symbol(type)), 5))
+hashint(type, hint::String) = occursin(hint, SubString(String(Symbol(type)), 5))
 
 function pt(b)
     if b === nothing
@@ -36,29 +36,29 @@ end
 
 
 function prepare(name)
-    traits = []
+    hints = []
     
-    if hastrait(name, "S")
-        traits = vcat(traits, :Stateless)
+    if hashint(name, "S")
+        hints = vcat(hints, :Stateless)
     end
-    if hastrait(name, "E")
-        traits = vcat(traits, :SingleEdge)
+    if hashint(name, "E")
+        hints = vcat(hints, :SingleEdge)
     end
-    if hastrait(name, "T")
-        traits = vcat(traits, :SingleType)
+    if hashint(name, "T")
+        hints = vcat(hints, :SingleType)
     end
-    if hastrait(name, "I")
-        traits = vcat(traits, :IgnoreFrom)
+    if hashint(name, "I")
+        hints = vcat(hints, :IgnoreFrom)
     end
 
-    if hastrait(name, "F")
+    if hashint(name, "F")
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgetype!(EdgeState, traits...; target=AgentState, size=3)
+            register_edgetype!(EdgeState, hints...; target=AgentState, size=3)
     else
         mt = ModelTypes() |>
             register_agenttype!(AgentState) |>
-            register_edgetype!(EdgeState, traits...; target=AgentState)
+            register_edgetype!(EdgeState, hints...; target=AgentState)
     end    
     create_model(mt, name)
 end
@@ -86,11 +86,11 @@ function createsim(foragg, mt, name)
 end
 
 function run_benchmark(mt, name)
-    stateless = hastrait(name, "S")
-    singleedge = hastrait(name, "E")
-    singletype = hastrait(name, "T")
-    ignorefrom = hastrait(name, "I")
-    fixedsize = hastrait(name, "F")
+    stateless = hashint(name, "S")
+    singleedge = hashint(name, "E")
+    singletype = hashint(name, "T")
+    ignorefrom = hashint(name, "I")
+    fixedsize = hashint(name, "F")
 
     (sim, a1, a2, a3) = createsim(false, mt, name)
 
@@ -166,7 +166,7 @@ end
 
 struct AgentWithState state::Int64 end
 
-println("| traits  | add_agent | agentstate | agentstate_flexible | mapreduce |")
+println("| hints  | add_agent | agentstate | agentstate_flexible | mapreduce |")
 
 function run_benchmark_agents(mt)
     sim = create_simulation(mt, nothing, nothing)

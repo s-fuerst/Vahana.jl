@@ -1,6 +1,6 @@
 # the edge types and some other stuff is defined in edges.jl
 
-import Vahana: has_trait, @onrankof
+import Vahana: has_hint, @onrankof
 
 # this test does not work with MPI, as it assumes that all edges are on one rank
 if mpi.size == 1
@@ -15,18 +15,18 @@ if mpi.size == 1
             for id in aids
                 if fieldcount(ET) > 0
                     add_edge!(eisim, aids[1], id, ET(id))
-                    if ! hastrait(ET, "E")
+                    if ! hashint(ET, "E")
                         add_edge!(eisim, id, aids[1], ET(id))
                     end
                 else
                     add_edge!(eisim, aids[1], id, ET())
-                    if ! hastrait(ET, "E")
+                    if ! hashint(ET, "E")
                         add_edge!(eisim, id, aids[1], ET())
                     end
                 end
             end
 
-            expected = hastrait(ET, "E") ? 10 : 20
+            expected = hashint(ET, "E") ? 10 : 20
             
             @test Vahana.edges_iterator(eisim, ET, false) |> length == expected
             @test Vahana.edges_iterator(eisim, ET, false) |> collect |> length ==
@@ -42,7 +42,7 @@ if mpi.size == 1
         end
 
         for ET in [ statelessEdgeTypes; statefulEdgeTypes ]
-            if ! (hastrait(ET, "S") & hastrait(ET, "I"))
+            if ! (hashint(ET, "S") & hashint(ET, "I"))
                 runedgesitertest(ET)
                 GC.gc(true)
             end
@@ -120,7 +120,7 @@ end
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
         for i in 1:10
-            if has_trait(sim, ET, :Stateless)
+            if has_hint(sim, ET, :Stateless)
                 add_edge!(sim, bids[i], aids[i], ET())
             else
                 add_edge!(sim, bids[i], aids[i], ET(i))
@@ -138,7 +138,7 @@ end
 
         @test num_edges(sim, ET) == 0  
 
-        if has_trait(sim, ET, :IgnoreFrom)
+        if has_hint(sim, ET, :IgnoreFrom)
             return
         end
 
@@ -150,7 +150,7 @@ end
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
         for i in 1:10
-            if has_trait(sim, ET, :Stateless)
+            if has_hint(sim, ET, :Stateless)
                 add_edge!(sim, bids[i], aids[i], ET())
             else
                 add_edge!(sim, bids[i], aids[i], ET(i))

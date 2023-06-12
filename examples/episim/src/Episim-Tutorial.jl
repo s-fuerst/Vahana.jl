@@ -8,7 +8,7 @@ import Base.+
 
 include("FakeRandomGen.jl")
 
-detect_stateless_trait(true)
+detect_stateless(true)
 
 @enum EventType Arrival=1 Depature=0
 

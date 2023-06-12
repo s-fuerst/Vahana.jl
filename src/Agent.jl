@@ -185,7 +185,7 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
         To get the number of agents, you can call num_agents instead.
     """
     states = getproperty(sim, Symbol(T)).read.state
-    l = if has_trait(sim, T, :Immortal, :Agent)
+    l = if has_hint(sim, T, :Immortal, :Agent)
         states
     else
         died = getproperty(sim, Symbol(T)).read.died
@@ -205,7 +205,7 @@ function num_agents(sim, ::Type{T}, sum_ranks = true) where T
     field = getproperty(sim, Symbol(T))
     attr = sim.typeinfos.nodes_attr[T]
 
-    local_num = if :Immortal in attr[:traits]
+    local_num = if :Immortal in attr[:hints]
         # we can not just access the length of read.state, as for
         # types without field, we don't use the read.state vector
         field.nextid - 1

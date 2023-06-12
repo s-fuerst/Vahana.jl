@@ -32,7 +32,7 @@ We want to run the model with optimized performance, see
 [Performance Tuning](performance.html) for details.
 
 ````@example predator
-detect_stateless_trait(true)
+detect_stateless(true)
 
 enable_asserts(false);
 nothing #hide
@@ -155,7 +155,7 @@ nothing #hide
 ## Create the Simulation
 
 We have now defined all the Julia structs needed to create the model
-and a simulation. We also add some traits to some edgetypes, mainly
+and a simulation. We also add some hints to some edgetypes, mainly
 for performance reasons.
 
 ````@example predator

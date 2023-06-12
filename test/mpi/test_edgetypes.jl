@@ -2,7 +2,7 @@ using Test
 
 using Vahana
 
-import Vahana.has_trait
+import Vahana.has_hint
 
 using MPI
 
@@ -30,7 +30,7 @@ struct AgentState2
     something::Bool
 end
 
-struct MPIEdgeD fromid::AgentID; toid::AgentID end # D for default (no trait is set)
+struct MPIEdgeD fromid::AgentID; toid::AgentID end # D for default (no hint is set)
 struct MPIEdgeS end
 struct MPIEdgeE fromid::AgentID; toid::AgentID end
 struct MPIEdgeT fromid::AgentID; toid::AgentID end
@@ -98,15 +98,15 @@ end
 # non reversed
 function check_state(ET)
     (agent, id, sim) -> begin
-        if has_trait(sim, ET, :SingleEdge)
+        if has_hint(sim, ET, :SingleEdge)
             @test has_edge(sim, id, ET)
-            if ! has_trait(sim, ET, :IgnoreFrom)
+            if ! has_hint(sim, ET, :IgnoreFrom)
                 @test neighborstates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx - 1, mpi.size)
             end
         else
             @test num_edges(sim, id, ET) == 1
-            if ! has_trait(sim, ET, :IgnoreFrom)
+            if ! has_hint(sim, ET, :IgnoreFrom)
                 @test first(neighborstates(sim, id, ET, AgentState1)).idx ==
                     mod1(agent.idx - 1, mpi.size)
             end
@@ -124,24 +124,24 @@ end
 # AS1_3 <- AS2_1
 
 # so the edges are going only to AgentState1. The edges from AS2 are
-# dropped for the :SingleEdge and :SingleType traits.
+# dropped for the :SingleEdge and :SingleType hints.
 function check_state_rev1(ET)
     (agent::AgentState1, id, sim) -> begin
-        if has_trait(sim, ET, :SingleEdge) 
+        if has_hint(sim, ET, :SingleEdge) 
             @test has_edge(sim, id, ET)
-            if ! has_trait(sim, ET, :IgnoreFrom)
+            if ! has_hint(sim, ET, :IgnoreFrom)
                 @test neighborstates(sim, id, ET, AgentState1).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
-        elseif has_trait(sim, ET, :SingleType)
+        elseif has_hint(sim, ET, :SingleType)
             @test num_edges(sim, id, ET) == 1
-            if ! has_trait(sim, ET, :IgnoreFrom)
+            if ! has_hint(sim, ET, :IgnoreFrom)
                 @test first(neighborstates(sim, id, ET, AgentState1)).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
         else
             @test num_edges(sim, id, ET) == 2
-            if ! has_trait(sim, ET, :IgnoreFrom)
+            if ! has_hint(sim, ET, :IgnoreFrom)
                 @test first(neighborstates_flexible(sim, id, ET)).idx ==
                     mod1(agent.idx + 1, mpi.size)
             end
@@ -153,7 +153,7 @@ end
 function check_state_rev2(ET)
     (_, id, sim) -> begin
         # for the SingleType we determined that ET can only go to AS1 agents
-        if ! has_trait(sim, ET, :SingleType)
+        if ! has_hint(sim, ET, :SingleType)
             @test ! has_edge(sim, id, ET)
         end
     end
@@ -167,12 +167,12 @@ end
 function reverse_edge_direction(ET)
     (state, id, sim) -> begin
         # In the :SingleType case there are no edges to AgentState2
-        if has_trait(sim, ET, :SingleType) && typeof(state) == AgentState2
+        if has_hint(sim, ET, :SingleType) && typeof(state) == AgentState2
             return
         end
         # If we would reverse the edges in the :SingleEdge case,
         # two edges would point to the same agent.
-        if has_trait(sim, ET, :SingleEdge) && typeof(state) == AgentState2
+        if has_hint(sim, ET, :SingleEdge) && typeof(state) == AgentState2
             return
         end
         # we are know how the edges are constructed and how ids are given
@@ -182,10 +182,10 @@ function reverse_edge_direction(ET)
         target_id = AgentID(1 << Vahana.SHIFT_TYPE +
             target_rank << Vahana.SHIFT_RANK + 1)
 
-        if has_trait(sim, ET, :Stateless)
+        if has_hint(sim, ET, :Stateless)
             add_edge!(sim, id, target_id, ET())
         else
-            if has_trait(sim, ET, :SingleEdge)
+            if has_hint(sim, ET, :SingleEdge)
                 nstate = edgestates(sim, id, ET) 
             else 
                 nstate = edgestates(sim, id, ET) |> first
@@ -210,14 +210,14 @@ function testforedgetype(ET)
             fromid = agentids[mod1(i-1, mpi.size)]
             toid = agentids[i]
             toid2 = agentids2[i]
-            if ! has_trait(sim, ET, :Stateless)
+            if ! has_hint(sim, ET, :Stateless)
                 add_edge!(sim, fromid, toid, ET(fromid, toid))
-                if ! has_trait(sim, ET, :SingleType)
+                if ! has_hint(sim, ET, :SingleType)
                     add_edge!(sim, fromid, toid2, ET(fromid, toid))
                 end
             else
                 add_edge!(sim, fromid, toid, ET())
-                if ! has_trait(sim, ET, :SingleType)
+                if ! has_hint(sim, ET, :SingleType)
                     add_edge!(sim, fromid, toid2, ET())
                 end
             end
@@ -237,7 +237,7 @@ function testforedgetype(ET)
     @test num_agents(sim, AgentState1) == mpi.size 
     @test num_agents(sim, AgentState2) == mpi.size 
 
-    num_edges_per_PE = has_trait(sim, ET, :SingleType) ? 1 : 2
+    num_edges_per_PE = has_hint(sim, ET, :SingleType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == mpi.size * num_edges_per_PE 
     
     finish_init!(sim; partition = part)

@@ -125,7 +125,7 @@ end
 
 
 function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
-    stateless = :Stateless in attr[:traits]
+    stateless = :Stateless in attr[:hints]
 
     @eval function transmit_agents!(sim::$simsymbol,
                              readableET::Vector{DataType},
@@ -139,7 +139,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
         end
         
         for ET in readableET
-            if :IgnoreSourceState in sim.typeinfos.edges_attr[ET][:traits]
+            if :IgnoreSourceState in sim.typeinfos.edges_attr[ET][:hints]
                 continue
             end
             
@@ -245,17 +245,17 @@ end
 function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
     attr = typeinfos.edges_attr[T]
 
-    ignorefrom = :IgnoreFrom in attr[:traits]
-    singleedge = :SingleEdge in attr[:traits]
-    singletype = :SingleType in attr[:traits]
-    stateless = :Stateless in attr[:traits]
+    ignorefrom = :IgnoreFrom in attr[:hints]
+    singleedge = :SingleEdge in attr[:hints]
+    singletype = :SingleType in attr[:hints]
+    stateless = :Stateless in attr[:hints]
     
     ST = Vector{Tuple{AgentID, CE}}
 
     # typeid = typeinfos.edges_type2id[T]
     
     # For sending the edges we need different versions, depending on the
-    # edge traits, as e.g. for the :HasEdgeOnly or :NumEdgeOnly we
+    # edge hints, as e.g. for the :HasEdgeOnly or :NumEdgeOnly we
     # transfer only the number of edges. In overall, when we iterate over
     # the container, we get the following values:
     # |                    | Statel. | Ignore | get edges via | sending (ST below) |
@@ -280,7 +280,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         # should be transmit to the PE
         perPE = [ ST() for _ in 1:mpi.size ]
 
-        # The iterator for the edges depends on the traits of the edgetype
+        # The iterator for the edges depends on the hints of the edgetype
         if $stateless && $ignorefrom
             iter = @edgeread($T)
             if $singletype 
