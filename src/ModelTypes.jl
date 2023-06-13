@@ -113,11 +113,13 @@ the hints parameters:
 - `:NumEdgesOnly`: Combines `:IgnoreFrom` and `:Stateless`
 - `:HasEdgeOnly`: Combines `:IgnoreFrom`, `:Stateless` and `:SingleEdge`
 
-When `:SingleType` is set it is necessary to add to the
-`target` keyword argument. The value of this argument must be
-the type of the target nodes. In the case that it's known how many
-agents of this type exists, this can be also given via the optional
-keyword `size`.
+If `:SingleType` is set, the keyword argument `target` must be
+added. The value of this argument must be the type of the target
+node. If the `target` keyword exists, but the `:SingleType` hint is
+not explicitly specified, it will be set implicitly
+
+In the case that it's known how many agents of this type exists, this
+can be also given via the optional keyword `size`.
 
 See also [Edge Hints](./performance.md#Edge-Hints), [`add_edge!`](@ref) and 
 [`add_edges!`](@ref) 
@@ -160,11 +162,22 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, hints...;
 
         """
     end
+    if haskey(kwargs, :target) && !(:SingleType in hints)
+        if ! config.quiet
+            @rootonly printstyled("""
+
+            Since the `target` keyword exists for type $T, the :SingleType hint is added for this type.
+
+            """; color = :red)
+        end
+
+        push!(hints, :SingleType)
+    end
     if fieldcount(T) == 0 && !(:Stateless in hints)
         if config.detect_stateless
             union!(hints, Set([:Stateless]))
-        elseif !config.quiet
-            printstyled("""
+        elseif ! config.quiet
+            @rootonly printstyled("""
 
         Edgetype $T is a struct without any field, so you can increase the
         performance by setting the :Stateless hint. You can also

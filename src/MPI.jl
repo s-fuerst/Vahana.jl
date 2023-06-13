@@ -24,7 +24,7 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     end
     
     # We add structure to the simple AgentID -> ProcessID mapping,
-    # so that we can combine all agents of the AgentTypes etc.
+    # so that we can combine all agents of a AgentTypes etc.
     ssm = create_structured_send_map(sim, sendmap)
 
     # First we send all agentstates and collect the idmapping, as the
@@ -264,7 +264,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
     # | (Vector){AgentID}  | x       |        | edgeids       | [(toid, fromid)]   |
     # | (Vector){$T}       |         | x      | edgestates    | [(toid, $T)]       |
     # | Int64              | x       | x      | num_edges     | num_edges      |
-    @eval function sendedges!(sim, sendmap::Dict{AgentID, ProcessID},
+    @eval function sendedges!(sim::$simsymbol, sendmap::Dict{AgentID, ProcessID},
                        idmapping, ::Type{$T})
         with_logger(sim) do
             @debug "<Begin> sendedges!" edgetype=$T
@@ -315,7 +315,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         end
 
         updateid(id::AgentID) = idmapping[id] |> AgentID
-        
+
         edges_alltoall!(sim, perPE, $T, updateid)
 
         with_logger(sim) do

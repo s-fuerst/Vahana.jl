@@ -239,8 +239,11 @@ function testforedgetype(ET)
 
     num_edges_per_PE = has_hint(sim, ET, :SingleType) ? 1 : 2
     @test num_edges(sim, ET; write = true) == mpi.size * num_edges_per_PE 
+    @info mpi.rank sim
     
-    finish_init!(sim; partition = part)
+    finish_init!(sim; partition_algo = :EqualAgentNumbers)
+
+    @info mpi.rank sim
     
     apply!(sim, check_state(ET), [ AgentState1 ],
                       [ AgentState1, ET ], [])
@@ -250,6 +253,7 @@ function testforedgetype(ET)
     @test num_agents(sim, AgentState1) == mpi.size
     @test num_agents(sim, AgentState2) == mpi.size 
 
+    @test num_edges(sim, ET; write = true) == mpi.size * num_edges_per_PE 
     # we are testing now that new edges in the transition functions are
     # send to the correct ranks
     apply!(sim, reverse_edge_direction(ET),
@@ -271,7 +275,7 @@ function testforedgetype(ET)
 end
 
 @testset "EdgeTypes" begin
-    CurrentEdgeType = Nothing
+    CurrentEdgeType = MPIEdgeST
 
     if CurrentEdgeType === Nothing
         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
