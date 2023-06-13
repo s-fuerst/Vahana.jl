@@ -1,6 +1,4 @@
-using Vahana, Statistics, BenchmarkTools, StatProfilerHTML
-
-profile = false
+using Vahana, Statistics
 
 num_steps = 10
 
@@ -61,8 +59,8 @@ function construct_sim(model)
     algo = graphtype == :complete ? :EqualAgentNumber : :Metis
     
     @rootonly @info "finish_init!"
-    if mpi.isroot && profile
-        @time @profilehtml finish_init!(sim; partition_algo = algo)
+    if mpi.isroot 
+        @time finish_init!(sim; partition_algo = algo)
     else
         finish_init!(sim; partition_algo = :EqualAgentNumbers)
     end
@@ -118,28 +116,30 @@ construct_sim(model) |> runsim |> finish_simulation!
 
 ### Without Vahana
 if mpi.size == 1
-    @info "Without Vahana complete"
-    states = [ rand() for i in 1:num_agents ]
-    
-    function calcnewstate(i::Int64, states)
-        own = states[i]
-        accepted = filter(states) do other
-            abs(other - own) < 0.2
+    if num_agents <= 10000
+        @info "Without Vahana complete"
+        states = [ rand() for i in 1:num_agents ]
+        
+        function calcnewstate(i::Int64, states)
+            own = states[i]
+            accepted = filter(states) do other
+                abs(other - own) < 0.2
+            end
+            mean(accepted)
         end
-        mean(accepted)
-    end
 
-    function updateall(states)
-        new = fill(0.0, num_agents)
-        for i in 1:num_agents
-            new[i] = calcnewstate(i, states)
+        function updateall(states)
+            new = fill(0.0, num_agents)
+            for i in 1:num_agents
+                new[i] = calcnewstate(i, states)
+            end
+            new
         end
-        new
-    end
 
-    states = updateall(states)
-    @time for _ in 1:num_steps
-        global states = updateall(states)
+        states = updateall(states)
+        @time for _ in 1:num_steps
+            global states = updateall(states)
+        end
     end
 
     import Graphs
@@ -181,10 +181,4 @@ if mpi.size == 1
         global states = updateall(states,g)
     end
 end
-
-
-
-
-
-
 
