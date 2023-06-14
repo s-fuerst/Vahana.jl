@@ -238,3 +238,4 @@ macro roottime(ex)
     end
 end
 
+edge_attrs(sim, T::DataType) = sim.typeinfos.edges_attr[T]

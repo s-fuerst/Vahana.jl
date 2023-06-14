@@ -56,7 +56,7 @@ function construct_sim(model)
         foreach(id -> add_edge!(sim, id, id, Knows()), agentids) 
     end
 
-    algo = graphtype == :complete ? :EqualAgentNumber : :Metis
+    algo = graphtype == :complete ? :EqualAgentNumbers : :Metis
     
     @rootonly @info "finish_init!"
     if mpi.isroot 
