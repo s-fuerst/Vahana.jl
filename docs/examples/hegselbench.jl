@@ -137,6 +137,7 @@ if mpi.size == 1
         end
 
         states = updateall(states)
+        GC.gc(true)
         @time for _ in 1:num_steps
             global states = updateall(states)
         end
@@ -166,6 +167,7 @@ if mpi.size == 1
         Graphs.add_edge!(g, i, i)
     end
     states = updateall(states,g)
+    GC.gc(true)
     @time for _ in 1:num_steps
         global states = updateall(states,g)
     end
@@ -177,6 +179,7 @@ if mpi.size == 1
     for i = 1:num_agents
         Graphs.add_edge!(g, i, i)
     end
+    GC.gc(true)
     @time for _ in 1:num_steps
         global states = updateall(states,g)
     end
