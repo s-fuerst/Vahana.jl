@@ -2,9 +2,13 @@ import DataFrames: DataFrame, subset!, nrow
 
 export DataFrame
 
-function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentnr = false)
+function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
     if mpi.size > 1
         @info "The created dataframe contains only data from rank $(mpi.rank)"
+    end
+
+    if localnr
+        types = true
     end
 
     df = DataFrame()
@@ -23,7 +27,7 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
         if ! has_hint(sim, T, :Immortal, :Agent)
             subset!(df, :id => id -> .! read.died[agent_nr.(id)])
         end
-        if show_agentnr
+        if localnr
             df.id = map(agent_nr, df.id)
         end
     elseif T in sim.typeinfos.edges_types # Networks
@@ -70,14 +74,14 @@ function DataFrame(sim::Simulation, T::DataType; show_types = false, show_agentn
             #     df.from = map(id -> agent_id(totypeid, AgentNr(id)), df.from)
             # end
         end
-        if show_types
+        if types
             if ! has_hint(sim, T, :IgnoreFrom)
                 df.from_type = map(id -> tinfos.nodes_id2type[type_nr(id)],
                                    df.from)
             end
             df.to_type = map(id -> tinfos.nodes_id2type[type_nr(id)], df.to)
         end
-        if show_agentnr
+        if localnr
             df.to = map(agent_nr, df.to)
             if ! has_hint(sim, T, :IgnoreFrom)
                 df.from = map(agent_nr, df.from)

@@ -294,7 +294,7 @@ finish_init!(sim)
 # sellers to sum up the demand and calculate the new price.
 
 function calc_demand(b::Buyer, id, sim)
-    seller = rand(edgeids(sim, id, KnownSellers))
+    seller = rand(neighborids(sim, id, KnownSellers))
     s = agentstate(sim, seller, Seller)
     x = b.B * b.α
     y = b.B * (1 - b.α) / s.p

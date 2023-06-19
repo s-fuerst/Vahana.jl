@@ -208,7 +208,7 @@ function disease_progression(p::Person, id, sim)
     if p.health == E && p.health_changed == day - 3
         if rand() < 0.5
             p = start_quarantine(p, day)
-            checked(foreach, edgeids(sim, id, Contact)) do nid
+            checked(foreach, neighborids(sim, id, Contact)) do nid
                 add_edge!(sim, id, nid, Inform())
             end
         end

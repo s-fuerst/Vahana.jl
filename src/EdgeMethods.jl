@@ -358,6 +358,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 @inbounds field[nr] = _get_agent_container!(sim, to, $T,
                                                             field) + 1
             end
+            nothing
         end
 
         @eval function add_edge!(sim::$simsymbol, _::AgentID, to::AgentID, _::$MT)
@@ -375,6 +376,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 @inbounds field[nr] = _get_agent_container!(sim, to, $T,
                                                             field) + 1
             end
+            nothing
         end
     elseif singleedge
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
@@ -397,6 +399,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 _check_size!(field, nr, $T)
                 @inbounds field[nr] = _valuetostore(sim, edge)
             end
+            nothing
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID,
@@ -425,6 +428,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 _check_size!(field, nr, $T)
                 @inbounds field[nr] = _valuetostore(sim, from, edgestate)
             end
+            nothing
         end
     else
         @eval function add_edge!(sim::$simsymbol, to::AgentID, edge::Edge{$MT})
@@ -446,6 +450,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 push!(_get_agent_container!(sim, to, $T, @edgewrite($T)),
                       _valuetostore(sim, edge))
             end
+            nothing
         end
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID, to::AgentID,
@@ -467,6 +472,7 @@ by calling suppress_warnings(true) after importing Vahana.
                 push!(_get_agent_container!(sim, to, $T, @edgewrite($T)),
                       _valuetostore(sim, from, edgestate))
             end
+            nothing
         end
     end
 
@@ -576,7 +582,7 @@ by calling suppress_warnings(true) after importing Vahana.
     # Rules for the edge functions:
     # stateless => !mapreduce, !edges, !edgestates
     # singledge => !num_edges
-    # ignorefrom => !edges, !edgeids
+    # ignorefrom => !edges, !neighborids
 
     #- edges
     if !stateless && !ignorefrom
@@ -591,29 +597,29 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
-    #- edgeids
+    #- neighborids
     if !ignorefrom
         if stateless
-            @eval function edgeids(sim::$simsymbol, to::AgentID, ::Type{$MT})
+            @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
                 _get_agent_container(sim, to, $T, @edgeread($T))
             end
         else
             if singleedge
-                @eval function edgeids(sim::$simsymbol, to::AgentID, ::Type{$MT})
+                @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
                     ac = _get_agent_container(sim, to, $T, @edgeread($T))
                     isnothing(ac) ? nothing : ac.from
                 end
             else
-                @eval function edgeids(sim::$simsymbol, to::AgentID, ::Type{$MT})
+                @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$MT})
                     ac = _get_agent_container(sim, to, $T, @edgeread($T))
                     isnothing(ac) ? nothing : map(e -> e.from, ac)
                 end
             end
         end
     else
-        @eval function edgeids(::$simsymbol, ::AgentID, t::Type{$MT})
+        @eval function neighborids(::$simsymbol, ::AgentID, t::Type{$MT})
             @assert false """
-            edgeids is not defined for the hint combination of $t
+            neighborids is not defined for the hint combination of $t
             """
         end
     end
@@ -622,13 +628,13 @@ by calling suppress_warnings(true) after importing Vahana.
     if singleedge
         @eval function neighborstates(sim::$simsymbol, id::AgentID,
                                edgetype::Type{$MT}, agenttype::Type) 
-            nid = edgeids(sim, id, edgetype)
+            nid = neighborids(sim, id, edgetype)
             isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
         end
     else
         @eval function neighborstates(sim::$simsymbol, id::AgentID,
                                edgetype::Type{$MT}, agenttype::Type) 
-            checked(map, edgeids(sim, id, edgetype)) do nid
+            checked(map, neighborids(sim, id, edgetype)) do nid
                 agentstate(sim, nid, agenttype)
             end
         end
