@@ -167,7 +167,7 @@ function _show_edge(sim, e, neighborstate, edgeT)
     function show_struct(s)
         if nfields(s) >= 1
             for k in typeof(s) |> fieldnames
-                if k in neighborstate
+                if neighborstate == true || k in neighborstate
                     f = getfield(s, k)
                     print(" $k=$f,")
                 end
@@ -190,7 +190,7 @@ function _show_edge(sim, e, neighborstate, edgeT)
     if ! (:Stateless in edgetypehints)
         print(" $(e.state)")
     end
-    if length(neighborstate) > 0
+    if neighborstate == true || length(neighborstate) > 0
         # for the to edges we get an empty edgetype hints, as we constructed
         # those edges they don't have the same hints
         # But here we need the original hints, so we access them directly
@@ -358,7 +358,7 @@ function show_agent(sim,
                     printstyled("\n\tfrom:              "; color = :green)
                     if ! (:Stateless in edgetypehints)
                         printstyled("edge.state:"; color = :green)
-                    elseif length(neighborstate) > 0
+                    elseif neighborstate == true || length(neighborstate) > 0 
                         printstyled("state of edge.from:"; color = :green)
                     end
                     if :SingleEdge in edgetypehints
