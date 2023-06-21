@@ -14,7 +14,7 @@ Example:
 Instead of writing 
 
 ```@example
-nids = edgeids(sim, id, Contact)
+nids = neighborids(sim, id, Contact)
 if nids != nothing
     foreach(nids) do nid
       add_edge!(sim, id, nid, Inform()
@@ -25,7 +25,7 @@ end
 you can use the checked function to write
 
 ```@example
-checked(foreach, edgeids(sim, id, Contact)) do nid
+checked(foreach, neighborids(sim, id, Contact)) do nid
     add_edge!(sim, id, nid, Inform())
 end
 ```

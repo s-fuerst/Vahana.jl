@@ -202,6 +202,11 @@ function create_graphplot(sim::Simulation;
     #     end
     # end
 
+    if update_fn === nothing && pos_jitter === nothing
+        hidedecorations!(vp.axis)
+    end
+
+
     update_graphplot!(vp)
 end
 
@@ -269,12 +274,10 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
 end
 
 function _plot(vg::VahanaGraph)
-    agentcolors = distinguishable_colors(256,
-                                         [RGB(1,1,1), RGB(0,0,0)],
-                                         dropseed = true)
+    agentcolors = distinguishable_colors(128,
+                                         [RGB(1,1,1), RGB(0,0,0)])
     edgecolors = distinguishable_colors(256,
-                                        [RGB(0.2,0.3,0.3), RGB(0,0,0)],
-                                        dropseed = true)    
+                                        [RGB(0.4,0.4,0.4), RGB(0,0,0)])[3:end]
 
 
     rv = 1:nv(vg)
@@ -282,7 +285,7 @@ function _plot(vg::VahanaGraph)
     p = graphplot(vg,
                   node_color = [ agentcolors[type_nr(vg.g2v[i]) + 1]
                                  for i in rv ],
-                  node_size = [ 10 for _ in rv ],
+                  node_size = [ 12 for _ in rv ],
                   node_marker = [ :circle for _ in rv ],
                   #                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
                   nlabels = [ "" for _ in rv ],
@@ -293,7 +296,7 @@ function _plot(vg::VahanaGraph)
                   nlabels_textsize = [ 14 for _ in rv ],
                   edge_color = [ edgecolors[vg.edgetypeidx[i] + 1]
                                  for i in re ],
-                  edge_width = [ 1.5 for _ in re ],
+                  edge_width = [ 1 for _ in re ],
                   elabels = [ "" for _ in re ],
                   elabels_align = [ (:left, :bottom) for _ in re ],
                   elabels_color = [ :black for _ in re ],

@@ -255,8 +255,8 @@ functions are ignored.
 
 ````@example predator
 function find_prey(_, id, sim)
-    checked(foreach, edgeids(sim, id, PreyPosition)) do preyid
-        checked(foreach, edgeids(sim, id, PredatorView)) do predid
+    checked(foreach, neighborids(sim, id, PreyPosition)) do preyid
+        checked(foreach, neighborids(sim, id, PredatorView)) do predid
             add_edge!(sim, preyid, predid, VisiblePrey())
         end
     end
@@ -279,7 +279,7 @@ function move(state::Predator, id, sim)
         # we need to access the pos of the prey which is part of it's state
         prey = neighborstates(sim, id, VisiblePrey, Prey)
         newpos = if isnothing(prey)
-            nextcellid = rand(edgeids(sim, id, PredatorView))
+            nextcellid = rand(neighborids(sim, id, PredatorView))
             agentstate(sim, nextcellid, Cell).pos
         else
             rand(prey).pos
@@ -302,11 +302,11 @@ the `countdown` field of a cell is equal to 0.
 function move(state::Prey, id, sim)
     e = state.energy - param(sim, :prey).loss_per_turn
     if e > 0
-        withgrass = filter(edgeids(sim, id, PreyView)) do id
+        withgrass = filter(neighborids(sim, id, PreyView)) do id
             agentstate(sim, id, Cell).countdown == 0
         end
         nextcellid = if length(withgrass) == 0
-            rand(edgeids(sim, id, PreyView))
+            rand(neighborids(sim, id, PreyView))
         else
             rand(withgrass)
         end
@@ -348,8 +348,8 @@ prey as the target.
 
 ````@example predator
 function try_eat(state::Cell, id, sim)
-    predators = edgeids(sim, id, PredatorPosition)
-    prey = edgeids(sim, id, PreyPosition)
+    predators = neighborids(sim, id, PredatorPosition)
+    prey = neighborids(sim, id, PreyPosition)
 
     # first the predators eat the prey, in case that both are on the cell
     if ! isnothing(predators) && ! isnothing(prey)

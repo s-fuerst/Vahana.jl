@@ -141,23 +141,23 @@ function runedgestest()
             end
         end
 
-        @testset "edgeids" begin
+        @testset "neighborids" begin
             disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
-                e = edgeids(sim, a3id, t)
+                e = neighborids(sim, a3id, t)
                 @test e[1] == a2id
                 @test e[2] == a1id
-                e = edgeids(sim, a2id, t)
+                e = neighborids(sim, a2id, t)
                 @test e === nothing
             end
             for t in [EdgeE, EdgeSE]
-                e = edgeids(sim, a3id, t)
+                e = neighborids(sim, a3id, t)
                 @test e == a2id
             end
             disable_transition_checks(false)
             for t in [EdgeI, EdgeTI, EdgeTsI, EdgeSI, EdgeSTI, EdgeSTsI,
                    EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
-                @test_throws AssertionError edgeids(sim, a1id, t)
+                @test_throws AssertionError neighborids(sim, a1id, t)
             end
         end
 
@@ -223,10 +223,10 @@ function runedgestest()
         @testset "neighbor_states" begin
             disable_transition_checks(true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
-                e = edgeids(sim, a3id, t)
+                e = neighborids(sim, a3id, t)
                 @test e[1] == a2id
                 @test e[2] == a1id
-                e = edgeids(sim, a2id, t)
+                e = neighborids(sim, a2id, t)
                 @test e === nothing
             end
             disable_transition_checks(false)

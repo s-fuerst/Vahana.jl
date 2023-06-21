@@ -28,7 +28,7 @@ end
 function initial_active(c::Cell, id, sim)
     if c.active
         foreach(nid -> add_edge!(sim, id, nid, ActiveNeighbor()),
-                edgeids(sim, id, Neighbor))
+                neighborids(sim, id, Neighbor))
     end
     c
 end
@@ -42,7 +42,7 @@ function transition(c::Cell, id, sim)
         (c.active == false && n >= rules[3] && n <= rules[4])
 
         foreach(nid -> add_edge!(sim, id, nid, ActiveNeighbor()),
-                edgeids(sim, id, Neighbor))
+                neighborids(sim, id, Neighbor))
 
         return Cell(true)
     end

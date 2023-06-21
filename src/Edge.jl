@@ -2,7 +2,7 @@ export Edge, edgestates
 export add_edge!, add_edges!, edges
 export num_edges, has_edge
 export neighborstates, neighborstates_flexible
-export edgeids
+export neighborids
 
 # For many function declared in this file, the concrete impementation depends
 # on the hints of the edge type and the function itself is build via
@@ -93,21 +93,21 @@ and [`neighborstates`](@ref)
 function edges(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
-    edgeids(sim, id::AgentID, ::Type{E}) 
+    neighborids(sim, id::AgentID, ::Type{E}) 
 
 Returns the ID of the agent on the source side of the edge of type `E`
 with agent `id` as target if `E` has the hint :SingleEdge, or otherwise
 a vector of the IDs of the agents on the source side of those edges.
 
-If there is no edge with agent `id` as target, `edgeids` returns `nothing`.
+If there is no edge with agent `id` as target, `neighborids` returns `nothing`.
 
-`edgeids` is not defined if `E` has the hint :IgnoreFrom.
+`neighborids` is not defined if `E` has the hint :IgnoreFrom.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`neighborstates`](@ref)
 """
-function edgeids(::__MODEL__, id::AgentID, edgetype::Type) end
+function neighborids(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
     edgestates(sim, id::AgentID, ::Type{E}) 
@@ -120,7 +120,7 @@ If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 `edgestates` is not defined if `E` has the hint :Stateless.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
+[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`neighborstates`](@ref)
 """
 function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
@@ -149,7 +149,7 @@ for the agents whose state is actually used in the transition
 function.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
+[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function neighborstates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Type) end
@@ -179,13 +179,13 @@ for the agents whose state is actually used in the transition
 function.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
+[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
 """
 function neighborstates_flexible(::__MODEL__, id::AgentID, edgetype::Type) end
 
 function neighborstates_flexible(sim, id::AgentID, edgetype::Type)
-    nids = edgeids(sim, id, edgetype)
+    nids = neighborids(sim, id, edgetype)
     isnothing(nids) ? nothing : map(id -> agentstate_flexible(sim, id), nids)  
 end
 
@@ -197,7 +197,7 @@ Returns the number of edges of type `E` with agent `id` as target.
 `num_edges` is not defined if T has the hint :SingleEdge
 
 See also [`apply!`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`edgestates`](@ref), [`has_edge`](@ref)
+[`neighborids`](@ref), [`edgestates`](@ref), [`has_edge`](@ref)
 and [`neighborstates`](@ref)
 """
 function num_edges(::__MODEL__, id::AgentID, edgetype::Type) end
@@ -213,7 +213,7 @@ hints, with the exception that it has also the :IgnoreFrom and
 :Stateless hints.
 
 See also [`apply!`](@ref), [`edges`](@ref),
-[`edgeids`](@ref), [`edgestates`](@ref), [`num_edges`](@ref)
+[`neighborids`](@ref), [`edgestates`](@ref), [`num_edges`](@ref)
 and [`neighborstates`](@ref)
 """
 function has_edge(::__MODEL__, id::AgentID, edgetype::Type) end

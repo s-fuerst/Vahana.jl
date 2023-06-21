@@ -233,7 +233,7 @@ function _printid(id, nrformatted = true)
 end    
 
 """
-    show_agent(sim, Type{T}, id=0; max=5, stateof=:Edge, source = true) 
+    show_agent(sim, Type{T}, id=0; max=5, neighborstate = []) 
 
 Display detailed information about the agent with ID `id`, or in the
 case that id is a value < 2^32, the information of the nth agent of
@@ -248,12 +248,8 @@ Keyword arguments:
 `max` controls the maximal number of edges that are shown per network
 (per direction).
 
-`stateof` controls whether the state of the edge (the default) or the
-state of the adjacent agent (for any value except :Edge) is displayed.
-
-`source` controls whether all edges of the simulation should be
-traversed to find the edges where the agent `id` is the source. Since
-this can take some time for large graphs, this search can be disabled.
+If a field of an agent on the source side of an edge is listed in the
+`neighborstate` vector, the value of this field will be also shown.
 """
 function show_agent(sim,
              t::Type{T},

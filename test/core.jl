@@ -139,7 +139,7 @@ end
         enable_asserts(true)
     end
 
-    @testset "edges & edgeids" begin
+    @testset "edges & neighborids" begin
         Vahana.disable_transition_checks(true)
         @onrankof a1id @test length(edges(sim, a1id, ESDict)) == 4
         @onrankof a1id @test length(edges(sim, a1id, ESLDict1)) == 10
@@ -147,14 +147,14 @@ end
         @onrankof a2id @test edges(sim, a2id, ESDict) === nothing
         @onrankof a2id @test edges(sim, a2id, ESLDict1) === nothing
 
-        # we must disable the edgeids checks
-        @onrankof avids[1] @test length(edgeids(sim, avids[1], ESLDict2)) == 1
-        @onrankof avids[10] @test length(edgeids(sim, avids[10], ESLDict2)) == 1
+        # we must disable the neighborids checks
+        @onrankof avids[1] @test length(neighborids(sim, avids[1], ESLDict2)) == 1
+        @onrankof avids[10] @test length(neighborids(sim, avids[10], ESLDict2)) == 1
 
         es = edges(sim, a1id, ESLDict1)
         @onrankof a1id @test (es)[1].from == avids[1]
         @onrankof a1id @test (es)[10].from == avids[10]
-        es = edgeids(sim, avids[10], ESLDict2)
+        es = neighborids(sim, avids[10], ESLDict2)
         @onrankof avids[10] @test es[1] == avfids[10]
         Vahana.disable_transition_checks(false)
     end

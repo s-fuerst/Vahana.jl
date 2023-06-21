@@ -111,7 +111,7 @@ function run_benchmark(mt, name)
     if ignorefrom 
         nids = nothing
     else
-        nids = @benchmark edgeids($sim, $a3, EdgeState)
+        nids = @benchmark neighborids($sim, $a3, EdgeState)
     end
 
     if stateless 
@@ -152,7 +152,7 @@ end
 
 ######################################## create edge table
 
-println("| S | E | T | I | F | add_edge! | edges | has_edge | num_edges | edgeids | edgestates | mapreduce |")
+println("| S | E | T | I | F | add_edge! | edges | has_edge | num_edges | neighborids | edgestates | mapreduce |")
 
 for t in allEdgeTypes
     mt = prepare(t)

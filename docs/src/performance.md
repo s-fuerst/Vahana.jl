@@ -103,7 +103,7 @@ depends on the edge type hints:
 | function                                  | not available for edge type with the hint (combination) |
 |:------------------------------------------|:---------------------------------------------------------|
 | [`edges`](@ref)                        | `:IgnoreFrom` or `:Stateless`                            |
-| [`edgeids`](@ref)                     | `:IgnoreFrom`                                            |
+| [`neighborids`](@ref)                     | `:IgnoreFrom`                                            |
 | [`neighborstates`](@ref)                  | `:IgnoreFrom`                            |
 | [`edgestates`](@ref), [`mapreduce`](@ref) | `:Stateless`                                             |
 | [`num_edges`](@ref)                   | `:SingleEdge`                                            |
