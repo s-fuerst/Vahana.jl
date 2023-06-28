@@ -296,7 +296,7 @@ function _plot(vg::VahanaGraph)
                   nlabels_textsize = [ 14 for _ in rv ],
                   edge_color = [ edgecolors[vg.edgetypeidx[i] + 1]
                                  for i in re ],
-                  edge_width = [ 1 for _ in re ],
+                  edge_width = [ 1.0 for _ in re ],
                   elabels = [ "" for _ in re ],
                   elabels_align = [ (:left, :bottom) for _ in re ],
                   elabels_color = [ :black for _ in re ],
