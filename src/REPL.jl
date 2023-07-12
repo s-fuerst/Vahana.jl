@@ -236,9 +236,9 @@ end
     show_agent(sim, Type{T}, id=0; max=5, neighborstate = []) 
 
 Display detailed information about the agent with ID `id`, or in the
-case that id is a value < 2^32, the information of the nth agent of
-type T created. If `id` is 0 (the default value), a random agent of
-type T is selected.
+case that id is a value < 2^36, the information of the nth agent of
+type T. If `id` is 0 (the default value), a random agent of type T is
+selected.
 
 Returns the ID of the agent (which is especially useful when a random
 agent is selected).
@@ -370,44 +370,6 @@ function show_agent(sim,
                 end
             end
         end
-        
-        # if ! source continue end
-        
-        # if :IgnoreFrom in edgetypehints
-        #     if !justcount
-        #         printstyled("\n\tFor edgetypes with the :IgnoreFrom hint " *
-        #             "the edges to an agent can not be determined."; color = :red)
-        #     end
-        #     continue
-        # end
-        # # collect the outgoing edges and overwrite the from id
-        # # with the to id
-        # edges_agents = Vector{Edge}()
-        # for (eid, e) in edges_iterator(sim, edgeT)
-        #     edge = _reconstruct_edge(sim, e, edgetypehints, edgeT)
-
-        #     if id == edge.from
-        #         push!(edges_agents, Edge(AgentID(eid), edge.state))
-        #     end   
-        # end
-
-        # if length(edges_agents) > 0
-        #     if ! edgeTheadershown
-        #         printstyled("\n    $edgeT"; color = :yellow)
-        #     end
-        #     printstyled("\n\tto:                "; color = :green)
-        #     if ! (:Stateless in edgetypehints)
-        #         printstyled("edge.state:"; color = :green)
-        #     elseif neighborstate
-        #         printstyled("state of edge.to:"; color = :green)
-        #     end
-        #     for ea in first(edges_agents, max)
-        #         _show_edge(sim, ea, neighborstate, edgeT)
-        #     end
-        #     if length(edges_agents) > max
-        #         println("\n\t... ($(length(edges_agents)-max) not shown)")
-        #     end
-        # end
     end
     println()
 
@@ -416,29 +378,4 @@ function show_agent(sim,
     
     id
 end
-
-
-
-# """
-# TODO DOC 
-# """
-# # TODO: for mortal agents we must filter the agent_ids list, also
-# # add support for parallel runs (and move this away from repl). Or add
-# # a function that return all agentstates
-# function do_agents(g, f, sim, ::Type{T}) where T
-#     agent_ids = [ agent_id(sim, AgentID(nr), T)
-#                   for nr in keys(getproperty(sim, Symbol(T)).read.state) ]
-#     f(g, agent_ids)
-# end
-
-
-# TODO: all_edges. Call edges_iterator and send them to other processes
-
-# """
-# TODO DOC 
-# """
-# function do_edges(f, h, sim, t::Type{T}) where T
-#     g = f ∘ (e -> e[2])
-#     h(g, edges_iterator(sim, t) |> collect)
-# end
 

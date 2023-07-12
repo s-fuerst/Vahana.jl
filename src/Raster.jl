@@ -1,7 +1,7 @@
 import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
-export calc_raster, calc_rasterstate, move_to!, cellid
+export calc_raster, calc_rasterstate, move_to!
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
@@ -93,8 +93,6 @@ function stencil(metric, n::Int64, distance::Float64)
     d = distance |> floor |> Int
     _stencil_core(metric, n, distance, d)
 end
-
-
 
 """
     connect_raster_neighbors!(sim, name::Symbol, edge_constructor; distance::Int, metric:: Symbol, periodic::Bool)
@@ -190,7 +188,7 @@ Can be only called after [`finish_init!`](@ref).
 
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim, raster::Symbol, f, f_returns::DataType,
+function calc_raster(sim::Simulation, raster::Symbol, f, f_returns::DataType,
               accessible::Vector{DataType})
     with_logger(sim) do
         @info "<Begin> calc_raster!" raster
@@ -215,7 +213,7 @@ function calc_raster(sim, raster::Symbol, f, f_returns::DataType,
 end
 
 
-calc_raster(f, sim, raster::Symbol, f_returns::DataType,
+calc_raster(f, sim::Simulation, raster::Symbol, f_returns::DataType,
             accessible::Vector{DataType}) =
                 calc_raster(sim, raster, f, f_returns, accessible)
 
@@ -273,15 +271,15 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     r
 end
 
-"""
-    cellid(sim, name::Symbol, pos)
+# """
+#     cellid(sim, name::Symbol, pos)
 
-Returns the ID of the agent (node) from the raster `name` at the
-position `pos`. `pos` must be of type CartesianIndex or a Dims{N}.
+# Returns the ID of the agent (node) from the raster `name` at the
+# position `pos`. `pos` must be of type CartesianIndex or a Dims{N}.
 
-See also [`add_raster!`](@ref), [`move_to!`](@ref),
-[`add_edge!`](@ref) and [`agentstate`](@ref)
-"""
+# See also [`add_raster!`](@ref), [`move_to!`](@ref),
+# [`add_edge!`](@ref) and [`agentstate`](@ref)
+# """
 function cellid(sim, name::Symbol, pos)
     sim.rasters[name][CartesianIndex(pos)]
 end

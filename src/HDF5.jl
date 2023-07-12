@@ -1,7 +1,6 @@
 using MPI
 
 using HDF5
-using H5Zblosc
 
 import NamedTupleTools: ntfromstruct, structfromnt
 

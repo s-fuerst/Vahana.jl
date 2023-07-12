@@ -39,7 +39,7 @@ function test_merge(model)
                     collect) do (i, state)
                         state.f == sim.Agent.read.state[agent_nr(to)].f 
                     end |> first |> first
-                rto = agent_id(sim, AgentNr(rto), Agent)
+                rto = Vahana.agent_id(sim, AgentNr(rto), Agent)
                 if has_hint(sim, T, :IgnoreFrom) &&
                     has_hint(sim, T, :Stateless)
                     if has_hint(sim, T, :SingleType)

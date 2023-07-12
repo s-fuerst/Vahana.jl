@@ -19,7 +19,7 @@ export neighborids
 An edge between to agents with (optionally) additional state. T can be
 also a struct without any field.
 
-The AgentID of the agent at the head of the edge is not a field of
+The AgentID of the agent at the target of the edge is not a field of
 `Edge` itself, since this information is already part of the
 containers in which the edges are stored.
 
@@ -34,13 +34,14 @@ end
     add_edge!(sim, to::AgentID, edge::Edge{T}) 
 
 Add a single edge to the simulation `sim`. The edges is directed from
-the agent with ID `edge.from` to the agent with ID `to`.
+the agent with ID `edge.from` (the source) to the agent with ID `to`
+(the target).
 
     add_edge!(sim, from::AgentID, to::AgentID, state::T) 
 
-Add a single edge to the simulation `sim`. The edge is directed
-from the agent with ID `from` to the agent with ID `to` and has the
-state `state`. 
+Add a single edge to the simulation `sim`. The edge is directed from
+the agent with ID `from` (the source) to the agent with ID `to` (the
+target) and has the state `state`.
 
 `T` must have been previously registered in the simulation by calling
 [`register_edgetype!`](@ref).
@@ -62,14 +63,18 @@ edges as arguments.
 
 See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edge!`](@ref)
 """
-function add_edges!(sim, to::AgentID, edges::Vector{Edge{T}}) where T
+function add_edges!(sim::Simulation, to::AgentID, edges::Vector{Edge{T}}) where T
     for e in edges
         add_edge!(sim, to, e) 
     end
     nothing
 end
 
-function add_edges!(sim, to::AgentID, edges::Edge{T}...) where T
+function add_edges!(::Simulation, ::AgentID)
+    nothing
+end
+
+function add_edges!(sim::Simulation, to::AgentID, edges::Edge{T}...) where T
     for e in edges
         add_edge!(sim, to, e)
     end
@@ -95,7 +100,7 @@ function edges(::__MODEL__, id::AgentID, edgetype::Type) end
 """
     neighborids(sim, id::AgentID, ::Type{E}) 
 
-Returns the ID of the agent on the source side of the edge of type `E`
+Returns the ID of the agent on the source of the edge of type `E`
 with agent `id` as target if `E` has the hint :SingleEdge, or otherwise
 a vector of the IDs of the agents on the source side of those edges.
 
@@ -128,7 +133,7 @@ function edgestates(::__MODEL__, id::AgentID, edgetype::Type) end
 """
     neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
 
-Returns the state of the agent with type `A` on the source side of the
+Returns the state of the agent with type `A` on the source of the
 edge of type `E` with agent `id` as target if `E` has the hint
 :SingleEdge, or a vector of these agent states otherwise.
 
@@ -141,13 +146,6 @@ types, and it is impossible to determine the Type{A} you can use
 
 `neighborstates` is not defined if T has the hint :IgnoreFrom 
 
-In a parallel run, this function can trigger communication between
-processes. In the case that the state of ALL agents is not needed in
-the transition function, the performance can be likely increased by
-using [`edges`](@ref) instead and calling [`agentstate`](@ref) only
-for the agents whose state is actually used in the transition
-function.
-
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`edgestates`](@ref)
@@ -158,7 +156,7 @@ function neighborstates(::__MODEL__, id::AgentID, edgetype::Type, agenttype::Typ
 """
     neighborstates_flexible(sim::Simulation, id::AgentID, ::Type{E}) 
 
-Returns the state of the agent on the source side of the
+Returns the state of the agent on the source of the
 edge of type `E` with agent `id` as target if `E` has the hint
 :SingleEdge, or a vector of these agent states otherwise.
 
@@ -170,13 +168,6 @@ returns `nothing`.
 type of agent can not be determined.
 
 `neighborstates_flexible` is not defined if T has the hint :IgnoreFrom.
-
-In a parallel run, this function can trigger communication between
-processes. In the case that the state of ALL agents is not needed in
-the transition function, the performance can be likely increased by
-using [`edges`](@ref) instead and calling [`agentstate`](@ref) only
-for the agents whose state is actually used in the transition
-function.
 
 See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
 [`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
@@ -219,7 +210,11 @@ and [`neighborstates`](@ref)
 function has_edge(::__MODEL__, id::AgentID, edgetype::Type) end
 
 """
-TODO DOC 
+    num_edges(sim, ::Type{T}, sum_ranks=false)
+
+If `all_ranks` is `true` this function retrieves the number of edges of type `T`
+of the simulation `sim`. When it is set to `false`, the function will only return the
+number of edges of type `T` managed by the process.
 """
 function num_edges(sim, t::Type{T}, sum_ranks = true; write = nothing) where T
     local_num = if write === nothing

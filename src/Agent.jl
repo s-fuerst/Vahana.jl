@@ -1,24 +1,25 @@
-# The overall AgentID is composed of four parts:
+# The overall AgentID is composed of three parts:
 #
 # - The TypeID by which the AgentType of the agent can be determined.
 #
-# - The ProcessID, which in the MPI implementation is the rank on which
-#   the agent is currently managed.
+# - The ProcessID, which in the rank on which the agent is currently managed.
 #
-# - The AgentNr which says: "This is the nth agent of type TypeID
-#   created on Process ID" (so on different processes there can be
-#   different agents with the same AgentNr)
+# - The AgentNr is the index of the vectors where agent specific
+#   information is stored. Those indices can be reused when an agent dies
+#   (see AgentReadWrite.reusable), so at different times different agents
+#   can have the same AgentNr (and even AgentID).
 #
 # In this implementation these three values are packed into a single
 # UInt64, but since the construction of the AgentID and the
 # determination of the TypeID, ProcessID and AgentNr from the AgentID
 # is always done using the interface defined below, this could also be
 # changed to a tuple, for example (and this was also tested during
-# development, but the implementation found here had most time a noticeable
-# performance advantage and a better memory usage).
+# development, but the implementation found here had a noticeable
+# performance advantage and a better memory usage). It's also possible
+# to change the number of bits used for the different parts by adjusting
+# the following BITS_ values.
 
 export AgentID, ProcessID#, AgentNr
-export agent_id
 
 export add_agent!, add_agents!
 export agentstate, agentstate_flexible
@@ -30,14 +31,28 @@ const TypeID = UInt8
 const BITS_TYPE = 8
 const MAX_TYPES = 2 ^ BITS_TYPE
 
-# TODO Doc
+"""
+    ProcessID
+
+The rank on which the agent is currently managed.
+"""  
 const ProcessID = UInt32
 const BITS_PROCESS = 20
 
 const AgentNr = UInt64
 const BITS_AGENTNR = 36
 
-# TODO Doc
+""" 
+     AgentID
+
+The AgentID is a combination of different (Vahana internal)
+information about an agent, like e.g. the position where the agent
+state is stored. It's important to understand that at different times
+different agents can have the same agent id, therefore those ids can
+not be used to identify an agent a simulation run. If you need this,
+you must add an field to the agent state and create an unique value for
+this field in the agent constructor by yourself.
+"""
 const AgentID = UInt64
 
 @assert round(log2(typemax(TypeID))) >= BITS_TYPE
@@ -102,8 +117,8 @@ T must have been previously registered by calling
 [`register_agenttype!`](@ref).
 
 `add_agent!` returns a new AgentID, which can be used to create edges
-from or to this agent before [`finish_init!`](@ref) is called (in the
-case that `add_agent!` is called in the initialization phase), or before
+from or to this agent until [`finish_init!`](@ref) is called (in the
+case that `add_agent!` is called in the initialization phase), or until
 the transition funcion is finished (in the case that add_agent! is
 called in an [`apply!`](@ref) callback). Do not use the ID
 for other purposes, they are not guaranteed to be stable.
@@ -125,7 +140,6 @@ agents as arguments.
 The types of the agents must have been previously registered by
 calling [`register_agenttype!`](@ref).
 
-
 `add_agents!` returns a vector of AgentIDs, which can be used to
 create edges from or to this agents before [`finish_init!`](@ref) is
 called (in the case that add_agents! is called in the initialization
@@ -146,13 +160,13 @@ function add_agents!(sim, agents...)
 end
 
 """
-    agentstate(sim, id::AgentID, Type{T})::T
+    agentstate(sim, id::AgentID, ::Type{T})
 
 Returns the state of an agent of type T.
 
 In the case where the type T is not determinable when writing the code
-(e.g., since there is no limit to the edges between agents,
-[`edges`](@ref) can return agentID of different agent types),
+(e.g. since there may be edges between agents of different types, the
+function [`edges`](@ref) may also return agentID of different agent types),
 [`agentstate_flexible`](@ref) must be used instead.
 
 !!! warning 
@@ -171,17 +185,27 @@ function agentstate(::__MODEL__, ::AgentID, ::Type{T}) where T end
 
 Returns the state of an agent with the `id`, where the type of the
 agent is determined at runtime. If the type is known at compile time,
-using [`agentstate`](@ref) is preferable as it improves performance.
+using [`agentstate`](@ref) is preferable as this improves performance.
 """
 agentstate_flexible(sim, id::AgentID) =
     agentstate(sim, id, sim.typeinfos.nodes_id2type[type_nr(id)])
 
 """
-TODO DOC 
+    all_agents(sim, ::Type{T}, all_ranks=false)
+
+This function retrieves a vector of the states for all agents of type T of the
+simulation `sim`.
+
+The `all_ranks` argument determines whether to include agents from all
+ranks or just the current rank in parallel simulations. When
+`all_ranks` is `true`, the function returns a vector of all agent
+identifiers across all ranks.  
+
+See also [`add_agents!`] and (@ref)[`num_agents`](@ref).
 """
 function all_agents(sim, ::Type{T}, all_ranks = true) where T
     @assert fieldcount(T) > 0 """
-        all_agents can be only called for agent types that have a fields.
+        all_agents can be only called for agent types that have fields.
         To get the number of agents, you can call num_agents instead.
     """
     states = getproperty(sim, Symbol(T)).read.state
@@ -199,7 +223,13 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
 end
 
 """
-TODO DOC 
+    num_agents(sim, ::Type{T}, all_ranks=false)
+
+If `all_ranks` is `true` this function retrieves the number of agents of type T
+of the simulation `sim`. When it is set to `false`, the function will return the
+number of agents managed by the process.
+
+See also [`add_agents!`] and [`all_agents`](@ref).
 """
 function num_agents(sim, ::Type{T}, sum_ranks = true) where T
     field = getproperty(sim, Symbol(T))

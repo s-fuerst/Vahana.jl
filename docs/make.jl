@@ -1,6 +1,6 @@
 using Documenter, Vahana
 
-using GraphMakie, Makie
+using GraphMakie, Makie, DataFrames
 
 # this is a really dirty workaround, but for whatever reason the
 # sandboxing mechanism of Documenter clashes with the way Vahana
@@ -22,6 +22,7 @@ Literate.markdown(joinpath(@__DIR__, "examples", "predator.jl"), "src"; execute 
 Literate.markdown(joinpath(@__DIR__, "examples", "hegselmann.jl"), "src"; execute = false)
 
 makedocs(sitename="Vahana Documentation",
+         modules = [Vahana],
 #         format = Documenter.LaTeX(),
          format = Documenter.HTML(prettyurls = false),
          clean = false, 
@@ -38,9 +39,10 @@ makedocs(sitename="Vahana Documentation",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
                  "Global Layer" => "global.md",
-                 "REPL helpers" => "repl.md",
+#                 "REPL helpers" => "repl.md",
                  "Plots" => "plots.md",
-                 "Configuration" => "config.md"
+                 "Configuration" => "config.md",
+                 "Misc" => "misc.md"
                  # "All" => "index.md"
              ]
 #             "Glossary" => "glossary.md",

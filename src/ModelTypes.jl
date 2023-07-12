@@ -45,10 +45,10 @@ These structs must be "bits types", meaning the type is immutable and
 contains only primitive types and other bits types.
 
 Per default it is assumed, that an agent can die (removed from the
-simulation), by returning `nothing` in the transition function (see
+simulation) by returning `nothing` in the transition function (see
 [`apply!`](@ref). In the case that agents are never
 removed, the hint :Immortal can be given to improve the performance
-of the simulation. When the size of the population is constant
+of the simulation. 
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
@@ -118,8 +118,9 @@ added. The value of this argument must be the type of the target
 node. If the `target` keyword exists, but the `:SingleType` hint is
 not explicitly specified, it will be set implicitly
 
-In the case that it's known how many agents of this type exists, this
-can be also given via the optional keyword `size`.
+If it is known how many agents of this type exist, this can also be
+specified via the optional `size` keyword. This can improve
+performance, but also memory usage.
 
 See also [Edge Hints](./performance.md#Edge-Hints), [`add_edge!`](@ref) and 
 [`add_edges!`](@ref) 

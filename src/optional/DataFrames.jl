@@ -2,6 +2,19 @@ import DataFrames: DataFrame, subset!, nrow
 
 export DataFrame
 
+"""
+    DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
+
+Creates a DataFrame with the current state of agents or edges of type
+`T`.  By default, the ID columns show the complete
+[`AgentID`](@ref). for readability (and the use of
+[`show_agent`](@ref)) it may be useful to show only the lowest 36
+bits, which gives a much more readable value, by setting the `localnr`
+argument to true. Since for edges the type information of the source
+and target agents is no longer available in this case, the `types`
+argument can be used to create additional columns containing the types
+of these agents.
+"""
 function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
     if mpi.size > 1
         @info "The created dataframe contains only data from rank $(mpi.rank)"

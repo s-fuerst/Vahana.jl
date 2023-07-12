@@ -9,5 +9,6 @@ The following functions allows to configure Vahana's behaviour:
 enable_asserts
 suppress_warnings
 detect_stateless
+set_compression
 ```
 

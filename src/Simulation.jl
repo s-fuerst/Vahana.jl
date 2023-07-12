@@ -527,12 +527,12 @@ optional `add_existing` collection.
 
 See also [`apply`](@ref)
 """
-function apply!(sim,
-                func::Function,
-                call,
-                read,
-                write;
-                add_existing = [])
+function apply!(sim::Simulation,
+         func::Function,
+         call,
+         read,
+         write;
+         add_existing = [])
     @assert sim.initialized "You must call finish_init! before apply!"
     with_logger(sim) do
         @info "<Begin> apply!" func transition=sim.num_transitions+1
@@ -598,11 +598,11 @@ function apply!(sim,
 end
 
 function apply!(func::Function,
-                sim,
-                call,
-                read,
-                write;
-                kwargs ...)
+         sim::Simulation,
+         call,
+         read,
+         write;
+         kwargs ...)
     apply!(sim, func, call, read, write; kwargs ...)
 end
 
@@ -621,23 +621,23 @@ Returns the copy of the simulation.
 
 See also [`apply!`](@ref)
 """
-function apply(sim,
-               func::Function,
-               call,
-               read,
-               write;
-               kwargs ...) 
+function apply(sim::Simulation,
+        func::Function,
+        call,
+        read,
+        write;
+        kwargs ...) 
     newsim = copy_simulation(sim)
     apply!(newsim, func, call, read, write; kwargs ...)
     newsim
 end
 
 function apply(func::Function,
-               sim,
-               call,
-               read,
-               write;
-               kwargs ...)
+        sim::Simulation,
+        call,
+        read,
+        write;
+        kwargs ...)
     apply(sim, func, call, read, write; kwargs ...)
 end
 

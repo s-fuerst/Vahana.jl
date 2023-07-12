@@ -115,12 +115,30 @@ calling [`register_edgetype!`](@ref).
 """
 detect_stateless = (detect::Bool) -> config.detect_stateless = detect
 
+
+"""
+    set_compression(level::Int, parallel_hdf5_compression = false)
+
+Set the compression level of HDF5 files. 
+
+However, by default, HDF5 datasets are not compressed when the used
+HDF5 library supports Parallel HDF5 due to encountered issues. While
+the necessary code to compress datasets in the Parallel HDF5 case is
+implemented, its activation via the parallel_hdf5_compression argument
+is considered experimental and should be used with awareness of
+potential risks and the specificities of the HDF5 implementation in
+use.
+"""
+function set_compression(level::Int, parallel_hdf5_compression = false)
+    config.compression_level = level
+    config.no_parallel_compression = ! parallel_hdf5_compression
+end
+    
+
 ######################################## include all other files
 
 abstract type Simulation end
 
-# TODO DOC
-disable_transition_checks = (disable::Bool) -> config.check_readable = ! disable
 
 include("Helpers.jl")
 
@@ -151,8 +169,6 @@ include("Raster.jl")
 include("GraphsSupport.jl")
 
 include("Logging.jl")
-# temporary of LSP
-# include("optional/MakieSupport.jl")
-# include("optional/GraphMakieSupport.jl")
+
 end
 

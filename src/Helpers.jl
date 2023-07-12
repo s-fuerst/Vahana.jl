@@ -239,3 +239,5 @@ macro roottime(ex)
 end
 
 edge_attrs(sim, T::DataType) = sim.typeinfos.edges_attr[T]
+
+disable_transition_checks = (disable::Bool) -> config.check_readable = ! disable

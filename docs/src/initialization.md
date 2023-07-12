@@ -41,7 +41,10 @@ it is advisable to import only the SimpleGraphs module from Graphs.jl.
 add_graph!
 ```
 
-There is also two function with works the other way and converts the underlying graph of an simulation (or a subset of this graph) to a structure that fulfills the AbstractGraph or AbstractSimpleGraph interface from the Graphs.jl package.
+There is also two function with works the other way and converts the
+underlying graph of an simulation (or a subset of this graph) to a
+structure that fulfills the AbstractGraph or AbstractSimpleGraph
+interface from the Graphs.jl package.
 
 ```@docs
 vahanagraph
@@ -66,7 +69,8 @@ representation of the state space.
 
 The ID and the state of the cells can not be accessed directly,
 instead it's necessary to create edges between the cells, or between
-the cells and agents of other types. 
+the cells and agents of other types via the following two helper
+functions.
 
 ```@docs
 connect_raster_neighbors!
