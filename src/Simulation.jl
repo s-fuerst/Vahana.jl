@@ -265,11 +265,20 @@ create_simulation(params::P = nothing,
                   kwargs...) where {P, G} =
                       model -> create_simulation(model, params, globals; kwargs...)
 
-function _create_equal_partition(d, ids)
-    l = length(ids)
-    ids_per_rank = Int64(ceil(l / mpi.size)) + 1
-    foreach(1:l) do idx
-        d[ids[idx]] = div(idx, ids_per_rank) + 1
+
+function _create_equal_partition(part_dict, ids)
+    # Partitions a sequence  into `n` nearly equally sized blocks.
+    function partition(seq, n::Int)
+        s, r = divrem(length(seq), n)
+        
+        [ ((i - 1) * s + 1 + min(i - 1, r)) : (i * s + min(i, r)) for i in 1:n ]
+    end
+
+    ps = partition(1:length(ids), mpi.size)
+    for (i, range) in enumerate(ps)
+        for idx in range
+            part_dict[ids[idx]] = i
+        end
     end
 end
 
