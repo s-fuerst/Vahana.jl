@@ -216,11 +216,11 @@ See also [`create_model`](@ref), [`param`](@ref),
 and [`finish_init!`](@ref)
 """
 function create_simulation(model::Model,
-                           params::P = nothing,
-                           globals::G = nothing;
-                           name = model.name,
-                           filename = name, overwrite_file = true,
-                           logging = false, debug = false) where {P, G}
+                    params::P = nothing,
+                    globals::G = nothing;
+                    name = model.name,
+                    filename = name, overwrite_file = true,
+                    logging = false, debug = false) where {P, G}
     
     sim::Simulation = @eval $(Symbol(model.name))(
         model = $model,

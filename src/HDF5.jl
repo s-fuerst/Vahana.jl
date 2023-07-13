@@ -51,6 +51,28 @@ parallel_write() = HDF5.has_parallel() && mpi.active
 
 mpio_mode() = parallel_write() ? Dict(:dxpl_mpio => :collective) : Dict()
 
+"""
+  create_h5file!(sim::Simulation, filename = sim.filename; overwrite = sim.overwrite_file)
+
+The canonical way to create an HDF5 file is to call one of the
+`write_` functions like [`write_snapshot`](@ref). If `sim` does not
+already have an HDF5 file attached, such a file will then be created
+automatically using the filename specified as keyword in
+[`create_simulation`](@ref) or, if this keyword was not given, the
+model name. But sometime it can be useful to control this manually,
+e.g. after a call to [`copy_simulation`](@ref).
+
+The `filename` argument can be used to use a filename other than
+`sim.filename`. If `overwrite` is true, existing files with this name
+will be overwritten. If it is false, the filename is automatically
+extended by an increasing 6-digit number, so that existing files are
+not overwritten.
+
+The files are always created in a `h5` subfolder, and this one will be
+create in the current working directory.
+
+`create_h5file!` can be only called after [`finish_init!`](@ref)
+"""
 function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = sim.overwrite_file)
     #in the case that the simulation is already attached to a h5file, we relase it first
     close_h5file!(sim)
