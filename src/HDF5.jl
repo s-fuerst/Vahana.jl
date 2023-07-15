@@ -4,36 +4,30 @@ using HDF5
 
 import NamedTupleTools: ntfromstruct, structfromnt
 
-export create_h5file!, open_h5file, close_h5file!
+export create_h5file!, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export list_snapshots
-export Pos, Pos2D, Pos3D
-export create_namedtuple_struct_converter
+export create_namedtuple_converter, create_enum_converter
+
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
 # are using those. The Pos2D/3D types can be used to add a Cell position
 # to an agent state, with automatical conversion from an Cartesianindex.
-Pos2D = NamedTuple{(:x, :y), Tuple{Int64, Int64}}
-Pos3D = NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
-
-Pos(x, y) = (x = x, y = y)
-Pos(x, y, z) = (x = x, y = y, z = z)
 
 import Base.convert
-convert(::Type{Pos2D}, ci::CartesianIndex{2}) = (x = ci[1], y = ci[2])
-
-convert(::Type{Pos3D}, ci::CartesianIndex{3}) = (x = ci[1], y = ci[2], z = ci[3])
-
-convert(::Type{CartesianIndex{2}}, pos::Pos2D) = CartesianIndex(pos[1], pos[2])
-
-convert(::Type{CartesianIndex{3}}, pos::Pos3D) = CartesianIndex(pos[1], pos[2], pos[3])
-
-# HDF5.jl does not support enumerations. We convert them to their
-# integer type (and back).
 import HDF5.hdf5_type_id
-hdf5_type_id(::Type{T}, ::Val{false}) where {I, T <: Enum{I}} = hdf5_type_id(I)
+"""
+    create_enum_converter()
 
-convert(::Type{T}, i::Int32) where { T <: Enum } = T(i)
+The HDF5.jl library does not support Enums as fields of structs that
+should be stored. This function add this support but as this involves
+type piracy, this support must be enabled explicitly.
+"""
+function create_enum_converter()
+    @eval hdf5_type_id(::Type{T}, ::Val{false}) where {I, T <: Enum{I}} = hdf5_type_id(I)
+
+    @eval convert(::Type{T}, i::Int32) where { T <: Enum } = T(i)
+end
 
 # TODO: this does not work as expected, write a stable hash function
 import Base.hash
@@ -47,12 +41,10 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 
 parallel_write() = HDF5.has_parallel() && mpi.active
 
-# parallel_write() = false
-
 mpio_mode() = parallel_write() ? Dict(:dxpl_mpio => :collective) : Dict()
 
 """
-  create_h5file!(sim::Simulation, filename = sim.filename; overwrite = sim.overwrite_file)
+    create_h5file!(sim::Simulation, [filename = sim.filename; overwrite = sim.overwrite_file])
 
 The canonical way to create an HDF5 file is to call one of the
 `write_` functions like [`write_snapshot`](@ref). If `sim` does not
@@ -71,7 +63,12 @@ not overwritten.
 The files are always created in a `h5` subfolder, and this one will be
 create in the current working directory.
 
+In the case that an HDF5 file was already created for the simulation
+`sim`, this will be closed.
+
 `create_h5file!` can be only called after [`finish_init!`](@ref)
+
+See also [`close_h5file!`](@ref), [`write_agents`](@ref), [`write_edges`](@ref), [`write_globals`](@ref), [`read_agents!`](@ref), [`read_edges!`](@ref), [`read_globals!`](@ref), [`read_snapshot!`](@ref) and [`list_snapshots`](@ref)
 """
 function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = sim.overwrite_file)
     #in the case that the simulation is already attached to a h5file, we relase it first
@@ -168,6 +165,16 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     fid
 end
 
+"""
+    close_h5file!(sim::Simulation)
+
+Closes the HDF5 file attached to the simulation `sim`.
+
+Be aware that a following call to one of the `write_` functions like
+[`write_snapshot`](@ref) will automatically create a new file and,
+depending on the `overwrite_file` argument of
+[`create_simulation`](@ref) also overwrites to closed file.
+"""
 function close_h5file!(sim::Simulation)
     if sim.h5file === nothing
         return
@@ -182,6 +189,13 @@ function close_h5file!(sim::Simulation)
     nothing
 end
 
+"""
+    write_globals(sim::Simulation, [fields])
+
+Writes the current global values to the attached HDF5 file. If only a
+subset of the fields is to be written, this subset can be specified
+via the optional `fields` argument.
+"""
 function write_globals(sim::Simulation,
                        fields = sim.globals === nothing ?
                            nothing : fieldnames(typeof(sim.globals)))
@@ -316,6 +330,13 @@ function calc_displace(num)
     (vec_num, vec_displace)
 end
 
+"""
+    write_agents(sim::Simulation, [types])
+
+Writes the current agent state to the attached HDF5 file. If only the
+agents of a subset of agent types are to be written, this subset can
+be specified via the optional `types` argument.
+"""
 function write_agents(sim::Simulation,
                       types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
@@ -401,6 +422,13 @@ _neighbors_only(sim, T) = (has_hint(sim, T, :Stateless) ||
     fieldcount(T) == 0) && has_hint(sim, T, :IgnoreFrom)
 
 
+"""
+    write_edges(sim::Simulation, [types])
+
+Writes the current edge states to the attached HDF5 file. If only the
+edges of a subset of edge types are to be written, this subset can
+be specified via the optional `types` argument.
+"""
 function write_edges(sim::Simulation,
                      types::Vector{DataType} = sim.typeinfos.edges_types)
 
@@ -497,6 +525,16 @@ function write_edges(sim::Simulation,
     nothing
 end
 
+"""
+    write_snapshot(sim::Simulation, [comment::String = "", ignore = []])
+
+Writes the current state of the simulation `sim` to the attached HDF5
+file. `comment` can be used to identify the snapshot via
+[`list_snapshots`](@ref). `ignore` is a list of agent and/or edge
+types, that should not be written.
+
+See also [`create_h5file!`](@ref)
+"""
 function write_snapshot(sim::Simulation, comment::String = ""; ignore = [])
     ignore = applicable(iterate, ignore) ? ignore : [ ignore ]
 
@@ -726,8 +764,28 @@ function _read_globals_or_params(hid, T)
     map(n -> unsorted[string(n)], fieldnames(T))
 end
 
-function read_params(name::String, T::DataType)
-    fids = open_h5file(nothing, name)
+"""
+    read_params(filename::String, T::DataType)
+    read_params(sim::Simulation, T::DataType)
+    read_params(sim::Simulation, nr::Int64, T::DataType)
+
+Read the parameters from an HDF5 file. If `filename` is given, the
+parameters are read from the file with this filename from the `h5`
+subfolder of the current working directory.
+
+If a simulation `sim` is given instead, the filename from the
+[`create_simulation`](@ref) call is used.
+
+If the `overwrite_file` argument of [`create_simulation`](@ref) is set
+to true, and the file names are supplemented with a number, the number of
+the meant file can be specified via the `nr` argument.
+
+In any case, the DataType `T` of the argument `params` of
+[`create_simulation`](@ref) used for the simulation that wrote the
+parameters must be specified.
+"""
+function read_params(filename::String, T::DataType)
+    fids = open_h5file(nothing, filename)
     if length(fids) == 0
         return
     end
@@ -739,12 +797,35 @@ function read_params(name::String, T::DataType)
     T(values...)
 end
 
-read_params(sim, T::DataType) =
+read_params(sim::Simulation, T::DataType) =
     read_params(sim.filename, T)
 
-read_params(sim, nr::Int64, T::DataType) =
+read_params(sim::Simulation, nr::Int64, T::DataType) =
     read_params(add_number_to_file(sim.filename, nr), T)
 
+"""
+    read_globals(name::String, T::DataType; [ transition = typemax(Int64) ])
+    read_globals(sim::Simulation, T::DataType; [ transition = typemax(Int64) ])
+    read_globals(sim::Simulation, nr::Int64, T::DataType; [ transition = typemax(Int64) ])
+
+Read the global values from an HDF5 file. If `filename` is given, the
+parameters are read from the file with this filename from the `h5`
+subfolder of the current working directory.
+
+If a simulation `sim` is given instead, the filename from the
+[`create_simulation`](@ref) call is used.
+
+If the `overwrite_file` argument of [`create_simulation`](@ref) is set
+to true, and the file names are supplemented with a number, the number of
+the meant file can be specified via the `nr` argument.
+
+In any case, the DataType `T` of the argument `globals` of
+[`create_simulation`](@ref) used for the simulation that wrote the
+parameters must be specified.
+
+Per default, the last written globals are read. The `transition`
+keyword allows to read also earlier versions. See also [Write simulations to dics](./hdf5.md) for details.
+"""
 function read_globals(name::String, T::DataType; transition = typemax(Int64))
     fids = open_h5file(nothing, name)
     if length(fids) == 0
@@ -766,10 +847,35 @@ read_globals(sim, T::DataType; transition = typemax(Int64)) =
 read_globals(sim, nr::Int64, T::DataType; transition = typemax(Int64)) =
     read_globals(add_number_to_file(sim.filename, nr), T; transition)
 
+"""
+    read_agents!(sim::Simulation, [name::String = sim.filename; transition = typemax(Int64), types::Vector{DataType} ])
+    read_agents!(sim::Simulation, nr::Int64; [transition = typemax(Int64), types::Vector{DataType}])
+
+Read the agents from an HDF5 file into the simulation `sim`. If
+`name` is given, the agent are read from the file with this filename
+from the `h5` subfolder of the current working directory.  In the
+other case the filename from the [`create_simulation`](@ref) call is
+used.
+
+If the `overwrite_file` argument of [`create_simulation`](@ref) is set
+to true, and the file names are supplemented with a number, the number of
+the meant file can be specified via the `nr` argument.
+
+Per default, the last written agents are read. The `transition`
+keyword allows to read also earlier versions. See also [Write
+simulations to dics](./hdf5.md) for details.
+
+If only the agents of a subset of agent types are to be read, this
+subset can be specified via the optional `types` argument.
+
+When the agents from a distributed simulation is read into a single
+threaded simulation, the IDs of the agents are modified. 
+`read_agents!` returns a dictory that contains the ID mapping.
+"""
 function read_agents!(sim::Simulation,
-                      name::String = sim.filename;
-                      transition = typemax(Int64),
-                      types::Vector{DataType} = sim.typeinfos.nodes_types)
+               name::String = sim.filename;
+               transition = typemax(Int64),
+               types::Vector{DataType} = sim.typeinfos.nodes_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -845,7 +951,6 @@ function read_agents!(sim::Simulation,
     
     foreach(close, fids)
     sim.intransition = false
-
     
     idmapping
 end
@@ -857,11 +962,39 @@ read_agents!(sim::Simulation,
                  read_agents!(sim, add_number_to_file(sim.filename, nr);
                               transition, types)
 
+"""
+    read_edges!(sim::Simulation, [name::String = sim.filename; idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType}])
+    read_edges!(sim::Simulation, nr::Int64; [ idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType} ])
+
+Read the edges from an HDF5 file into the simulation `sim`. If
+`name` is given, the edges are read from the file with this filename
+from the `h5` subfolder of the current working directory.  In the
+other case the filename from the [`create_simulation`](@ref) call is
+used.
+
+If the `overwrite_file` argument of [`create_simulation`](@ref) is set
+to true, and the file names are supplemented with a number, the number of
+the meant file can be specified via the `nr` argument.
+
+Per default, the last written edges are read. The `transition` keyword
+allows to read also earlier versions. See also [Write simulations to
+disc](./hdf5.md) for details.
+
+If only the edges of a subset of edge types are to be read, this
+subset can be specified via the optional `types` argument.
+
+When the agents from a distributed simulation is read into a single
+threaded simulation, the IDs of the agents are modified.  The
+`idmapfunc` must be a function that must return the new agent id for a
+given old agent id. [`read_agents!`](@ref) returns a `Dict{AgentID,
+AgentID}` that can be used for this via: `idmapfunc = (key) ->
+idmapping[key]`, where `idmapping` is such a `Dict`.
+"""
 function read_edges!(sim::Simulation,
-                     name::String = sim.filename;
-                     idmapfunc = identity,
-                     transition = typemax(Int64),
-                     types::Vector{DataType} = sim.typeinfos.edges_types)
+              name::String = sim.filename;
+              idmapfunc = identity,
+              transition = typemax(Int64),
+              types::Vector{DataType} = sim.typeinfos.edges_types)
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -871,7 +1004,6 @@ function read_edges!(sim::Simulation,
     """
 
     original_size = attrs(fids[1])["mpisize"]
-    parallel = attrs(fids[1])["HDF5parallel"]
     merge = original_size > mpi.size
     @assert !merge || mpi.size == 1
     
@@ -935,7 +1067,6 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
     field = getproperty(sim, Symbol(T))
     vec_num_edges = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
-    size = sum(vec_num_edges)
     start = vec_displace[fidx] + 1
     last = start + vec_num_edges[fidx] - 1
 
@@ -963,13 +1094,11 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
                 field.write[idmapfunc(ec.to)] = ec.count
             end
         end
-    elseif fieldcount(T) == 0
-        # StatelessEdge struct
+    elseif fieldcount(T) == 0 # StatelessEdge 
         for se in HDF5.read(tid, StatelessEdge, start:last)
             add_edge!(sim, idmapfunc(se.from), idmapfunc(se.to), T())
         end
     elseif has_hint(sim, T, :IgnoreFrom)
-        # T struct
         # for add_edge! we need always a from id, even when it's ignored
         dummy = AgentID(0)
         for edge in HDF5.read(tid, IgnoreFromEdge{T}, start:last)
@@ -997,8 +1126,8 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
 end
 
 function read_rasters!(sim::Simulation,
-                       name::String = sim.filename;
-                       idmapping)
+                name::String = sim.filename;
+                idmapping)
     # the rasters are immutable arrays of agents_ids. So there
     # is no need to read them more then once
     if length(sim.rasters) > 0
@@ -1028,11 +1157,36 @@ read_rasters!(sim::Simulation,
                                 idmapping)
 
 # returns false when snapshot not found
+"""
+    read_snapshot!(sim::Simulation, [name::String; transition = typemax(Int64), writeable = false, ignore_params = false])
+    read_snapshot!(sim::Simulation, nr::Int64; [transition = typemax(Int64), writeable = false, ignore_params = false])
+
+Read a complete snapshot from a file into the simulation `sim`. If
+`name` is given, the snapshot is read from the file with this filename
+from the `h5` subfolder of the current working directory.  In the
+other case the filename from the [`create_simulation`](@ref) call is
+used.
+
+If the `overwrite_file` argument of [`create_simulation`](@ref) is set
+to true, and the file names are supplemented with a number, the number of
+the meant file can be specified via the `nr` argument.
+
+Per default, the last written snapshot is read. The `transition`
+keyword allows to read also earlier versions. See also
+[Transition](./hdf5.md#Transition) for details.
+
+If `writeable` is set to true, the file is also attached to the simulation
+and following `write_` functions like [`write_snapshot`](@ref) will be
+append to the file.
+
+If `ignore_params` is set to true, the parameters of `sim` will not be
+changed.
+"""
 function read_snapshot!(sim::Simulation,
-                        name::String = sim.filename;
-                        transition = typemax(Int64),
-                        writeable = false,
-                        ignore_params = false)
+                 name::String = sim.filename;
+                 transition = typemax(Int64),
+                 writeable = false,
+                 ignore_params = false)
     # First we free the memory allocated by the current state of sim
     _free_memory!(sim)
 
@@ -1085,6 +1239,23 @@ read_snapshot!(sim::Simulation,
                                   transition, writeable, ignore_params)
 
 
+"""
+    list_snapshots(name::String)
+    list_snapshots(sim::Simulation)
+    list_snapshots(sim::Simulation, nr::Int64)
+
+List all snapshots of a HDF5 file. If `name` is given, the snapshots
+from the file with this filename is returned.  In the other case the
+filename from the [`create_simulation`](@ref) call is used.
+
+If the `overwrite_file` argument of [`create_simulation`](@ref) is set
+to true, and the file names are supplemented with a number, the number of
+the meant file can be specified via the `nr` argument.
+
+Returns a vector of tuples, where the first element is the transition
+number for which a snapshot was saved, and the second element is the
+comment given in the [`write_snapshot`](@ref) call.
+"""
 function list_snapshots(name::String)
     fids = open_h5file(nothing, name)
     sid = fids[1]["snapshots"]
@@ -1107,7 +1278,16 @@ list_snapshots(sim::Simulation, nr::Int64) =
 
 
 import Base.convert
-function create_namedtuple_struct_converter(T::DataType)
+"""
+    create_namedtuple_converter(T::DataType)
+
+The HDF5.jl library does not support the storage of nested structs,
+but structs can have `NamedTuples` as fields. This function creates a
+convert function from a struct to a corresponding `NamedTuple` (and
+also the other way around), so after calling this for a type `T`, `T`
+can be the type of an agent/edge/param/global field.
+"""
+function create_namedtuple_converter(T::DataType)
     NT = NamedTuple{fieldnames(T), Tuple{fieldtypes(T)...}}
     @eval convert(::Type{$NT}, st::$T) = ntfromstruct(st)
     @eval convert(::Type{$T}, nt::$NT) = structfromnt($T, nt)

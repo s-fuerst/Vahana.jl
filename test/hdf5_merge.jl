@@ -8,7 +8,7 @@ function test_merge(model)
     sim = runsim(model, false)
     restored = restore(model, sim)
 
-    fids = open_h5file(restored, sim.name)
+    fids = Vahana.open_h5file(restored, sim.name)
     @assert mpi.size == 1 && length(fids) > 1 """
         this should test the merge functionality (reading a distributed
         sim back to a single process), so the test should not be run 

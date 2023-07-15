@@ -41,6 +41,7 @@ makedocs(sitename="Vahana Documentation",
                  "Global Layer" => "global.md",
 #                 "REPL helpers" => "repl.md",
                  "Plots" => "plots.md",
+                 "HDF5" => "hdf5.md",
                  "Configuration" => "config.md",
                  "Misc" => "misc.md"
                  # "All" => "index.md"

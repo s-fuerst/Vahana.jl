@@ -4,6 +4,13 @@ using Test
 
 suppress_warnings(true)
 
+Pos2D = NamedTuple{(:x, :y), Tuple{Int64, Int64}}
+Pos3D = NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
+
+Pos(x, y) = (x = x, y = y)
+Pos(x, y, z) = (x = x, y = y, z = z)
+
+
 struct InnerStruct
     f::Float64
     i::Int64
