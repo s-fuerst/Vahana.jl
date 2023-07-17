@@ -102,7 +102,8 @@ function test_aggregate_mortal(sim, T::DataType)
         mpi.isroot ? state : nothing
     end
 
-    agg = mapreduce(sim, a -> a.foo, +, T)
+    # this should not cause an assertion
+    mapreduce(sim, a -> a.foo, +, T)
 end    
 
 function createsim()
@@ -210,7 +211,16 @@ end
     finish_simulation!(sim)
         
     @testset "transition" begin
+        # check that with assertion enables, it is checked that the agent types
+        # are in `read`
+        enable_asserts(true)
+        (sim, a1id, a2id, a3id, avids, avfids) = createsim()
+        @test_throws AssertionError apply!(sim, AMortal, ESLDict1, []) do _, id, sim
+            neighborstates_flexible(sim, id, ESLDict1)
+        end
+        finish_simulation!(sim)
 
+        
         # normally it's not allowed to call add_edge! between transition
         # function, but because of the @onrankof this hack works here
         enable_asserts(false)
@@ -305,7 +315,6 @@ end
 
     finish_simulation!(sim)
     
-    # TODO transition with add_agent! and add_edge!
     @testset "Mapreduce" begin
         sim = create_simulation(model; name = "Mapreduce")
 

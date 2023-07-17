@@ -59,7 +59,7 @@ read_snapshot!
 
 Also here exists also some more fine grained read functions:
 
-```
+```@docs
 read_params
 read_globals
 read_agents!

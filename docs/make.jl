@@ -42,6 +42,7 @@ makedocs(sitename="Vahana Documentation",
 #                 "REPL helpers" => "repl.md",
                  "Plots" => "plots.md",
                  "HDF5" => "hdf5.md",
+                 "Logging" => "logging.md",
                  "Configuration" => "config.md",
                  "Misc" => "misc.md"
                  # "All" => "index.md"

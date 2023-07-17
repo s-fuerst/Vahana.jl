@@ -73,8 +73,10 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
 end
 
 function create_logger(filename, logging, debug, overwrite_file)
+    filename = mkpath("log") * "/" * filename
+
     if ! overwrite_file
-        filename = add_number_to_file(mkpath("logs") * "/" * filename)
+        filename = add_number_to_file(filename)
         # to avoid that rank 0 creates a file before other ranks check this
         MPI.Barrier(MPI.COMM_WORLD)
     end
@@ -96,15 +98,36 @@ function create_logger(filename, logging, debug, overwrite_file)
 end
 
 """
-TODO: DOC
+    create_logger!(sim::Simulation, [debug = false, name = sim.name; overwrite = sim.overwrite_file])
+
+The canonical way to create log files for a simulation is by setting the
+logging keyword of [`create_simulation`](@ref) to true. But sometime
+it can be useful to control this manually, e.g. after a call to
+[`copy_simulation`](@ref).
+
+When also `debug` is set to true, the log file contains more details and
+the stream will be flushed after each write.
+
+The `filename` argument can be used to specify a filename other than
+`sim.filename`. If `overwrite` is true, existing files with this name
+will be overwritten. If it is false, the filename is automatically
+extended by an increasing 6-digit number, so that existing files are
+not overwritten.
+
+The files are always created in a `log` subfolder, and this one will be
+create in the current working directory.
 """
-function create_logger!(sim, debug = false, name = sim.name)
-    sim.logger = create_logger(name, true, debug, sim.overwrite_file)
+function create_logger!(sim::Simulation, debug = false, filename = sim.name;
+                 overwrite = sim.overwrite_file)
+    sim.logger = create_logger(filename, true, debug, overwrite)
 end
 
 
 """
-TODO: DOC
+    with_logger(f::Function, sim::Simulation)
+
+Execute function f, directing all log messages to the logger that is attached
+to simulation `sim`.
 """
 function with_logger(f::Function, sim::Simulation)
     if sim.logger.logger !== nothing
@@ -126,9 +149,11 @@ end
 
 
 """
-TODO: DOC
+  log_overview(sim::Simulation)
+
+Dump an overview of the simulation `sim` to the attached logfile.
 """
-function log_overview(sim)
+function log_overview(sim::Simulation)
     if sim.logger.logger !== nothing
         show(sim.logger.logger.stream, MIME("text/plain"), sim)
     end

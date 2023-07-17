@@ -667,4 +667,4 @@ mapreduce is calling Base.mapreduce, `f`, `op` and `kwargs` are
 passed directly to mapreduce, while `sim` and `T` are used to determine the
 iterator.
 """
-function mapreduce(::__MODEL__, f, op, ::Type; kwargs...) end
+function mapreduce(::Simulation, f, op, ::Type; kwargs...) end

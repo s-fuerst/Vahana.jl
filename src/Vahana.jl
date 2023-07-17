@@ -18,22 +18,6 @@ function __init__()
     mpiinit()
 end
 
-# This is a dummy struct to define the stubs of functions like add_agent
-# with a type for the simulation. The real type of the simulation is
-# constructed in create_model (simulations are an instance of a model).
-# Adding the dummy type to the struct has the advantage, that e.g. LSP will
-# not omit a warning about a possible false call of the function without catching
-# calls to the function with a wrong type for the simulation parameter.
-
-"""
-    __MODEL__ is a documentation placeholder for the type of the
-simulation that is returned from the [`create_simulation`](@ref)
-call. The concrete type depends on the [`ModelTypes`](@ref) of the
-[`create_model`](@ref) call, the concrete type name is the name of
-the model.
-"""
-struct __MODEL__ end
-
 """
     enable_asserts(enable::Bool)
 

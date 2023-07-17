@@ -126,7 +126,7 @@ for other purposes, they are not guaranteed to be stable.
 See also [`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
 
 """
-function add_agent!(::__MODEL__, agent) end
+function add_agent!(::Simulation, agent) end
 
 
 """
@@ -178,7 +178,7 @@ function [`edges`](@ref) may also return agentID of different agent types),
     there is a runtime check that the agent with the ID `id` has indeed
     the type T.
 """
-function agentstate(::__MODEL__, ::AgentID, ::Type{T}) where T end
+function agentstate(::Simulation, ::AgentID, ::Type{T}) where T end
 
 """
     agentstate_flexible(sim, id::AgentID)

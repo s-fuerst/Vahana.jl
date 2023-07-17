@@ -56,7 +56,7 @@ neighborstates_flexible
 edges
 edgestates
 neighborids
-num_edges(::__MODEL__, id::AgentID, edgetype::Type) 
+num_edges(::Simulation, id::AgentID, edgetype::Type) 
 has_edge
 ```
 
