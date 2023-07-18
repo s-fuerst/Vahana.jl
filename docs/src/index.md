@@ -29,15 +29,15 @@ equivalent of a rule in a CA), and each transition function can act on
 a different subgraph.
 
 (Discrete) spatial information can be added using Vahana functions
-that insert grid cells as vertices in the graph and have access to a
+that insert grid cells as nodes in the graph and have access to a
 mapping from the Cartesian index of the underlaying space to the
-corresponding vertex. Since the cells are vertices of the graph, they
+corresponding node. Since the cells are vertices of the graph, they
 can be treated in the same way as other agents
 
 To model the system's dynamic evolution, we consider discrete time
 steps. At each step ``t``, there is a set of vertices which can change
 their own state and also add new vertices and edges.  The new state of
-a vertex at time ``t`` is computed based only on information from the
+a node at time ``t`` is computed based only on information from the
 previous step.  Information from step ``t-1`` usually includes the
 previous state of the agent itself, and may include states of adjacent
 agents in the graph, possibly also the states of the respective edges
