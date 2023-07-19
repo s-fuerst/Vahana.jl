@@ -50,3 +50,7 @@ makedocs(sitename="Vahana Documentation",
 #             "Glossary" => "glossary.md",
 #             "Change Log" => "changelog.md"
          ])
+
+deploydocs(
+    repo = "github.com/s-fuerst/Vahana.jl.git",
+)
