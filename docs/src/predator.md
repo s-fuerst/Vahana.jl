@@ -29,7 +29,7 @@ nothing #hide
 ````
 
 We want to run the model with optimized performance, see
-[Performance Tuning](performance.html) for details.
+[Performance Tuning](performance.md) for details.
 
 ````@example predator
 detect_stateless(true)

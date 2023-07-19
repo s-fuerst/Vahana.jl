@@ -43,12 +43,18 @@ Pkg.add("Vahana")
 
 ## Documentation 
 
-Github Pages are in preperation, but the documentation is already available in the `docs` subfolder.
+Full documentation, including tutorials, guides, and API references, 
+is available [here](https://s-fuerst.github.io/Vahana.jl/).
 
-<!-- Full documentation, including tutorials, guides, and API references, -->
-<!-- is available at [Your Documentation Website Link Here]. -->
+## Acknowledgments
 
-# License
+![mathplus logo](/mathplus.png)
+
+This research has been partially funded under Germany’s Excellence
+Strategy, MATH+ : The Berlin Mathematics Research Center (EXC-2046/1),
+project no. 390685689
+
+## License
 
 Vahana is distributed under the MIT license. For more
 information, please refer to the LICENSE file in this repository.

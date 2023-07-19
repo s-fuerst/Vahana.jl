@@ -1,6 +1,6 @@
 using GraphMakie, Makie, Colors
 
-import Graphs, Graphs.SimpleGraphs, NetworkLayout
+import Graphs, Graphs.SimpleGraphs
 
 export create_graphplot, update_graphplot!
 export plot, axis, figure

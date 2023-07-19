@@ -22,7 +22,7 @@ using Random
 Random.seed!(1); #hide
 
 # We want to run the model with optimized performance, see
-# [Performance Tuning](performance.html) for details.
+# [Performance Tuning](performance.md) for details.
 
 detect_stateless(true)
 

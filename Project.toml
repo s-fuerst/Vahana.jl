@@ -22,6 +22,17 @@ Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 
 [compat]
 julia = "1"
+Colors = "0"
+DataFrames = "1"
+GraphMakie = "0.5"
+Graphs = "1.8"
+HDF5 = "0.16"
+MPI = "0.20"
+MPIPreferences = "0.1"
+Makie = "0"
+NamedTupleTools = "0"
+Requires = "1"
+ 
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

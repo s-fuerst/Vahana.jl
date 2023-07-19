@@ -195,7 +195,7 @@ agents/edgetypes (see [`register_agenttype!`](@ref) and
 
 This subgraphs implements the AbstractGraph interface from the
 Graphs.jl package, so that e.g. GraphMakie can be used to visualize
-the subgraph. See also [`plot`](@ref).
+the subgraph. See also [`create_graphplot`](@ref).
 
 The AbstractGraph interface allows multiple edges between two nodes,
 but some functions (e.g. those that convert the graph to a binary
