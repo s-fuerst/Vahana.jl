@@ -36,19 +36,18 @@ struct Model
 end
 
 """
-    register_agenttype!(types::ModelTypes, ::Type{T}, hints...) 
+    register_agenttype!(types::ModelTypes, ::Type{T}, [hints...]) 
 
 Register an additional agent type to `types`. 
 
-An agent type is an struct that define the state for agents of type `T`.
+An agent type is a struct that define the state space for agents of type `T`.
 These structs must be "bits types", meaning the type is immutable and
 contains only primitive types and other bits types.
 
-Per default it is assumed, that an agent can die (removed from the
+By default, it is assumed that an agent can die (be removed from the
 simulation) by returning `nothing` in the transition function (see
-[`apply!`](@ref). In the case that agents are never
-removed, the hint :Immortal can be given to improve the performance
-of the simulation. 
+[`apply!`](@ref). In the case that agents are never removed, the hint
+:Immortal can be given to improve the performance of the simulation.
 
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
@@ -87,7 +86,7 @@ register_agenttype!(t::Type{T}, hints...; kwargs...) where T =
 
 
 """
-    register_edgetype!(types::ModelTypes, ::Type{T}, hints...; kwargs...)  
+    register_edgetype!(types::ModelTypes, ::Type{T}, [hints...; kwargs...])  
 
 Register an additional edge type to `types`. 
 
@@ -103,7 +102,7 @@ the hints parameters:
 
 - `:IgnoreFrom`: The ID of the source agent is not stored. This
   implies that the state of the agents on the source of the edge is
-  not accessible via the [`neighborstates`](@ref) function.
+  not accessible via e.g. the [`neighborstates`](@ref) function.
 - `:Stateless`: Store only the ID of the source agent. 
 - `:SingleType`: All target agents have the same type, needs also keyword
   `target` (see below).
@@ -120,7 +119,7 @@ not explicitly specified, it will be set implicitly
 
 If it is known how many agents of this type exist, this can also be
 specified via the optional `size` keyword. This can improve
-performance, but also memory usage.
+performance, but can also increase the memory usage.
 
 See also [Edge Hints](./performance.md#Edge-Hints), [`add_edge!`](@ref) and 
 [`add_edges!`](@ref) 

@@ -34,12 +34,18 @@ network-based systems.
 
 ## Installation
 
-You can install Vahana in Julia using the following command:
+You can (hopefully soon) install Vahana in Julia using the following command:
 
 ```
 using Pkg
 Pkg.add("Vahana")
 ```
+
+If you want to run a simulation in parallel, it is useful to also read
+the configuration/installation sections of the
+[MPI.jl](https://juliaparallel.org/MPI.jl/stable/configuration/) and
+[HDF5.jl](https://juliaio.github.io/HDF5.jl/stable/#Installation)
+libraries.
 
 ## Documentation 
 

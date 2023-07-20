@@ -9,7 +9,7 @@ import Base:
     show, eltype
 
 """
-    add_graph!(sim, graph, agent_constructor, edge_constructor) -> Vector{AgentID}
+    add_graph!(sim::Simulation, graph, agent_constructor, edge_constructor) -> Vector{AgentID}
 
 Adds a `graph` from the Graphs.jl package to `sim`, incl. all vertices
 of `graph` as new agents.
@@ -27,12 +27,11 @@ type via [`register_edgetype!`](@ref).
 !!! info
 
     add_graph! is only available when the Graphs.jl package is imported
-    by the model implementation. Therefore the "Vahana does not have
-    Graphs in its dependencies" warning can be ignored.
+    by the model implementation. 
 
 Returns a vector with the IDs of the created agents.
 """
-function add_graph!(sim, graph, agent_constructor, edge_constructor)
+function add_graph!(sim::Simulation, graph, agent_constructor, edge_constructor)
     with_logger(sim) do
         @info "<Begin> add_graph!" 
     end
@@ -64,7 +63,7 @@ end
 # as it depends on the AbstractSimpleGraph structure instead
 # on the official AbstractGraph API.
 struct VahanaSimpleGraph <: Graphs.AbstractSimpleGraph{Integer}
-    sim
+    sim::Simulation
     agenttypes::Vector{DataType}
     networks::Vector{DataType}
     g2v::Vector{AgentID}
@@ -80,7 +79,7 @@ end
 # the comment of VahanaSimpleGraph above
 
 """
-    vahanasimplegraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true)
+    vahanasimplegraph(sim::Simulation; [agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true])
 
 Creates a subgraph with nodes for all agents that have one of the
 `agenttypes` types, and all edges that have one of the `edgetypes`
@@ -105,7 +104,7 @@ suppressed by setting `show_ignorefrom_warning` to false.
     into a binary (sparse)matrix can produce undefined results
     for those graphs. So use this function with care. 
 """ 
-function vahanasimplegraph(sim;
+function vahanasimplegraph(sim::Simulation;
                     agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
                     edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
                     show_ignorefrom_warning = true)
@@ -183,7 +182,7 @@ end
 # SingleType not supported (und IgnoreFrom sowieso nicht)
 
 """
-    vahanagraph(sim; agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true, drop_multiedges = false)
+    vahanagraph(sim::Simulation; [agenttypes::Vector{DataType}, edgetypes::Vector{DataType}, show_ignorefrom_warning = true, drop_multiedges = false])
 
 Creates a subgraph with nodes for all agents that have one of the
 `agenttypes` types, and all edges that have one of the `edgetypes`

@@ -4,11 +4,14 @@ CurrentModule = Vahana
 
 # Transition Function
 
-As mentioned in the `create_model` documentation, the model struct is
-created dynamically incl. a dynamically name for this struct. E.g. in
-the "Game of Life" Example this type is `Vahana.var"Game of
-Life"{Params, Globals} `. All of this types are subtypes of the
-abstract type `Simulation`.
+As mentioned in the [`create_model`](@ref) documentation, the model
+struct is created dynamically incl. the name for this
+struct. E.g. in the "Hegselmann" Example this type is
+`Vahana.var"Hegselmann"{Params, Globals} `. All of this types are
+subtypes of the abstract type `Simulation`.
+
+After the initialization, the state of the simulation is modified by
+so called transition functions. 
 
 ```@docs
 apply!

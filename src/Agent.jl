@@ -119,7 +119,7 @@ T must have been previously registered by calling
 `add_agent!` returns a new AgentID, which can be used to create edges
 from or to this agent until [`finish_init!`](@ref) is called (in the
 case that `add_agent!` is called in the initialization phase), or until
-the transition funcion is finished (in the case that add_agent! is
+the transition funcion is finished (in the case that `add_agent!` is
 called in an [`apply!`](@ref) callback). Do not use the ID
 for other purposes, they are not guaranteed to be stable.
 
@@ -142,9 +142,9 @@ calling [`register_agenttype!`](@ref).
 
 `add_agents!` returns a vector of AgentIDs, which can be used to
 create edges from or to this agents before [`finish_init!`](@ref) is
-called (in the case that add_agents! is called in the initialization
+called (in the case that `add_agents!` is called in the initialization
 phase), or before the transition funcion is finished (in the case that
-add_agents!  is called in an [`apply!`](@ref) callback). Do
+`add_agents!`  is called in an [`apply!`](@ref) callback). Do
 not use the ID for other purposes, they are not guaranteed to be stable.
 
 See also [`add_agent!`](@ref), [`register_agenttype!`](@ref),
@@ -166,7 +166,7 @@ Returns the state of an agent of type T.
 
 In the case where the type T is not determinable when writing the code
 (e.g. since there may be edges between agents of different types, the
-function [`edges`](@ref) may also return agentID of different agent types),
+function [`edges`](@ref) may also return agentIDs of different agent types),
 [`agentstate_flexible`](@ref) must be used instead.
 
 !!! warning 
@@ -191,7 +191,7 @@ agentstate_flexible(sim, id::AgentID) =
     agentstate(sim, id, sim.typeinfos.nodes_id2type[type_nr(id)])
 
 """
-    all_agents(sim, ::Type{T}, all_ranks=false)
+    all_agents(sim, ::Type{T}, [all_ranks=false])
 
 This function retrieves a vector of the states for all agents of type T of the
 simulation `sim`.
@@ -223,7 +223,7 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
 end
 
 """
-    num_agents(sim, ::Type{T}, all_ranks=false)
+    num_agents(sim, ::Type{T}, [all_ranks=false])
 
 If `all_ranks` is `true` this function retrieves the number of agents of type T
 of the simulation `sim`. When it is set to `false`, the function will return the

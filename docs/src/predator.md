@@ -581,6 +581,16 @@ calc_raster(ppsim, :raster, Int64, [ Cell ]) do id
 end |> heatmap |> add_colorbar
 ````
 
+# Finish the simulation
+
+As always, it is important to call `finish_simulation` at the end of the
+simulation to avoid memory leaks.
+
+````@example predator
+finish_simulation!(ppsim);
+nothing #hide
+````
+
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

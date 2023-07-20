@@ -496,3 +496,10 @@ end |> heatmap |> add_colorbar
 calc_raster(ppsim, :raster, Int64, [ Cell ]) do id
     agentstate(ppsim, id, Cell).countdown == 0
 end |> heatmap |> add_colorbar 
+
+# # Finish the simulation
+
+# As always, it is important to call `finish_simulation` at the end of the
+# simulation to avoid memory leaks.
+
+finish_simulation!(ppsim);
