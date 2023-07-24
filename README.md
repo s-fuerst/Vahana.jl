@@ -30,11 +30,11 @@ network-based systems.
 
 - HDF5 Data Persistence: For efficient data storage and access, Vahana
   utilises the Hierarchical Data Format version 5 (HDF5), including
-  optional support for parallel HDF5 for more extensive simulations.
+  optional support for parallel HDF5.
 
 ## Installation
 
-You can (hopefully soon) install Vahana in Julia using the following command:
+You can install Vahana in Julia using the following command:
 
 ```
 using Pkg
