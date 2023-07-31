@@ -23,6 +23,8 @@ runedgestest()
 #edgesiterator depends on edges.jl
 include("edgesiterator.jl")
 
+include("parametric_types.jl")
+
 # depends on core
 include("globals.jl")
 
