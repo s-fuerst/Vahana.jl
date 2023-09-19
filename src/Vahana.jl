@@ -123,7 +123,6 @@ end
 
 abstract type Simulation end
 
-
 include("Helpers.jl")
 
 # MPIInit must be included before Agent/Edge, and Agent/Edge before MPI

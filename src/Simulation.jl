@@ -91,11 +91,12 @@ end
 """
     create_model(types::ModelTypes, name::String)
 
-Adds a structure and methods corresponding to the type information of
-`types` to the Julia session. The new structure is named `name`, and
-all methods are specific to this structure using Julia's multiple
-dispatch concept, so it is possible to have different models in the
-same Julia session (as long as `name` is different).
+Creates a struct that is a subtype of the `Simulation` type and methods
+corresponding to the type information of `types` to the Julia
+session. The new structure is named `name`, and all methods are
+specific to this structure using Julia's multiple dispatch concept, so
+it is possible to have different models in the same Julia session (as
+long as `name` is different).
 
 Returns a [`Model`](@ref) that can be used in
 [`create_simulation`](@ref) to create a concrete simulation.  
@@ -166,7 +167,7 @@ end
 num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
 
 """
-    create_simulation(model::Model, params = nothing, globals = nothing; name = model.name, filename = name, overwrite_file = true, logging = false, debug = false)
+    create_simulation(model::Model, [params = nothing, globals = nothing; name = model.name, filename = name, overwrite_file = true, logging = false, debug = false])
 
 Creates and return a new simulation object, which stores the complete state 
 of a simulation. 
@@ -188,7 +189,7 @@ name of the model is used instead.
 
 The optional `filename` keyword is a string that will be used as the
 name of the hdf5 file when a simulation or a part of it is written via
-e.g. `write_snapshot`. 
+e.g. [`write_snapshot`](@ref). 
 
 The file is created when a `write...` function is called for the first time,
 and it is created in an `h5` subfolder. By default an existing file
@@ -202,7 +203,7 @@ log file.  The log file contains information such as the time spent in
 different functions. When also `debug` is set to true, the log file
 contains more details and the stream will be flushed after each write.
 
-As with the hdf5 files, the `overwrite_file` keyword determines
+As with the hdf5 files, overwrite_file `the` keyword determines
 whether the log files are overwritten or numbered. The numbering is
 set independently from the numbering of the hdf5 files.
 
@@ -283,9 +284,9 @@ function _create_equal_partition(part_dict, ids)
 end
 
 """
-    finish_init!(sim::Simulation; distribute = true, 
+    finish_init!(sim::Simulation; [distribute = true, 
                  partition::Dict{AgentID, ProcessID}, 
-                 partition_algo = :Metis)
+                 partition_algo = :Metis])
 
 Finish the initialization phase of the simulation. 
 
@@ -502,12 +503,13 @@ isiterable(v) = applicable(iterate, v)
 
 
 """
-    apply!(sim, func, call, read, write; add_existing)
+    apply!(sim, func, call, read, write; [add_existing])
 
 Apply the transition function `func` to the simulation state. 
 
-`call` must be a collection of agent types, `read` and `write` must be
-collections of agent and/or edge state types.
+`call` must be a single agent type or a collection of agent types,
+likewise "read" and "write" must be a single agent/edge type or a
+collection of agent/edge types.
 
 `call` determines for which agent types the transition function `func`
 is called. Within the transition function, an agent has access to the
@@ -518,7 +520,7 @@ their types are in the `write` collection.
 
 Assume that T is an agent type that is in `call`. In case T is also in
 `read`, the transition function must have the following signature:
-`transition_function(agent::T, id, sim:)`, where the type declaration
+`transition_function(agent::T, id, sim)`, where the type declaration
 of agent is optional if `call` contains only a single type. If T is
 not in `read`, it must have the signature `transition_function(::Val{T},
 id::AgentID, sim::Simulation)`.
@@ -655,7 +657,7 @@ end
 
 import Base.mapreduce
 """
-    mapreduce(sim, f, op, ::Type{T}; kwargs ...)
+    mapreduce(sim, f, op, ::Type{T}; [kwargs ...])
 
 Calculate an aggregated value, based on the state of all agents or
 edges of type T.

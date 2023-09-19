@@ -101,7 +101,7 @@ display(vp::VahanaPlot) = Base.display(vp.figure)
 obsrange(x) = 1:length(x)
 
 """
-    create_graphplot(sim; agenttypes, edgestatetypes, update_fn, pos_jitter)
+    create_graphplot(sim; [agenttypes, edgestatetypes, update_fn, pos_jitter])
 
 Creates an interactive Makie plot for the the simulation `sim`.
 

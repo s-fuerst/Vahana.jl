@@ -14,9 +14,9 @@ The usual workflow is as follows:
 - Create a [`ModelTypes`](@ref) instance
 - Register the defined Agent and Edge types 
 - Call [`create_model`](@ref) to create an model (state space) object
-- Call [`create_simulation`](@ref) to create a simulation of this model
+- Call [`create_simulation`](@ref) to create an uninitialized simulation of this model
 
-The simplest example of creating a simulation is:
+The simplest example for such a workflow is:
 
 ```
 struct Agent end
@@ -26,7 +26,7 @@ const sim = ModelTypes() |>
     register_agenttype!(Agent) |>
     register_edgetype!(EdgeState) |>
     create_model("Minimal Example") |>
-    create_simulation(nothing, nothing)
+    create_simulation()
 ```
 
 After the simulation is created, the next step is its initialization,
@@ -43,13 +43,6 @@ register_agenttype!
 register_edgetype!
 ```
 
-!!! tip
-	
-	That the agent and edge types must be bits types has the implication
-	that it is not possible for them to have a `String` field, since Strings have 
-	a flexible size. But the InlineStrings.jl package can be used instead, if
-	Strings are really necessary.
-	
 We can then use the `ModelTypes` instance to construct the model.
 Which means that optimized methods that can be used to access or
 modify the simulation state during the transition function are

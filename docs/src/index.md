@@ -4,8 +4,8 @@ CurrentModule = Vahana -->
 
 # Introduction
 
-Vahana.jl is a new open-source high-performance software framework for
-easy development of large-scale agent-based models (ABM) of complex
+Vahana.jl is an open-source high-performance software framework for
+the development of large-scale agent-based models (ABM) of complex
 social systems. Vahana is based on a discrete dynamical systems
 formulation referred to as a synchronous graph dynamical system
 (SyGDS)[^1], which is a generalization of cellular automata (CA). In a CA
@@ -58,12 +58,6 @@ starting the simulation via mpirun. The challenge for the user is
 mainly to think about how to express the model as a SyGDS, rather than
 thinking about technical details of the implementation such as which
 data structure is best to use.
-
-However, care was also taken during the development of Vahana to
-ensure that a very good performance can be achieved. Therefore, the
-user can inform Vahana about properties of the agents or about the
-intended use of edges of a specific type.
-
 
 [^1]: Adiga, A., Kuhlman, C.J., Marathe, M.V. et al. Graphical dynamical systems and their applications to bio-social systems. [https://doi.org/10.1007/s12572-018-0237-6](https://doi.org/10.1007/s12572-018-0237-6)
 

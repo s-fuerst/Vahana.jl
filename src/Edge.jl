@@ -220,7 +220,7 @@ and [`neighborstates`](@ref)
 function has_edge(::Simulation, id::AgentID, edgetype::Type) end
 
 """
-    num_edges(sim, ::Type{T}, sum_ranks=false)
+    num_edges(sim, ::Type{T}, [sum_ranks=false])
 
 If `all_ranks` is `true` this function retrieves the number of edges of type `T`
 of the simulation `sim`. When it is set to `false`, the function will only return the

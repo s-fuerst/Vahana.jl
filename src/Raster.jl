@@ -95,7 +95,7 @@ function stencil(metric, n::Int64, distance::Float64)
 end
 
 """
-    connect_raster_neighbors!(sim, name::Symbol, edge_constructor; distance::Int, metric:: Symbol, periodic::Bool)
+    connect_raster_neighbors!(sim, name::Symbol, edge_constructor; [distance::Int, metric:: Symbol, periodic::Bool])
 
 All cells that are at most `distance` from each other (using the metric
 `metric`) are connected with edges, where the edges are created with
@@ -173,9 +173,9 @@ If the results of `calc_raster` depend only on the state of the cells
 Returns a n-dimensional array (with the same dimensions as `raster`)
 with those values.
 
-Example
+Example:
 
-The following code from the "Game of Life" example generates a
+The following code from a "Game of Life" implementation generates a
 boolean matrix indicating which cells are alive (and therefore
 maps the internal graph structure to the usual representation of a
 cellular automaton):
@@ -233,7 +233,7 @@ must be equal to f(state).
 Returns a n-dimensional array (with the same dimensions as `raster`)
 with those values.
 
-Example
+Example:
 
 Instead of
 ```@example
@@ -286,7 +286,7 @@ end
 
 
 """
-    move_to!(sim, name::Symbol, id::AgentID, pos, edge_from_raster, edge_to_raster; distance = 0, metric = :chebyshev, periodic = true) 
+    move_to!(sim, name::Symbol, id::AgentID, pos, edge_from_raster, edge_to_raster; [distance = 0, metric = :chebyshev, periodic = true]) 
 
 Creates up to two edges of type between the agent with ID `id` and the cell from the raster `name` at the position `pos`.
 

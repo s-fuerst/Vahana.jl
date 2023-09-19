@@ -466,3 +466,10 @@ DataFrame(sim, Globals)
 
 DataFrame(sim, Bought)
 
+# # Finish the simulation
+
+# Vahana uses internally a C library and also allocates memory via
+# this library. So when you have finished your simulation and want to free
+# the memory, you must call `finish_simulation`.
+
+finish_simulation!(sim)

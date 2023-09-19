@@ -233,7 +233,7 @@ function _printid(id, nrformatted = true)
 end    
 
 """
-    show_agent(sim, Type{T}, id=0; max=5, neighborstate = []) 
+    show_agent(sim, Type{T}, [id=0; max=5, neighborstate = []]) 
 
 Display detailed information about the agent with ID `id`, or in the
 case that id is a value < 2^36, the information of the nth agent of
