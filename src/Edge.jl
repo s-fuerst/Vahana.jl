@@ -50,7 +50,19 @@ See also [`Edge`](@ref) [`register_edgetype!`](@ref) and [`add_edges!`](@ref)
 """
 function add_edge!(::Simulation, to::AgentID, edge::Edge)  end
 
-function add_edge!(::Simulation, from::AgentID, to::AgentID, state::T) where T  end
+
+function add_edge!(::Simulation, from::AgentID, to::AgentID, state::Edge) 
+    error("""
+
+`add_edge!(sim, from, to, state)` can not be called with a complete edge as state.
+If `edge.from == from`, you can use `add_edge!(sim, to, edge)` instead, otherwise you
+must extract the state of the edge by adding `.state` to your current `state` argument.
+""")
+end
+
+function add_edge!(::Simulation, from::AgentID, to::AgentID, state::T) where T
+    error("add_edge! can not be called with a state of type $T")
+end
 
 """
     add_edges!(sim, to::AgentID, edges)
