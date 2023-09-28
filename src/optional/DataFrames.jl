@@ -1,6 +1,6 @@
 import DataFrames: DataFrame, subset!, nrow
 
-export DataFrame
+export DataFrame, GlobalsDataFrame
 
 """
     DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
@@ -120,8 +120,10 @@ so this field will not be added to the dataframe"""; color = :red)
             end
         end
     else
-        printstyled("Type $T is neither an agent type nor an edge nor the global type\n";
+        printstyled("Type $T is neither an agent type nor an edge type\n";
                     color = :red)
     end
     df
 end
+
+GlobalsDataFrame(sim::Simulation) = DataFrame(sim, typeof(sim.globals))
