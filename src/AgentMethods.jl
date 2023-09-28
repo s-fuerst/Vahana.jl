@@ -201,7 +201,10 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 @assert begin
                     T = $T
                     add_existing == true
-                end "You cannot rebuild $T because it has the trait :Immortal."
+                end """
+                  You can add $T to the `write` argument only when $T is also 
+                  included in the `add_existing` argument, as $T has the hint :Immortal.
+                  """
             end
         end
         if ! add_existing
