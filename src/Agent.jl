@@ -207,7 +207,7 @@ The states and IDs of the agents returned by `all_agents` and
 See also [`all_agentids`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
 """
 function all_agents(sim, ::Type{T}, all_ranks = true) where T
-    @assert fieldcount(T) > 0 """
+    @assert fieldcount(T) > 0 """\n
         all_agents can be only called for agent types that have fields.
         To get the number of agents, you can call num_agents instead.
     """

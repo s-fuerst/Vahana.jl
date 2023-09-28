@@ -54,6 +54,22 @@ function Base.show(io::IO, ::MIME"text/plain", model::Model)
             print(io, "{$(model.types.edges_attr[T][:target])}")
         end
     end
+
+    params = model.types.params
+    if length(params) >= 1
+        printstyled(io, "\nParameter(s) with default values:"; color = :cyan)
+    end
+    for param in model.types.params
+        print(io, "\n\t$(param.name): $(param.default_value)")
+    end
+
+    globals = model.types.globals
+    if length(globals) >= 1
+        printstyled(io, "\nGlobal(s) with init values:"; color = :cyan)
+    end
+    for g in model.types.globals
+        print(io, "\n\t$(g.name): $(g.init_value)")
+    end
 end
 
 ######################################## Simulation
