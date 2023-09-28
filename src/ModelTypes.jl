@@ -1,5 +1,19 @@
 export ModelTypes
-export register_agenttype!, register_edgetype!
+export register_agenttype!, register_edgetype!, register_param!, register_global!
+
+
+Base.@kwdef struct Param{T}
+    name::Symbol
+    default_value::T
+end
+
+Base.@kwdef struct Global{T}
+    name::Symbol
+    init_value::T
+end
+
+#Param(name, default::T) where T = Param{T}(name, default, default)
+
 
 """
     ModelTypes
@@ -22,6 +36,8 @@ Base.@kwdef struct ModelTypes
     nodes_types = Vector{DataType}()
     nodes_type2id::Dict{DataType, TypeID} = Dict{DataType, TypeID}()
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
+    params::Vector{Param} = Vector{Param}()
+    globals::Vector{Global} = Vector{Global}()
 end
 
 """
@@ -65,12 +81,10 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, hints...) where T
 
     hints = Set{Symbol}(hints)
     for hint in hints
-        @assert hint in [:Immortal] """
-
+        @assert hint in [:Immortal] """\n
         The agent type hint $hint is unknown for type $T. The following hints are
         supported: 
             :Immortal
-
         """
     end
 
@@ -189,11 +203,9 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, hints...;
         end
     end
     @assert !(:SingleType in hints && :SingleEdge in hints &&
-        !(:Stateless in hints && :IgnoreFrom in hints)) """
-
+        !(:Stateless in hints && :IgnoreFrom in hints)) """\n
         The hints :SingleEdge and :SingleType can be only combined
         when the type $T has also the hints :Stateless and :IgnoreFrom.
-        
         """
     
     types.edges_attr[T][:hints] = hints
@@ -211,4 +223,26 @@ has_hint(sim, T::DataType, hint::Symbol, ge = :Edge) =
     else
         @error "Unknown graph element, use :Agent or :Edge"
     end
-        
+
+"""
+DOCTODO
+"""
+function register_param!(types::ModelTypes, name::Symbol, default_value::T) where T
+    push!(types.params, Param{T}(name, default_value))
+    types
+end
+
+register_param!(name, default_value::T) where T =
+    types -> register_param!(types, name, default_value) 
+
+"""
+DOCTODO
+"""
+function register_global!(types::ModelTypes, name::Symbol, init_value::T) where T
+    push!(types.globals, Global{T}(name, init_value))
+    types
+end
+
+register_global!(name, init_value::T) where T =
+    types -> register_global!(types, name, init_value) 
+

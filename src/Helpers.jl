@@ -73,7 +73,7 @@ function val4empty(op; kwargs...)
         end
     end
 
-    @assert emptyval !== nothing """ 
+    @assert emptyval !== nothing """\n 
             Can not derive the init value for the operator. You must add this
             information via the `init` keyword.
         """

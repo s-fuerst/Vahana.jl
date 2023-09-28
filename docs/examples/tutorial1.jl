@@ -156,57 +156,56 @@ end
 import Base.+
 +(a::Bought, b::Bought) = Bought(a.x + b.x, a.y + b.y);
 
-# Before we can construct our simulation, we need to define two
-# additional structures. The first structure contains the parameters of
-# the simulation.
-
-Base.@kwdef struct Params
-    numBuyer::Int64
-    numSeller::Int64
-    knownSellers::Int64
-end;
-
-# We use the `@kwdef` macro here only for code readability
-# reasons, as this allows us to use the name of the parameters in the
-# `Params` constructor.
-
-# The second struct allows us to add a global state to the
-# simulation, which can be an exogenous input or an (aggregated) state
-# from the simulation itself. This global state can then be used for the
-# agents' decisions or, as in our case, as the output of the simulation,
-# namely the development of the average price and excess demand.
-
-mutable struct Globals
-    x_minus_y::Vector{Float64}
-    p::Vector{Float64}
-end
-
 # We now have all the elements needed to construct an uninitialized
 # simulation. Therefore we combine first all the Agent- and Edgetypes
 # into a `ModelTypes` collection, via the `register_agenttype!` and
 # `register_edgetype!` functions, and then call `contruct_model` on this
 # collection. 
 
-const model = ModelTypes() |>
+const modeltypes = ModelTypes() |>
     register_agenttype!(Buyer) |>
     register_agenttype!(Seller) |>
     register_edgetype!(KnownSellers) |>
-    register_edgetype!(Bought) |>
-    create_model("Excess Demand");
+    register_edgetype!(Bought);
+
+# Before we can construct the model, we must also the model parameters
+# incl. the default values
+
+modeltypes |>
+    register_param!(:numBuyer, 50) |>
+    register_param!(:numSeller, 5) |>
+    register_param!(:knownSellers, 2);
+
+# Parameters can be only set via the `set_param!` function until the
+# simulation is initialized with `finish_init!`. But often it is
+# useful to have some variables in the simulation that are like
+# parameters accessible for all agents, in Vahana they are called
+# global variables (this has nothing to do with the `global` keyword
+# from Julia).
+
+# This global variables can be exogenous input or an (aggregated)
+# state from the simulation itself and can then be used for the
+# agents' decisions or, as in our case, as the output of the
+# simulation, namely the development of the average price and excess
+# demand.
+
+# As parameters they are registered before the model is created,
+# this time with an initial value instead of the default value
+
+modeltypes |>
+    register_global!(:x_minus_y, Vector{Float64}()) |>
+    register_global!(:p, Vector{Float64}()); 
+
+# Now we have anything together to create the model:
+
+const model = create_model(modeltypes, "Excess Demand")
 
 # `create_model` returns a blueprint for our simulation. Simulations
 # itself can be seen as instances of models, where each simulation has
 # it's individual state and set of parameters. The Simulation is
-# instanciated by the `create_simulation` function, which needs beside
-# the model also the parameters struct and the globals struct, whereby
-# the parameters and globals can be also `nothing`. 
+# instanciated by the `create_simulation` function.
 
-const sim = create_simulation(model,
-                              Params(numBuyer = 50,
-                                     numSeller = 5,
-                                     knownSellers = 2),
-                              Globals(Vector(),
-                                      Vector()))
+const sim = create_simulation(model)
 
 # Now we can also populate our simulation with the agents and the
 # `KnownSeller` network (the `Bought` network is a result of the
@@ -460,9 +459,13 @@ get_global(sim, :x_minus_y)
 
 import DataFrames
 
-DataFrame(sim, Globals)
+# To get the DataFrame for the Globals, we call the `GlobalsDataFrame`
+# function for our sim. Be aware, that only global variable that are vectors
+# are added to the DataFrame.
 
-# But we can also create a DataFrame for the agent and edgetypes, e.g.
+GlobalsDataFrame(sim)
+
+# We can also create a DataFrame for the agent and edgetypes, e.g.
 
 DataFrame(sim, Bought)
 

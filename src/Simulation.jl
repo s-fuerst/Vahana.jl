@@ -1,3 +1,5 @@
+using Infiltrator
+
 import Base.deepcopy
 import Logging.with_logger
 
@@ -5,7 +7,7 @@ export create_model
 export create_simulation, finish_simulation!, copy_simulation
 export finish_init!
 export apply, apply!
-export param
+export param, set_param!
 export mapreduce
 
 # this is mutable, as we assign write -> read in finish_write!
@@ -161,6 +163,33 @@ function create_model(typeinfos::ModelTypes, name::String)
 
     construct_prettyprinting_methods(simsymbol)
 
+    ### Parameters
+    paramfields = [
+        Expr(Symbol("="),
+             :($(param.name)::$(typeof(param.default_value))),
+             :($(param.default_value)))
+        for param in typeinfos.params ]
+
+    # the true in the second arg makes the struct mutable
+    paramstrukt = Expr(:struct, true, :($(Symbol("Params_" * String(simsymbol)))),
+                       Expr(:block, paramfields...))
+
+    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, paramstrukt) |> eval    
+
+    ### Globals
+    globalfields = [
+        Expr(Symbol("="),
+             :($(g.name)::$(typeof(g.init_value))),
+             :($(g.init_value)))
+        for g in typeinfos.globals ]
+
+
+    # the true in the second arg makes the struct mutable
+    globalstrukt = Expr(:struct, true, :($(Symbol("Globals_" * String(simsymbol)))),
+                        Expr(:block, globalfields...))
+
+    Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, globalstrukt) |> eval
+
     Model(typeinfos, name)
 end
 
@@ -222,7 +251,37 @@ function create_simulation(model::Model,
                     name = model.name,
                     filename = name, overwrite_file = true,
                     logging = false, debug = false) where {P, G}
+
+    simsymbol = Symbol(model.name)
     
+    # Since v1.1 params and globals should be added to the model
+    # via register_param! and register_global!
+    # But to be backward compatible, it's still possible to
+    # use own Param and Global Structs
+    pstrukt = eval(Symbol("Params_" * model.name))
+    @assert(params === nothing || fieldcount(pstrukt) == 0, """\n
+    You can not use `register_param!` and the `param` argument of 
+    `create_simulation` at the same time.
+    """)
+
+    params = if fieldcount(pstrukt) == 0
+        params
+    else
+        deepcopy(pstrukt())
+    end
+
+    gstrukt = eval(Symbol("Globals_" * model.name))
+    @assert(globals === nothing || fieldcount(gstrukt) == 0, """\n
+    You can not use `register_globals!` and the `global` argument of 
+    `create_simulation` at the same time.
+    """)
+
+    globals = if fieldcount(gstrukt) == 0
+        globals
+    else
+        deepcopy(gstrukt())
+    end
+
     sim::Simulation = @eval $(Symbol(model.name))(
         model = $model,
         name = $name,
@@ -479,6 +538,18 @@ Simulation constructor.
 See also [`create_model`](@ref)
 """
 param(sim, name) = getfield(sim.params, name)
+
+"""
+DOCTODO
+"""
+function set_param!(sim, name, value)
+    @assert !sim.initialized """\n
+         You can call `set_param!` only before `finish_init!`. For values that 
+         change while the simulation is running, register them as globals and use 
+         `set_global!` instead.
+            """
+    setfield!(sim.params, name, value)
+end
 
 function maybeadd(coll,
            id,
