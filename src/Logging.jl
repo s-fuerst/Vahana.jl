@@ -73,7 +73,9 @@ function Logging.handle_message(logger::VahanaLogger, level::LogLevel, message, 
 end
 
 function create_logger(filename, logging, debug, overwrite_file)
-    filename = mkpath("log") * "/" * filename
+    if logging
+        filename = mkpath("log") * "/" * filename
+    end
 
     if ! overwrite_file
         filename = add_number_to_file(filename)
