@@ -1,3 +1,8 @@
+# _memcpy! moved in Julia 1.10 from Base._memcpy! to Libc.memcpy. Before
+# I start to support two different versions, I just define my own _memcpy!
+
+@inline memcpy!(dst, src, n) = ccall(:memcpy, Cvoid, (Ptr{UInt8}, Ptr{UInt8}, Csize_t), dst, src, n)
+
 function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.nodes_attr[T]
     # in the case that the AgentType is stateless, we only check
@@ -254,7 +259,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         length(@writestate($T)),
                                         mpi.shmcomm)
 
-            Base._memcpy!(sarr, @writestate($T),
+            memcpy!(sarr, @writestate($T),
                           length(@writestate($T)) * sizeof($T))
             
             MPI.Win_fence(0, @windows($T).shmstate)
@@ -279,7 +284,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         length(@writedied($T)),
                                         mpi.shmcomm)
 
-            Base._memcpy!(sarr, @writedied($T),
+            memcpy!(sarr, @writedied($T),
                           length(@writedied($T)) * sizeof(Bool))
 
             MPI.Win_fence(0, @windows($T).shmdied)
@@ -318,7 +323,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         length(@readstate($T)),
                                         mpi.shmcomm)
 
-            Base._memcpy!(sarr, @readstate($T),
+            memcpy!(sarr, @readstate($T),
                           length(@readstate($T)) * sizeof($T))
             
             MPI.Win_fence(0, @windows($T).shmstate)
@@ -335,7 +340,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         length(@readdied($T)),
                                         mpi.shmcomm)
 
-            Base._memcpy!(sarr, @readdied($T),
+            memcpy!(sarr, @readdied($T),
                           length(@readdied($T)) * sizeof(Bool))
 
             MPI.Win_fence(0, @windows($T).shmdied)
