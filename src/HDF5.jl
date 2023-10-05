@@ -752,7 +752,7 @@ function _read_globals_or_params(hid, T)
                    filter(k -> k != "empty_array", [keys(hid); keys(attrs(eid))]))
 
     unsorted = Dict(map(all_keys) do k
-                        k => if haskey(attributes(eid), k)
+                        k => if haskey(HDF5.attributes(eid), k)
                             Vector{fieldtype(T, Symbol(k))}()
                         elseif attrs(hid[k])["array"] 
                             hid[k][]
