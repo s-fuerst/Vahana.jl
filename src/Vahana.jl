@@ -2,7 +2,7 @@ module Vahana
 
 using MPI, Metis, Requires
 
-export enable_asserts, suppress_warnings, detect_stateless
+export enable_asserts, suppress_warnings, detect_stateless, set_hdf5_path
 
 function __init__()
     @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
@@ -71,6 +71,7 @@ Base.@kwdef mutable struct VahanaConfig
     # by default. Activate this only after careful testing (e.g.
     # run the run_mpitests script in Vahana's test folder.
     no_parallel_compression = true
+    hdf5_path = nothing
 end
 
 const config = VahanaConfig()
@@ -117,7 +118,18 @@ function set_compression(level::Int, parallel_hdf5_compression = false)
     config.compression_level = level
     config.no_parallel_compression = ! parallel_hdf5_compression
 end
-    
+
+
+"""
+    set_hdf5_path(path::String)
+
+Specify the path that is used to save and read the hdf5 files. If the
+directory does not exist, it is created the first time a file is
+written or tried to read.
+
+See also [`create_h5file!`](@ref)
+"""
+set_hdf5_path = (path::String) -> config.hdf5_path = path
 
 ######################################## include all other files
 

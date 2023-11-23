@@ -60,8 +60,9 @@ will be overwritten. If it is false, the filename is automatically
 extended by an increasing 6-digit number, so that existing files are
 not overwritten.
 
-The files are always created in a `h5` subfolder, and this one will be
-create in the current working directory.
+By default, the files are created in an `h5` subfolder, and this is
+created in the current working directory. However, the path can also be
+set with the function `set_hdf5_path`.
 
 In the case that an HDF5 file was already created for the simulation
 `sim`, this will be closed.
@@ -78,8 +79,12 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     if endswith(filename, ".h5")
         filename = filename[1, end-3]
     end
-    
-    filename = mkpath("h5") * "/" * filename
+
+    filename = if config.hdf5_path !== nothing
+        mkpath(config.hdf5_path)  * "/" * filename
+    else
+        mkpath("h5") * "/" * filename
+    end
 
     if ! overwrite
         filename = add_number_to_file(filename)
@@ -571,6 +576,11 @@ function open_h5file(sim::Union{Simulation, Nothing}, filename)
     if endswith(filename, "_0")
         filename = filename[1:end-2]
     end
+    
+    if config.hdf5_path !== nothing
+        filename = mkpath(config.hdf5_path)  * "/" * filename
+    end
+
     if ! (isfile(filename * ".h5") || isfile(filename * "_0.h5"))
         filename = mkpath("h5") * "/" * filename
         if ! (isfile(filename * ".h5") || isfile(filename * "_0.h5"))

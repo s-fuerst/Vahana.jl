@@ -4,6 +4,8 @@ using Test
 
 suppress_warnings(true)
 
+set_hdf5_path(tempdir())
+
 Pos2D = NamedTuple{(:x, :y), Tuple{Int64, Int64}}
 Pos3D = NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
 
