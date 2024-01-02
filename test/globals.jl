@@ -14,4 +14,17 @@
     @test get_global(sim, :bar) == [1, 2]
 
     finish_simulation!(sim)
+
+    # testing register_global!
+    mt = ModelTypes() |>
+        register_global!(:test, Vector{Int64}()) |>
+        create_model("Test_register_global!")
+
+    sim1 = create_simulation(mt)
+    finish_init!(sim1)
+    sim2 = create_simulation(mt)
+    finish_init!(sim2)
+
+    push_global!(sim1, :test, 3)
+    get_global(sim2, :test)
 end
