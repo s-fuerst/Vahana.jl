@@ -6,16 +6,16 @@ function test_write_restore(model)
     test(sim, restored)
 
     apply!(sim,
-                      remove_some_rasternodes,
-                      [ RasterAgent ],
-                      [ RasterAgent, RasterEdge, Agent ],
-                      [ RasterAgent, RasterEdge ])
+           remove_some_rasternodes,
+           [ RasterAgent ],
+           [ RasterAgent, RasterEdge, Agent ],
+           [ RasterAgent, RasterEdge ])
 
     apply!(restored,
-                      remove_some_rasternodes,
-                      [ RasterAgent ],
-                      [ RasterAgent, RasterEdge, Agent ],
-                      [ RasterAgent, RasterEdge ])
+           remove_some_rasternodes,
+           [ RasterAgent ],
+           [ RasterAgent, RasterEdge, Agent ],
+           [ RasterAgent, RasterEdge ])
 
     test(sim, restored)
     
@@ -95,7 +95,7 @@ end
         register_edgetype!(EdgeState, :NumEdgesOnly) |>
         register_edgetype!(RasterEdge) |>
         register_edgetype!(StatelessEdge, :HasEdgeOnly, :SingleType; target = Agent) |>
-                               create_model("hdf5_neighbors")
+        create_model("hdf5_neighbors")
 
     test_write_restore(model_neighbors)
 
