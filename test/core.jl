@@ -111,7 +111,7 @@ function createsim()
 
     (a1id, a2id, a3id, avids, avfids) = add_example_network!(sim)
     
-    idmap = finish_init!(sim; return_idmapping = true)
+    idmap = finish_init!(sim; return_idmapping = true, partition_algo=:EqualAgentNumbers)
 
     a1id, a2id, a3id =
         updateids(idmap, a1id), updateids(idmap, a2id), updateids(idmap, a3id)
@@ -120,6 +120,7 @@ function createsim()
     (sim, a1id, a2id, a3id, avids, avfids)
 end
     
+
 
 @testset "Core" begin
     (sim, a1id, a2id, a3id, avids, avfids) = createsim()
@@ -212,15 +213,15 @@ end
         
     @testset "transition" begin
         # check that with assertion enables, it is checked that the agent types
-        # are in `read`
+        # are in `read`.
         enable_asserts(true)
         (sim, a1id, a2id, a3id, avids, avfids) = createsim()
-        @test_throws AssertionError apply!(sim, AMortal, ESLDict1, []) do _, id, sim
-            neighborstates_flexible(sim, id, ESLDict1)
+        # AImmFixed is missing
+        @test_throws AssertionError apply!(sim, AImm, [ ESLDict2], []) do _, id, sim
+            neighborstates_flexible(sim, id, ESLDict2)
         end
         finish_simulation!(sim)
 
-        
         # normally it's not allowed to call add_edge! between transition
         # function, but because of the @onrankof this hack works here
         enable_asserts(false)
@@ -360,7 +361,7 @@ end
 
         finish_simulation!(sim)
     end
-    
+
     # this hack should help that the output is not scrambled
     sleep(mpi.rank * 0.05)
 end

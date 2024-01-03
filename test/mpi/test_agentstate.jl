@@ -12,7 +12,10 @@ enable_asserts(true)
 
 suppress_warnings(true)
 
-@assert mpi.size > mpi.shmsize "This test is only for multinode configurations"
+if mpi.size == mpi.shmsize
+    @rootonly println("This test is only for multi-node configurations")
+    exit()
+end
 
 # Logging.disable_logging(Logging.Info)
 

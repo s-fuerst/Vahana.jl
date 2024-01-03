@@ -1,5 +1,3 @@
-using Revise
-
 include("hdf5_common.jl")
 
 import Vahana: has_hint, type_nr, agent_id, agent_nr, AgentID, AgentNr
