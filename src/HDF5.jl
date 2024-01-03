@@ -86,7 +86,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
         # to avoid that rank 0 creates a file before other ranks check this
         MPI.Barrier(MPI.COMM_WORLD)
     end
-    
+
     fid = if parallel_write()
         _log_info(sim, "Create hdf5 file in parallel mode")
         HDF5.h5open(filename * ".h5", "w", mpi.comm, MPI.Info())
@@ -108,17 +108,19 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     attrs(fid)["initialized"] = sim.initialized
     
     pid = create_group(fid, "params")
-    # See comment in write_globals. We use a unified function to read params and
-    # globals, therefore we also create this unused group for params (and
-    # hope that nobody fill have an empty vector as a parameter)
-    create_group(pid, "empty_array")
-
+    # See comment in write_globals.
+    eid = create_group(pid, "empty_array")
+    
     if sim.params !== nothing
         for k in fieldnames(typeof(sim.params))
             field = getfield(sim.params, k)
             if typeof(field) <: Array
-                pid[string(k)] = field
-                attrs(pid[string(k)])["array"] = true
+                if length(field) > 0
+                    pid[string(k)] = field
+                    attrs(pid[string(k)])["array"] = true
+                else
+                    attrs(eid)[string(k)] = true
+                end
             else
                 pid[string(k)] = [ field ]
                 attrs(pid[string(k)])["array"] = false
@@ -197,8 +199,8 @@ subset of the fields is to be written, this subset can be specified
 via the optional `fields` argument.
 """
 function write_globals(sim::Simulation,
-                       fields = sim.globals === nothing ?
-                           nothing : fieldnames(typeof(sim.globals)))
+                fields = sim.globals === nothing ?
+                    nothing : fieldnames(typeof(sim.globals)))
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -228,8 +230,12 @@ function write_globals(sim::Simulation,
             if k in fields
                 field = getfield(sim.globals, k)
                 if typeof(field) <: Array
-                    tid[string(k)] = field
-                    attrs(tid[string(k)])["array"] = true
+                    if length(field) > 0
+                        tid[string(k)] = field
+                        attrs(tid[string(k)])["array"] = true
+                    else
+                        attrs(eid)[string(k)] = true
+                    end
                 else
                     tid[string(k)] = [ field ]
                     attrs(tid[string(k)])["array"] = false
@@ -314,7 +320,7 @@ agents of a subset of agent types are to be written, this subset can
 be specified via the optional `types` argument.
 """
 function write_agents(sim::Simulation,
-                      types::Vector{DataType} = sim.typeinfos.nodes_types)
+               types::Vector{DataType} = sim.typeinfos.nodes_types)
     if sim.h5file === nothing 
         create_h5file!(sim)
     end
@@ -406,7 +412,7 @@ edges of a subset of edge types are to be written, this subset can
 be specified via the optional `types` argument.
 """
 function write_edges(sim::Simulation,
-                     types::Vector{DataType} = sim.typeinfos.edges_types)
+              types::Vector{DataType} = sim.typeinfos.edges_types)
 
     if sim.h5file === nothing
         create_h5file!(sim)
