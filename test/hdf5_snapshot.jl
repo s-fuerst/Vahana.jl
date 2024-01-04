@@ -103,3 +103,34 @@ end
     sleep(mpi.rank * 0.05)
 end
 
+@testset "Arrays" begin
+    mutable struct ParGlo
+        vec::Vector{Int64}
+        mat::Matrix{Int64}
+        arr::Array{Int64, 3}
+        empty::Vector{Int64}
+    end
+    
+    model_arrays = ModelTypes() |> create_model("Arrays")
+    sim = create_simulation(model_arrays,
+                            ParGlo([1, 2, 3], [1 2 3; 4 5 6],
+                                   ones(2,3,4), Int64[]),
+                            ParGlo([1, 2, 3], [1 2 3; 4 5 6],
+                                   ones(2,3,4), Int64[]))
+    finish_init!(sim; partition_algo = :EqualAgentNumbers)
+    write_snapshot(sim)
+    read_snapshot!(sim)
+    @test sim.params.vec == [1, 2, 3]
+    @test sim.params.mat == [1 2 3; 4 5 6]
+    @test sim.params.arr == ones(2,3,4)
+    @test sim.params.empty == Int64[]
+    @test sim.globals.vec == [1, 2, 3]
+    @test sim.globals.mat == [1 2 3; 4 5 6]
+    @test sim.globals.arr == ones(2,3,4)
+    @test sim.globals.empty == Int64[]
+
+    finish_simulation!(sim)
+
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
+end
