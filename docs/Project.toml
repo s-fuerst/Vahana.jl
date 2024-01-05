@@ -9,6 +9,7 @@ Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 NetworkLayout = "46757867-2c16-5918-afeb-47bfcb05e46a"
 SNAPDatasets = "fc66bc1b-447b-53fc-8f09-bc9cfb0b0c10"
+Vahana = "e9033725-1633-496a-b29a-3bc5a5543602"
 
 [compat]
 CairoMakie = "0.10.6"

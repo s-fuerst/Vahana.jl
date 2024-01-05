@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/examples/predator.jl"
+EditURL = "../examples/predator.jl"
 ```
 
 # Predator/Prey Model

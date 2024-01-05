@@ -1,14 +1,14 @@
-using MPI
-
-using HDF5
+using MPI, HDF5
 
 import NamedTupleTools: ntfromstruct, structfromnt
+import Dates: format, now
 
 export create_h5file!, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export list_snapshots
 export create_namedtuple_converter, create_enum_converter
+export write_metadata, read_metadata
 
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
 # are using those. The Pos2D/3D types can be used to add a Cell position
@@ -42,6 +42,14 @@ transition_str(sim) = "t_$(sim.num_transitions-1)"
 parallel_write() = HDF5.has_parallel() && mpi.active
 
 mpio_mode() = parallel_write() ? Dict(:dxpl_mpio => :collective) : Dict()
+
+# since fileformat 2, empty_array and last_change starts with an _
+empty_array_string(fids) = attrs(fids[1])["fileformat"] == 1 ?
+    "empty_array" : "_empty_array"
+
+last_change_string(fids) = attrs(fids[1])["fileformat"] == 1 ?
+    "last_change" : "_last_change"
+
 
 """
     create_h5file!(sim::Simulation, [filename = sim.filename; overwrite = sim.overwrite_file])
@@ -102,19 +110,25 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
 
     sim.h5file = fid
 
-    attrs(fid)["simulationname"] = sim.name
-    attrs(fid)["modelname"] = sim.model.name
     # attrs(fid)["modelhash"] = hash(sim.model)
     # @info "wrote hash" attrs(fid)["modelhash"] hash(sim.model)
-    attrs(fid)["fileformat"] = 1
+    attrs(fid)["fileformat"] = 2
     attrs(fid)["mpisize"] = mpi.size
     attrs(fid)["mpirank"] = mpi.rank
     attrs(fid)["HDF5parallel"] = parallel_write() 
     attrs(fid)["initialized"] = sim.initialized
+    attrs(fid)["last_snapshot"] = -1
+
+    # we use this to attach metadata to a simulation
+    mid = create_group(fid, "_meta")
+    attrs(mid)["simulation_name"] = sim.name
+    attrs(mid)["model_name"] = sim.model.name
+    attrs(mid)["date"] = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
     
     pid = create_group(fid, "params")
+    create_group(pid, "_meta")
     # See comment in write_globals.
-    eid = create_group(pid, "empty_array")
+    eid = create_group(pid, "_empty_array")
     
     if sim.params !== nothing
         for k in fieldnames(typeof(sim.params))
@@ -133,7 +147,15 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
         end
     end
     
-    create_group(fid, "globals")
+    gid = create_group(fid, "globals")
+    create_group(gid, "_meta")
+    # # we create a group for each global field so that it's possible
+    # #
+    # if sim.globals !== nothing
+    #     for k in fieldnames(typeof(sim.globals))
+    #         create_group(gid, k)
+    #     end
+    # end
 
     rid = create_group(fid, "rasters")
     _log_time(sim, "write rasters") do
@@ -147,7 +169,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     # vectors of size 0 in parallel mode and we must track those.
     # The group have a subgroup for each transition, and this subgroup
     # the agent types as attributes with a boolean value.
-    create_group(aid, "empty_array")
+    create_group(aid, "_empty_array")
     foreach(sim.typeinfos.nodes_types) do T
         tid = create_group(aid, string(T))
         attrs(tid)[":Immortal"] = has_hint(sim, T, :Immortal, :Agent)
@@ -155,7 +177,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
 
     eid = create_group(fid, "edges")
     # see comment for agent
-    create_group(eid, "empty_array")
+    create_group(eid, "_empty_array")
     foreach(sim.typeinfos.edges_types) do T
         tid = create_group(eid, string(T))
         attrs(tid)[":Stateless"] = has_hint(sim, T, :Stateless)
@@ -214,12 +236,13 @@ function write_globals(sim::Simulation,
         return
     end
 
+    lcstr = last_change_string([sim.h5file])
     gid = sim.h5file["globals"]
-    if haskey(HDF5.attributes(gid), "last_change") &&
-        sim.globals_last_change == attrs(gid)["last_change"]
+    if haskey(HDF5.attributes(gid), lcstr) &&
+        sim.globals_last_change == attrs(gid)[lcstr]
         return
     end
-    attrs(gid)["last_change"] = sim.globals_last_change
+    attrs(gid)[lcstr] = sim.globals_last_change
     
     _log_time(sim, "write globals") do
         t = transition_str(sim)
@@ -229,7 +252,7 @@ function write_globals(sim::Simulation,
         # in this case. Even worse, we can not access attributes of the emtpy
         # dataset. So we need an additional group to store this information.
         # Don't know what to say about this.
-        eid = create_group(tid, "empty_array")
+        eid = create_group(tid, "_empty_array")
 
         for k in fieldnames(typeof(sim.globals))
             if k in fields
@@ -330,26 +353,28 @@ function write_agents(sim::Simulation,
         create_h5file!(sim)
     end
 
+    lcstr = last_change_string([sim.h5file])
+    
     _log_time(sim, "write agents") do
         t = transition_str(sim)
-        eid = create_group(sim.h5file["agents"]["empty_array"], t)
+        eid = create_group(sim.h5file["agents"]["_empty_array"], t)
 
         for T in types
             gid = sim.h5file["agents"][string(T)]
             
             field = getproperty(sim, Symbol(T))
-            if haskey(attrs(gid), "last_change") &&
-                field.last_change == attrs(gid)["last_change"]
+            if haskey(attrs(gid), lcstr) &&
+                field.last_change == attrs(gid)[lcstr]
                 continue
             end
-            attrs(gid)["last_change"] = field.last_change
+            attrs(gid)[lcstr] = field.last_change
 
             num_agents = Int64(field.nextid - 1)
             (vec_num_agents, vec_displace) = calc_displace(num_agents)
             sum_num_agents = sum(vec_num_agents)
 
             tid = create_group(gid, t)
-            attrs(tid)["last_change"] = field.last_change
+            attrs(tid)[lcstr] = field.last_change
             attrs(tid)["size_per_rank"] = vec_num_agents
             attrs(tid)["displace"] = vec_displace
 
@@ -423,19 +448,21 @@ function write_edges(sim::Simulation,
         create_h5file!(sim)
     end
 
+    lcstr = last_change_string([sim.h5file])
+
     _log_time(sim, "write edges") do
         t = transition_str(sim)
-        eid = create_group(sim.h5file["edges"]["empty_array"], t)
+        eid = create_group(sim.h5file["edges"]["_empty_array"], t)
 
         for T in types
             gid = sim.h5file["edges"][string(T)]
 
             field = getproperty(sim, Symbol(T))
-            if haskey(attrs(gid), "last_change") &&
-                field.last_change == attrs(gid)["last_change"]
+            if haskey(attrs(gid), lcstr) &&
+                field.last_change == attrs(gid)[lcstr]
                 continue
             end
-            attrs(gid)["last_change"] = field.last_change
+            attrs(gid)[lcstr] = field.last_change
 
             # prepare_read! triggers the distributions of the edges to the
             # correct nodes
@@ -481,7 +508,7 @@ function write_edges(sim::Simulation,
                 new_dset(gid, t, DT, sum_num_edges, Vector{DT}(), create_dt)
             end
             
-            attrs(tid)["last_change"] = field.last_change
+            attrs(tid)[lcstr] = field.last_change
             attrs(tid)["size_per_rank"] = vec_num_edges
             attrs(tid)["displace"] = vec_displace
 
@@ -550,6 +577,8 @@ end
 # of the vector point to the same file. So
 # fid[mpi.rank][...][pe_mpi.rank] access always the data that was stored
 # by mpi.rank, independent if h5parallel was used or not.
+#
+# IMPORTANT: the files must be closed by the caller of open_h5file
 function open_h5file(sim::Union{Simulation, Nothing}, filename)
     # first we sanitize the filename
     if endswith(filename, ".h5")
@@ -618,7 +647,8 @@ function find_transition_nr(ids, transition::Int)
     if length(ids) == 0
         return nothing
     end
-    ts = filter(<=(transition), map(s -> parse(Int64, s[3:end]), keys(ids)))
+    only_numbers = filter(s -> s[1:2] == "t_", keys(ids))
+    ts = filter(<=(transition), map(s -> parse(Int64, s[3:end]), only_numbers))
     if length(ts) == 0
         return nothing
     end
@@ -738,10 +768,11 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     idmapping
 end
 
-function _read_globals_or_params(hid, T)
-    eid = hid["empty_array"]
+function _read_globals_or_params(hid, T, empty_array_str)
+    eid = hid[empty_array_str]
     all_keys = map(string,
-                   filter(k -> k != "empty_array", [keys(hid); keys(attrs(eid))]))
+                   filter(k -> k[1] != '_',
+                          [keys(hid); keys(attrs(eid))]))
 
     unsorted = Dict(map(all_keys) do k
                         k => if haskey(HDF5.attributes(eid), k)
@@ -755,6 +786,7 @@ function _read_globals_or_params(hid, T)
     
     map(n -> unsorted[string(n)], fieldnames(T))
 end
+
 
 """
     read_params(filename::String, T::DataType)
@@ -782,7 +814,9 @@ function read_params(filename::String, T::DataType)
         return
     end
 
-    values = _read_globals_or_params(fids[1]["params"], T)
+    values = _read_globals_or_params(fids[1]["params"],
+                                     T,
+                                     empty_array_string(fids))
     
     foreach(close, fids)
 
@@ -826,7 +860,8 @@ function read_globals(name::String, T::DataType; transition = typemax(Int64))
 
     values = _read_globals_or_params(find_transition_group(fids[1]["globals"],
                                                            transition),
-                                     T)
+                                     T,
+                                     empty_array_string(fids))
 
     foreach(close, fids)
 
@@ -889,7 +924,7 @@ function read_agents!(sim::Simulation,
             field = getproperty(sim, Symbol(T))
 
             t = find_transition_nr(fids[1]["agents"][string(T)], transition)
-            if attrs(fids[1]["agents"]["empty_array"]["t_$t"])[string(T)]
+            if attrs(fids[1]["agents"][empty_array_string(fids)]["t_$t"])[string(T)]
                 if ! has_hint(sim, T, :Immortal, :Agent)
                     field.write.died = Vector{Bool}()
                 end
@@ -1018,7 +1053,7 @@ function read_edges!(sim::Simulation,
                 """ 
             continue
         end
-        if attrs(fids[1]["edges"]["empty_array"]["t_$(trnr)"])[string(T)]
+        if attrs(fids[1]["edges"][empty_array_string(fids)]["t_$(trnr)"])[string(T)]
             _log_info(sim, "<End> read edges")
             finish_write!(sim, T)
             continue
@@ -1286,3 +1321,150 @@ function create_namedtuple_converter(T::DataType)
     @eval convert(::Type{$NT}, st::$T) = ntfromstruct(st)
     @eval convert(::Type{$T}, nt::$NT) = structfromnt($T, nt)
 end
+
+"""
+    write_metadata(sim::Simulation, type::Symbol, field::Symbol, key::Symbol, value)
+
+Attach metadata to a `field` of the `globals` or `params` struct
+(see [`create_simulation`](@ref)). `type` must be :Global or
+:Param. Metadata is stored via `key`, `value` pairs, so that multiple
+data of different types can be attached to a single field.
+
+`write_metadata` can only be called after [`finish_init!`](@ref).
+
+See also: [`read_metadata`](@ref)
+"""
+function write_metadata(sim::Simulation,
+                 type::Symbol,
+                 field::Symbol,
+                 key::Symbol,
+                 value)
+    if sim.h5file === nothing 
+        create_h5file!(sim)
+    end
+
+    what = if type == :Param
+        "params"
+    elseif type == :Global
+        "globals"
+    else
+        @error "Can not write metadata, `type` must be :Param or :Global"
+    end
+
+    field_str = String(field)
+    
+    mid = sim.h5file[what]["_meta"]
+    if ! (field_str in keys(mid))
+        fieldid = create_group(mid, field_str)
+    end
+    write_attribute(mid[field_str], String(key), value)
+    flush(sim.h5file)
+end
+
+"""
+    read_metadata(sim::Simulation, type::Symbol, field::Symbol, [ key::Symbol = Symbol() ])
+
+Read metadata for a `field` of the `globals` or `params` struct (see
+[`create_simulation`](@ref)). `type` must be :Global or
+:Param. Metadata is stored via `key`, value pairs. Multiple data of
+different types can be attached to a single field, a single piece of
+the metadata can be retrived via the `key` parameter. If this is not
+set (or set to Symbol()), a Dict{Symbol, Any} with the complete
+metadata of this field is returned.
+
+See also: [`write_metadata`](@ref)
+"""
+function read_metadata(sim::Simulation,
+                type::Symbol,
+                field::Symbol,
+                key::Symbol = Symbol())
+    fids = open_h5file(sim, sim.filename)
+    if length(fids) == 0
+        return
+    end
+
+
+    what = if type == :Param
+        "params"
+    elseif type == :Global
+        "globals"
+    else
+        @error "Can not read metadata, `type` must be :Param or :Global"
+    end
+    
+    field_str = String(field)
+    mid = fids[1][what]["_meta"]
+    
+    r = if field_str in keys(mid)
+        if key == Symbol()
+            Dict([ (Symbol(d[1]), d[2]) for d in Dict(attrs(mid[field_str])) ])
+        else
+            get(attrs(mid[field_str]), String(key), nothing)
+        end
+    else
+        nothing
+    end
+
+    foreach(close, fids)
+
+    r
+end
+
+"""
+    write_metadata(sim::Simulation, key::Symbol, value)
+
+Attach additional metadata to a simulation. Metadata is stored via
+`key`, `value` pairs, so that multiple data of different types can be
+attached.
+
+`write_metadata` can only be called after [`finish_init!`](@ref).
+
+See also: [`read_metadata`](@ref)
+"""
+function write_metadata(sim::Simulation, key::Symbol, value)
+    if sim.h5file === nothing 
+        create_h5file!(sim)
+    end
+
+    write_attribute(sim.h5file["_meta"], String(key), value)
+
+    flush(sim.h5file)
+end    
+
+"""
+    read_metadata(sim::Simulation, [ key::Symbol = Symbol() ])
+
+Read metadata for a simulation. `type` must be :Global or
+:Param. Metadata is stored via `key`, value pairs. Multiple data of
+different types can be attached to a single field, a single piece of
+the metadata can be retrived via the `key` parameter. If this is not
+set (or set to Symbol()), a Dict{Symbol, Any} with the complete
+metadata of this field is returned.
+
+The following metadata is stored automatically:
+- simulation_name
+- model_name
+- date (in the format "yyyy-mm-dd hh:mm:ss")
+
+See also: [`write_metadata`](@ref)
+"""
+function read_metadata(sim::Simulation,
+                key::Symbol = Symbol())
+    fids = open_h5file(sim, sim.filename)
+    if length(fids) == 0
+        return
+    end
+    
+    mid = fids[1]["_meta"]
+    
+    r = if key == Symbol()
+        Dict([ (Symbol(d[1]), d[2]) for d in Dict(attrs(mid)) ])
+    else
+        get(attrs(mid), String(key), nothing)
+    end
+
+    foreach(close, fids)
+
+    r
+end
+

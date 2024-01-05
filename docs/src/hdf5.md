@@ -29,6 +29,7 @@ write function like [`write_snapshot`](@ref) is called. All following
 `write_*` calls then add additional datasets to the file.
 
 ```@docs
+set_hdf5_path
 write_snapshot
 create_h5file!
 close_h5file!
@@ -92,6 +93,16 @@ stored snapshots in the file.
 list_snapshots
 ```
 
+## Metadata
+
+It's possible to attach Metadata to the parameters and globals of a
+simulation.
+
+```@docs
+write_metadata
+read_metadata
+```
+
 ## Restrictions and Workarounds
 
 The exact datastructs that can be stored and read from a HDF5 depends
@@ -107,5 +118,11 @@ create_enum_converter
 
 ## Example Model
 
-TODO DOC link to Vahana Episim
+The tutorials in the documentation does not include examples for the
+file storage functionality, but this
+[model](https://git.zib.de/sfuerst/vahana-episim/) is a good example,
+which also demonstrates checkpointing (resuming a simulation after an
+interruption), and working with initial snapshots (the initialized
+simulation state is stored after the graph structure is constructed
+and distributed to the different processes).
 
