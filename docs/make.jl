@@ -24,7 +24,8 @@ Literate.markdown(joinpath(@__DIR__, "examples", "hegselmann.jl"), "src"; execut
 makedocs(sitename="Vahana Documentation",
          modules = [Vahana],
 #         format = Documenter.LaTeX(),
-         format = Documenter.HTML(prettyurls = false),
+         format = Documenter.HTML(prettyurls = false,
+                                  edit_link = :commit),
          clean = false, 
          pages = [
              "Introduction" => "index.md",
@@ -53,4 +54,5 @@ makedocs(sitename="Vahana Documentation",
 
 deploydocs(
     repo = "github.com/s-fuerst/Vahana.jl.git",
+    devbranch = "main"
 )

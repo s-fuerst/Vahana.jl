@@ -52,6 +52,8 @@ libraries.
 Full documentation, including tutorials, guides, and API references, 
 is available [here](https://s-fuerst.github.io/Vahana.jl/).
 
+A JuliaCon 2023 Pre-recorded Video about Vahana is available [here](https://www.youtube.com/watch?v=-318ec-kCBM).
+
 ## Acknowledgments
 
 ![mathplus logo](/mathplus.png)

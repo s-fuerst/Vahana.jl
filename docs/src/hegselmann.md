@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/examples/hegselmann.jl"
+EditURL = "../examples/hegselmann.jl"
 ```
 
 # Opinion Model
