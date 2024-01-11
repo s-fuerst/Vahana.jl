@@ -195,21 +195,29 @@ function calc_raster(sim::Simulation, raster::Symbol, f, f_returns::DataType,
     end
 
     @assert sim.initialized "calc_raster can be only called after finish_init!"
+
+    ids = sim.rasters[raster]
+    idsvec = reshape(ids, length(ids))
+
+    onprocess = Vector{Tuple{Int64, f_returns}}()
+
     foreach(T -> prepare_read!(sim, Vector{DataType}(), T), accessible)
-    z = zero(f_returns)
-    rs = map(sim.rasters[raster]) do id
+    for (idx, id) = enumerate(ids)
         if process_nr(id) == mpi.rank
-            f(id)
-        else
-            z
+            push!(onprocess, (idx, f(id)))
         end
     end
     foreach(T -> finish_read!(sim, T), accessible)
-    r = MPI.Allreduce(rs, |, MPI.COMM_WORLD)
+
+    all = join(onprocess)
+
+    resvec = zeros(f_returns, length(idsvec))
+    for (idx, val) in all
+        resvec[idx] = val
+    end
 
     _log_info(sim, "<End> calc_raster!")
-    
-    r
+    reshape(resvec, size(sim.rasters[raster]))
 end
 
 
@@ -227,7 +235,7 @@ Calculate values for the raster `raster` by applying `f` to the state of each
 cell.
 
 `f_returns` must be the type returned by the function f. There must be an
-implementation of the zero function for this type, and zero(returntype) | f(state)
+implementation of the zero function for this type, and zero(returntype) + f(state)
 must be equal to f(state).
 
 Returns a n-dimensional array (with the same dimensions as `raster`)
@@ -256,20 +264,34 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     @assert sim.initialized """
     calc_rasterstate can be only called after finish_init!"""
 
+    ids = sim.rasters[raster]
+    idsvec = reshape(ids, length(ids))
+
+    onprocess = Vector{Tuple{Int64, f_returns}}()
+
     disable_transition_checks(true)
-    z = zero(f_returns)
-    rs = map(sim.rasters[raster]) do id
-        if process_nr(id) == mpi.rank
-            f(agentstate(sim, id, T))
-        else
-            z
+    for (idx, id) = enumerate(ids)
+        if Vahana.process_nr(id) == mpi.rank
+            push!(onprocess, (idx, f(agentstate(sim, id, T))))
         end
     end
     disable_transition_checks(false)
-    r = MPI.Allreduce(rs, |, MPI.COMM_WORLD)
+
+    all = join(onprocess)
+
+    resvec = zeros(f_returns, length(idsvec))
+    for (idx, val) in all
+        resvec[idx] = val
+    end
+
     _log_info(sim, "<End> calc_rasterstate")
-    r
+    reshape(resvec, size(sim.rasters[raster]))
 end
+
+###
+
+
+###
 
 # """
 #     cellid(sim, name::Symbol, pos)

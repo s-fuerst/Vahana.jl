@@ -1,7 +1,7 @@
 name = "Vahana"
 uuid = "e9033725-1633-496a-b29a-3bc5a5543602"
 authors = ["Steffen Fürst <fuerst@zib.de> and contributors"]
-version = "1.0.0"
+version = "1.1.0"
 
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
@@ -29,7 +29,7 @@ Graphs = "^1.8"
 HDF5 = "~0.17"
 MPI = "~0.20"
 MPIPreferences = "~0.1"
-Makie = "^0.19"
+Makie = "^0.20"
 Metis = "^1.4"
 NamedTupleTools = "^0.14"
 Requires = "1"
