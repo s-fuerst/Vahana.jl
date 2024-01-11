@@ -97,7 +97,11 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
         HDF5.h5open(filename * ".h5", "w", mpi.comm, MPI.Info())
     else
         _log_info(sim, "Create hdf5 file without parallel mode")
-        HDF5.h5open(filename * "_" * string(mpi.rank) * ".h5", "w")
+        if mpi.active
+            HDF5.h5open(filename * "_" * string(mpi.rank) * ".h5", "w")
+        else
+            HDF5.h5open(filename * ".h5", "w")
+        end
     end
 
     sim.h5file = fid
@@ -1201,7 +1205,7 @@ function read_snapshot!(sim::Simulation,
         sim.params = read_params(name, typeof(sim.params))
     end
 
-    if sim.globals !== nothing
+    if sim.globals !== nothing && globals_last_change !== nothing
         sim.globals = read_globals(name, typeof(sim.globals); transition)
     end
     
