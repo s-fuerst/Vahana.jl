@@ -39,6 +39,7 @@ mpirun -n 4 julia --project mpi/test_agentstate.jl
 echo
 echo "HDF5 Snapshot"
 echo "-------------"
+rm -r h5
 mpirun -n 4 julia --project hdf5_snapshot.jl 
 
 echo

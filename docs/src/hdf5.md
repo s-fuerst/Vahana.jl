@@ -93,6 +93,16 @@ stored snapshots in the file.
 list_snapshots
 ```
 
+## Metadata
+
+It's possible to attach Metadata to the parameters and globals of a
+simulation.
+
+```@docs
+write_metadata
+read_metadata
+```
+
 ## Restrictions and Workarounds
 
 The exact datastructs that can be stored and read from a HDF5 depends

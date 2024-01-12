@@ -2,6 +2,8 @@ include("hdf5_common.jl")
 
 import Vahana: has_hint, type_nr, agent_id, agent_nr, AgentID, AgentNr
 
+set_hdf5_path(joinpath(dirname(@__FILE__), "h5"))
+
 function test_merge(model)
     sim = runsim(model, false)
     restored = restore(model, sim)

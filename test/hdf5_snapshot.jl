@@ -1,5 +1,7 @@
 include("hdf5_common.jl")
 
+set_hdf5_path(joinpath(dirname(@__FILE__), "h5"))
+
 function test_write_restore(model)
     sim = runsim(model, true)
     restored = restore(model, sim)
@@ -103,7 +105,7 @@ end
     sleep(mpi.rank * 0.05)
 end
 
-@testset "Arrays" begin
+@testset "Metadata" begin
     mutable struct ParGlo
         vec::Vector{Int64}
         mat::Matrix{Int64}
@@ -111,14 +113,28 @@ end
         empty::Vector{Int64}
     end
     
-    model_arrays = ModelTypes() |> create_model("Arrays")
+    model_arrays = ModelTypes() |> create_model("Metadata")
     sim = create_simulation(model_arrays,
                             ParGlo([1, 2, 3], [1 2 3; 4 5 6],
                                    ones(2,3,4), Int64[]),
                             ParGlo([1, 2, 3], [1 2 3; 4 5 6],
-                                   ones(2,3,4), Int64[]))
+                                   ones(2,3,4), Int64[]);
+                            name = "Metadata_sim")
     finish_init!(sim; partition_algo = :EqualAgentNumbers)
+    write_metadata(sim, :Param, :empty, :foo, 1)
+    write_metadata(sim, :Global, :mat, :dim1, "hhtype")
     write_snapshot(sim)
+    write_metadata(sim, :Global, :mat, :dim2, "agegroup")
+    write_metadata(sim, :foo, 2)
+    finish_simulation!(sim)
+
+    sim = create_simulation(model_arrays,
+                            ParGlo(Int64[], zeros(1,1),
+                                   zeros(1,1,1), Int64[]),
+                            ParGlo(Int64[], zeros(1,1),
+                                   zeros(1,1,1), Int64[]);
+                            name = "Metadata_sim")
+    
     read_snapshot!(sim)
     @test sim.params.vec == [1, 2, 3]
     @test sim.params.mat == [1 2 3; 4 5 6]
@@ -128,6 +144,19 @@ end
     @test sim.globals.mat == [1 2 3; 4 5 6]
     @test sim.globals.arr == ones(2,3,4)
     @test sim.globals.empty == Int64[]
+    @test read_metadata(sim, :Param, :empty, :foo) == 1
+    @test read_metadata(sim, :Global, :mat, :dim1) == "hhtype"
+    @test read_metadata(sim, :Global, :mat, :dim2) == "agegroup"
+    @test read_metadata(sim, :Global, :mat, :nonsense) == nothing
+    @test read_metadata(sim, :Global, :nonsense, :nonsense) == nothing
+
+    asdict = read_metadata(sim, :Global, :mat)
+    @test asdict[:dim1] == "hhtype"
+
+    @test read_metadata(sim, :foo) == 2
+    asdict = read_metadata(sim)
+    asdict[:model_name] == "Metadata"
+    asdict[:simulation_name] == "Metadata_sim"
 
     finish_simulation!(sim)
 
