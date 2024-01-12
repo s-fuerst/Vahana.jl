@@ -201,6 +201,41 @@ end
         finish_simulation!(copy)
     end
 
+    @testset "all_agentids" begin
+        sim_agentids = ModelTypes() |>
+            register_agenttype!(AMortal) |>
+            create_model("all_agentids_test") |>
+            create_simulation()
+
+        foreach(i -> add_agent!(sim_agentids, AMortal(i)), 1:10)
+
+        finish_init!(sim_agentids)
+
+        @test length(all_agentids(sim_agentids, AMortal)) == 10
+
+        apply!(sim_agentids, AMortal, AMortal, AMortal) do state, id, sim
+            state.foo % 2 == 0 ? state : nothing
+        end
+        @test length(all_agentids(sim_agentids, AMortal)) == 5
+        finish_simulation!(sim_agentids)
+               
+
+        # test also for immortal agents
+        sim_agentids = ModelTypes() |>
+            register_agenttype!(AImm) |>
+            create_model("all_agentids_test_immortal") |>
+            create_simulation()
+
+        foreach(i -> add_agent!(sim_agentids, AImm(i)), 1:10)
+
+        finish_init!(sim_agentids)
+
+        allids = all_agentids(sim_agentids, AImm)
+        @test length(allids) == 10
+
+        finish_simulation!(sim_agentids)
+    end
+
     @testset "num_edges" begin
         Vahana.disable_transition_checks(true)
         @onrankof a1id @test num_edges(sim, a1id, ESDict) == 4

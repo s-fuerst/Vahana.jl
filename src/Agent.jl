@@ -23,7 +23,7 @@ export AgentID, ProcessID#, AgentNr
 
 export add_agent!, add_agents!
 export agentstate, agentstate_flexible
-export all_agents
+export all_agents, all_agentids
 
 export num_agents
 
@@ -201,7 +201,10 @@ ranks or just the current rank in parallel simulations. When
 `all_ranks` is `true`, the function returns a vector of all agent
 identifiers across all ranks.  
 
-See also [`add_agents!`] and (@ref)[`num_agents`](@ref).
+The states and IDs of the agents returned by `all_agents` and
+[`all_agentids`](@ref) are in the same order.
+
+See also [`all_agentids`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
 """
 function all_agents(sim, ::Type{T}, all_ranks = true) where T
     @assert fieldcount(T) > 0 """
@@ -214,6 +217,45 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
     else
         died = getproperty(sim, Symbol(T)).read.died
         [ states[i] for i in 1:length(died) if died[i] == false ]
+    end
+    if all_ranks
+        join(l)
+    else
+        l
+    end
+end
+
+"""
+    all_agentids(sim, ::Type{T}, [all_ranks=false])
+
+This function retrieves a vector of the current ids for all agents of type T of
+the simulation `sim`. 
+
+These ids are not stable and can change during parallel simulations,
+e.g. by calling [`finish_init!`](@ref) (and hopefully in the future
+through dynamic load balancing).
+
+The `all_ranks` argument determines whether to include agents from all
+ranks or just the current rank in parallel simulations. When
+`all_ranks` is `true`, the function returns a vector of all agent
+identifiers across all ranks.  
+
+The states and IDs of the agents returned by [`all_agents`](@ref) and
+`all_agentids` are in the same order.
+
+See also [`all_agents`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
+"""
+function all_agentids(sim, ::Type{T}, all_ranks = true) where T
+    # we are only interessted in the states field to get the length
+    # as this vector is also used for stateless agenttypes
+    states = getproperty(sim, Symbol(T)).read.state
+
+    l = if has_hint(sim, T, :Immortal, :Agent)
+        [ agent_id(typeid(sim, T), AgentNr(i)) for i in 1:length(states) ]
+    else
+        died = getproperty(sim, Symbol(T)).read.died
+        [ agent_id(typeid(sim, T), AgentNr(i))
+          for i in 1:length(died) if died[i] == false ]
     end
     if all_ranks
         join(l)

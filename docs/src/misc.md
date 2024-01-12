@@ -11,6 +11,7 @@ Here are the remaining exported Vahana definitions that do not fit into any of t
 ProcessID
 AgentID
 all_agents
+all_agentids
 num_agents
 ```
 
