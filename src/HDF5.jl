@@ -927,6 +927,10 @@ function read_agents!(sim::Simulation,
         for T in types
             field = getproperty(sim, Symbol(T))
 
+            if ! haskey(fids[1]["agents"], string(T))
+                continue
+            end
+
             t = find_transition_nr(fids[1]["agents"][string(T)], transition)
             if attrs(fids[1]["agents"][empty_array_string(fids)]["t_$t"])[string(T)]
                 if ! has_hint(sim, T, :Immortal, :Agent)
@@ -953,9 +957,6 @@ function read_agents!(sim::Simulation,
                 tid = find_transition_group(gid[string(T)], transition)
 
                 if tid === nothing && fidx == 1
-                    @rootonly @info """
-                        for $T nothing was written before transition $(transition)
-                    """ 
                     continue
                 end
                 
@@ -1045,6 +1046,10 @@ function read_edges!(sim::Simulation,
     sim.intransition = true
     
     for T in types
+        if ! haskey(fids[1]["edges"], string(T))
+            continue
+        end
+        
         with_logger(sim) do
             @info("<Begin> read edges", edgetype = T, transition = transition)
         end
@@ -1052,9 +1057,6 @@ function read_edges!(sim::Simulation,
 
         trnr = find_transition_nr(fids[1]["edges"][string(T)], transition)
         if trnr === nothing
-            @rootonly @info """
-                    for $T nothing was written before transition $(transition)
-                """ 
             continue
         end
         if attrs(fids[1]["edges"][empty_array_string(fids)]["t_$(trnr)"])[string(T)]
