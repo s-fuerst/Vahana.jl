@@ -254,16 +254,20 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             if ! isnothing(@windows($T).shmstate)
                 MPI.free(@windows($T).shmstate)
             end
-            (@windows($T).shmstate, sarr) = 
-                MPI.Win_allocate_shared(Array{$T},
-                                        length(@writestate($T)),
-                                        mpi.shmcomm)
+            if length(@writestate($T)) > 0
+                (@windows($T).shmstate, sarr) = 
+                    MPI.Win_allocate_shared(Array{$T},
+                                            length(@writestate($T)),
+                                            mpi.shmcomm)
 
-            memcpy!(sarr, @writestate($T),
-                          length(@writestate($T)) * sizeof($T))
-            
-            MPI.Win_fence(0, @windows($T).shmstate)
-            @readstate($T) = sarr
+                memcpy!(sarr, @writestate($T),
+                        length(@writestate($T)) * sizeof($T))
+                
+                MPI.Win_fence(0, @windows($T).shmstate)
+                @readstate($T) = sarr
+            else
+                @readstate($T) = $T[]
+            end
 
             # maybe the state has change, so we must clear the cache 
             empty!(@agent($T).foreignstate)
@@ -279,29 +283,39 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             if ! isnothing(@windows($T).shmdied)
                 MPI.free(@windows($T).shmdied)
             end
-            (@windows($T).shmdied, sarr) = 
-                MPI.Win_allocate_shared(Array{Bool},
-                                        length(@writedied($T)),
-                                        mpi.shmcomm)
+            if length(@writedied($T)) > 0
+                (@windows($T).shmdied, sarr) = 
+                    MPI.Win_allocate_shared(Array{Bool},
+                                            length(@writedied($T)),
+                                            mpi.shmcomm)
 
-            memcpy!(sarr, @writedied($T),
-                          length(@writedied($T)) * sizeof(Bool))
+                memcpy!(sarr, @writedied($T),
+                        length(@writedied($T)) * sizeof(Bool))
 
-            MPI.Win_fence(0, @windows($T).shmdied)
-            @readdied($T) = sarr
+                MPI.Win_fence(0, @windows($T).shmdied)
+                @readdied($T) = sarr
+            else
+                @readdied($T) = Bool[]
+            end
         end
         
         if ! $stateless
-            @agent($T).shmstate = 
+            @agent($T).shmstate = if length(@writestate($T)) > 0
                 [ MPI.Win_shared_query(Array{$T},
                                        @windows($T).shmstate;
                                        rank = i - 1) for i in 1:mpi.shmsize ]
+            else
+                $T[]
+            end
         end
         if $mortal
-            @agent($T).shmdied = 
+            @agent($T).shmdied = if length(@writedied($T)) > 0
                 [ MPI.Win_shared_query(Array{Bool},
                                        @windows($T).shmdied;
                                        rank = i - 1) for i in 1:mpi.shmsize ]
+            else
+                Bool[]
+            end
         end
         # for the reusable vector, we merge the new reuseable indices
         # (from agent died in this transition) with the unused indicies that
@@ -318,38 +332,47 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     # used in copy_simulation!
     @eval function copy_shm!(sim, ::Type{$T})
         if ! $stateless
-            (@windows($T).shmstate, sarr) = 
-                MPI.Win_allocate_shared(Array{$T},
-                                        length(@readstate($T)),
-                                        mpi.shmcomm)
+            if length(@readstate($T)) > 0
+                (@windows($T).shmstate, sarr) = 
+                    MPI.Win_allocate_shared(Array{$T},
+                                            length(@readstate($T)),
+                                            mpi.shmcomm)
 
-            memcpy!(sarr, @readstate($T),
-                          length(@readstate($T)) * sizeof($T))
-            
-            MPI.Win_fence(0, @windows($T).shmstate)
-            @readstate($T) = sarr
+                memcpy!(sarr, @readstate($T),
+                        length(@readstate($T)) * sizeof($T))
+                
+                MPI.Win_fence(0, @windows($T).shmstate)
+                @readstate($T) = sarr
 
-            @agent($T).shmstate = 
-                [ MPI.Win_shared_query(Array{$T},
-                                       @windows($T).shmstate;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+                @agent($T).shmstate = 
+                    [ MPI.Win_shared_query(Array{$T},
+                                           @windows($T).shmstate;
+                                           rank = i - 1) for i in 1:mpi.shmsize ]
+            else
+                @agent($T).shmstate = $T[]
+            end
+
         end
         if $mortal
-            (@windows($T).shmdied, sarr) = 
-                MPI.Win_allocate_shared(Array{Bool},
-                                        length(@readdied($T)),
-                                        mpi.shmcomm)
+            if length(@readdied($T)) > 0
+                (@windows($T).shmdied, sarr) = 
+                    MPI.Win_allocate_shared(Array{Bool},
+                                            length(@readdied($T)),
+                                            mpi.shmcomm)
 
-            memcpy!(sarr, @readdied($T),
-                          length(@readdied($T)) * sizeof(Bool))
+                memcpy!(sarr, @readdied($T),
+                        length(@readdied($T)) * sizeof(Bool))
 
-            MPI.Win_fence(0, @windows($T).shmdied)
-            @readdied($T) = sarr
+                MPI.Win_fence(0, @windows($T).shmdied)
+                @readdied($T) = sarr
 
-            @agent($T).shmdied = 
-                [ MPI.Win_shared_query(Array{Bool},
-                                       @windows($T).shmdied;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+                @agent($T).shmdied = 
+                    [ MPI.Win_shared_query(Array{Bool},
+                                           @windows($T).shmdied;
+                                           rank = i - 1) for i in 1:mpi.shmsize ]
+            else
+                @agent($T).shmdied = Bool[]
+            end
         end
     end
     
