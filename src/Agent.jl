@@ -223,7 +223,7 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
 end
 
 """
-    num_agents(sim, ::Type{T}, [all_ranks=false])
+    num_agents(sim, ::Type{T}, [all_ranks=true])
 
 If `all_ranks` is `true` this function retrieves the number of agents of type T
 of the simulation `sim`. When it is set to `false`, the function will return the

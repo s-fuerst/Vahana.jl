@@ -157,9 +157,7 @@ end
 Calculate values for the raster `raster` by applying `f` to each
 cell ID of the cells constructed by the `add_raster!` function.
 
-`f_returns` must be the type returned by the function f. There must be an
-implementation of the zero function for this type, and zero(returntype) | f(id)
-must be equal to f(id).
+`f_returns` must be the type returned by the function f. 
 
 `accessible` is a vector of Agent and/or Edge types. This vector must
 list all types that are accessed directly (e.g. via
@@ -211,7 +209,7 @@ function calc_raster(sim::Simulation, raster::Symbol, f, f_returns::DataType,
 
     all = join(onprocess)
 
-    resvec = zeros(f_returns, length(idsvec))
+    resvec = Array{f_returns}(undef, length(idsvec))
     for (idx, val) in all
         resvec[idx] = val
     end
@@ -234,9 +232,7 @@ Combined calc_raster with agentstate for the cells of the raster.
 Calculate values for the raster `raster` by applying `f` to the state of each
 cell.
 
-`f_returns` must be the type returned by the function f. There must be an
-implementation of the zero function for this type, and zero(returntype) + f(state)
-must be equal to f(state).
+`f_returns` must be the type returned by the function f.
 
 Returns a n-dimensional array (with the same dimensions as `raster`)
 with those values.
@@ -279,7 +275,7 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
 
     all = join(onprocess)
 
-    resvec = zeros(f_returns, length(idsvec))
+    resvec = Array{f_returns}(undef, length(idsvec))
     for (idx, val) in all
         resvec[idx] = val
     end
