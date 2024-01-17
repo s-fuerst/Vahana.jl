@@ -227,11 +227,16 @@ of the simulation `sim`. When it is set to `false`, the function will only retur
 number of edges of type `T` managed by the process.
 """
 function num_edges(sim, t::Type{T}, sum_ranks = true; write = nothing) where T
+    prepare_read!(sim, [], t)
+
     local_num = if write === nothing
         _num_edges(sim, t, ! sim.initialized)
     else
         _num_edges(sim, t, write)
     end
+
+    finish_read!(sim, t)
+    
     if sum_ranks
         MPI.Allreduce(local_num, +, MPI.COMM_WORLD)
     else

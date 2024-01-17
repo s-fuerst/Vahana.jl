@@ -50,6 +50,9 @@ function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
             df.id = map(agent_nr, df.id)
         end
     elseif T in sim.typeinfos.edges_types # Networks
+        if sim.initialized
+            prepare_read!(sim, [], T)
+        end
         read = sim.initialized ?
             getproperty(sim, Symbol(T)).read :
             getproperty(sim, Symbol(T)).write 
@@ -105,6 +108,9 @@ function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
             if ! has_hint(sim, T, :IgnoreFrom)
                 df.from = map(agent_nr, df.from)
             end
+        end
+        if sim.initialized
+            finish_read!(sim, T)
         end
     elseif T == typeof(sim.globals)
         for i in 1:fieldcount(T)
