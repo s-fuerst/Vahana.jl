@@ -241,8 +241,9 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
                         global show_second_edge_warning = false
                         print("""
     
-An edge with agent $to as target was added the second time. Since the value of
-the edge (after applying hints like :IgnoreFrom) is identical to that of
+An edge of type $T with agent $to 
+as target was added the second time. Since the value of the edge 
+(after applying hints like :IgnoreFrom) is identical to that of
 the first edge, this can be indented and is allowed. 
 
 This warning is only shown once is a Julia session and can be disabled
