@@ -224,16 +224,21 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                    agenttype=$T, transition=sim.num_transitions)
         end
         if $mortal
+            network_changed = fill(false, length(sim.typeinfos.edges_types))
             # in writereuseable we have collected all agents that died
             # in this iteration
             aids = map(nr -> agent_id($typeid, nr), @writereuseable($T))
 
+            edges_types = sim.typeinfos.edges_types
+            
             # first we remove all the edges, where the agent is in the
             # target position. As those edges are stored on the same
             # rank as the agent, we can do this locally.
             for id in aids
-                for ET in sim.typeinfos.edges_types
-                    _remove_edges_agent_traget!(sim, id, ET)
+                for ET in edges_types
+                    idx = findfirst(x -> x == ET, edges_types)
+                    network_changed[idx] |= 
+                        _remove_edges_agent_traget!(sim, id, ET)
                 end
             end
 
@@ -244,8 +249,19 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             # all ranks, and then go locally to all the edges of the rank.
             alldied = $nompi ? aids : join(aids)
             if ! isempty(alldied)
-                for ET in sim.typeinfos.edges_types
-                    _remove_edges_agent_source!(sim, alldied, ET)
+                for ET in edges_types
+                    idx = findfirst(x -> x == ET, edges_types)
+                    network_changed[idx] |=
+                        _remove_edges_agent_source!(sim, alldied, ET) 
+                end
+            end
+
+            MPI.Allreduce!(network_changed, |, mpi.comm)
+            for ET in edges_types
+                idx = findfirst(x -> x == ET, edges_types)
+                if network_changed[idx]
+                    getproperty(sim, Symbol(ET)).last_change =
+                        sim.num_transitions
                 end
             end
 
@@ -263,7 +279,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         mpi.shmcomm)
 
             memcpy!(sarr, @writestate($T),
-                          length(@writestate($T)) * sizeof($T))
+                    length(@writestate($T)) * sizeof($T))
             
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
@@ -288,7 +304,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         mpi.shmcomm)
 
             memcpy!(sarr, @writedied($T),
-                          length(@writedied($T)) * sizeof(Bool))
+                    length(@writedied($T)) * sizeof(Bool))
 
             MPI.Win_fence(0, @windows($T).shmdied)
             @readdied($T) = sarr
@@ -327,7 +343,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         mpi.shmcomm)
 
             memcpy!(sarr, @readstate($T),
-                          length(@readstate($T)) * sizeof($T))
+                    length(@readstate($T)) * sizeof($T))
             
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
@@ -344,7 +360,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                         mpi.shmcomm)
 
             memcpy!(sarr, @readdied($T),
-                          length(@readdied($T)) * sizeof(Bool))
+                    length(@readdied($T)) * sizeof(Bool))
 
             MPI.Win_fence(0, @windows($T).shmdied)
             @readdied($T) = sarr

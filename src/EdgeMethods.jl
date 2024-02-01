@@ -483,7 +483,7 @@ by calling suppress_warnings(true) after importing Vahana.
         # when we don't know where there edges are come from, we can not
         # remove them
         if $ignorefrom
-            return nothing
+            return false
         end
 
         # when the edge is stateless, the edge is already the agent id.
@@ -503,7 +503,7 @@ by calling suppress_warnings(true) after importing Vahana.
             end
         end
 
-        
+        network_changed = false
         for to in keys(@edgewrite($T))
             if $singletype && (! isassigned(@edgewrite($T), to))
                 continue
@@ -512,21 +512,27 @@ by calling suppress_warnings(true) after importing Vahana.
             ac = @edgewrite($T)[to]
             if $singleedge # the container is a single element
                 if __is_from(ac)
+                    network_changed = true
                     if $singletype
                         @edgewrite($T)[to] = zero($CT)
                     else
                         delete!(@edgewrite($T), to)
                     end
                 end
-            else  
-                deleteat!(ac, findall(__is_from, ac))
-                if ! $singletype
-                    if length(ac) == 0
-                        delete!(@edgewrite($T), to)
+            else
+                found = findall(__is_from, ac)
+                if length(found) > 0
+                    network_changed = true
+                    deleteat!(ac, found)
+                    if ! $singletype
+                        if length(ac) == 0
+                            delete!(@edgewrite($T), to)
+                        end
                     end
                 end
             end
-        end        
+        end
+        network_changed
     end
     
     @eval function init_storage!(sim::$simsymbol, ::Type{$T})
@@ -712,21 +718,30 @@ else
     end
 end
 
-#- _remove_edges (called from Vahana itself to remove the edges of
-#- died agents)
+# _remove_edges (called from Vahana itself to remove the edges of
+# died agents). returns true when edges where removed (and the network
+# changed)
 if singletype
     @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$T})
         if type_of(sim, to) == $AT
             nr = agent_nr(to)
             if length(@edgewrite($T)) >= nr
                 @edgewrite($T)[nr] = zero($CT)
+                true
+            else
+                false
             end
-        end 
+        else
+            false
+        end
     end
 else
     @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$T})
         if haskey(@edgewrite($T), to)
             delete!(@edgewrite($T), to)
+            true
+        else
+            false
         end
     end
 end
