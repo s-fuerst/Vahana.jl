@@ -102,14 +102,18 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
 
     fid = if parallel_write()
         _log_info(sim, "Create hdf5 file in parallel mode")
-        HDF5.h5open(filename * ".h5", "w", mpi.comm, MPI.Info())
+        filename = filename * ".h5"
+        rm(filename; force = true)
+        HDF5.h5open(filename, "w", mpi.comm, MPI.Info())
     else
         _log_info(sim, "Create hdf5 file without parallel mode")
-        if mpi.active
-            HDF5.h5open(filename * "_" * string(mpi.rank) * ".h5", "w")
+        filename = if mpi.active
+            filename * "_" * string(mpi.rank) * ".h5"
         else
-            HDF5.h5open(filename * ".h5", "w")
+            filename * ".h5"
         end
+        rm(filename; force = true)
+        HDF5.h5open(filename, "w")
     end
 
     sim.h5file = fid
