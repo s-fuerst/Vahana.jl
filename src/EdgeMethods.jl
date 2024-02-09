@@ -567,8 +567,6 @@ by calling suppress_warnings(true) after importing Vahana.
         if @edge($T).last_transmit <= @edge($T).last_change &&
             @edge($T).last_change > 0
 
-            edges_alltoall!(sim, @storage($T), $T)
-            foreach(empty!, @storage($T))
         end
 
         @edge($T).readable = true
@@ -583,6 +581,12 @@ by calling suppress_warnings(true) after importing Vahana.
         @edgeread($T) = @edgewrite($T)
         @edge($T).last_change = sim.num_transitions
         edge_attrs(sim, $T)[:writeable] = false
+
+    end
+
+    @eval function transmit_edges!(sim::$simsymbol, ::Type{$T})
+        edges_alltoall!(sim, @storage($T), $T)
+        foreach(empty!, @storage($T))
     end
 
     # Rules for the edge functions:

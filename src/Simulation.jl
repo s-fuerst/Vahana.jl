@@ -656,13 +656,19 @@ function apply!(sim::Simulation,
 
     foreach(T -> finish_read!(sim, T), read)
 
-    # we must first call finish_write! for the agents, as this will
+    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
+    writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
+
+    # we must first call transmit_edges, so that they are exists
+    # on the correct rank instead in @storage, where they are
+    # not deleted in the case that an agent died
+    foreach(ET -> transmit_edges!(sim, ET), writeableET)
+    
+    # then we can call finish_write! for the agents, as this will
     # remove the edges where are died agents are involved (and modifies
     # EdgeType_write).
-    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
     foreach(finish_write!(sim), writeableAT)
 
-    writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
     foreach(finish_write!(sim), writeableET)
 
     sim.intransition = false

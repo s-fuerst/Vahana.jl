@@ -339,9 +339,9 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         edge_attrs(sim, $T)[:writeable] = true
 
         # see comments for prepare_read/write
-        if sim.initialized
-            @assert @edgeread($T) === @edgewrite($T)
-        end
+        # if sim.initialized
+        #     @assert @edgeread($T) === @edgewrite($T)
+        # end
 
         # for sending them via AllToAll we flatten the perPE structure
         longvec = reduce(vcat, perPE)
