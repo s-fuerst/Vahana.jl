@@ -37,3 +37,9 @@ calc_raster
 calc_rasterstate
 ```
 
+Also the id of a cell for a given position can be archived via cellid:
+
+```@docs
+cellid
+```
+

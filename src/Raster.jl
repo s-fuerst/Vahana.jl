@@ -1,7 +1,7 @@
 import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
-export calc_raster, calc_rasterstate, move_to!
+export calc_raster, calc_rasterstate, move_to!, cellid
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
