@@ -211,11 +211,17 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
         all_agents can be only called for agent types that have fields.
         To get the number of agents, you can call num_agents instead.
     """
-    states = getproperty(sim, Symbol(T)).read.state
+    states = sim.initialized ?
+        getproperty(sim, Symbol(T)).read.state : 
+        getproperty(sim, Symbol(T)).write.state  
+
     l = if has_hint(sim, T, :Immortal, :Agent)
         states
     else
-        died = getproperty(sim, Symbol(T)).read.died
+        died = sim.initialized ?
+            getproperty(sim, Symbol(T)).read.died :
+            getproperty(sim, Symbol(T)).write.died  
+
         [ states[i] for i in 1:length(died) if died[i] == false ]
     end
     if all_ranks
@@ -248,12 +254,17 @@ See also [`all_agents`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
 function all_agentids(sim, ::Type{T}, all_ranks = true) where T
     # we are only interessted in the states field to get the length
     # as this vector is also used for stateless agenttypes
-    states = getproperty(sim, Symbol(T)).read.state
+    states = sim.initialized ?
+        getproperty(sim, Symbol(T)).read.state : 
+        getproperty(sim, Symbol(T)).write.state  
 
     l = if has_hint(sim, T, :Immortal, :Agent)
         [ agent_id(typeid(sim, T), AgentNr(i)) for i in 1:length(states) ]
     else
-        died = getproperty(sim, Symbol(T)).read.died
+        died = sim.initialized ?
+            getproperty(sim, Symbol(T)).read.died :
+            getproperty(sim, Symbol(T)).write.died  
+
         [ agent_id(typeid(sim, T), AgentNr(i))
           for i in 1:length(died) if died[i] == false ]
     end
