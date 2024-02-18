@@ -637,10 +637,6 @@ function open_h5file(sim::Union{Simulation, Nothing}, filename)
         [ HDF5.h5open(f, "r+") for f in filenames ]
     end
 
-    # TODO improve hash function
-    # @assert hash(sim.model) == attrs(fids[1])["modelhash"] """
-    # The file was written for a different model than that of the given simulation.
-    # """
     h5mpisize = attrs(fids[1])["mpisize"]
     if mpi.size > 1
         @assert mpi.size == h5mpisize """
@@ -1373,6 +1369,7 @@ end
 
 """
     read_metadata(sim::Simulation, type::Symbol, field::Symbol, [ key::Symbol = Symbol() ])
+    read_metadata(filename::String, type::Symbol, field::Symbol, [ key::Symbol = Symbol() ])
 
 Read metadata for a `field` of the `globals` or `params` struct (see
 [`create_simulation`](@ref)). `type` must be :Global or
@@ -1388,7 +1385,17 @@ function read_metadata(sim::Simulation,
                 type::Symbol,
                 field::Symbol,
                 key::Symbol = Symbol())
-    fids = open_h5file(sim, sim.filename)
+    read_metadata(open_h5file(sim, sim.filename), type, field, key)
+end
+
+function read_metadata(filename::String,
+                type::Symbol,
+                field::Symbol,
+                key::Symbol = Symbol())
+    read_metadata(open_h5file(nothing, filename), type, field, key)
+end
+
+function read_metadata(fids, type, field, key)
     if length(fids) == 0
         return
     end
@@ -1443,13 +1450,14 @@ end
 
 """
     read_metadata(sim::Simulation, [ key::Symbol = Symbol() ])
+    read_metadata(filename::String, [ key::Symbol = Symbol() ])
 
-Read metadata for a simulation. `type` must be :Global or
-:Param. Metadata is stored via `key`, value pairs. Multiple data of
-different types can be attached to a single field, a single piece of
-the metadata can be retrived via the `key` parameter. If this is not
-set (or set to Symbol()), a Dict{Symbol, Any} with the complete
-metadata of this field is returned.
+Read metadata for a simulation or from the file `filename`. `type` must
+be :Global or :Param. Metadata is stored via `key`, value
+pairs. Multiple data of different types can be attached to a single
+field, a single piece of the metadata can be retrived via the `key`
+parameter. If this is not set (or set to Symbol()), a Dict{Symbol,
+Any} with the complete metadata of this field is returned.
 
 The following metadata is stored automatically:
 - simulation_name
@@ -1460,7 +1468,16 @@ See also: [`write_metadata`](@ref)
 """
 function read_metadata(sim::Simulation,
                 key::Symbol = Symbol())
-    fids = open_h5file(sim, sim.filename)
+    read_metadata(open_h5file(sim, sim.filename), key)
+end
+
+function read_metadata(filename::String,
+                key::Symbol = Symbol())
+    read_metadata(open_h5file(nothing, filename), key)
+end
+
+function read_metadata(fids,
+                key::Symbol = Symbol())
     if length(fids) == 0
         return
     end
