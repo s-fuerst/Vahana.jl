@@ -51,6 +51,12 @@ last_change_string(fids) = attrs(fids[1])["fileformat"] == 1 ?
     "last_change" : "_last_change"
 
 
+# in the case that write_metadata is called before the file is created
+# we store the information in the vector, so that write_metadata
+# can be also called before the simulation is initialized.
+_preinit_meta = Tuple{Symbol, Symbol, Symbol, Any}[]
+# the same for the simulation
+_preinit_meta_sim = Tuple{Symbol, Any}[]
 """
     create_h5file!(sim::Simulation, [filename = sim.filename; overwrite = sim.overwrite_file])
 
@@ -198,6 +204,14 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     end
 
     create_group(fid, "snapshots")
+
+    for (type, field, key, value) in _preinit_meta
+        write_metadata(sim, type, field, key, value)
+    end
+
+    for (key, value) in _preinit_meta_sim
+        write_metadata(sim, key, value)
+    end
     
     fid
 end
@@ -1331,12 +1345,11 @@ end
 """
     write_metadata(sim::Simulation, type::Symbol, field::Symbol, key::Symbol, value)
 
-Attach metadata to a `field` of the `globals` or `params` struct
-(see [`create_simulation`](@ref)). `type` must be :Global or
-:Param. Metadata is stored via `key`, `value` pairs, so that multiple
+Attach metadata to a `field` of the `globals` or `params` struct (see
+[`create_simulation`](@ref)) or to a raster (in that case `field` must
+be the name of the raster). `type` must be :Global, :Param or
+:Raster. Metadata is stored via `key`, `value` pairs, so that multiple
 data of different types can be attached to a single field.
-
-`write_metadata` can only be called after [`finish_init!`](@ref).
 
 See also: [`read_metadata`](@ref)
 """
@@ -1345,23 +1358,25 @@ function write_metadata(sim::Simulation,
                  field::Symbol,
                  key::Symbol,
                  value)
-    if sim.h5file === nothing 
-        create_h5file!(sim)
-    end
-
-    what = if type == :Param
-        "params"
-    elseif type == :Global
-        "globals"
-    else
-        @error "Can not write metadata, `type` must be :Param or :Global"
+    if sim.h5file === nothing
+        push!(_preinit_meta, (type, field, key, value))
+        return
     end
 
     field_str = String(field)
     
-    mid = sim.h5file[what]["_meta"]
+    mid = if type == :Param
+        sim.h5file["params"]["_meta"]
+    elseif type == :Global
+        sim.h5file["globals"]["_meta"]
+    elseif type == :Raster
+        sim.h5file["rasters"]
+    else
+        @error "Can not write metadata, `type` must be :Param, :Global or :Raster"
+    end
+
     if ! (field_str in keys(mid))
-        fieldid = create_group(mid, field_str)
+        create_group(mid, field_str)
     end
     write_attribute(mid[field_str], String(key), value)
     flush(sim.h5file)
@@ -1372,8 +1387,9 @@ end
     read_metadata(filename::String, type::Symbol, field::Symbol, [ key::Symbol = Symbol() ])
 
 Read metadata for a `field` of the `globals` or `params` struct (see
-[`create_simulation`](@ref)). `type` must be :Global or
-:Param. Metadata is stored via `key`, value pairs. Multiple data of
+[`create_simulation`](@ref)) or to a raster (in that case `field` must
+be the name of the raster).. `type` must be :Global, :Param or
+:Raster. Metadata is stored via `key`, value pairs. Multiple data of
 different types can be attached to a single field, a single piece of
 the metadata can be retrived via the `key` parameter. If this is not
 set (or set to Symbol()), a Dict{Symbol, Any} with the complete
@@ -1401,16 +1417,17 @@ function read_metadata(fids, type, field, key)
     end
 
 
-    what = if type == :Param
-        "params"
+    mid = if type == :Param
+        fids[1]["params"]["_meta"]
     elseif type == :Global
-        "globals"
+        fids[1]["globals"]["_meta"]
+    elseif type == :Raster
+        fids[1]["rasters"]
     else
         @error "Can not read metadata, `type` must be :Param or :Global"
     end
     
     field_str = String(field)
-    mid = fids[1][what]["_meta"]
     
     r = if field_str in keys(mid)
         if key == Symbol()
@@ -1434,15 +1451,17 @@ Attach additional metadata to a simulation. Metadata is stored via
 `key`, `value` pairs, so that multiple data of different types can be
 attached.
 
-`write_metadata` can only be called after [`finish_init!`](@ref).
-
 See also: [`read_metadata`](@ref)
 """
 function write_metadata(sim::Simulation, key::Symbol, value)
-    if sim.h5file === nothing 
-        create_h5file!(sim)
+    if sim.h5file === nothing
+        push!(_preinit_meta_sim, (key, value))
+        return
     end
 
+    # to ensure that the user written meta data does not
+    # interfere with the metadata from Vahana, we
+    # also store this into a seperate group
     write_attribute(sim.h5file["_meta"], String(key), value)
 
     flush(sim.h5file)

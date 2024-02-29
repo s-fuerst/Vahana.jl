@@ -112,20 +112,32 @@ end
         arr::Array{Int64, 3}
         empty::Vector{Int64}
     end
+
+    struct MetaDataCell end
     
-    model_arrays = ModelTypes() |> create_model("Metadata")
+    model_arrays = ModelTypes() |>
+        register_agenttype!(MetaDataCell) |> 
+        create_model("Metadata")
     sim = create_simulation(model_arrays,
                             ParGlo([1, 2, 3], [1 2 3; 4 5 6],
                                    ones(2,3,4), Int64[]),
                             ParGlo([1, 2, 3], [1 2 3; 4 5 6],
                                    ones(2,3,4), Int64[]);
                             name = "Metadata_sim")
-    finish_init!(sim; partition_algo = :EqualAgentNumbers)
+
+    add_raster!(sim,
+                :grid,
+                (10,8),
+                _ -> MetaDataCell())
+
+    # check that we can also write metadata before finish_inith!
     write_metadata(sim, :Param, :empty, :foo, 1)
+    write_metadata(sim, :Raster,:grid, :bar, 2)
+    write_metadata(sim, :foo, 2)
+    finish_init!(sim; partition_algo = :EqualAgentNumbers)
     write_metadata(sim, :Global, :mat, :dim1, "hhtype")
     write_snapshot(sim)
     write_metadata(sim, :Global, :mat, :dim2, "agegroup")
-    write_metadata(sim, :foo, 2)
     finish_simulation!(sim)
 
     sim = create_simulation(model_arrays,
@@ -149,6 +161,7 @@ end
     @test read_metadata(sim, :Global, :mat, :dim2) == "agegroup"
     @test read_metadata(sim, :Global, :mat, :nonsense) == nothing
     @test read_metadata(sim, :Global, :nonsense, :nonsense) == nothing
+    @test read_metadata(sim, :Raster, :grid, :bar) == 2
 
     asdict = read_metadata(sim, :Global, :mat)
     @test asdict[:dim1] == "hhtype"
