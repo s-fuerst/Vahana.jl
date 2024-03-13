@@ -1,4 +1,4 @@
-using GraphMakie, Makie, Colors
+using GraphMakie, Makie, ColorSchemes
 
 import Graphs, Graphs.SimpleGraphs
 
@@ -274,16 +274,13 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
 end
 
 function _plot(vg::VahanaGraph)
-    agentcolors = distinguishable_colors(128,
-                                         [RGB(1,1,1), RGB(0,0,0)])
-    edgecolors = distinguishable_colors(256,
-                                        [RGB(0.4,0.4,0.4), RGB(0,0,0)])[3:end]
-
+    edgecolors = ColorSchemes.glasbey_bw_minc_20_maxl_70_n256
+    agentcolors = ColorSchemes.glasbey_bw_minc_20_hue_150_280_n256
 
     rv = 1:nv(vg)
     re = 1:ne(vg)
     p = graphplot(vg,
-                  node_color = [ agentcolors[type_nr(vg.g2v[i]) + 1]
+                  node_color = [ agentcolors[type_nr(vg.g2v[i])]
                                  for i in rv ],
                   node_size = [ 12 for _ in rv ],
                   node_marker = [ :circle for _ in rv ],
@@ -294,7 +291,7 @@ function _plot(vg::VahanaGraph)
                   nlabels_distance = [ 0.0 for _ in rv ],
                   nlabels_offset = [ Makie.Point(0, 0) for _ in rv ],
                   nlabels_textsize = [ 14 for _ in rv ],
-                  edge_color = [ edgecolors[vg.edgetypeidx[i] + 1]
+                  edge_color = [ edgecolors[vg.edgetypeidx[i]]
                                  for i in re ],
                   edge_width = [ 1.0 for _ in re ],
                   elabels = [ "" for _ in re ],
