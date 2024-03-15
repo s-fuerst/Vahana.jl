@@ -208,10 +208,12 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     for (type, field, key, value) in _preinit_meta
         write_metadata(sim, type, field, key, value)
     end
+    empty!(_preinit_meta)
 
     for (key, value) in _preinit_meta_sim
         write_metadata(sim, key, value)
     end
+    empty!(_preinit_meta_sim)
     
     fid
 end
