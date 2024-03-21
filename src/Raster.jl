@@ -346,7 +346,6 @@ function move_to!(sim,
     if mpi.isroot || sim.initialized
         raster = sim.rasters[name]
         dims = size(raster)
-        st = stencil(metric, ndims(raster), distance)
         pos = CartesianIndex(pos)
 
         if ! isnothing(edge_from_raster)
@@ -357,7 +356,7 @@ function move_to!(sim,
         end
         
         if distance >= 1 
-            for s in st
+            for s in stencil(metric, ndims(raster), distance)
                 shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)
                 if ! isnothing(shifted)
                     if ! isnothing(edge_from_raster)
