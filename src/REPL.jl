@@ -267,10 +267,10 @@ Keyword arguments:
 If a field of an agent on the source side of an edge is listed in the
 `neighborstate` vector, the value of this field will be also shown.
 """
-function show_agent(sim,
+function show_agent(sim::Simulation,
              t::Type{T},
-             id = 0;
-             max = 5,
+             id::Int = 0;
+             max::Int = 5,
              neighborstate = []) where T
     if !sim.initialized
         println("show_agent can not be called before finish_init!.")
