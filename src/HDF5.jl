@@ -8,7 +8,7 @@ export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export list_snapshots
 export create_namedtuple_converter, create_enum_converter
-export write_metadata, read_metadata
+export write_metadata, read_metadata, write_sim_metadata, read_sim_metadata
 
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
 # are using those. The Pos2D/3D types can be used to add a Cell position
@@ -54,7 +54,7 @@ last_change_string(fids) = attrs(fids[1])["fileformat"] == 1 ?
 # in the case that write_metadata is called before the file is created
 # we store the information in the vector, so that write_metadata
 # can be also called before the simulation is initialized.
-_preinit_meta = Tuple{Symbol, Symbol, Symbol, Any}[]
+_preinit_meta = Tuple{Union{Symbol, DataType}, Symbol, Symbol, Any}[]
 # the same for the simulation
 _preinit_meta_sim = Tuple{Symbol, Any}[]
 """
@@ -187,6 +187,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     foreach(sim.typeinfos.nodes_types) do T
         tid = create_group(aid, string(T))
         attrs(tid)[":Immortal"] = has_hint(sim, T, :Immortal, :Agent)
+        create_group(tid, "_meta")
     end    
 
     eid = create_group(fid, "edges")
@@ -201,6 +202,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
             has_hint(sim, T, :SingleType)
         attrs(tid)[":IgnoreSourceState"] =
             has_hint(sim, T, :IgnoreSourceState)
+        create_group(tid, "_meta")
     end
 
     create_group(fid, "snapshots")
@@ -1345,18 +1347,19 @@ function create_namedtuple_converter(T::DataType)
 end
 
 """
-    write_metadata(sim::Simulation, type::Symbol, field::Symbol, key::Symbol, value)
+    write_metadata(sim::Simulation, type::Union{Symbol, DataType}, field::Symbol, key::Symbol, value)
 
-Attach metadata to a `field` of the `globals` or `params` struct (see
-[`create_simulation`](@ref)) or to a raster (in that case `field` must
-be the name of the raster). `type` must be :Global, :Param or
-:Raster. Metadata is stored via `key`, `value` pairs, so that multiple
-data of different types can be attached to a single field.
+Attach metadata to a `field` of an agent- or edgetype or the
+`globals` or `params` struct (see [`create_simulation`](@ref)) or to a
+raster (in that case `field` must be the name of the raster). `type`
+must be an agent- or edgetype, :Global, :Param or :Raster. Metadata is
+stored via `key`, `value` pairs, so that multiple data of different
+types can be attached to a single field.
 
 See also: [`read_metadata`](@ref)
 """
 function write_metadata(sim::Simulation,
-                 type::Symbol,
+                 type::Union{Symbol, DataType},
                  field::Symbol,
                  key::Symbol,
                  value)
@@ -1365,6 +1368,10 @@ function write_metadata(sim::Simulation,
         return
     end
 
+    if value === nothing
+        value = "nothing"
+    end
+    
     field_str = String(field)
     
     mid = if type == :Param
@@ -1373,8 +1380,17 @@ function write_metadata(sim::Simulation,
         sim.h5file["globals"]["_meta"]
     elseif type == :Raster
         sim.h5file["rasters"]
+    elseif type in sim.typeinfos.nodes_types ||
+        type in map(Symbol, sim.typeinfos.nodes_types)
+        sim.h5file["agents"][String(type)]["_meta"]
+    elseif type in sim.typeinfos.edges_types ||
+        type in map(Symbol, sim.typeinfos.edges_types)
+        sim.h5file["edges"][String(type)]["_meta"]
     else
-        @error "Can not write metadata, `type` must be :Param, :Global or :Raster"
+        @error """
+        Can not write metadata, `type` must be an agenttype or edgetype 
+        or one of the following symbols: :Param, :Global, :Raster.
+        """
     end
 
     if ! (field_str in keys(mid))
@@ -1385,39 +1401,66 @@ function write_metadata(sim::Simulation,
 end
 
 """
-    read_metadata(sim::Simulation, type::Symbol, field::Symbol, [ key::Symbol = Symbol() ])
-    read_metadata(filename::String, type::Symbol, field::Symbol, [ key::Symbol = Symbol() ])
+    read_metadata(sim::Simulation, type::Union{Symbol, DataType}[, field::Symbol, key::Symbol ])
+    read_metadata(filename::String, type::Union{Symbol, DataType}[, field::Symbol, key::Symbol ])
 
-Read metadata for a `field` of the `globals` or `params` struct (see
-[`create_simulation`](@ref)) or to a raster (in that case `field` must
-be the name of the raster).. `type` must be :Global, :Param or
-:Raster. Metadata is stored via `key`, value pairs. Multiple data of
-different types can be attached to a single field, a single piece of
-the metadata can be retrived via the `key` parameter. If this is not
-set (or set to Symbol()), a Dict{Symbol, Any} with the complete
-metadata of this field is returned.
+Attach metadata to a `field` of an agent- or edgetype or the
+`globals` or `params` struct (see [`create_simulation`](@ref)) or to a
+raster (in that case `field` must be the name of the raster). `type`
+must be an agent- or edgetype, :Global, :Param or :Raster. Metadata is
+stored via `key`, `value` pairs, so that multiple data of different
+
+
+Read metadata for a `field` of an agent- or edgetype or the `globals` or
+`params` struct (see [`create_simulation`](@ref)) or to a raster (in that
+case `field` must be the name of the raster). `type` must be an agent-
+or edgetype :Global, :Param or :Raster. Metadata is stored via `key`,
+value pairs. Multiple data of different types can be attached to a
+single field, a single piece of the metadata can be retrived via the
+`key` parameter. If this is not set (or set to Symbol()), a
+Dict{Symbol, Any} with the complete metadata of this field is
+returned.
 
 See also: [`write_metadata`](@ref)
 """
 function read_metadata(sim::Simulation,
-                type::Symbol,
-                field::Symbol,
+                type::Union{Symbol, DataType},
+                field::Symbol = Symbol(),
                 key::Symbol = Symbol())
-    read_metadata(open_h5file(sim, sim.filename), type, field, key)
+    if field == Symbol()
+        _read_metadata_all_fields(open_h5file(sim, sim.filename), type)
+    else
+        _read_metadata(open_h5file(sim, sim.filename), type, field, key, true)
+    end
 end
 
 function read_metadata(filename::String,
-                type::Symbol,
-                field::Symbol,
+                type::Union{Symbol, DataType},
+                field::Symbol = Symbol(),
                 key::Symbol = Symbol())
-    read_metadata(open_h5file(nothing, filename), type, field, key)
+    if field == Symbol()
+        _read_metadata_all_fields(open_h5file(nothing, filename), type)
+    else
+        _read_metadata(open_h5file(nothing, filename), type, field, key, true)
+    end
 end
 
-function read_metadata(fids, type, field, key)
+function _read_metadata_all_fields(fids, type::Symbol)
+    all = Dict()
+
+    for f in _read_metadata(fids, type, Symbol(), Symbol(), false)
+        all[f] = _read_metadata(fids, type, f, Symbol(), false)
+    end
+
+    foreach(close, fids)
+
+    all
+end
+
+function _read_metadata(fids, type, field, key, close_file)
     if length(fids) == 0
         return
     end
-
 
     mid = if type == :Param
         fids[1]["params"]["_meta"]
@@ -1425,10 +1468,27 @@ function read_metadata(fids, type, field, key)
         fids[1]["globals"]["_meta"]
     elseif type == :Raster
         fids[1]["rasters"]
+    elseif type in keys(fids[1]["agents"]) ||
+        type in map(Symbol, keys(fids[1]["agents"]))
+        fids[1]["agents"][String(type)]["_meta"]
+    elseif type in keys(fids[1]["edges"]) ||
+        type in map(Symbol, keys(fids[1]["edges"]))
+        fids[1]["edges"][String(type)]["_meta"]
     else
-        @error "Can not read metadata, `type` must be :Param or :Global"
+        @error """
+        Can not read metadata, `type` must be an agenttype or edgetype 
+        or one of the following symbols: :Param, :Global, :Raster.
+        """
     end
-    
+
+    if field == Symbol()
+        r = keys(mid)
+        if close_file
+            foreach(close, fids)
+        end
+        return r
+    end
+
     field_str = String(field)
     
     r = if field_str in keys(mid)
@@ -1441,21 +1501,21 @@ function read_metadata(fids, type, field, key)
         nothing
     end
 
-    foreach(close, fids)
+    if close_file 
+        foreach(close, fids)
+    end
 
     r
 end
 
 """
-    write_metadata(sim::Simulation, key::Symbol, value)
+    write_sim_metadata(sim::Simulation, key::Symbol, value)
 
-Attach additional metadata to a simulation. Metadata is stored via
-`key`, `value` pairs, so that multiple data of different types can be
-attached.
+Attach additional metadata to a simulation. 
 
-See also: [`read_metadata`](@ref)
+See also: [`read_sim_metadata`](@ref)
 """
-function write_metadata(sim::Simulation, key::Symbol, value)
+function write_sim_metadata(sim::Simulation, key::Symbol, value)
     if sim.h5file === nothing
         push!(_preinit_meta_sim, (key, value))
         return
@@ -1470,15 +1530,13 @@ function write_metadata(sim::Simulation, key::Symbol, value)
 end    
 
 """
-    read_metadata(sim::Simulation, [ key::Symbol = Symbol() ])
-    read_metadata(filename::String, [ key::Symbol = Symbol() ])
+    read_sim_metadata(sim::Simulation, [ key::Symbol = Symbol() ])
+    read_sim_metadata(filename::String, [ key::Symbol = Symbol() ])
 
-Read metadata for a simulation or from the file `filename`. `type` must
-be :Global or :Param. Metadata is stored via `key`, value
-pairs. Multiple data of different types can be attached to a single
-field, a single piece of the metadata can be retrived via the `key`
-parameter. If this is not set (or set to Symbol()), a Dict{Symbol,
-Any} with the complete metadata of this field is returned.
+Read metadata for a simulation or from the file `filename`. Metadata is
+stored via `key`, value pairs. If `key` is not set (or set to
+Symbol()), a Dict{Symbol, Any} with the complete metadata of the
+simulation is returned.
 
 The following metadata is stored automatically:
 - simulation_name
@@ -1487,18 +1545,18 @@ The following metadata is stored automatically:
 
 See also: [`write_metadata`](@ref)
 """
-function read_metadata(sim::Simulation,
-                key::Symbol = Symbol())
-    read_metadata(open_h5file(sim, sim.filename), key)
+function read_sim_metadata(sim::Simulation,
+                    key::Symbol = Symbol())
+    read_sim_metadata(open_h5file(sim, sim.filename), key)
 end
 
-function read_metadata(filename::String,
-                key::Symbol = Symbol())
-    read_metadata(open_h5file(nothing, filename), key)
+function read_sim_metadata(filename::String,
+                    key::Symbol = Symbol())
+    read_sim_metadata(open_h5file(nothing, filename), key)
 end
 
-function read_metadata(fids,
-                key::Symbol = Symbol())
+function read_sim_metadata(fids,
+                    key::Symbol = Symbol())
     if length(fids) == 0
         return
     end
