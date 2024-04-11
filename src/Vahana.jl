@@ -2,7 +2,8 @@ module Vahana
 
 using MPI, Metis, Requires
 
-export enable_asserts, suppress_warnings, detect_stateless, set_hdf5_path
+export enable_asserts, suppress_warnings, detect_stateless
+export set_hdf5_path, set_log_path
 
 function __init__()
     @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
@@ -72,6 +73,7 @@ Base.@kwdef mutable struct VahanaConfig
     # run the run_mpitests script in Vahana's test folder.
     no_parallel_compression = true
     hdf5_path = nothing
+    log_path = nothing
 end
 
 const config = VahanaConfig()
@@ -100,7 +102,6 @@ calling [`register_edgetype!`](@ref).
 """
 detect_stateless = (detect::Bool) -> config.detect_stateless = detect
 
-
 """
     set_compression(level::Int, parallel_hdf5_compression = false)
 
@@ -119,7 +120,6 @@ function set_compression(level::Int, parallel_hdf5_compression = false)
     config.no_parallel_compression = ! parallel_hdf5_compression
 end
 
-
 """
     set_hdf5_path(path::String)
 
@@ -130,6 +130,19 @@ written or tried to read.
 See also [`create_h5file!`](@ref)
 """
 set_hdf5_path = (path::String) -> config.hdf5_path = path
+
+"""
+    set_log_path(path::String)
+
+Specify the path that is used to save the log files. If the directory
+does not exist, it is created the first time a log file is written.
+
+Must be called before [`create_simulation`](@ref). If this is not
+done, the log files are written to a subfolder `log` of the current
+working directory.
+"""
+set_log_path = (path::String) -> config.log_path = path
+
 
 ######################################## include all other files
 

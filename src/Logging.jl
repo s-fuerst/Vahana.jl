@@ -74,7 +74,11 @@ end
 
 function create_logger(filename, logging, debug, overwrite_file)
     if logging
-        filename = mkpath("log") * "/" * filename
+        filename = if config.log_path === nothing
+            mkpath("log") * "/" * filename
+        else
+            mkpath(config.log_path) * "/" * filename
+        end
     end
 
     if ! overwrite_file
