@@ -6,6 +6,7 @@ import Dates: format, now
 export create_h5file!, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
+export read_agents, read_edges
 export list_snapshots
 export create_namedtuple_converter, create_enum_converter
 export write_metadata, read_metadata, write_sim_metadata, read_sim_metadata
@@ -896,15 +897,57 @@ read_globals(sim, T::DataType; transition = typemax(Int64)) =
 read_globals(sim, nr::Int64, T::DataType; transition = typemax(Int64)) =
     read_globals(add_number_to_file(sim.filename, nr), T; transition)
 
+
+"""
+    read_agents(filename::String, type; transition = typemax(Int64))
+
+Read the agentstates of type `type` from an HDF5 file with the name
+`filename`. The agent are read from the `h5` subfolder of the current
+working directory, or from the subfolder set with
+[`set_hdf5_path`](@ref).
+
+Per default, the last written agents are read. The `transition`
+keyword allows to read also earlier versions. See also [Write
+simulations to disc](./hdf5.md) for details.
+
+Returns a vector of agentstates.
+"""
+function read_agents(filename::String, type; transition = typemax(Int64))
+    type = string(type)
+    fids = open_h5file(nothing, filename)
+    aid = fids[1]["agents"][type]
+    t = find_transition_nr(aid, transition)
+    immortal = attrs(aid)[":Immortal"]
+
+    state = map(fids) do fid
+        fid["agents/$(type)/t_$t/state"][]
+    end |> Iterators.flatten 
+
+    if ! immortal
+        died = map(fids) do fid
+            fid["agents/$(type)/t_$t/died"][]
+        end |> Iterators.flatten
+    end
+        
+    foreach(close, fids)
+
+    if immortal
+        state |> collect
+    else
+        map(z -> z[1], filter(z -> !z[2], zip(state, died) |> collect))
+    end
+end
+
+
 """
     read_agents!(sim::Simulation, [name::String = sim.filename; transition = typemax(Int64), types::Vector{DataType} ])
     read_agents!(sim::Simulation, nr::Int64; [transition = typemax(Int64), types::Vector{DataType}])
 
-Read the agents from an HDF5 file into the simulation `sim`. If
-`name` is given, the agent are read from the file with this filename
-from the `h5` subfolder of the current working directory.  In the
-other case the filename from the [`create_simulation`](@ref) call is
-used.
+Read the agents from an HDF5 file into the simulation `sim`. If `name`
+is given, the agent are read from the file with this filename from the
+`h5` subfolder of the current working directory, or from the subfolder
+set with [`set_hdf5_path`](@ref). In the other case the filename from
+the [`create_simulation`](@ref) call is used.
 
 If the `overwrite_file` argument of [`create_simulation`](@ref) is set
 to true, and the file names are supplemented with a number, the number of
@@ -1011,6 +1054,42 @@ read_agents!(sim::Simulation,
              types::Vector{DataType} = sim.typeinfos.nodes_types) = 
                  read_agents!(sim, add_number_to_file(sim.filename, nr);
                               transition, types)
+
+
+"""
+    read_edges(filename::String, type; transition = typemax(Int64))
+
+Read the edgestates of type T from an HDF5 file with the name
+`filename`. The edgestates are read from the `h5` subfolder of the
+current working directory, or from the subfolder set with
+[`set_hdf5_path`](@ref).
+
+Per default, the last written edgestates are read. The `transition`
+keyword allows to read also earlier versions. See also [Write
+simulations to disc](./hdf5.md) for details.
+
+Returns a vector of edgestates.
+"""
+function read_edges(filename::String, type; transition = typemax(Int64))
+    type = string(type)
+    fids = open_h5file(nothing, filename)
+    eid = fids[1]["edges"][type]
+    t = find_transition_nr(eid, transition)
+    stateless = attrs(eid)[":Stateless"]
+
+    if stateless
+        error("Can not read the state of stateless edges")
+    end
+
+    state = map(fids) do fid
+        fid["edges/$(type)/t_$t"][]
+    end |> Iterators.flatten 
+
+        
+    foreach(close, fids)
+
+    state |> collect
+end
 
 """
     read_edges!(sim::Simulation, [name::String = sim.filename; idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType}])
