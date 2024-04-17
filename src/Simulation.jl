@@ -138,6 +138,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(num_transitions::Int64),
                   :(logger::Log),
                   :(h5file::Union{HDF5.File, Nothing}),
+                  :(external::Dict{Any, Any}),
                   edgefields...,
                   nodefields...)
     
@@ -294,7 +295,10 @@ function create_simulation(model::Model,
         intransition = false,
         num_transitions = 0,
         logger = create_logger($name, $logging, $debug, $overwrite_file),
-        h5file = nothing # we need the sim instance to create the h5file
+        h5file = nothing, # we need the sim instance to create the h5file
+        # allows the client to attach arbitrary information, that will
+        # be removed in finish_simulation.
+        external = Dict{Any, Any}() 
     )
 
     for T in sim.typeinfos.edges_types
@@ -513,6 +517,8 @@ function finish_simulation!(sim)
     _free_memory!(sim)
     
     close_h5file!(sim)
+
+    empty!(sim.external)
 
     _log_info(sim, "<End> finish_simulation!")
     
