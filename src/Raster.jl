@@ -1,7 +1,7 @@
 import LinearAlgebra
 
 export add_raster!, connect_raster_neighbors!
-export calc_raster, calc_rasterstate, move_to!, cellid
+export calc_raster, calc_rasterstate, rastervalues, move_to!, cellid
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
@@ -254,7 +254,7 @@ it also possible to just write
 
 Can be only called after [`finish_init!`](@ref).
     
-See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
+See also [`add_raster!`](@ref), [`calc_rasterstate`](@ref) and [`rastervalues`](@ref)
 """
 function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}) where T
     with_logger(sim) do
@@ -273,6 +273,65 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     for (idx, id) = enumerate(ids)
         if Vahana.process_nr(id) == mpi.rank
             push!(onprocess, (idx, f(agentstate(sim, id, T))))
+        end
+    end
+    disable_transition_checks(false)
+
+    all = join(onprocess)
+
+    resvec = zeros(f_returns, length(idsvec))
+    for (idx, val) in all
+        resvec[idx] = val
+    end
+
+    _log_info(sim, "<End> calc_rasterstate")
+    reshape(resvec, size(sim.rasters[raster]))
+end
+
+"""
+    rastervalues(sim, raster::Symbol, fieldname::Symbol)
+
+Creates a matrix with the same dims as the raster `raster` with the
+values of the field `fieldnames`. All cells of the raster must have 
+the same type, and also a `zeros` function must exist for the type of `fieldnames`.
+
+Example:
+
+Instead of
+```@example
+    calc_rasterstate(sim, :raster, c -> c.active, Bool, Cell)
+```
+
+it also possible to just write
+```@example
+    calc_raster(sim, :raster, :active) 
+```
+
+Can be only called after [`finish_init!`](@ref).
+    
+See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
+"""
+function rastervalues(sim, raster::Symbol, field::Symbol) 
+    with_logger(sim) do
+        @info "<Begin> calc_rasterstate" raster
+    end
+
+    @assert sim.initialized """
+    calc_rasterstate can be only called after finish_init!"""
+
+    ids = sim.rasters[raster]
+    idsvec = reshape(ids, length(ids))
+
+    T = type_of(sim, ids[1,1])
+
+    f_returns = fieldtype(T, field)
+
+    onprocess = Vector{Tuple{Int64, f_returns}}()
+
+    disable_transition_checks(true)
+    for (idx, id) = enumerate(ids)
+        if Vahana.process_nr(id) == mpi.rank
+            push!(onprocess, (idx, getproperty(agentstate(sim, id, T), field)))
         end
     end
     disable_transition_checks(false)
