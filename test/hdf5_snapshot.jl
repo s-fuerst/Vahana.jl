@@ -133,7 +133,7 @@ end
     # check that we can also write metadata before finish_inith!
     write_metadata(sim, :Param, :empty, :foo, 1)
     write_metadata(sim, :Raster,:grid, :bar, 2)
-    write_metadata(sim, :foo, 2)
+    write_sim_metadata(sim, :foo, 2)
     finish_init!(sim; partition_algo = :EqualAgentNumbers)
     write_metadata(sim, :Global, :mat, :dim1, "hhtype")
     write_snapshot(sim)
@@ -166,8 +166,8 @@ end
     asdict = read_metadata(sim, :Global, :mat)
     @test asdict[:dim1] == "hhtype"
 
-    @test read_metadata(sim, :foo) == 2
-    asdict = read_metadata(sim)
+    @test read_sim_metadata(sim, :foo) == 2
+    asdict = read_sim_metadata(sim)
     asdict[:model_name] == "Metadata"
     asdict[:simulation_name] == "Metadata_sim"
 
