@@ -122,11 +122,11 @@ already registered via [`register_agenttype!`](@ref).
 See also [`add_raster!`](@ref)
 """
 function connect_raster_neighbors!(sim,
-                            name::Symbol,
-                            edge_constructor;
-                            distance = 1,
-                            metric::Symbol = :chebyshev,
-                            periodic = true)
+                                   name::Symbol,
+                                   edge_constructor;
+                                   distance = 1,
+                                   metric::Symbol = :chebyshev,
+                                   periodic = true)
     with_logger(sim) do
         @info "<Begin> connect_raster_neighbors!" name 
     end
@@ -189,7 +189,7 @@ Can be only called after [`finish_init!`](@ref).
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
 function calc_raster(sim::Simulation, raster::Symbol, f, f_returns::DataType,
-              accessible::Vector{DataType})
+                     accessible::Vector{DataType})
     with_logger(sim) do
         @info "<Begin> calc_raster!" raster
     end
@@ -227,7 +227,7 @@ calc_raster(f, sim::Simulation, raster::Symbol, f_returns::DataType,
 
 
 """
-    calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T})
+    calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType = Nothing, ::Type{T} = Nothing)
 
 Combined calc_raster with agentstate for the cells of the raster.
 
@@ -235,8 +235,16 @@ Calculate values for the raster `raster` by applying `f` to the state of each
 cell.
 
 `f_returns` must be the type returned by the function f. There must be an
-implementation of the zero function for this type, and zero(returntype) + f(state)
-must be equal to f(state).
+implementation of the zero function for this type, and
+zero(returntype) + f(state) must be equal to f(state). In the event
+that all cells in the raster returns the same `DataType`, `f_returns`
+can be set to `Nothing`, in which case `f_returns` is automatically
+derived.
+
+`T` can be set to `Nothing`, this decreases the performance, but is
+necessary in the unusual case that a raster contains different types of
+agents (in this case `agentstate_flexible` is used instead of
+`agentstate`).
 
 Returns a n-dimensional array (with the same dimensions as `raster`)
 with those values.
@@ -256,7 +264,8 @@ Can be only called after [`finish_init!`](@ref).
     
 See also [`add_raster!`](@ref), [`calc_rasterstate`](@ref) and [`rastervalues`](@ref)
 """
-function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}) where T
+function calc_rasterstate(sim, raster::Symbol, f,
+                   f_returns::DataType = Nothing, ::Type{T} = Nothing) where T
     with_logger(sim) do
         @info "<Begin> calc_rasterstate" raster
     end
@@ -267,14 +276,28 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     ids = sim.rasters[raster]
     idsvec = reshape(ids, length(ids))
 
+    disable_transition_checks(true)
+
+    if f_returns == Nothing
+        f_returns = typeof(f(agentstate_flexible(sim, idsvec[1])))
+    end
+    
     onprocess = Vector{Tuple{Int64, f_returns}}()
 
-    disable_transition_checks(true)
-    for (idx, id) = enumerate(ids)
-        if Vahana.process_nr(id) == mpi.rank
-            push!(onprocess, (idx, f(agentstate(sim, id, T))))
+    if T != Nothing
+        for (idx, id) = enumerate(ids)
+            if Vahana.process_nr(id) == mpi.rank
+                push!(onprocess, (idx, f(agentstate(sim, id, T))))
+            end
+        end
+    else
+        for (idx, id) = enumerate(ids)
+            if Vahana.process_nr(id) == mpi.rank
+                push!(onprocess, (idx, f(agentstate_flexible(sim, id))))
+            end
         end
     end
+    
     disable_transition_checks(false)
 
     all = join(onprocess)
@@ -287,6 +310,7 @@ function calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType, ::Type{T}
     _log_info(sim, "<End> calc_rasterstate")
     reshape(resvec, size(sim.rasters[raster]))
 end
+
 
 """
     rastervalues(sim, raster::Symbol, fieldname::Symbol)
@@ -304,7 +328,7 @@ Instead of
 
 it also possible to just write
 ```@example
-    calc_raster(sim, :raster, :active) 
+    rastervalues(sim, :raster, :active) 
 ```
 
 Can be only called after [`finish_init!`](@ref).
@@ -392,14 +416,14 @@ keyword `periodic` determines whether all dimensions are cyclic.
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
 function move_to!(sim,
-           name::Symbol,
-           id::AgentID,
-           pos,
-           edge_from_raster,
-           edge_to_raster;
-           distance = 0,
-           metric::Symbol = :chebyshev,
-           periodic = true)
+                  name::Symbol,
+                  id::AgentID,
+                  pos,
+                  edge_from_raster,
+                  edge_to_raster;
+                  distance = 0,
+                  metric::Symbol = :chebyshev,
+                  periodic = true)
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized

@@ -340,12 +340,26 @@ end
     @test raster[2,2] == 5
     @test raster[2,3] == 0
 
+    # new versions of calc_rasterstate
+    raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64)
+    @test raster[1,1] == 1
+    @test raster[1,2] == 0
+    @test raster[2,2] == 5
+    @test raster[2,3] == 0
+
+    raster = calc_rasterstate(sim, :raster, c -> c.sum)
+    @test raster[1,1] == 1
+    @test raster[1,2] == 0
+    @test raster[2,2] == 5
+    @test raster[2,3] == 0
+
     apply!(sim,
-                      value_on_pos,
-                      [ MovingAgent ],
-                      [ Position, OnPosition ],
-                      [ OnPosition, MovingAgent ])
-    apply!(sim, sum_on_pos, [ Position ], [ MovingAgent, OnPosition ], [ Position ])
+           value_on_pos,
+           [ MovingAgent ],
+           [ Position, OnPosition ],
+           [ OnPosition, MovingAgent ])
+    apply!(sim, sum_on_pos,
+           [ Position ], [ MovingAgent, OnPosition ], [ Position ])
     raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
