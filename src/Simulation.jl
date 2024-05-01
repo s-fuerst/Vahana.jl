@@ -518,7 +518,7 @@ function finish_simulation!(sim)
     
     close_h5file!(sim)
 
-    sim.external = nothing
+    empty!(sim.external)
 
     _log_info(sim, "<End> finish_simulation!")
     

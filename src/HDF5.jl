@@ -214,7 +214,7 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
     empty!(_preinit_meta)
 
     for (key, value) in _preinit_meta_sim
-        write_metadata(sim, key, value)
+        write_sim_metadata(sim, key, value)
     end
     empty!(_preinit_meta_sim)
     
@@ -1528,7 +1528,7 @@ function _read_metadata_all_fields(fids, type::Symbol)
     all = Dict()
 
     for f in _read_metadata(fids, type, Symbol(), Symbol(), false)
-        all[f] = _read_metadata(fids, type, f, Symbol(), false)
+        all[Symbol(f)] = _read_metadata(fids, type, f, Symbol(), false)
     end
 
     foreach(close, fids)
