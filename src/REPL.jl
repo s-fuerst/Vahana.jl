@@ -250,6 +250,7 @@ end
 
 """
     show_agent(sim, Type{T}, [id=0; max=5, neighborstate = []]) 
+    show_agent(sim, id=0; [max=5, neighborstate = []]) 
 
 Display detailed information about the agent with ID `id`, or in the
 case that id is a value < 2^36, the information of the nth agent of
@@ -269,7 +270,7 @@ If a field of an agent on the source side of an edge is listed in the
 """
 function show_agent(sim::Simulation,
              t::Type{T},
-             id::Int = 0;
+             id = 0;
              max::Int = 5,
              neighborstate = []) where T
     if !sim.initialized
@@ -395,3 +396,7 @@ function show_agent(sim::Simulation,
     id
 end
 
+function show_agent(sim::Simulation, id; kwargs...)
+    show_agent(sim, type_of(sim, id), id; kwargs...)
+    nothing
+end
