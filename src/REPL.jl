@@ -206,11 +206,12 @@ function _show_edge(sim, e, neighborstate, edgeT)
     if ! (:Stateless in edgetypehints)
         print(" $(e.state)")
     end
-    if neighborstate == true || length(neighborstate) > 0
+    if (neighborstate == true || length(neighborstate) > 0) &&
+        !has_hint(sim, edgeT, :IgnoreFrom)
         # for the to edges we get an empty edgetype hints, as we constructed
         # those edges they don't have the same hints
         # But here we need the original hints, so we access them directly
-        if :SingleType in sim.typeinfos.edges_attr[edgeT][:hints]
+        if has_hint(sim, edgeT, :SingleType)
             agentT = sim.typeinfos.edges_attr[edgeT][:target]
             aid = agent_id(sim.typeinfos.nodes_type2id[agentT], agent_nr(e.from))
             # We disable assertions to call agentstate from the REPL
