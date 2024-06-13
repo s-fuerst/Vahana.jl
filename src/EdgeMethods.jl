@@ -544,9 +544,18 @@ by calling suppress_warnings(true) after importing Vahana.
     # as in edges_alltoall! the edges are added via add_edge! to the
     # @edgewrite collection. But between finish_write! and prepare_write!
     # @edgeread == @edgewrite.
-    @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, t::Type{$T})
+    @eval function prepare_write!(sim::$simsymbol,
+                           read,
+                           add_existing::Bool,
+                           t::Type{$T})
         if add_existing
-            @edgewrite($T) = deepcopy(@edgeread($T))
+            # when we can not read the types that we are writing
+            # there is no need to copy the elements            
+            if $T in read
+                @edgewrite($T) = deepcopy(@edgeread($T))
+            else 
+                @edgewrite($T) = @edgeread($T)
+            end
         else
             @edgewrite($T) = $FT()
             init_field!(sim, t)
@@ -643,9 +652,12 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     else
         @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                               edgetype::Type{$T}, agenttype::Type) 
-            checked(map, neighborids(sim, id, edgetype)) do nid
-                agentstate(sim, nid, agenttype)
+                               edgetype::Type{$T}, agenttype::Type)
+            nids = neighborids(sim, id, edgetype)
+            if nids === nothing
+                nothing
+            else
+                map(nid -> agentstate(sim, nid, agenttype), nids)
             end
         end
     end

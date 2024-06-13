@@ -192,7 +192,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end 
     end
 
-    @eval function prepare_write!(sim::$simsymbol, add_existing::Bool, ::Type{$T})
+    @eval function prepare_write!(sim::$simsymbol, _, add_existing::Bool, ::Type{$T})
         if $immortal 
             # distributing the initial graph or reading from file will
             # also kill immortal agents, so we can assert this only

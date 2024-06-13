@@ -570,7 +570,8 @@ function maybeadd(_,
     nothing
 end
 
-prepare_write!(sim, add_existing) = t -> prepare_write!(sim, t in add_existing, t)
+prepare_write!(sim, read, add_existing) =
+    t -> prepare_write!(sim, read, t in add_existing, t)
 
 finish_write!(sim) = t -> finish_write!(sim, t)
 
@@ -644,7 +645,7 @@ function apply!(sim::Simulation,
     readableAT = filter(w -> w in sim.typeinfos.nodes_types, read)
     foreach(T -> prepare_read!(sim, read, T), readableAT)
     
-    foreach(prepare_write!(sim, [call; add_existing]), write)
+    foreach(prepare_write!(sim, read, [call; add_existing]), write)
 
     MPI.Barrier(MPI.COMM_WORLD)
 

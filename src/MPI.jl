@@ -13,7 +13,7 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     edge_types = sim.typeinfos.edges_types
     # We reconstruct the whole graph, so we call prepare_write for
     # all agent and edgetypes
-    foreach(prepare_write!(sim, []), [ node_types; edge_types ])
+    foreach(prepare_write!(sim, [], []), [ node_types; edge_types ])
 
     MPI.Barrier(MPI.COMM_WORLD)
     disable_transition_checks(true)

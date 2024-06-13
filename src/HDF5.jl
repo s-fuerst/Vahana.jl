@@ -1008,7 +1008,7 @@ function read_agents!(sim::Simulation,
                 # must disable by setting sim.initialized temporary to false
                 was_initialized = sim.initialized
                 sim.initialized = false
-                prepare_write!(sim, false, T) 
+                prepare_write!(sim, [], false, T) 
                 sim.initialized = was_initialized
             end
 
@@ -1150,7 +1150,7 @@ function read_edges!(sim::Simulation,
         with_logger(sim) do
             @info("<Begin> read edges", edgetype = T, transition = transition)
         end
-        prepare_write!(sim, false, T)
+        prepare_write!(sim, [], false, T)
 
         trnr = find_transition_nr(fids[1]["edges"][string(T)], transition)
         if trnr === nothing

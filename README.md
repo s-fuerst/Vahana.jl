@@ -2,7 +2,7 @@
 
 Vahana is a high-performance, agent-based modelling library developed
 in Julia, specifically (but not only) designed for large-scale
-simulations of complex social network. It leverages the power of Graph
+simulations of complex social networks. It leverages the power of Graph
 Dynamical Systems, coupled with advanced parallel computing
 methodologies, to provide a robust framework for the exploration of
 network-based systems.
@@ -11,11 +11,11 @@ network-based systems.
 
 - Efficient and Scalable: Vahana uses Message Passing Interface (MPI)
   for distributed memory parallelism, allowing for efficient scaling
-  across thousands of cores.
+  to thousands of cores.
 
 - Expressive Interface: Despite its high-performance capabilities,
   Vahana is designed with an accessible and expressive interface,
-  making the construction of complex models intuitive and simple.
+  making the construction of complex models intuitive and easy.
 
 - Network-Oriented Approach: Vahana's design focuses on network
   dynamics, making it an excellent tool for simulations involving
