@@ -311,8 +311,6 @@ function runedgestest()
     end
 end
 
-
-
 @testset "transition" begin
     for ET in [ EdgeD, EdgeE, EdgeT, EdgeI, EdgeEI, EdgeTI ]
         sim = create_simulation(model_edges)
@@ -322,7 +320,6 @@ end
             continue
         end
 
-        
         nagents = mpi.size * 2
         
         add_graph!(sim,

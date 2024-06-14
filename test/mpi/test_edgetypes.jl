@@ -1,3 +1,6 @@
+
+using Revise
+
 using Test
 
 using Vahana
@@ -7,6 +10,8 @@ import Vahana.has_hint
 using MPI
 
 using Logging
+
+import Graphs: SimpleGraphs
 
 enable_asserts(true)
 
@@ -78,6 +83,8 @@ model = ModelTypes() |>
     register_edgetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
     create_model("MPI EdgeTypes");
 
+
+###
 # We have the following edge setup (as an example for mpi.size of 3, but
 # everything is modulo mpi.size)
 
@@ -243,7 +250,7 @@ function testforedgetype(ET)
     finish_init!(sim; partition_algo = :EqualAgentNumbers)
 
     apply!(sim, check_state(ET), [ AgentState1 ],
-                      [ AgentState1, ET ], [])
+           [ AgentState1, ET ], [])
     
     @test num_agents(sim, AgentState1, false) == 1
     @test num_agents(sim, AgentState2, false) == 1
@@ -254,25 +261,25 @@ function testforedgetype(ET)
     # we are testing now that new edges in the transition functions are
     # send to the correct ranks
     apply!(sim, reverse_edge_direction(ET),
-                      [ AgentState1, AgentState2 ],
-                      [ AgentState1, AgentState2, ET ],
-                      [ ET ])
+           [ AgentState1, AgentState2 ],
+           [ AgentState1, AgentState2, ET ],
+           [ ET ])
 
 
     apply!(sim, check_state_rev1(ET),
-                      [ AgentState1 ],
-                      [ AgentState1, AgentState2, ET ],
-                      [])
+           [ AgentState1 ],
+           [ AgentState1, AgentState2, ET ],
+           [])
 
     apply!(sim, check_state_rev2(ET),
-                      [ AgentState2 ],
-                      [ ET ], [])
+           [ AgentState2 ],
+           [ ET ], [])
 
     finish_simulation!(sim)
 end
 
 @testset "EdgeTypes" begin
-    CurrentEdgeType = MPIEdgeST
+    CurrentEdgeType = Nothing
 
     if CurrentEdgeType === Nothing
         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
@@ -285,4 +292,61 @@ end
     sleep(mpi.rank * 0.05)
 end
 
+###
+function testforedgetype_remove(ET)
+    sim = create_simulation(model, nothing, nothing)
 
+    # each agent has exact one neighbar
+    if has_hint(sim, ET, :Stateless)
+        add_graph!(sim,
+                   SimpleGraphs.cycle_digraph(100),
+                   i -> AgentState1(i),
+                   _ -> ET())
+    else
+        add_graph!(sim,
+                   SimpleGraphs.cycle_digraph(100),
+                   i -> AgentState1(i),
+                   _ -> ET(0, 0))
+    end
+
+    finish_init!(sim)
+
+    removed = apply(sim, AgentState1, [AgentState1, ET], ET;
+                    add_existing = ET) do self, id, sim
+                        if self.idx % 2 == 0
+                            remove_edges!(sim, id, ET)
+                        end
+                    end
+    @test num_edges(removed, ET) == 50
+    finish_simulation!(removed)
+
+    if ! has_hint(sim, ET, :IgnoreFrom)
+        removed = apply(sim, AgentState1, [AgentState1, ET], ET;
+                        add_existing = ET) do self, id, sim
+                            if self.idx % 2 == 0
+                                nid = neighborids(sim, id, ET) |> first
+                                remove_edges!(sim, nid, ET)
+                            end
+                        end
+        @test num_edges(removed, ET) == 50
+        finish_simulation!(removed)
+    end
+    finish_simulation!(sim)
+end
+
+@testset "remove edges" begin
+    CurrentEdgeType = Nothing
+
+    if CurrentEdgeType === Nothing
+        for ET in [ MPIEdgeD, MPIEdgeS, MPIEdgeE, MPIEdgeI, MPIEdgeSE,
+                 MPIEdgeSI, MPIEdgeEI, MPIEdgeSEI, MPIEdgeSTI, MPIEdgeSETI,
+                 MPIEdgeT, MPIEdgeST ]
+            testforedgetype_remove(ET)
+        end
+    else
+        testforedgetype_remove(CurrentEdgeType)
+    end
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
+end
+###

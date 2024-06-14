@@ -3,6 +3,7 @@ export add_edge!, add_edges!, edges
 export num_edges, has_edge
 export neighborstates, neighborstates_flexible
 export neighborids
+export remove_edges!
 
 # For many function declared in this file, the concrete impementation depends
 # on the hints of the edge type and the function itself is build via
@@ -91,6 +92,14 @@ function add_edges!(sim::Simulation, to::AgentID, edges::Edge{T}...) where T
         add_edge!(sim, to, e)
     end
     nothing
+end
+
+
+"""
+TODO write docs
+"""
+function remove_edges!(sim::Simulation, to::AgentID, edgetype::Type)
+@info "this should not be called"
 end
 
 """

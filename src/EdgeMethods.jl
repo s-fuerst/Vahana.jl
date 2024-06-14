@@ -98,6 +98,25 @@ init_field!(_, _) = nothing
 
 show_second_edge_warning = true
 
+function _can_remove_edges(sim, to, T)
+    @mayassert sim.initialized == false || sim.intransition """
+             You can call remove_edges! only in the initialization phase (until
+            `finish_init!` is called) or within a transition function called by
+            `apply`.
+            """
+    # @mayassert process_nr(to) == mpi.rank """
+    #         In a remove_edges! call `to` must be equal to the second 
+    #         argument of the transition function.
+    #         """
+    @mayassert begin
+        ! config.check_readable ||
+            ! sim.initialized ||
+            edge_attrs(sim, T)[:writeable] == true 
+    end """
+      $T must be in the `write` argument of the transition function.
+      """
+end
+
 
 function construct_edge_methods(T::DataType, typeinfos, simsymbol)
     attr = typeinfos.edges_attr[T]
@@ -476,6 +495,26 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
+
+    #- remove_edges!
+    if ! singletype
+        @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
+            _can_remove_edges(sim, to, $T)
+            delete!(@edgewrite($T), to)
+            nothing
+        end
+    else
+        @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
+            _can_remove_edges(sim, to, $T)
+            nr = _to2idx(sim, to, $T)
+            field = @edgewrite($T)
+            _check_size!(field, nr, $T)
+            @inbounds field[nr] = zero($CT)
+            nothing
+        end
+    end
+
+    
     # iterate over all edge containers for the agents on the rank,
     # search for edges where on of the agents in the from vector is in
     # the source position, and remove those edges.
@@ -569,98 +608,98 @@ by calling suppress_warnings(true) after importing Vahana.
         edge_attrs(sim, $T)[:writeable] = true
     end
 
-    # It is important that prepare_read! is called before prepare_write!,
-    # (the reasoning behind this is mentioned already above).
-    @eval function prepare_read!(sim::$simsymbol, _::Vector, ::Type{$T})
-        # finish_init! already transmit the edges, so we check last_change > 0
-        if @edge($T).last_transmit <= @edge($T).last_change &&
-            @edge($T).last_change > 0
-
-        end
-
-        @edge($T).readable = true
-    end
-
-    @eval function finish_read!(sim::$simsymbol, ::Type{$T})
-        @edge($T).readable = false
-    end
-    
-    #- finish_write!
-    @eval function finish_write!(sim::$simsymbol, ::Type{$T})
-        @edgeread($T) = @edgewrite($T)
-        @edge($T).last_change = sim.num_transitions
-        edge_attrs(sim, $T)[:writeable] = false
+# It is important that prepare_read! is called before prepare_write!,
+# (the reasoning behind this is mentioned already above).
+@eval function prepare_read!(sim::$simsymbol, _::Vector, ::Type{$T})
+    # finish_init! already transmit the edges, so we check last_change > 0
+    if @edge($T).last_transmit <= @edge($T).last_change &&
+        @edge($T).last_change > 0
 
     end
 
-    @eval function transmit_edges!(sim::$simsymbol, ::Type{$T})
-        edges_alltoall!(sim, @storage($T), $T)
-        foreach(empty!, @storage($T))
+    @edge($T).readable = true
+end
+
+@eval function finish_read!(sim::$simsymbol, ::Type{$T})
+    @edge($T).readable = false
+end
+
+#- finish_write!
+@eval function finish_write!(sim::$simsymbol, ::Type{$T})
+    @edgeread($T) = @edgewrite($T)
+    @edge($T).last_change = sim.num_transitions
+    edge_attrs(sim, $T)[:writeable] = false
+
+end
+
+@eval function transmit_edges!(sim::$simsymbol, ::Type{$T})
+    edges_alltoall!(sim, @storage($T), $T)
+    foreach(empty!, @storage($T))
+end
+
+# Rules for the edge functions:
+# stateless => !mapreduce, !edges, !edgestates
+# singledge => !num_edges
+# ignorefrom => !edges, !neighborids
+
+#- edges
+if !stateless && !ignorefrom
+    @eval function edges(sim::$simsymbol, to::AgentID, ::Type{$T})
+        _get_agent_container(sim, to, $T, @edgeread($T))
     end
+else
+    @eval function edges(::$simsymbol, ::AgentID, t::Type{$T})
+        @assert false """
+            edges is not defined for the hint combination of $t
+            """
+    end
+end
 
-    # Rules for the edge functions:
-    # stateless => !mapreduce, !edges, !edgestates
-    # singledge => !num_edges
-    # ignorefrom => !edges, !neighborids
-
-    #- edges
-    if !stateless && !ignorefrom
-        @eval function edges(sim::$simsymbol, to::AgentID, ::Type{$T})
+#- neighborids
+if !ignorefrom
+    if stateless
+        @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$T})
             _get_agent_container(sim, to, $T, @edgeread($T))
         end
     else
-        @eval function edges(::$simsymbol, ::AgentID, t::Type{$T})
-            @assert false """
-            edges is not defined for the hint combination of $t
-            """
-        end
-    end
-
-    #- neighborids
-    if !ignorefrom
-        if stateless
+        if singleedge
             @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$T})
-                _get_agent_container(sim, to, $T, @edgeread($T))
+                ac = _get_agent_container(sim, to, $T, @edgeread($T))
+                isnothing(ac) ? nothing : ac.from
             end
         else
-            if singleedge
-                @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$T})
-                    ac = _get_agent_container(sim, to, $T, @edgeread($T))
-                    isnothing(ac) ? nothing : ac.from
-                end
-            else
-                @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$T})
-                    ac = _get_agent_container(sim, to, $T, @edgeread($T))
-                    isnothing(ac) ? nothing : map(e -> e.from, ac)
-                end
+            @eval function neighborids(sim::$simsymbol, to::AgentID, ::Type{$T})
+                ac = _get_agent_container(sim, to, $T, @edgeread($T))
+                isnothing(ac) ? nothing : map(e -> e.from, ac)
             end
         end
-    else
-        @eval function neighborids(::$simsymbol, ::AgentID, t::Type{$T})
-            @assert false """
+    end
+else
+    @eval function neighborids(::$simsymbol, ::AgentID, t::Type{$T})
+        @assert false """
             neighborids is not defined for the hint combination of $t
             """
-        end
     end
+end
 
-    #- neighborstates
-    if singleedge
-        @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                               edgetype::Type{$T}, agenttype::Type) 
-            nid = neighborids(sim, id, edgetype)
-            isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
-        end
-    else
-        @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                               edgetype::Type{$T}, agenttype::Type)
-            nids = neighborids(sim, id, edgetype)
-            if nids === nothing
-                nothing
-            else
-                map(nid -> agentstate(sim, nid, agenttype), nids)
-            end
+#- neighborstates
+if singleedge
+    @eval function neighborstates(sim::$simsymbol, id::AgentID,
+                           edgetype::Type{$T}, agenttype::Type) 
+        nid = neighborids(sim, id, edgetype)
+        isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
+    end
+else
+    @eval function neighborstates(sim::$simsymbol, id::AgentID,
+                           edgetype::Type{$T}, agenttype::Type)
+        nids = neighborids(sim, id, edgetype)
+        if nids === nothing
+            nothing
+        else
+            map(nid -> agentstate(sim, nid, agenttype), nids)
         end
     end
+end
 
 
 #- edgestates
