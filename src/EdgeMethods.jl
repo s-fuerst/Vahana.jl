@@ -500,16 +500,24 @@ by calling suppress_warnings(true) after importing Vahana.
     if ! singletype
         @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
             _can_remove_edges(sim, to, $T)
-            delete!(@edgewrite($T), to)
+            if $mpiactive && process_nr(to) != mpi.rank
+                push!(@removeedges($T)[process_nr(to) + 1], (0, to))
+            else
+                delete!(@edgewrite($T), to)
+            end
             nothing
         end
     else
         @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
             _can_remove_edges(sim, to, $T)
-            nr = _to2idx(sim, to, $T)
-            field = @edgewrite($T)
-            _check_size!(field, nr, $T)
-            @inbounds field[nr] = zero($CT)
+            if $mpiactive && process_nr(to) != mpi.rank
+                push!(@removeedges($T)[process_nr(to) + 1], (0, to))
+            else
+                nr = _to2idx(sim, to, $T)
+                field = @edgewrite($T)
+                _check_size!(field, nr, $T)
+                @inbounds field[nr] = zero($CT)
+            end
             nothing
         end
     end
@@ -575,14 +583,11 @@ by calling suppress_warnings(true) after importing Vahana.
     end
     
     @eval function init_storage!(sim::$simsymbol, ::Type{$T})
-        @storage($T) = [ Vector{Tuple{AgentID, $CE}}() for _ in 1:mpi.size ]
+        @storage($T) = [ Tuple{AgentID, $CE}[] for _ in 1:mpi.size ]
+        @removeedges($T) = [ Tuple{AgentID, AgentID}[] for _ in 1:mpi.size ]
     end
 
 
-    # It is important that prepare_read! is called before prepare_write!,
-    # as in edges_alltoall! the edges are added via add_edge! to the
-    # @edgewrite collection. But between finish_write! and prepare_write!
-    # @edgeread == @edgewrite.
     @eval function prepare_write!(sim::$simsymbol,
                            read,
                            add_existing::Bool,
@@ -608,8 +613,6 @@ by calling suppress_warnings(true) after importing Vahana.
         edge_attrs(sim, $T)[:writeable] = true
     end
 
-# It is important that prepare_read! is called before prepare_write!,
-# (the reasoning behind this is mentioned already above).
 @eval function prepare_read!(sim::$simsymbol, _::Vector, ::Type{$T})
     # finish_init! already transmit the edges, so we check last_change > 0
     if @edge($T).last_transmit <= @edge($T).last_change &&
@@ -635,6 +638,8 @@ end
 @eval function transmit_edges!(sim::$simsymbol, ::Type{$T})
     edges_alltoall!(sim, @storage($T), $T)
     foreach(empty!, @storage($T))
+    removeedges_alltoall!(sim, @removeedges($T), $T)
+    foreach(empty!, @removeedges($T))
 end
 
 # Rules for the edge functions:

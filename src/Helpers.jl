@@ -200,6 +200,12 @@ macro storage(T)
 end
 storage(sim, T) = getproperty(sim, Symbol(T)).storage
 
+macro removeedges(T)
+    field = Symbol(T)
+    :( sim.$(field).removeedges ) |> esc
+end
+removeedges(sim, T) = getproperty(sim, Symbol(T)).removeedges
+
 
 # we use this tests are for the distributed version, in this case
 # the tests should be only run on the rank that the id is currently

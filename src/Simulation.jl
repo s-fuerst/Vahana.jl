@@ -71,6 +71,11 @@ mutable struct EdgeFields{ET, EST}
     # when a edge is added with target-agents on a different process
     # it is stored here
     storage::EST
+    # store which edges must be removed on other processes,
+    # first UInt64 is the source, second UInt64 the target
+    # the source is set to 0 if all edges of the target should be removed.
+    # the vector index is the rank+1 of the target agent.
+    removeedges::Vector{Vector{Tuple{AgentID, AgentID}}}
     # this tracks edges with source-agents on a different node, the
     # outer vector is the agenttype nr, the middle vector the process
     # index. It's possible that the sets are containing agents that
@@ -79,7 +84,7 @@ mutable struct EdgeFields{ET, EST}
     # edgetype is rewritten.
     accessible::Vector{Vector{Set{AgentID}}}
     # the last time (in number of transitions called) that the storage
-    # was send to the other processes (via edges_alltoall!)
+    # (incl. removeedges) was send to the other processes (via edges_alltoall!)
     last_transmit::Int64
     # the last time that the edgetype was writable
     last_change::Int64
@@ -111,6 +116,7 @@ function create_model(typeinfos::ModelTypes, name::String)
              :(EdgeFields($(edgefield_constructor(T, typeinfos.edges_attr[T])),
                           $(edgefield_constructor(T, typeinfos.edges_attr[T])),
                           $(edgestorage_type(T, typeinfos.edges_attr[T])()),
+                          Vector{Tuple{AgentID, AgentID}}[],
                           [ [ Set{AgentID}() for _ in 1:mpi.size ] for _ in 1:MAX_TYPES ],
                           0,0,false)))
         for T in typeinfos.edges_types ] 
@@ -635,11 +641,6 @@ function apply!(sim::Simulation,
     write = applicable(iterate, write) ? write : [ write ]
     add_existing = applicable(iterate, add_existing) ? add_existing : [ add_existing ]
 
-    # before we call prepare_write! we must ensure that all edges
-    # in the storage that are accessible are distributed to the correct
-    # ranks. Also we must first transfer the edges, as they determine,
-    # which agentstate is available, and the agentstate of other nodes
-    # are transmitted in prepare_read! of an agenttype
     readableET = filter(w -> w in sim.typeinfos.edges_types, read)
     foreach(T -> prepare_read!(sim, read, T), readableET)
     readableAT = filter(w -> w in sim.typeinfos.nodes_types, read)

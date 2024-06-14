@@ -338,11 +338,6 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         waswriteable = edge_attrs(sim, $T)[:writeable]
         edge_attrs(sim, $T)[:writeable] = true
 
-        # see comments for prepare_read/write
-        # if sim.initialized
-        #     @assert @edgeread($T) === @edgewrite($T)
-        # end
-
         # for sending them via AllToAll we flatten the perPE structure
         longvec = reduce(vcat, perPE)
         sendbuf = if length(longvec) > 0
@@ -408,7 +403,56 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
 
         nothing
     end
+
+    @eval function removeedges_alltoall!(sim::$simsymbol, perPE, ::Type{$T})
+        with_logger(sim) do
+            @debug "<Begin> removeedges_alltoall!" edgetype=$T
+        end
+        # we call remove_edges! but remove_edges! has an check that we
+        # are in the initialization phase or in a transition function.
+        # So we set the intranstion flag, is necessary
+        wasintransition = sim.intransition
+        sim.intransition = true
+        waswriteable = edge_attrs(sim, $T)[:writeable]
+        edge_attrs(sim, $T)[:writeable] = true
+
+        # for sending them via AllToAll we flatten the perPE structure
+        longvec = reduce(vcat, perPE)
+        sendbuf = if length(longvec) > 0
+            VBuffer(longvec, [ length(perPE[i]) for i in 1:mpi.size ])
+        else
+            VBuffer($ST(), [ 0 for _ in 1:mpi.size ])
+        end
+
+        # transmit the number of edges the current PE want to send to the
+        # other PEs
+        sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
+        recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+        # with this information we can prepare the receive buffer
+        recvbuf = MPI.VBuffer(fill((0,0), sum(recvNumElems)),
+                              recvNumElems)
+
+        # transmit the information about the removed edge itself
+        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+
+        for (source, target) in recvbuf.data
+            target = AgentID(target)
+            if source == 0
+                @assert process_nr(target) == mpi.rank
+                remove_edges!(sim, target, $T)
+            end
+        end
+
+        sim.intransition = wasintransition 
+        edge_attrs(sim, $T)[:writeable] = waswriteable
+       
+        _log_debug(sim, "<End> removeedges_alltoall!")
+
+        nothing
+    end
 end
+
+
 
 # Join a vector that is distributed over serveral processes. vec can be [].
 #
