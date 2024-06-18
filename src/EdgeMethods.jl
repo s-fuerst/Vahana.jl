@@ -104,16 +104,19 @@ function _can_remove_edges(sim, to, T)
             `finish_init!` is called) or within a transition function called by
             `apply`.
             """
-    # @mayassert process_nr(to) == mpi.rank """
-    #         In a remove_edges! call `to` must be equal to the second 
-    #         argument of the transition function.
-    #         """
     @mayassert begin
         ! config.check_readable ||
             ! sim.initialized ||
             edge_attrs(sim, T)[:writeable] == true 
     end """
       $T must be in the `write` argument of the transition function.
+      """
+    @mayassert begin
+        ! config.check_readable ||
+            ! sim.initialized ||
+            edge_attrs(sim, T)[:add_existing] == true 
+    end """
+      $T must be in the `add_existing` keyword of the transition function.
       """
 end
 
@@ -497,17 +500,7 @@ by calling suppress_warnings(true) after importing Vahana.
 
 
     #- remove_edges!
-    if ! singletype
-        @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
-            _can_remove_edges(sim, to, $T)
-            if $mpiactive && process_nr(to) != mpi.rank
-                push!(@removeedges($T)[process_nr(to) + 1], (0, to))
-            else
-                delete!(@edgewrite($T), to)
-            end
-            nothing
-        end
-    else
+    if singletype
         @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
             _can_remove_edges(sim, to, $T)
             if $mpiactive && process_nr(to) != mpi.rank
@@ -520,13 +513,62 @@ by calling suppress_warnings(true) after importing Vahana.
             end
             nothing
         end
+    else
+        @eval function remove_edges!(sim::$simsymbol, to::AgentID, ::Type{$T})
+            _can_remove_edges(sim, to, $T)
+            if $mpiactive && process_nr(to) != mpi.rank
+                push!(@removeedges($T)[process_nr(to) + 1], (0, to))
+            else
+                delete!(@edgewrite($T), to)
+            end
+            nothing
+        end
     end
+
+    if ! ignorefrom
+        @eval function remove_edges!(sim::$simsymbol, from::AgentID, to::AgentID,
+                              ::Type{$T})
+            _can_remove_edges(sim, to, $T)
+            if $mpiactive && process_nr(to) != mpi.rank
+                push!(@removeedges($T)[process_nr(to) + 1], (from, to))
+            else
+                nr = _to2idx(sim, to, $T)
+                if $singleedge 
+                    if $stateless && @edgewrite($T)[nr] == from
+                        remove_edges!(sim, to, $T)
+                    elseif !$stateless && @edgewrite($T)[nr].from == from
+                        remove_edges!(sim, to, $T)
+                    end
+                else
+                    if length(@edgewrite($T)[nr]) > 0
+                        if $stateless
+                            @edgewrite($T)[nr] = filter(id -> id != from,
+                                                        @edgewrite($T)[nr])
+                        else
+                            @edgewrite($T)[nr] = filter(e -> e.from != from,
+                                                        @edgewrite($T)[nr])
+                        end
+                    end
+                end
+            end
+        end
+    else
+        @eval function remove_edges!(sim::$simsymbol, from::AgentID, to::AgentID,
+                              ::Type{$T})
+                              @assert false """
+            remove_edges! with a source agent is not defined for edgetypes
+            with the :IgnoreFrom hint.
+            """
+        end
+    end    
+    
 
     
     # iterate over all edge containers for the agents on the rank,
     # search for edges where on of the agents in the from vector is in
     # the source position, and remove those edges.
-    @eval function _remove_edges_agent_source!(sim::$simsymbol, from::Vector{AgentID}, ::Type{$T})
+    @eval function _remove_edges_agent_source!(sim::$simsymbol,
+                                        from::Vector{AgentID}, ::Type{$T})
         # when we don't know where there edges are come from, we can not
         # remove them
         if $ignorefrom
@@ -611,6 +653,7 @@ by calling suppress_warnings(true) after importing Vahana.
             end
         end
         edge_attrs(sim, $T)[:writeable] = true
+        edge_attrs(sim, $T)[:add_existing] = add_existing
     end
 
 @eval function prepare_read!(sim::$simsymbol, _::Vector, ::Type{$T})

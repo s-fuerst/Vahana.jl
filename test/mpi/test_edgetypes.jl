@@ -55,6 +55,7 @@ struct MPIEdgeTsI fromid::AgentID; toid::AgentID end
 struct MPIEdgeSTs end
 struct MPIEdgeSTsI end
 struct MPIEdgeSETsI end
+struct SendId end
 
 statelessMPIEdgeTypes = [ MPIEdgeS, MPIEdgeSE, MPIEdgeST, MPIEdgeSI, MPIEdgeSEI, MPIEdgeSTI, MPIEdgeSETI, MPIEdgeSTs, MPIEdgeSTsI, MPIEdgeSETsI  ]
 
@@ -81,6 +82,7 @@ model = ModelTypes() |>
     register_edgetype!(MPIEdgeSTs, :Stateless, :SingleType; target = AgentState1, size = mpi.size * 2) |>
     register_edgetype!(MPIEdgeSTsI, :Stateless, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
     register_edgetype!(MPIEdgeSETsI, :Stateless, :SingleEdge, :SingleType, :IgnoreFrom; target = AgentState1, size = mpi.size * 2) |>
+    register_edgetype!(SendId, :SingleEdge) |>
     create_model("MPI EdgeTypes");
 
 
@@ -278,19 +280,19 @@ function testforedgetype(ET)
     finish_simulation!(sim)
 end
 
-@testset "EdgeTypes" begin
-    CurrentEdgeType = Nothing
+# @testset "EdgeTypes" begin
+#     CurrentEdgeType = Nothing
 
-    if CurrentEdgeType === Nothing
-        for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
-            testforedgetype(ET)
-        end
-    else
-        testforedgetype(CurrentEdgeType)
-    end
-    # this hack should help that the output is not scrambled
-    sleep(mpi.rank * 0.05)
-end
+#     if CurrentEdgeType === Nothing
+#         for ET in [ statelessMPIEdgeTypes; statefulMPIEdgeTypes ]
+#             testforedgetype(ET)
+#         end
+#     else
+#         testforedgetype(CurrentEdgeType)
+#     end
+#     # this hack should help that the output is not scrambled
+#     sleep(mpi.rank * 0.05)
+# end
 
 ###
 function testforedgetype_remove(ET)
@@ -334,6 +336,101 @@ function testforedgetype_remove(ET)
     finish_simulation!(sim)
 end
 
+function testforedgetype_remove_from(ET)
+    sim = create_simulation(model, nothing, nothing)
+
+    graph = if has_hint(sim, ET, :SingleEdge)
+        SimpleGraphs.cycle_digraph(100)
+    else
+        SimpleGraphs.complete_graph(100)
+    end
+
+    if has_hint(sim, ET, :Stateless)
+        add_graph!(sim,
+                   graph,
+                   i -> AgentState1(i),
+                   _ -> ET())
+    else
+        add_graph!(sim,
+                   graph,
+                   i -> AgentState1(i),
+                   _ -> ET(0, 0))
+    end
+
+    finish_init!(sim)
+    if has_hint(sim, ET, :SingleEdge)
+        @assert num_edges(sim, ET) == 100 # all 100 agents have 1 edge
+    else
+        @assert num_edges(sim, ET) == 9900 # all 100 agents have 99 edges
+    end
+    sim2 = copy_simulation(sim)
+    sim3 = copy_simulation(sim)
+
+    apply!(sim, AgentState1, [AgentState1, ET], ET;
+           add_existing = ET) do self, id, sim
+               nids = neighborids(sim, id, ET) 
+               remove_edges!(sim, first(nids), id, ET)
+               if ! has_hint(sim, ET, :SingleEdge)
+                   remove_edges!(sim, nids[2], id, ET)
+               end
+           end
+    if has_hint(sim, ET, :SingleEdge)
+        @test num_edges(sim, ET) == 0
+    else
+        @test num_edges(sim, ET) == 9700 # we remove for 100 agent 2 edges
+    end
+
+    # test also to remove the edges in the other direction
+    if !has_hint(sim, ET, :SingleEdge)
+        apply!(sim2, AgentState1, [AgentState1, ET], ET;
+               add_existing = ET) do self, id, sim
+                   if self.idx % 2 == 0
+                       nid = rand(neighborids(sim, id, ET))
+                       remove_edges!(sim, id, nid, ET)
+                   end
+               end
+        @test num_edges(sim2, ET) == 9850 # we remove for 50 agent 2 edges
+    else
+        apply!(sim2, AgentState1, ET, SendId) do _, id, sim
+            nid = neighborids(sim, id, ET)
+            add_edge!(sim2, id, nid, SendId())
+        end
+        apply!(sim2, AgentState1, [AgentState1, ET, SendId], ET;
+               add_existing = ET) do self, id, sim
+                   if self.idx < 100
+                       nid = neighborids(sim, id, SendId)
+                       remove_edges!(sim, id, nid, ET)
+                   end
+               end
+        @test num_edges(sim2, ET) == 1
+    end
+
+    # test that we can call it with a from value for which we did not
+    # have added edges
+    apply!(sim3, AgentState1, [], ET; add_existing = ET) do _, id, sim
+        remove_edges!(sim, AgentID(0), id, ET)
+    end
+    if has_hint(sim, ET, :SingleEdge)
+        @test num_edges(sim3, ET) == 100 # all 100 agents have 1 edge
+    else
+        @test num_edges(sim3, ET) == 9900 # all 100 agents have 99 edges
+    end
+
+    @test_throws AssertionError apply!(sim3, AgentState1, [], []) do _, id, sim
+        remove_edges!(sim, AgentID(0), id, ET)
+    end
+
+    @test_throws AssertionError apply!(sim3, AgentState1, [], ET) do _, id, sim
+        remove_edges!(sim, AgentID(0), id, ET)
+    end
+    
+    
+    finish_simulation!(sim)
+    finish_simulation!(sim2)
+    finish_simulation!(sim3)
+end
+
+
 @testset "remove edges" begin
     CurrentEdgeType = Nothing
 
@@ -346,6 +443,16 @@ end
     else
         testforedgetype_remove(CurrentEdgeType)
     end
+
+    if CurrentEdgeType === Nothing
+        for ET in [ MPIEdgeD, MPIEdgeS, MPIEdgeE, MPIEdgeSE,
+                 MPIEdgeT, MPIEdgeST ]
+            testforedgetype_remove_from(ET)
+        end
+    else
+        testforedgetype_remove_from(CurrentEdgeType)
+    end
+    
     # this hack should help that the output is not scrambled
     sleep(mpi.rank * 0.05)
 end

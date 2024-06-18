@@ -83,5 +83,10 @@ also be used inside a transition function, namely:
 * [`connect_raster_neighbors!`](@ref)
 * [`move_to!`](@ref)
 
+## Remove Edges
+
+Since v1.2 it's also possible to remove edges:
+
+* [`remove_edges!`](@ref)
 
 

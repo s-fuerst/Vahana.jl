@@ -662,7 +662,6 @@ function apply!(sim::Simulation,
     
     MPI.Barrier(MPI.COMM_WORLD)
 
-    foreach(T -> finish_read!(sim, T), read)
 
     writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
     writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
@@ -672,6 +671,7 @@ function apply!(sim::Simulation,
     # not deleted in the case that an agent died
     foreach(ET -> transmit_edges!(sim, ET), writeableET)
     
+    foreach(T -> finish_read!(sim, T), read)
     # then we can call finish_write! for the agents, as this will
     # remove the edges where are died agents are involved (and modifies
     # EdgeType_write).

@@ -437,9 +437,11 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
 
         for (source, target) in recvbuf.data
             target = AgentID(target)
+            @mayassert process_nr(target) == mpi.rank
             if source == 0
-                @assert process_nr(target) == mpi.rank
                 remove_edges!(sim, target, $T)
+            else
+                remove_edges!(sim, AgentID(source), target, $T)
             end
         end
 

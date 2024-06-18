@@ -96,10 +96,31 @@ end
 
 
 """
-TODO write docs
+    remove_edges!(sim::Simulation, to::AgentID, ::Type{E})
+
+Remove all edges of type `E` where `to` is at the target position. 
+
+Can only be called within a transition function, where `E` is in the `write`
+argument and also in the `add_existing` list of [`apply!`](@ref).
+
 """
 function remove_edges!(sim::Simulation, to::AgentID, edgetype::Type)
-@info "this should not be called"
+    @error "remove_edges! is called for the unregisterted edgetype $(edgetype)"
+end
+
+"""
+    remove_edges!(sim::Simulation, from::AgentID, to::AgentID, ::Type{E})
+
+Removes all edges of type `E` with `from` at the source position
+and `to` at the target position of an edge. `remove_edges!` in this
+form (with `from` as argument) can only be called if the edge type `E`
+does not have the `:IgnoreFrom` hint.
+
+Can also only be called within a transition function, where `E` is in the `write`
+argument and also in the `add_existing` list of [`apply!`](@ref).
+"""
+function remove_edges!(sim::Simulation, from::AgentID, to::AgentID, edgetype::Type)
+    @error "remove_edges! is called for the unregisterted edgetype $(edgetype)"
 end
 
 """
