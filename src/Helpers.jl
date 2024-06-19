@@ -200,6 +200,13 @@ macro storage(T)
 end
 storage(sim, T) = getproperty(sim, Symbol(T)).storage
 
+macro agentsontarget(T)
+    field = Symbol(T)
+    :( sim.$(field).agentsontarget ) |> esc
+end
+agentsontarget(sim, T) = getproperty(sim, Symbol(T)).agentsontarget
+
+
 macro removeedges(T)
     field = Symbol(T)
     :( sim.$(field).removeedges ) |> esc

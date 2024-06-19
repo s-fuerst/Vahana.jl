@@ -1,3 +1,6 @@
+using Test, Vahana
+detect_stateless(true)
+
 struct ComputeAgent end
 struct ConstructedAgent end
 struct Connection end
@@ -11,15 +14,26 @@ function test_model(model)
 
     finish_init!(sim)
 
+    @test length(Vahana.agentsontarget(sim, Connection)[constructedid]) == 1
+
+    # as we have Connection in add_existing, the agentsontarget dict
+    # should be unchanged
+    apply!(sim, ComputeAgent, [], Connection;
+           add_existing = Connection) do _, id, sim
+           end
+    @test length(Vahana.agentsontarget(sim, Connection)[constructedid]) == 1
+    
     # add_existing is empty and we have added ConstructedAgent and
     # Connection to rebuild, so after the transition function only the
     # ComputeAgent exists anymore
     apply!(sim,
-                      [ ComputeAgent ],
-                      [],
-                      [ ConstructedAgent, Connection ]) do _, id, sim
-                      end
+           [ ComputeAgent ],
+           [],
+           [ ConstructedAgent, Connection ]) do _, id, sim
+           end
 
+    @test length(Vahana.agentsontarget(sim, Connection)) == 0
+    
     @test num_agents(sim, ComputeAgent) == 1
     @test num_agents(sim, ConstructedAgent) == 0
     @test num_edges(sim, Connection) == 0
@@ -39,9 +53,9 @@ function test_model(model)
     # still have them even with this "do nothing" transition function. And thanks to
     # invariant_compute, we also must not return the ComputeAgent 
     apply!(sim,
-                      [ ComputeAgent ], [], [ ConstructedAgent, Connection ];
-                      add_existing = [ ConstructedAgent, Connection ]) do _, id, sim
-                      end
+           [ ComputeAgent ], [], [ ConstructedAgent, Connection ];
+           add_existing = [ ConstructedAgent, Connection ]) do _, id, sim
+           end
 
     @test num_agents(sim, ConstructedAgent) == 1
     @test num_agents(sim, ComputeAgent) == 1

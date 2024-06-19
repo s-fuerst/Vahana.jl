@@ -109,7 +109,7 @@ function _can_remove_edges(sim, to, T)
             ! sim.initialized ||
             edge_attrs(sim, T)[:writeable] == true 
     end """
-      $T must be in the `write` argument of the transition function.
+      Edge of $T can not removed, as $T is not in the `write` argument of the transition function.
       """
     @mayassert begin
         ! config.check_readable ||
@@ -362,6 +362,20 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
+    if ignorefrom
+        @eval function _push_agentsontarget(sim, from, to, _::Type{$T})
+        end
+    else
+        @eval function _push_agentsontarget(sim, from, to, _::Type{$T})
+            if type_nr(from) == 0
+                @info "zero?" from mpi.rank to $T
+            end
+            if ! sim.model.immortal[type_nr(from)]
+                push!(get!(@agentsontarget($T), from, Set{AgentID}()), to)
+            end
+        end
+    end
+    
     #### The exported functions
     #- add_edge!
     if stateless && ignorefrom && !singleedge
@@ -407,6 +421,7 @@ by calling suppress_warnings(true) after importing Vahana.
             An edge has already been added to the agent with the id $to (and the
             edgetype hints containing the :SingleEdge hint).
             """
+            _push_agentsontarget(sim, edge.from, to, $T)
             if $multinode && ! $ignorefrom && node_nr(edge.from) != mpi.node
                 push!(@edge($T).
                     accessible[type_nr(edge.from)][process_nr(edge.from) + 1],
@@ -426,7 +441,6 @@ by calling suppress_warnings(true) after importing Vahana.
 
         @eval function add_edge!(sim::$simsymbol, from::AgentID,
                           to::AgentID, edgestate::$T)
-            @mayassert _can_add(sim, @edgewrite($T), to, nothing, $T)
             @mayassert sim.initialized == false || sim.intransition """
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
@@ -437,6 +451,7 @@ by calling suppress_warnings(true) after importing Vahana.
             An edge has already been added to the agent with the id $to (and the
             edgetype hints containing the :SingleEdge hint).
             """
+            _push_agentsontarget(sim, from, to, $T)
             if $multinode && ! $ignorefrom && node_nr(from) != mpi.node
                 push!(@edge($T).
                     accessible[type_nr(from)][process_nr(from) + 1], from)
@@ -459,7 +474,8 @@ by calling suppress_warnings(true) after importing Vahana.
             You can call add_edge! only in the initialization phase (until
             `finish_init!` is called) or within a transition function called by
             `apply`.
-            """
+                """
+            _push_agentsontarget(sim, edge.from, to, $T)
             if $multinode && ! $ignorefrom && node_nr(edge.from) != mpi.node
                 push!(@edge($T).
                     accessible[type_nr(edge.from)][process_nr(edge.from) + 1],
@@ -483,6 +499,7 @@ by calling suppress_warnings(true) after importing Vahana.
             `finish_init!` is called) or within a transition function called by
             `apply`.
             """
+            _push_agentsontarget(sim, from, to, $T)
             if $multinode && ! $ignorefrom && node_nr(from) != mpi.node
                 push!(@edge($T).
                     accessible[type_nr(from)][process_nr(from) + 1], from)
@@ -534,13 +551,25 @@ by calling suppress_warnings(true) after importing Vahana.
             else
                 nr = _to2idx(sim, to, $T)
                 if $singleedge 
-                    if $stateless && @edgewrite($T)[nr] == from
-                        remove_edges!(sim, to, $T)
-                    elseif !$stateless && @edgewrite($T)[nr].from == from
-                        remove_edges!(sim, to, $T)
+                    if ($singletype &&
+                        length(@edgewrite($T)) >= nr) ||
+                        (! $singletype &&
+                        haskey(@edgewrite($T), nr))
+                        if $stateless && @edgewrite($T)[nr] == from
+                            remove_edges!(sim, to, $T)
+                        elseif !$stateless && @edgewrite($T)[nr].from == from
+                            remove_edges!(sim, to, $T)
+                        end
                     end
                 else
-                    if length(@edgewrite($T)[nr]) > 0
+                    if ($singletype &&
+                        length(@edgewrite($T)) >= nr &&
+                        isassigned(@edgewrite($T), nr) &&
+                        length(@edgewrite($T)[nr]) > 0) ||
+                        (! $singletype &&
+                        haskey(@edgewrite($T), nr) &&
+                        length(@edgewrite($T)[nr]) > 0)
+                        
                         if $stateless
                             @edgewrite($T)[nr] = filter(id -> id != from,
                                                         @edgewrite($T)[nr])
@@ -555,7 +584,7 @@ by calling suppress_warnings(true) after importing Vahana.
     else
         @eval function remove_edges!(sim::$simsymbol, from::AgentID, to::AgentID,
                               ::Type{$T})
-                              @assert false """
+            @assert false """
             remove_edges! with a source agent is not defined for edgetypes
             with the :IgnoreFrom hint.
             """
@@ -575,86 +604,72 @@ by calling suppress_warnings(true) after importing Vahana.
             return false
         end
 
-        # when the edge is stateless, the edge is already the agent id.
-        @inline function __is_from(edgeorid)
-            if $stateless
-                edgeorid in from
-            else
-                edgeorid.from in from
-            end
-        end
-
-        function _is_from(died) @inline edgeorid ->
-            if $stateless
-                edgeorid in died
-            else
-                edgeorid.from in died
-            end
-        end
-
         network_changed = false
-        for to in keys(@edgewrite($T))
-            if $singletype && (! isassigned(@edgewrite($T), to))
-                continue
-            end
-            # ac stands for agent container
-            ac = @edgewrite($T)[to]
-            if $singleedge # the container is a single element
-                if __is_from(ac)
-                    network_changed = true
-                    if $singletype
-                        @edgewrite($T)[to] = zero($CT)
-                    else
-                        delete!(@edgewrite($T), to)
-                    end
-                end
-            else
-                found = findall(__is_from, ac)
-                if length(found) > 0
-                    network_changed = true
-                    deleteat!(ac, found)
-                    if ! $singletype
-                        if length(ac) == 0
-                            delete!(@edgewrite($T), to)
-                        end
-                    end
-                end
-            end
-        end
-        network_changed
-    end
-    
-    @eval function init_storage!(sim::$simsymbol, ::Type{$T})
-        @storage($T) = [ Tuple{AgentID, $CE}[] for _ in 1:mpi.size ]
-        @removeedges($T) = [ Tuple{AgentID, AgentID}[] for _ in 1:mpi.size ]
-    end
 
-
-    @eval function prepare_write!(sim::$simsymbol,
-                           read,
-                           add_existing::Bool,
-                           t::Type{$T})
-        if add_existing
-            # when we can not read the types that we are writing
-            # there is no need to copy the elements            
-            if $T in read
-                @edgewrite($T) = deepcopy(@edgeread($T))
-            else 
-                @edgewrite($T) = @edgeread($T)
+        if edge_attrs(sim, $T)[:writeable] 
+            for f in from
+                if haskey(@agentsontarget($T), f)
+                    network_changed = true
+                    for t in @agentsontarget($T)[f]
+                        remove_edges!(sim, f, t, $T)
+                    end
+                    delete!(@agentsontarget($T), f)
+                end
             end
         else
-            @edgewrite($T) = $FT()
-            init_field!(sim, t)
-            foreach(empty!, @storage($T))
-            for tnr in 1:length(sim.typeinfos.nodes_types)
-                for i in 1:mpi.size
-                    empty!(@edge($T).accessible[tnr][i])
+            for f in from
+                if haskey(@agentsontarget($T), f)
+                    network_changed = true
+                end
+                if network_changed
+                    prepare_write!(sim, [], true, $T)
+                    for f in from
+                        if haskey(@agentsontarget($T), f)
+                            for t in @agentsontarget($T)[f]
+                                remove_edges!(sim, f, t, $T)
+                            end
+                            delete!(@agentsontarget($T), f)
+                        end
+                    end
+                    finish_write!(sim, $T)
                 end
             end
         end
-        edge_attrs(sim, $T)[:writeable] = true
-        edge_attrs(sim, $T)[:add_existing] = add_existing
+
+        network_changed
     end
+
+@eval function init_storage!(sim::$simsymbol, ::Type{$T})
+    @storage($T) = [ Tuple{AgentID, $CE}[] for _ in 1:mpi.size ]
+    @removeedges($T) = [ Tuple{AgentID, AgentID}[] for _ in 1:mpi.size ]
+end
+
+
+@eval function prepare_write!(sim::$simsymbol,
+                       read,
+                       add_existing::Bool,
+                       t::Type{$T})
+    if add_existing
+        # when we can not read the types that we are writing
+        # there is no need to copy the elements            
+        if $T in read
+            @edgewrite($T) = deepcopy(@edgeread($T))
+        else 
+            @edgewrite($T) = @edgeread($T)
+        end
+    else
+        @edgewrite($T) = $FT()
+        init_field!(sim, t)
+        foreach(empty!, @storage($T))
+        for tnr in 1:length(sim.typeinfos.nodes_types)
+            for i in 1:mpi.size
+                empty!(@edge($T).accessible[tnr][i])
+            end
+        end
+    end
+    edge_attrs(sim, $T)[:writeable] = true
+    edge_attrs(sim, $T)[:add_existing] = add_existing
+end
 
 @eval function prepare_read!(sim::$simsymbol, _::Vector, ::Type{$T})
     # finish_init! already transmit the edges, so we check last_change > 0
@@ -681,6 +696,9 @@ end
 @eval function transmit_edges!(sim::$simsymbol, ::Type{$T})
     edges_alltoall!(sim, @storage($T), $T)
     foreach(empty!, @storage($T))
+end
+
+@eval function transmit_remove_edges!(sim::$simsymbol, ::Type{$T})
     removeedges_alltoall!(sim, @removeedges($T), $T)
     foreach(empty!, @removeedges($T))
 end

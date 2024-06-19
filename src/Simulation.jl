@@ -91,6 +91,11 @@ mutable struct EdgeFields{ET, EST}
     # is set to true, when this field is in the read vector of a
     # transition function
     readable::Bool
+    # here we track the agent on the target side of the edges, so
+    # that in a case that an agent died, we can call
+    # remove_edges! for the edges with the died agent at the source
+    # position. We create a dict entry only for agents that are mortal.
+    agentsontarget::Dict{AgentID, Set{AgentID}}
 end
 
 """
@@ -118,7 +123,8 @@ function create_model(typeinfos::ModelTypes, name::String)
                           $(edgestorage_type(T, typeinfos.edges_attr[T])()),
                           Vector{Tuple{AgentID, AgentID}}[],
                           [ [ Set{AgentID}() for _ in 1:mpi.size ] for _ in 1:MAX_TYPES ],
-                          0,0,false)))
+                          0,0,false,
+                          Dict{AgentID, Set{AgentID}}())))
         for T in typeinfos.edges_types ] 
 
     nodefields = [
@@ -188,14 +194,16 @@ function create_model(typeinfos::ModelTypes, name::String)
              :($(g.init_value)))
         for g in typeinfos.globals ]
 
-
     # the true in the second arg makes the struct mutable
     globalstrukt = Expr(:struct, true, :($(Symbol("Globals_" * String(simsymbol)))),
                         Expr(:block, globalfields...))
 
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, globalstrukt) |> eval
 
-    Model(typeinfos, name)
+    immortal = [ :Immortal in typeinfos.nodes_attr[T][:hints]
+                 for T in typeinfos.nodes_types ]
+
+    Model(typeinfos, name, immortal)
 end
 
 num_agenttypes(sim) = length(sim.typeinfos.nodes_types)
@@ -639,12 +647,22 @@ function apply!(sim::Simulation,
     call = applicable(iterate, call) ? call : [ call ]
     read = applicable(iterate, read) ? read : [ read ]
     write = applicable(iterate, write) ? write : [ write ]
-    add_existing = applicable(iterate, add_existing) ? add_existing : [ add_existing ]
+    add_existing = applicable(iterate, add_existing) ?
+        add_existing : [ add_existing ]
 
     readableET = filter(w -> w in sim.typeinfos.edges_types, read)
     foreach(T -> prepare_read!(sim, read, T), readableET)
     readableAT = filter(w -> w in sim.typeinfos.nodes_types, read)
     foreach(T -> prepare_read!(sim, read, T), readableAT)
+
+    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
+    writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
+    
+    for T in writeableET
+        if ! (T in add_existing)
+            empty!(agentsontarget(sim, T))
+        end
+    end
     
     foreach(prepare_write!(sim, read, [call; add_existing]), write)
 
@@ -662,20 +680,24 @@ function apply!(sim::Simulation,
     
     MPI.Barrier(MPI.COMM_WORLD)
 
-
-    writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
-    writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
-
     # we must first call transmit_edges, so that they are exists
     # on the correct rank instead in @storage, where they are
     # not deleted in the case that an agent died
     foreach(ET -> transmit_edges!(sim, ET), writeableET)
     
     foreach(T -> finish_read!(sim, T), read)
+
     # then we can call finish_write! for the agents, as this will
     # remove the edges where are died agents are involved (and modifies
     # EdgeType_write).
     foreach(finish_write!(sim), writeableAT)
+
+    # we have now collected all edges that are removed, sowohl
+    # directly via a remove_edges! call in the transition function,
+    # or in finish_write! for the agents type, where we remove the
+    # edges of died agents
+    foreach(ET -> transmit_remove_edges!(sim, ET), writeableET)
+
 
     foreach(finish_write!(sim), writeableET)
 

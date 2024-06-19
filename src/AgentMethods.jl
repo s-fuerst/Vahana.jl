@@ -242,11 +242,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
             end
 
-            # for the edges where the agent is in the source position,
-            # the situation is worse, as they don't have the
-            # information on the agents rank, to which other agents
-            # edges are targeted. So we create a join of all the ids of
-            # all ranks, and then go locally to all the edges of the rank.
+            # for the edges where we have the died agents on the source
+            # position we have the agentsontarget dicts on each process.
+            # So we first collect the ids of all died agents and then
+            # call remove_edges! for all edges stored in agentsontarget for
+            # the collected ids.
             alldied = $nompi ? aids : join(aids)
             if ! isempty(alldied)
                 for ET in edges_types

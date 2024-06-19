@@ -38,6 +38,15 @@ begin
         create_model("Test Core")
 end
 
+@testset "ModelImmortal" begin
+    @test model.immortal[1] == false
+    @test model.immortal[2] == false
+    @test model.immortal[3] == true
+    @test model.immortal[4] == true
+    @test model.immortal[5] == true
+    @test model.immortal[6] == false
+end
+
 function add_example_network!(sim)
     # construct 3 AMortal agents, 10 AImm agents and 10 AImmFixed
     a1id = add_agent!(sim, AMortal(1))

@@ -49,6 +49,7 @@ used to create one or multiple simulations via [`create_simulation`](@ref).
 struct Model
     types::ModelTypes
     name::String
+    immortal::Vector{Bool}
 end
 
 """

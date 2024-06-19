@@ -1,3 +1,4 @@
+using Base: nothing_sentinel
 # the edge types and some other stuff is defined in edges.jl
 
 import Vahana: has_hint, @onrankof
@@ -143,39 +144,76 @@ end
         end
 
         finish_simulation!(sim)
-        # we create edges from type AgentB to Agent and remove all
-        # agents of type AgentB. This should also remove the edges.
+        # we create edges between all agent of type AgentB and Agent
+        # with the same index i.
         sim = create_simulation(model_edges, nothing, nothing)
 
         aids = add_agents!(sim, [ Agent(i) for i in 1:10 ])
         bids = add_agents!(sim, [ AgentB(i) for i in 1:10 ])
         for i in 1:10
             if has_hint(sim, ET, :Stateless)
-                add_edge!(sim, bids[i], aids[i], ET())
+                if ! has_hint(sim, ET, :SingleEdge)
+                    add_edge!(sim, aids[i], aids[i], ET())
+                    if ! has_hint(sim, ET, :SingleType)
+                        add_edge!(sim, aids[i], bids[i], ET())
+                    end
+                end
+                # test both add_edge! variants
+                add_edge!(sim, aids[i], Edge(bids[i], ET()))
+                if ! has_hint(sim, ET, :SingleType)
+                    add_edge!(sim, bids[i], Edge(bids[i], ET()))
+                end
             else
-                add_edge!(sim, bids[i], aids[i], ET(i))
+                if ! has_hint(sim, ET, :SingleEdge)
+                    add_edge!(sim, aids[i], aids[i], ET(i))
+                    if ! has_hint(sim, ET, :SingleType)
+                        add_edge!(sim, aids[i], bids[i], ET(i))
+                    end
+                end
+                add_edge!(sim, aids[i], Edge(bids[i], ET(i)))
+                if ! has_hint(sim, ET, :SingleType)
+                    add_edge!(sim, bids[i], Edge(bids[i], ET(i)))
+                end
             end 
         end
 
-        @onrankof aids[1] Vahana._remove_edges_agent_traget!(sim, aids[1], ET)
-        @onrankof bids[2] Vahana._remove_edges_agent_source!(sim, [ bids[2] ], ET)
-
         finish_init!(sim)
 
-        @test num_edges(sim, ET) == 8
+        # And then remove every second agents of type AgentB.
+        apply!(sim, AgentB, AgentB, AgentB; add_existing = ET) do self, id, sim
+            self.foo % 2 == 0 ? self : nothing
+        end
 
-        # # first we test that edges to the agents are removed
-        # apply!(sim, [ AgentB ], [], []) do state, id, sim
-        #     nothing
-        # end
+        # After this the:
+        # 10 a-a edges, (but not for :SingleEdge)
+        # 5 b-a edges, (! :SingleType or :SingleEdge)
+        # 5 b-b edges (! :SingleType)
+        # 5 a-b edges (always)
+        # should be left
+        count = 5
+        if ! has_hint(sim, ET, :SingleEdge)
+            count += 10
+        end
+        if ! has_hint(sim, ET, :SingleType)
+            count += 5
+        end
+        if (! has_hint(sim, ET, :SingleEdge) &&
+            ! has_hint(sim, ET, :SingleType))
+            count += 5
+        end
 
-        # @test num_edges(sim, ET) == 0  
+        if has_hint(sim, ET, :IgnoreFrom)
+            # only the edges to the agent are removed
+            @test num_edges(sim, ET) == 30
+        else
+            @test num_edges(sim, ET) == count
+        end
+
         finish_simulation!(sim)
     end
 
     for ET in [ statefulEdgeTypes; statelessEdgeTypes ]
         runremoveedgestest(ET)
-        GC.gc(true)
     end
     
     # this hack should help that the output is not scrambled

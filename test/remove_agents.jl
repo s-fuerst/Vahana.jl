@@ -40,11 +40,11 @@ model = ModelTypes() |>
 
         # we remove all ADefault edges, that should also remove the ESDict edges
         apply!(sim,
-                          [ DAgentRemove ],
-                          [],
-                          [ DAgentRemove ]) do _,_,_
-                              nothing
-                          end
+               [ DAgentRemove ],
+               [],
+               [ DAgentRemove ]) do _,_,_
+                   nothing
+               end
 
         @test num_edges(sim, E) == (mpi.size * 3) + 1
 
