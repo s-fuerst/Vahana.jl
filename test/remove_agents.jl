@@ -1,8 +1,10 @@
+using Vahana
 import Vahana.@onrankof
 import Vahana.@rootonly
 import Vahana.disable_transition_checks
+import Graphs.SimpleGraphs
 
-struct DAgent end
+struct DAgent idx::Int64 end
 struct DAgentRemove end
 struct DEdgeState state::Int64 end
 struct DEdge end
@@ -22,7 +24,7 @@ model = ModelTypes() |>
     function test_edgetype(E)
         sim = create_simulation(model)
         
-        ids = add_agents!(sim, [ DAgent() for _ in 1:(mpi.size * 3)])
+        ids = add_agents!(sim, [ DAgent(i) for i in 1:(mpi.size * 3)])
 
         rids = add_agents!(sim, [ DAgentRemove() for _ in 1:mpi.size ])
 

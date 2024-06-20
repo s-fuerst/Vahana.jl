@@ -238,7 +238,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 for ET in edges_types
                     idx = findfirst(x -> x == ET, edges_types)
                     network_changed[idx] |= 
-                        _remove_edges_agent_traget!(sim, id, ET)
+                        _remove_edges_agent_target!(sim, id, ET)
                 end
             end
 

@@ -367,9 +367,6 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     else
         @eval function _push_agentsontarget(sim, from, to, _::Type{$T})
-            if type_nr(from) == 0
-                @info "zero?" from mpi.rank to $T
-            end
             if ! sim.model.immortal[type_nr(from)]
                 push!(get!(@agentsontarget($T), from, Set{AgentID}()), to)
             end
@@ -606,36 +603,20 @@ by calling suppress_warnings(true) after importing Vahana.
 
         network_changed = false
 
-        if edge_attrs(sim, $T)[:writeable] 
-            for f in from
-                if haskey(@agentsontarget($T), f)
-                    network_changed = true
-                    for t in @agentsontarget($T)[f]
-                        remove_edges!(sim, f, t, $T)
-                    end
-                    delete!(@agentsontarget($T), f)
+        check_status = config.check_readable
+        config.check_readable = false
+        for f in from
+            if haskey(@agentsontarget($T), f)
+                network_changed = true
+                for t in @agentsontarget($T)[f]
+                    remove_edges!(sim, f, t, $T)
                 end
-            end
-        else
-            for f in from
-                if haskey(@agentsontarget($T), f)
-                    network_changed = true
-                end
-                if network_changed
-                    prepare_write!(sim, [], true, $T)
-                    for f in from
-                        if haskey(@agentsontarget($T), f)
-                            for t in @agentsontarget($T)[f]
-                                remove_edges!(sim, f, t, $T)
-                            end
-                            delete!(@agentsontarget($T), f)
-                        end
-                    end
-                    finish_write!(sim, $T)
-                end
+                delete!(@agentsontarget($T), f)
             end
         end
 
+        config.check_readable = check_status
+        
         network_changed
     end
 
@@ -672,12 +653,6 @@ end
 end
 
 @eval function prepare_read!(sim::$simsymbol, _::Vector, ::Type{$T})
-    # finish_init! already transmit the edges, so we check last_change > 0
-    if @edge($T).last_transmit <= @edge($T).last_change &&
-        @edge($T).last_change > 0
-
-    end
-
     @edge($T).readable = true
 end
 
@@ -685,7 +660,13 @@ end
     @edge($T).readable = false
 end
 
-#- finish_write!
+# Important: When edges are removed because of dying agents,
+# it's allowed that the edgetypes are not in the write argument
+# of the apply function, and therefore prepare_write and finish_write
+# is not called. Thats okay, as $edgeread = $edgewrite, and
+# we update the last_change value when a edge was removed,
+# but in the case that in the future additional functionallity
+# is added to finish_write, keep this in mind
 @eval function finish_write!(sim::$simsymbol, ::Type{$T})
     @edgeread($T) = @edgewrite($T)
     @edge($T).last_change = sim.num_transitions
@@ -843,7 +824,7 @@ end
 # died agents). returns true when edges where removed (and the network
 # changed)
 if singletype
-    @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$T})
+    @eval function _remove_edges_agent_target!(sim::$simsymbol, to::AgentID, ::Type{$T})
         if type_of(sim, to) == $AT
             nr = agent_nr(to)
             if length(@edgewrite($T)) >= nr
@@ -857,7 +838,7 @@ if singletype
         end
     end
 else
-    @eval function _remove_edges_agent_traget!(sim::$simsymbol, to::AgentID, ::Type{$T})
+    @eval function _remove_edges_agent_target!(sim::$simsymbol, to::AgentID, ::Type{$T})
         if haskey(@edgewrite($T), to)
             delete!(@edgewrite($T), to)
             true
