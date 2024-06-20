@@ -593,7 +593,7 @@ isiterable(v) = applicable(iterate, v)
 
 
 """
-    apply!(sim, func, call, read, write; [add_existing])
+    apply!(sim, func, call, read, write; [add_existing, with_edge])
 
 Apply the transition function `func` to the simulation state. 
 
@@ -620,11 +620,28 @@ or `nothing`. If `nothing` is returned, the agent will be removed from
 the simulation, otherwise the agent with id `id` will get the returned
 state after the transition function was called for all agents.
 
-When an agent or edge state type is in `write`, the current agents and
-edges of that type are removed from the simulation. Usually the agents
-are read by returning them from the transition function. If you want keep the
-existing agents/edges for a specific type, you can add this type to the
-optional `add_existing` collection.
+When an edge state type is in `write`, the current edges of that type
+are removed from the simulation. If you want keep the existing edges
+for a specific type, you can add this type to the optional
+`add_existing` collection.
+
+With the keyword `with_edge` it is possible to restrict the set of
+agents for which the transition function is called to those agents who are on
+the target side of edges of the type `with_edge`. So  
+```
+apply!(sim, AT, ET, []) do _, id, sim 
+    if has_edge(sim, id, ET)
+       do_something
+    end
+end
+```
+is equivalent to 
+```
+apply!(sim, AT, ET, []; with_edge = ET) do _, id, sim 
+    do_something
+end
+```
+but saves all the `has_edge` checks.
 
 See also [`apply`](@ref)
 """
@@ -633,7 +650,8 @@ function apply!(sim::Simulation,
          call,
          read,
          write;
-         add_existing = [])
+         add_existing = [],
+         with_edge = nothing)
     @assert sim.initialized "You must call finish_init! before apply!"
     with_logger(sim) do
         @info "<Begin> apply!" func transition=sim.num_transitions+1
@@ -672,9 +690,15 @@ function apply!(sim::Simulation,
         with_logger(sim) do
             @debug "<Begin> tf_call!" agenttype=C transition=sim.num_transitions+1
         end
-        rfunc = C in read ? transition_with_read! : transition_without_read!
         wfunc = C in write ? transition_with_write! : transition_without_write!
-        rfunc(wfunc, sim, func, C)
+        if with_edge === nothing
+            rfunc = C in read ? transition_with_read! : transition_without_read!
+            rfunc(wfunc, sim, func, C)
+        else
+            rfunc = C in read ? transition_with_read_with_edge! :
+                transition_without_read_with_edge!
+                rfunc(wfunc, sim, func, C, with_edge)
+        end    
         _log_debug(sim, "<End> tf_call!")
     end
     

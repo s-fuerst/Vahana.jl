@@ -177,6 +177,25 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end 
     end
 
+    @eval function transition_with_read_with_edge!(wfunc,
+                                            sim::$simsymbol,
+                                            tfunc,
+                                            ::Type{$T},
+                                            ET::DataType)
+        @mayassert !has_hint(sim, ET, :SingleType) """
+        Only edge types without the :SingeType hint can be added to
+        to the `with_edge` keyword of an apply! call, but $ET                          has the :SingleType hint.    
+        """
+        for id in keys(edgeread(sim, ET))
+            idx = agent_nr(id)
+            state = @readstate($T)[idx]
+            @mayassert ! @readdied($T)[idx]
+            newstate = tfunc(state, id, sim)
+            wfunc(sim, idx, newstate, $T)
+        end
+    end
+    
+
     @eval function transition_without_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate 
         idx = AgentNr(0)
@@ -192,6 +211,24 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end 
     end
 
+    @eval function transition_without_read_with_edge!(wfunc,
+                                               sim::$simsymbol,
+                                               tfunc,
+                                               ::Type{$T},
+                                               ET::DataType)
+        @mayassert !has_hint(sim, ET, :SingleType) """
+        Only edge types without the :SingeType hint can be added to
+        to the `with_edge` keyword of an apply! call, but $ET                          has the :SingleType hint.    
+        """
+        for id in keys(edgeread(sim, ET))
+            idx = agent_nr(id)
+            @mayassert ! @readdied($T)[idx]
+            newstate = tfunc(Val($T), id, sim)
+            wfunc(sim, idx, newstate, $T)
+        end
+    end
+
+    
     @eval function prepare_write!(sim::$simsymbol, _, add_existing::Bool, ::Type{$T})
         if $immortal 
             # distributing the initial graph or reading from file will
