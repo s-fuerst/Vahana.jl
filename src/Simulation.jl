@@ -703,6 +703,11 @@ function apply!(sim::Simulation,
     
     MPI.Barrier(MPI.COMM_WORLD)
 
+    # we first remove all deleted edges, so that we can readd
+    # new edges to an agent in the SingleEdge case.
+    # This include the edges of died agents.
+    foreach(ET -> transmit_remove_edges!(sim, ET), writeableET)
+    
     # we must first call transmit_edges, so that they are exists
     # on the correct rank instead in @storage, where they are
     # not deleted in the case that an agent died
@@ -714,13 +719,6 @@ function apply!(sim::Simulation,
     # remove the edges where are died agents are involved (and modifies
     # EdgeType_write).
     foreach(finish_write!(sim), writeableAT)
-
-    # we have now collected all edges that are removed, sowohl
-    # directly via a remove_edges! call in the transition function,
-    # or in finish_write! for the agents type, where we remove the
-    # edges of died agents
-    foreach(ET -> transmit_remove_edges!(sim, ET), writeableET)
-
 
     foreach(finish_write!(sim), writeableET)
 

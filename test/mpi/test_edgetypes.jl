@@ -322,6 +322,8 @@ function testforedgetype_remove(ET)
     @test num_edges(removed, ET) == 50
     finish_simulation!(removed)
 
+    copy = copy_simulation(sim)
+
     if ! has_hint(sim, ET, :IgnoreFrom)
         removed = apply(sim, AgentState1, [AgentState1, ET], ET;
                         add_existing = ET) do self, id, sim
@@ -334,6 +336,25 @@ function testforedgetype_remove(ET)
         finish_simulation!(removed)
     end
     finish_simulation!(sim)
+
+    # remove_edges! and add_edge! for the same edge should keep the edge
+    # (the order depends on the handling if the send edges)
+    if ! has_hint(sim, ET, :IgnoreFrom)
+        apply!(copy, AgentState1, ET, ET; add_existing = ET) do self, id, sim
+            fromid = neighborids(sim, id, ET) |> first
+            remove_edges!(sim, fromid, id, ET)
+            if has_hint(sim, ET, :Stateless)
+                add_edge!(sim, fromid, id, ET())
+            else
+                add_edge!(sim, fromid, id, ET(0,0))
+            end
+        end
+        @test num_edges(copy, ET) == 100
+        
+    end
+    
+    finish_simulation!(copy)
+    
 end
 
 function testforedgetype_remove_from(ET)
