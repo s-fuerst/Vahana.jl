@@ -62,6 +62,53 @@ model = ModelTypes() |>
         @test num_edges(sim, E) == 3
         
         finish_simulation!(sim)
+
+        # run nearly the same test, but add the edges two times
+        if ! Vahana.has_hint(sim, E, :SingleEdge)
+            sim = create_simulation(model)
+            
+            ids = add_agents!(sim, [ DAgent(i) for i in 1:(mpi.size * 3)])
+
+            rids = add_agents!(sim, [ DAgentRemove() for _ in 1:mpi.size ])
+
+            # we create a network where with an edge for each agent to ids[2]
+            foreach(id -> add_edge!(sim, id, ids[2], E()), ids)
+            foreach(id -> add_edge!(sim, id, ids[2], DEdgeState(0)), rids)
+            foreach(id -> add_edge!(sim, id, ids[2], E()), ids)
+            foreach(id -> add_edge!(sim, id, ids[2], DEdgeState(0)), rids)
+
+            # and a single edge from ids[1] to ids[3]
+            add_edge!(sim, ids[2], ids[3], E())
+            add_edge!(sim, ids[2], ids[3], E())
+            
+            finish_init!(sim; partition_algo = :EqualAgentNumbers)
+
+            @test num_edges(sim, E) == ((mpi.size * 3) + 1) * 2
+            @test num_edges(sim, DEdgeState) == mpi.size * 2
+
+            # we remove all ADefault edges, that should also remove the ESDict edges
+            apply!(sim,
+                   [ DAgentRemove ],
+                   [],
+                   [ DAgentRemove ]) do _,_,_
+                       nothing
+                   end
+
+            @test num_edges(sim, E) == ((mpi.size * 3) + 1) * 2
+
+            apply!(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
+                if num_edges(sim, id, E) == 0
+                    nothing
+                else
+                    state
+                end
+            end
+
+            # the remaining edges are ids[3]->ids[2],rids[3]->ids[2],ids[2]->ids[3]
+            @test num_edges(sim, E) == 6
+            
+            finish_simulation!(sim)
+        end
     end
 
     test_edgetype(DEdge)

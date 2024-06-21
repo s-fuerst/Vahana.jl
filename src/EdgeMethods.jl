@@ -121,7 +121,7 @@ function _can_remove_edges(sim, to, T)
 end
 
 
-function construct_edge_methods(T::DataType, typeinfos, simsymbol)
+function construct_edge_methods(T::DataType, typeinfos, simsymbol, immortal)
     attr = typeinfos.edges_attr[T]
     
     ignorefrom = :IgnoreFrom in attr[:hints]
@@ -237,6 +237,14 @@ function construct_edge_methods(T::DataType, typeinfos, simsymbol)
                 @eval init_field!(sim::$simsymbol, ::Type{$T}) =
                     resize!(@edgewrite($T), $singletype_size)
             end
+        end
+    else
+        # in the other case we must also define this method
+        # to ensure that we don't call an old implementation
+        # of a previous model with different hints
+        @eval function _check_size!(_, ::AgentNr, ::Type{$T})
+        end
+        @eval function init_field!(sim::$simsymbol, ::Type{$T})
         end
     end
 
@@ -362,13 +370,15 @@ by calling suppress_warnings(true) after importing Vahana.
         end
     end
 
-    if ignorefrom
+    # when all agenttypes are immortal, there is no need to check
+    # ! sim.model.immortal[type_nr(from)] for every add_edge
+    if ignorefrom || reduce(&, immortal)
         @eval function _push_agentsontarget(sim, from, to, _::Type{$T})
         end
     else
         @eval function _push_agentsontarget(sim, from, to, _::Type{$T})
             if ! sim.model.immortal[type_nr(from)]
-                push!(get!(@agentsontarget($T), from, Set{AgentID}()), to)
+                push!(get!(@agentsontarget($T), from, Vector{AgentID}()), to)
             end
         end
     end
@@ -671,7 +681,6 @@ end
     @edgeread($T) = @edgewrite($T)
     @edge($T).last_change = sim.num_transitions
     edge_attrs(sim, $T)[:writeable] = false
-
 end
 
 @eval function transmit_edges!(sim::$simsymbol, ::Type{$T})

@@ -95,7 +95,7 @@ mutable struct EdgeFields{ET, EST}
     # that in a case that an agent died, we can call
     # remove_edges! for the edges with the died agent at the source
     # position. We create a dict entry only for agents that are mortal.
-    agentsontarget::Dict{AgentID, Set{AgentID}}
+    agentsontarget::Dict{AgentID, Vector{AgentID}}
 end
 
 """
@@ -124,7 +124,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                           Vector{Tuple{AgentID, AgentID}}[],
                           [ [ Set{AgentID}() for _ in 1:mpi.size ] for _ in 1:MAX_TYPES ],
                           0,0,false,
-                          Dict{AgentID, Set{AgentID}}())))
+                          Dict{AgentID, Vector{AgentID}}())))
         for T in typeinfos.edges_types ] 
 
     nodefields = [
@@ -161,10 +161,12 @@ function create_model(typeinfos::ModelTypes, name::String)
     # nothing in third argument is for the expected LineNumberNode
     # see also https://github.com/JuliaLang/julia/issues/43976
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, strukt) |> eval
+    immortal = [ :Immortal in typeinfos.nodes_attr[T][:hints]
+                 for T in typeinfos.nodes_types ]
 
     # Construct all type specific functions for the edge typeinfos
     for T in typeinfos.edges_types
-        construct_edge_methods(T, typeinfos, simsymbol)
+        construct_edge_methods(T, typeinfos, simsymbol, immortal)
     end
 
     # Construct all type specific functions for the agent typeinfos
@@ -199,9 +201,6 @@ function create_model(typeinfos::ModelTypes, name::String)
                         Expr(:block, globalfields...))
 
     Expr(:macrocall, Expr(Symbol("."), :Base, kwdefqn), nothing, globalstrukt) |> eval
-
-    immortal = [ :Immortal in typeinfos.nodes_attr[T][:hints]
-                 for T in typeinfos.nodes_types ]
 
     Model(typeinfos, name, immortal)
 end
