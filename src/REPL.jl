@@ -398,6 +398,7 @@ function show_agent(sim::Simulation,
 end
 
 function show_agent(sim::Simulation, id; kwargs...)
-    show_agent(sim, type_of(sim, id), id; kwargs...)
+    # we call AgentID so that id can be also a signed value, or lower then 64bit
+    show_agent(sim, type_of(sim, AgentID(id)), id; kwargs...)
     nothing
 end
