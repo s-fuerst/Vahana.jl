@@ -50,6 +50,31 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
         sendedges!(sim, sendmap, idmapping, T)
     end
 
+    # we want to allow that add_raster is only called on the root rank
+    # but in this case the sim.rasters Dict missings the keys on the
+    # other ranks. So we first send the key names
+    if mpi.rank == 0
+        rasternames = String.(keys(sim.rasters))
+        n = length(rasternames)
+        MPI.Bcast!(Ref(n), MPI.COMM_WORLD)
+        for s in rasternames
+            len = length(s)
+            MPI.Bcast!(Ref(len), MPI.COMM_WORLD)
+            MPI.Bcast!(Vector{UInt8}(s), MPI.COMM_WORLD)
+        end
+    else
+        n = Ref{Int}()
+        MPI.Bcast!(n, MPI.COMM_WORLD)
+    
+        for _ in 1:n[]
+            len = Ref{Int}()
+            MPI.Bcast!(len, MPI.COMM_WORLD)
+            buffer = Vector{UInt8}(undef, len[])
+            MPI.Bcast!(buffer, MPI.COMM_WORLD)
+            push!(sim.rasters, Symbol(String(buffer)) => AgentID[])
+        end
+    end
+
     # we must also update and broadcast the ids for each raster. As we
     # don't need the edges for that, we must not synchronize the PEs
     # before.
@@ -59,7 +84,7 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     disable_transition_checks(false)
     MPI.Barrier(MPI.COMM_WORLD)
     foreach(T -> finish_distribute!(sim, T), node_types)
-
+    
     idmapping
 end
 

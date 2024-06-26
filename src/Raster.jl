@@ -57,9 +57,20 @@ function broadcastids(sim, raster, idmapping::Dict)
     end
 
     if mpi.isroot
+        MPI.Bcast!(Ref(ndims(sim.rasters[raster])), MPI.COMM_WORLD)
+        MPI.Bcast!(Ref(size(sim.rasters[raster])), MPI.COMM_WORLD)
+        
         sim.rasters[raster] = map(id -> idmapping[id], sim.rasters[raster])
+        MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
+    else
+        rndims = Ref{Int}()
+        MPI.Bcast!(rndims, MPI.COMM_WORLD)
+        rsize = Ref{NTuple{rndims[], Int64}}()
+        MPI.Bcast!(rsize, MPI.COMM_WORLD)
+        sim.rasters[raster] = Array{AgentID}(undef, rsize[])
+        MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
+                  
     end
-    MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
 
     _log_info(sim, "<End> broadcastids")
 end

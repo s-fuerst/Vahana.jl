@@ -136,6 +136,7 @@ end
     write_sim_metadata(sim, :foo, 2)
     finish_init!(sim; partition_algo = :EqualAgentNumbers)
     write_metadata(sim, :Global, :mat, :dim1, "hhtype")
+    write_metadata(sim, :Global, :mat, :foo, "bar")
     write_snapshot(sim)
     write_metadata(sim, :Global, :mat, :dim2, "agegroup")
     finish_simulation!(sim)

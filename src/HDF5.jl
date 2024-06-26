@@ -208,16 +208,40 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
 
     create_group(fid, "snapshots")
 
+    if mpi.rank == 0
+        MPI.Bcast!(Ref(length(_preinit_meta)), MPI.COMM_WORLD)
+    else
+        len = Ref{Int}()
+        MPI.Bcast!(len, MPI.COMM_WORLD)
+        if mpi.rank == 1
+            @assert length(_preinit_meta) == len[] """
+            You must call write_metadata always on all ranks!
+            """
+        end
+    end
+
     for (type, field, key, value) in _preinit_meta
         write_metadata(sim, type, field, key, value)
     end
     empty!(_preinit_meta)
 
+    if mpi.rank == 0
+        MPI.Bcast!(Ref(length(_preinit_meta_sim)), MPI.COMM_WORLD)
+    else
+        len = Ref{Int}()
+        MPI.Bcast!(len, MPI.COMM_WORLD)
+        if mpi.rank == 1 
+            @assert length(_preinit_meta_sim) == len[] """
+            You must call write_sim_metadata always on all ranks!
+            """
+        end
+    end
+
     for (key, value) in _preinit_meta_sim
         write_sim_metadata(sim, key, value)
     end
     empty!(_preinit_meta_sim)
-    
+
     fid
 end
 
