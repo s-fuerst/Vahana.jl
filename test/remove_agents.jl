@@ -40,7 +40,7 @@ model = ModelTypes() |>
         @test num_edges(sim, E) == (mpi.size * 3) + 1
         @test num_edges(sim, DEdgeState) == mpi.size
 
-        # we remove all ADefault edges, that should also remove the ESDict edges
+        # we remove all (1 per rank) agents of type DAgentRemove 
         apply!(sim,
                [ DAgentRemove ],
                [],
@@ -49,6 +49,7 @@ model = ModelTypes() |>
                end
 
         @test num_edges(sim, E) == (mpi.size * 3) + 1
+        @test num_edges(sim, DEdgeState) == 0
 
         apply!(sim, [ DAgent ], [ DAgent, E ], [ DAgent ]) do state, id, sim
             if num_edges(sim, id, E) == 0

@@ -20,12 +20,21 @@ of these agents.
     `DataFrame` is only available when the DataFrame.jl package is imported
     by the model implementation. 
 
+!!! warning 
+
+    In a parallel simulation, the DataFrame method only converts the
+    local part of the graph (agents or edges) that exists on the current
+    MPI rank. It does not provide a global view of the entire distributed
+    graph. For agents the [`all_agents`](@ref) method can be used to 
+    get a vector of the states of all agents.
+
+    In parallel simulations, the DataFrame method converts only the local  
+    graph partition (agents or edges) on the current MPI rank, not providing
+    a global view of the distributed graph. For a complete lists of all agent 
+    states the [`all_agents`](@ref) can be used.
+
 """
 function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
-    if mpi.size > 1
-        @info "The created dataframe contains only data from rank $(mpi.rank)"
-    end
-
     if localnr
         types = true
     end

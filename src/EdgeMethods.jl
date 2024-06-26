@@ -689,8 +689,11 @@ end
 end
 
 @eval function transmit_remove_edges!(sim::$simsymbol, ::Type{$T})
+    check_status = config.check_readable
+    config.check_readable = false
     removeedges_alltoall!(sim, @removeedges($T), $T)
     foreach(empty!, @removeedges($T))
+    config.check_readable = check_status
 end
 
 # Rules for the edge functions:
