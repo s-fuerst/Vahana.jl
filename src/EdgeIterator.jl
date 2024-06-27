@@ -97,7 +97,7 @@ function construct_edges_iter_methods(T::DataType, attr, simsymbol, FT)
             # this code is only reached for is.nextedgeidx > len, which means
             # we move on our outer iterator to the next agent and call
             # the iterate function recursivly.
-        elseif length(is.agentiter) == 0
+        elseif isempty(is.agentiter)
             return nothing
         end
         currentagentid = Iterators.take(is.agentiter, 1) |> only
