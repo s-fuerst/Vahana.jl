@@ -139,6 +139,15 @@ end
 
 
 @testset "Core" begin
+    @testset "ModelImmortal" begin
+        @test model.immortal[1] == false
+        @test model.immortal[2] == false
+        @test model.immortal[3] == true
+        @test model.immortal[4] == true
+        @test model.immortal[5] == true
+        @test model.immortal[6] == false
+    end
+    
     @testset "with_edge" begin
         sim = create_simulation(model; logging = true, debug = true)
 
@@ -160,15 +169,9 @@ end
             nothing
         end
         @test num_agents(sim, AMortal) == 99
-    end
-    
-    @testset "ModelImmortal" begin
-        @test model.immortal[1] == false
-        @test model.immortal[2] == false
-        @test model.immortal[3] == true
-        @test model.immortal[4] == true
-        @test model.immortal[5] == true
-        @test model.immortal[6] == false
+
+        finish_simulation!(sim)
+        finish_simulation!(sim2)
     end
     
     (sim, a1id, a2id, a3id, avids, avfids) = createsim()
@@ -394,10 +397,13 @@ end
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(7)
         disable_transition_checks(false)
+
+        finish_simulation!(sim)
     end
 
+    
 
-    finish_simulation!(sim)
+
     
     @testset "Mapreduce" begin
         sim = create_simulation(model; name = "Mapreduce")
