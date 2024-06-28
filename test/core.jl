@@ -16,6 +16,8 @@ struct ADefault
     foo::Int64
     bool::Bool
 end
+struct AIndependent           foo::Int64 end
+
 
 allagenttypes = [ AMortal, AImm, AImmFixed ]
 
@@ -25,19 +27,18 @@ struct ESDict  foo::Int64 end
 struct ESLDict1 end
 struct ESLDict2 end
 
-begin
-    model = ModelTypes() |>
-        register_agenttype!(AMortal) |>
-        register_agenttype!(AMortalFixed) |> 
-        register_agenttype!(AImm, :Immortal) |>
-        register_agenttype!(AImmFixed, :Immortal) |>
-        register_agenttype!(AImmFixedOversize, :Immortal) |>
-        register_agenttype!(ADefault) |>
-        register_edgetype!(ESDict) |>
-        register_edgetype!(ESLDict1) |> 
-        register_edgetype!(ESLDict2, :SingleType; target = AImm) |>
-        create_model("Test Core")
-end
+model = ModelTypes() |>
+    register_agenttype!(AMortal) |>
+    register_agenttype!(AMortalFixed) |> 
+    register_agenttype!(AImm, :Immortal) |>
+    register_agenttype!(AImmFixed, :Immortal) |>
+    register_agenttype!(AImmFixedOversize, :Immortal) |>
+    register_agenttype!(ADefault) |>
+    register_agenttype!(AIndependent, :Independent) |>
+    register_edgetype!(ESDict) |>
+    register_edgetype!(ESLDict1) |> 
+    register_edgetype!(ESLDict2, :SingleType; target = AImm) |>
+    create_model("Test Core")
 
 
 function add_example_network!(sim)
@@ -121,22 +122,6 @@ function createsim()
 
     (sim, a1id, a2id, a3id, avids, avfids)
 end
-
-# struct AMortal           foo::Int64 end
-# struct AMortalFixed      foo::Int64 end
-# struct AImm              foo::Int64 end
-# struct AImmFixed         foo::Int64 end
-# struct AImmFixedOversize foo::Int64 end
-# struct ADefault
-#     foo::Int64
-#     bool::Bool
-# end
-
-# # ES = EdgeState and ESL = EdgeStateless
-# struct ESDict  foo::Int64 end
-# struct ESLDict1 end
-# struct ESLDict2 end
-
 
 @testset "Core" begin
     @testset "ModelImmortal" begin
@@ -402,6 +387,78 @@ end
     end
 
     
+    
+    @testset "independent" begin
+        sim = create_simulation(model)
+        ids = [ add_agent!(sim, AIndependent(i)) for i in 1:10 ]
+        for from in ids
+            for to in ids
+                add_edge!(sim, from, to, ESLDict1())
+            end
+        end
+
+        finish_init!(sim)
+
+        @test num_agents(sim, AIndependent) == 10
+        @test num_edges(sim, ESLDict1) == 10 * 10
+
+        # remove agent i, all other add edges of type ESDict to the neighbors
+        apply!(sim, AIndependent,
+               [AIndependent, ESLDict1],
+               [AIndependent, ESDict]) do state, id, sim
+                   if state.foo == 1
+                       nothing
+                   else
+                       foreach(neighborids(sim, id, ESLDict1)) do nid
+                           add_edge!(sim, nid, id, ESDict(state.foo))
+                           add_edge!(sim, id, nid, ESDict(state.foo))
+                       end
+                       state
+                   end
+               end
+
+        @test num_agents(sim, AIndependent) == 9
+        @test num_edges(sim, ESLDict1) == 9 * 9
+        @test num_edges(sim, ESDict) == 9 * 9 * 2
+
+        apply!(sim,
+               AIndependent,
+               [AIndependent, ESLDict1],
+               [AIndependent, ESDict]) do state, id, sim
+                   if state.foo == 2
+                       nothing
+                   else
+                       foreach(neighborids(sim, id, ESLDict1)) do nid
+                           add_edge!(sim, nid, id, ESDict(state.foo))
+                           add_edge!(sim, id, nid, ESDict(state.foo))
+                       end
+                       state
+                   end
+               end
+
+        @test num_agents(sim, AIndependent) == 8
+        @test num_edges(sim, ESLDict1) == 8 * 8
+        @test num_edges(sim, ESDict) == 8 * 8 * 2
+
+
+        apply!(sim,
+               AIndependent,
+               [AIndependent, ESLDict1],
+               [AIndependent, ESDict]) do state, id, sim
+                   nid = add_agent!(sim, AIndependet(state.foo))
+                   state
+                   foreach(neighborids(sim, id, ESLDict1)) do nid
+                       add_edge!(sim, nid, id, ESDict(state.foo))
+                       add_edge!(sim, id, nid, ESDict(state.foo))
+                   end
+               end
+
+        @test num_agents(sim, AIndependent) == 16
+        @test num_edges(sim, ESLDict1) == 8 * 8
+        @test num_edges(sim, ESDict) == 8 * 8 * 2 + 8 * 2
+        
+        finish_simulation!(sim)
+    end
 
 
     

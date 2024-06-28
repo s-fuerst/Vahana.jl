@@ -82,10 +82,11 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, hints...) where T
 
     hints = Set{Symbol}(hints)
     for hint in hints
-        @assert hint in [:Immortal] """\n
+        @assert hint in [:Immortal, :Independent] """\n
         The agent type hint $hint is unknown for type $T. The following hints are
         supported: 
             :Immortal
+            :Independent
         """
     end
 

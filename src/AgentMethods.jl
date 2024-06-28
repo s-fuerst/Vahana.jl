@@ -9,6 +9,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     # in mpi calls the value of the died entry
     stateless = fieldcount(T) == 0
     immortal = :Immortal in attr[:hints]
+    independent = :Independent in attr[:hints]
     mortal = ! immortal
 
     nompi = ! mpi.active
@@ -21,8 +22,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     
     @eval function init_field!(sim::$simsymbol, ::Type{$T})
         @agentread($T) = AgentReadWrite($T)
+        # for independent types we only use the reusable field of the struct
         @agentwrite($T) = AgentReadWrite($T)
-        @nextid($T) = AgentNr(1)
 
         for ET in sim.typeinfos.edges_types
             @agent($T).last_transmit[ET] = -1
@@ -33,29 +34,56 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     
     typeid = typeinfos.nodes_type2id[T]
 
-    @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
-        if $mortal && length(@readreuseable($T)) > 0
-            nr = pop!(@readreuseable($T))
-            @writedied($T)[nr] = false
-            nr
-        else   # immortal or no reusable row was found, use the next row
-            nr = @nextid($T)
-            # TODO AGENT: add an assterions that we have ids left
-            @nextid($T) = nr + 1
-            if nr > length(@writestate($T))
-                resize!(@writestate($T), nr)
-                # the length of writestate and writedied is always
-                # the same, so we don't need a seperate if
-                if $mortal
-                    resize!(@writedied($T), nr)
+    
+    if independent
+        @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
+            if $mortal && length(@readreuseable($T)) > 0
+                nr = pop!(@readreuseable($T))
+                @readdied($T)[nr] = false
+                nr
+            else   # immortal or no reusable row was found, use the next row
+                nr = @nextid($T)
+                # TODO AGENT: add an assterions that we have ids left
+                @nextid($T) = nr + 1
+                if nr > length(@readstate($T))
+                    resize!(@readstate($T), nr)
+                    # the length of readstate and readdied is always
+                    # the same, so we don't need a seperate if
+                    if $mortal
+                        resize!(@readdied($T), nr)
+                    end
                 end
-            end
-            if $mortal
+                if $mortal
+                    @readdied($T)[nr] = false
+                end
+                nr
+            end       
+        end    
+    else
+        @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
+            if $mortal && length(@readreuseable($T)) > 0
+                nr = pop!(@readreuseable($T))
                 @writedied($T)[nr] = false
-            end
-            nr
-        end       
-    end    
+                nr
+            else   # immortal or no reusable row was found, use the next row
+                nr = @nextid($T)
+                # TODO AGENT: add an assterions that we have ids left
+                @nextid($T) = nr + 1
+                if nr > length(@writestate($T))
+                    resize!(@writestate($T), nr)
+                    # the length of writestate and writedied is always
+                    # the same, so we don't need a seperate if
+                    if $mortal
+                        resize!(@writedied($T), nr)
+                    end
+                end
+                if $mortal
+                    @writedied($T)[nr] = false
+                end
+                nr
+            end       
+        end
+    end
 
     @eval function add_agent!(sim::$simsymbol, agent::$T)
         @mayassert sim.initialized == false || sim.intransition """
@@ -71,7 +99,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
           $T must be in the `write` argument of the transition function.
         """
         nr = _get_next_id(sim, $T)
-        @inbounds @writestate($T)[nr] = agent
+        if $independent
+            @inbounds @readstate($T)[nr] = agent
+        else
+            @inbounds @writestate($T)[nr] = agent
+        end
         agent_id($typeid, nr)
     end
 
@@ -142,19 +174,41 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
     @eval agent_id(_::$simsymbol, agent_nr, ::Type{$T}) =
         agent_id($typeid, agent_nr)
-    
-    @eval @inline function transition_with_write!(sim, idx, newstate, ::Type{$T})
-        if $immortal
-            @mayassert begin
-                newstate !== nothing
-            end "You can not return `nothing` for immortal agents" 
-            @inbounds @writestate($T)[idx] = newstate
-        else
-            if isnothing(newstate)
-                push!(@writereuseable($T), idx)
-                @inbounds @writedied($T)[idx] = true
+
+    if independent
+        @eval @inline function transition_with_write!(sim, idx, newstate, ::Type{$T})
+            if $immortal
+                @mayassert begin
+                    newstate !== nothing
+                end "You can not return `nothing` for immortal agents" 
+                @inbounds @readstate($T)[idx] = newstate
             else
+                if isnothing(newstate)
+                    # writereuseable is needed to collect all
+                    # died agents. When we would use @readreusable
+                    # we entries could be poped via add_agents
+                    # and we would forgot to remove the edges
+                    push!(@writereuseable($T), idx)
+                    @inbounds @readdied($T)[idx] = true
+                else
+                    @inbounds @readstate($T)[idx] = newstate
+                end
+            end
+        end
+    else
+        @eval @inline function transition_with_write!(sim, idx, newstate, ::Type{$T})
+            if $immortal
+                @mayassert begin
+                    newstate !== nothing
+                end "You can not return `nothing` for immortal agents" 
                 @inbounds @writestate($T)[idx] = newstate
+            else
+                if isnothing(newstate)
+                    push!(@writereuseable($T), idx)
+                    @inbounds @writedied($T)[idx] = true
+                else
+                    @inbounds @writestate($T)[idx] = newstate
+                end
             end
         end
     end
@@ -241,7 +295,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         if $immortal 
             # distributing the initial graph or reading from file will
             # also kill immortal agents, so we can assert this only
-            # after the sim is initialized
+            # after the sim is initialized.
+            # for agentypes in call, add_existing is always set to true
             if sim.initialized
                 @assert begin
                     T = $T
@@ -253,7 +308,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
         end
         if ! add_existing
-            @agentwrite($T) = AgentReadWrite($T)
+            if $independent
+                @agentread($T) = AgentReadWrite($T)
+            else
+                @agentwrite($T) = AgentReadWrite($T)
+            end
             @nextid($T) = 1
             if $mortal
                 # As we start from 1, we empty the reuseable `nr`
@@ -315,7 +374,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             empty!(@agent($T).foreigndied)
         end
 
-        if ! $stateless
+        if (! $stateless && ! $independent)||(! $stateless && ! sim.initialized)
             if ! isnothing(@windows($T).shmstate)
                 MPI.free(@windows($T).shmstate)
             end
@@ -332,7 +391,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
             # maybe the state has change, so we must clear the cache 
             empty!(@agent($T).foreignstate)
-        else
+        elseif $stateless
             # for stateless T this is a fast operation (25 ns), and
             # we need this to detect the number of agents in the
             # case that they are immortal (in this case we could use
@@ -340,7 +399,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             # ensure that readstate is available
             @readstate($T) = fill($T(), length(@writestate($T)))
         end
-        if $mortal
+
+        if $mortal && ! $independent
             if ! isnothing(@windows($T).shmdied)
                 MPI.free(@windows($T).shmdied)
             end
@@ -356,13 +416,13 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             @readdied($T) = sarr
         end
         
-        if ! $stateless
+        if ! $stateless && ! $independent
             @agent($T).shmstate = 
                 [ MPI.Win_shared_query(Array{$T},
                                        @windows($T).shmstate;
                                        rank = i - 1) for i in 1:mpi.shmsize ]
         end
-        if $mortal
+        if $mortal && ! $independent
             @agent($T).shmdied = 
                 [ MPI.Win_shared_query(Array{Bool},
                                        @windows($T).shmdied;
