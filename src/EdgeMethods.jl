@@ -1,4 +1,5 @@
 import Base.zero
+using DataStructures
 
 # In the following comment:
 # SType stands for the :SingleType hint
@@ -53,7 +54,7 @@ function construct_types(T, attr::Dict{Symbol, Any})
     A = if singletype
         "Vector{"
     else
-        "Dict{AgentID,"
+        "RobinDict{AgentID,"
     end
 
     B = if stateless

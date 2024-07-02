@@ -126,7 +126,18 @@ for other purposes, they are not guaranteed to be stable.
 See also [`add_agents!`](@ref), [`add_edge!`](@ref) and [`add_edges!`](@ref)
 
 """
-function add_agent!(::Simulation, agent) end
+function add_agent!(::Simulation, agent)
+    if typeof(agent) == DataType
+        error("""
+`add_agent!(sim, agent)` is called with a DataType as value for `agent`. 
+Maybe you forgot the `()` behind the DataType?
+""")
+    else
+    error("""
+`add_agent!(sim, agent)` is called for the unregistered type $(typeof(agent))
+    """)
+    end
+end
 
 
 """
@@ -287,6 +298,8 @@ See also [`add_agents!`] and [`all_agents`](@ref).
 function num_agents(sim, ::Type{T}, sum_ranks = true) where T
     field = getproperty(sim, Symbol(T))
     attr = sim.typeinfos.nodes_attr[T]
+
+#    independent = :Independent in attr[:hints]
 
     local_num = if :Immortal in attr[:hints]
         # we can not just access the length of read.state, as for

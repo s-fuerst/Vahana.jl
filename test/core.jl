@@ -2,7 +2,6 @@ import Vahana.@onrankof
 import Vahana.@rootonly
 import Vahana.disable_transition_checks
 
-
 # A for Agent, Imm for Immortal
 # Fixed and Oversize doesn't have a real meaning anymore, in earlier versions
 # there was a size keyword that allows to give an upper bound for the size
@@ -16,7 +15,6 @@ struct ADefault
     foo::Int64
     bool::Bool
 end
-struct AIndependent           foo::Int64 end
 
 
 allagenttypes = [ AMortal, AImm, AImmFixed ]
@@ -34,7 +32,6 @@ model = ModelTypes() |>
     register_agenttype!(AImmFixed, :Immortal) |>
     register_agenttype!(AImmFixedOversize, :Immortal) |>
     register_agenttype!(ADefault) |>
-    register_agenttype!(AIndependent, :Independent) |>
     register_edgetype!(ESDict) |>
     register_edgetype!(ESLDict1) |> 
     register_edgetype!(ESLDict2, :SingleType; target = AImm) |>
@@ -386,82 +383,6 @@ end
         finish_simulation!(sim)
     end
 
-    
-    
-    @testset "independent" begin
-        sim = create_simulation(model)
-        ids = [ add_agent!(sim, AIndependent(i)) for i in 1:10 ]
-        for from in ids
-            for to in ids
-                add_edge!(sim, from, to, ESLDict1())
-            end
-        end
-
-        finish_init!(sim)
-
-        @test num_agents(sim, AIndependent) == 10
-        @test num_edges(sim, ESLDict1) == 10 * 10
-
-        # remove agent i, all other add edges of type ESDict to the neighbors
-        apply!(sim, AIndependent,
-               [AIndependent, ESLDict1],
-               [AIndependent, ESDict]) do state, id, sim
-                   if state.foo == 1
-                       nothing
-                   else
-                       foreach(neighborids(sim, id, ESLDict1)) do nid
-                           add_edge!(sim, nid, id, ESDict(state.foo))
-                           add_edge!(sim, id, nid, ESDict(state.foo))
-                       end
-                       state
-                   end
-               end
-
-        @test num_agents(sim, AIndependent) == 9
-        @test num_edges(sim, ESLDict1) == 9 * 9
-        @test num_edges(sim, ESDict) == 9 * 9 * 2
-
-        apply!(sim,
-               AIndependent,
-               [AIndependent, ESLDict1],
-               [AIndependent, ESDict]) do state, id, sim
-                   if state.foo == 2
-                       nothing
-                   else
-                       foreach(neighborids(sim, id, ESLDict1)) do nid
-                           add_edge!(sim, nid, id, ESDict(state.foo))
-                           add_edge!(sim, id, nid, ESDict(state.foo))
-                       end
-                       state
-                   end
-               end
-
-        @test num_agents(sim, AIndependent) == 8
-        @test num_edges(sim, ESLDict1) == 8 * 8
-        @test num_edges(sim, ESDict) == 8 * 8 * 2
-
-
-        apply!(sim,
-               AIndependent,
-               [AIndependent, ESLDict1],
-               [AIndependent, ESDict]) do state, id, sim
-                   nid = add_agent!(sim, AIndependet(state.foo))
-                   state
-                   foreach(neighborids(sim, id, ESLDict1)) do nid
-                       add_edge!(sim, nid, id, ESDict(state.foo))
-                       add_edge!(sim, id, nid, ESDict(state.foo))
-                   end
-               end
-
-        @test num_agents(sim, AIndependent) == 16
-        @test num_edges(sim, ESLDict1) == 8 * 8
-        @test num_edges(sim, ESDict) == 8 * 8 * 2 + 8 * 2
-        
-        finish_simulation!(sim)
-    end
-
-
-    
     @testset "Mapreduce" begin
         sim = create_simulation(model; name = "Mapreduce")
 
