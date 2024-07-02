@@ -299,6 +299,10 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         must_copy_mem = length(@writestate($T)) > length(@readstate($T)) ||
             ! sim.initialized ||
             ! $independent
+
+        # copy_mem needs collective calls, so if one rank want to
+        # copy_mem, all must participate
+        must_copy_mem = MPI.Allreduce(must_copy_mem, |, MPI.COMM_WORLD)
         
         if $mortal
             network_changed = fill(false, length(sim.typeinfos.edges_types))

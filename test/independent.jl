@@ -1,6 +1,5 @@
 using Vahana
 using Test
-using Infiltrator
 
 struct AIndependent
     foo::Int64
@@ -81,8 +80,6 @@ model = ModelTypes() |>
     @test num_edges(sim, AEdge) == num_edges(simnot, AEdge)
     @test num_edges(sim, AFooEdge) == num_edges(simnot, AFooEdge)
 
-    @infiltrate
-
     apply!(sim,
            AIndependent,
            [AIndependent, AEdge],
@@ -118,20 +115,15 @@ model = ModelTypes() |>
     @test num_edges(sim, AEdge) == num_edges(sim, AEdge)
     @test num_edges(sim, AFooEdge) == num_edges(sim, AFooEdge)
 
-    @infiltrate
-
-
     apply!(sim,
            AIndependent,
            [AIndependent, AEdge],
            [AIndependent, AFooEdge];
            add_existing = AFooEdge) do state, id, sim
                nid = add_agent!(sim, AIndependent(state.foo+10))
-               @info nid
                add_edge!(sim, nid, id, AFooEdge(nid))
                add_edge!(sim, id, nid, AFooEdge(nid))
                nid = add_agent!(sim, AIndependent(state.foo+20))
-               @info nid
                add_edge!(sim, nid, id, AFooEdge(nid))
                add_edge!(sim, id, nid, AFooEdge(nid))
                state
@@ -156,8 +148,8 @@ model = ModelTypes() |>
     @test num_edges(sim, AEdge) == num_edges(sim, AEdge)
     @test num_edges(sim, AFooEdge) == num_edges(sim, AFooEdge)
 
-    @infiltrate
-
     finish_simulation!(sim)
+
+    sleep(mpi.rank * 0.05)
 end
 

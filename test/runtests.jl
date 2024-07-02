@@ -25,6 +25,8 @@ include("edgesiterator.jl")
 
 include("parametric_types.jl")
 
+include("independent.jl")
+
 # depends on core
 include("globals.jl")
 
