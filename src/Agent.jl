@@ -202,7 +202,7 @@ agentstate_flexible(sim, id::AgentID) =
     agentstate(sim, id, sim.typeinfos.nodes_id2type[type_nr(id)])
 
 """
-    all_agents(sim, ::Type{T}, [all_ranks=false])
+    all_agents(sim, ::Type{T}, [all_ranks=true])
 
 This function retrieves a vector of the states for all agents of type T of the
 simulation `sim`.
@@ -243,7 +243,7 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
 end
 
 """
-    all_agentids(sim, ::Type{T}, [all_ranks=false])
+    all_agentids(sim, ::Type{T}, [all_ranks=true])
 
 This function retrieves a vector of the current ids for all agents of type T of
 the simulation `sim`. 
@@ -287,7 +287,7 @@ function all_agentids(sim, ::Type{T}, all_ranks = true) where T
 end
 
 """
-    num_agents(sim, ::Type{T}, [all_ranks=false])
+    num_agents(sim, ::Type{T}, [all_ranks=true])
 
 If `all_ranks` is `true` this function retrieves the number of agents of type T
 of the simulation `sim`. When it is set to `false`, the function will return the

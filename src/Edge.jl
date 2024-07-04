@@ -5,6 +5,7 @@ export neighborstates, neighborstates_flexible
 export neighborstates_iter, neighborstates_flexible_iter
 export neighborids, neighborids_iter
 export remove_edges!
+export all_edges
 
 # For many function declared in this file, the concrete impementation depends
 # on the hints of the edge type and the function itself is build via
@@ -385,4 +386,25 @@ function num_edges(sim, t::Type{T}, sum_ranks = true; write = nothing) where T
     else
         local_num
     end
+end
+
+
+"""
+    all_edges(sim, ::Type{T}, [all_ranks=true])
+
+This function retrieves a vector of (AgentID, Edge) tuples for all edges of
+type T of the simulation `sim`.
+
+The AgentID in the tuple is the target of the edge. The specific form
+of the edge in the tuple depends on the hints for type T.
+
+The `all_ranks` argument determines whether to include edges from all
+ranks or just the current rank in parallel simulations. When
+`all_ranks` is `true`, the function returns a vector of all edges
+identifiers across all ranks.  
+
+See also [`add_edge!`](@ref) and [`num_edges`](@ref).
+"""
+function all_edges(sim, edgetype::Type, all_ranks = true) where T
+    @error "all_edges is called for the unregisterted edgetype $(edgetype)"
 end

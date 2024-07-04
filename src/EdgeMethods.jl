@@ -1000,4 +1000,31 @@ else
     end
 end
 
+
+###
+@eval function all_edges(sim, t::Type{$T}, all_ranks = true) 
+    if num_edges(sim, $T) == 0
+        return []
+    end
+
+    prepare_read!(sim, [], $T)
+
+    # when we use collect on edges_iterator, we loose
+    # for whatever reason the type information we need to call join
+    c = Tuple{AgentID, $CE}[]
+
+    for e in edges_iterator(sim, $T, sim.initialized)
+        push!(c, e)
+    end
+
+    finish_read!(sim, $T)
+        
+    if all_ranks
+        join(c)
+    else
+        c
+    end
+end
+
+
 end

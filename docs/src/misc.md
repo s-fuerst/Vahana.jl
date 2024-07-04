@@ -18,6 +18,7 @@ num_agents
 ## Edges
 
 ```@docs
+all_edges
 num_edges(sim, t::Type{T}, sum_ranks = true; write = nothing) where T
 ```
 
