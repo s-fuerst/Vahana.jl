@@ -601,34 +601,34 @@ by calling suppress_warnings(true) after importing Vahana.
 
     
     # iterate over all edge containers for the agents on the rank,
-    # search for edges where on of the agents in the from vector is in
-    # the source position, and remove those edges.
-    @eval function _remove_edges_agent_source!(sim::$simsymbol,
-                                        from::Vector{AgentID}, ::Type{$T})
-        # when we don't know where there edges are come from, we can not
-        # remove them
-        if $ignorefrom
-            return false
-        end
-
-        network_changed = false
-
-        check_status = config.check_readable
-        config.check_readable = false
-        for f in from
-            if haskey(@agentsontarget($T), f)
-                network_changed = true
-                for t in @agentsontarget($T)[f]
-                    remove_edges!(sim, f, t, $T)
-                end
-                delete!(@agentsontarget($T), f)
-            end
-        end
-
-        config.check_readable = check_status
-        
-        network_changed
+# search for edges where on of the agents in the from vector is in
+# the source position, and remove those edges.
+@eval function _remove_edges_agent_source!(sim::$simsymbol,
+                                    from::Vector{AgentID}, ::Type{$T})
+    # when we don't know where there edges are come from, we can not
+    # remove them
+    if $ignorefrom
+        return false
     end
+
+    network_changed = false
+
+    check_status = config.check_readable
+    config.check_readable = false
+    for f in from
+        if haskey(@agentsontarget($T), f)
+            network_changed = true
+            for t in @agentsontarget($T)[f]
+                remove_edges!(sim, f, t, $T)
+            end
+            delete!(@agentsontarget($T), f)
+        end
+    end
+
+    config.check_readable = check_status
+    
+    network_changed
+end
 
 @eval function init_storage!(sim::$simsymbol, ::Type{$T})
     @storage($T) = [ Tuple{AgentID, $CE}[] for _ in 1:mpi.size ]
@@ -741,6 +741,26 @@ else
     end
 end
 
+#- neighborids_iter
+if singleedge || ignorefrom
+    @eval function neighborids_iter(sim::$simsymbol, to::AgentID, ::Type{$T})
+        @assert false """
+            neighborids_iter is not defined for edgetypes with the 
+            :SingleEdge or :IgnoreFrom hint
+        """
+    end
+elseif stateless
+    @eval function neighborids_iter(sim::$simsymbol, to::AgentID, ::Type{$T})
+        _get_agent_container(sim, to, $T, @edgeread($T))
+    end
+else
+    @eval function neighborids_iter(sim::$simsymbol, to::AgentID, ::Type{$T})
+        ac = _get_agent_container(sim, to, $T, @edgeread($T))
+        isnothing(ac) ? nothing : (e.from for e in ac)
+    end
+end
+
+
 #- neighborstates
 if singleedge
     @eval function neighborstates(sim::$simsymbol, id::AgentID,
@@ -760,6 +780,26 @@ else
     end
 end
 
+#- neighborstates_iter
+if singleedge || ignorefrom
+    @eval function neighborstates_iter(sim::$simsymbol, id::AgentID,
+                                edgetype::Type{$T}, agenttype::Type) 
+        @assert false """
+            neighborstates_iter is not defined for edgetypes with the 
+            :SingleEdge or :IgnoreFrom hint
+        """
+    end
+else
+    @eval function neighborstates_iter(sim::$simsymbol, id::AgentID,
+                                edgetype::Type{$T}, agenttype::Type)
+        nids = neighborids(sim, id, edgetype)
+        if nids === nothing
+            nothing
+        else
+            (agentstate(sim, nid, agenttype) for nid in nids)
+        end
+    end
+end
 
 #- edgestates
 if !stateless
@@ -785,6 +825,25 @@ else
         @assert false """
             edgestates is not defined for the hint combination of $t
             """
+    end
+end
+
+#- edgestate_iter
+if singleedge || stateless
+    @eval function edgestates_iter(sim::$simsymbol, to::AgentID, ::Type{$T})
+        @assert false """
+            edgestates_iter is not defined for edgetypes with the 
+            :SingleEdge or :Stateless hint
+        """
+    end
+elseif ignorefrom
+    @eval function edgestates_iter(sim::$simsymbol, to::AgentID, ::Type{$T})
+        _get_agent_container(sim, to, $T, @edgeread($T))
+    end
+else
+    @eval function edgestates_iter(sim::$simsymbol, to::AgentID, ::Type{$T})
+        ac = _get_agent_container(sim, to, $T, @edgeread($T))
+        isnothing(ac) ? nothing : (e.state for e in ac)
     end
 end
 

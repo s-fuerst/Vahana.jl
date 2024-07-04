@@ -169,6 +169,12 @@ function runedgestest()
                 @test e[2] == t(2)
                 e = edgestates(sim, a2id, t)
                 @test e === nothing
+
+                e = edgestates_iter(sim, a3id, t) |> collect
+                @test e[1] == t(1)
+                @test e[2] == t(2)
+                e = edgestates_iter(sim, a2id, t)
+                @test e === nothing
             end
             for t in [EdgeE, EdgeEI]
                 e = edgestates(sim, a3id, t)
@@ -178,6 +184,7 @@ function runedgestest()
             for t in [EdgeS, EdgeST, EdgeSTs, EdgeSI, EdgeSTI, EdgeSTsI,
                    EdgeSE, EdgeSEI, EdgeSETI, EdgeSETsI]
                 @test_throws AssertionError edgestates(sim, a1id, t)
+                @test_throws AssertionError edgestates_iter(sim, a1id, t)
             end
         end
         

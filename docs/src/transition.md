@@ -45,12 +45,14 @@ agentstate_flexible
 
 To get the states of all agents that are connected to an agent (with
 the agent as target) via edges of a specific edge type, the
-neighborstates functions can be useful (they are combing
+neighborstates(_iter) functions can be useful (they are combing
 [`neighborids`](@ref) and [`agentstate`](@ref)).
 
 ```@docs
 neighborstates
 neighborstates_flexible
+neighborstates_iter
+neighborstates_flexible_iter
 ```
 
 ## Get Edge(state)
@@ -58,7 +60,9 @@ neighborstates_flexible
 ```@docs
 edges
 edgestates
+edgestates_iter
 neighborids
+neighborids_iter
 num_edges(::Simulation, id::AgentID, edgetype::Type) 
 has_edge
 ```

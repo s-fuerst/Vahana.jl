@@ -185,11 +185,15 @@ end
         # we must disable the neighborids checks
         @onrankof avids[1] @test length(neighborids(sim, avids[1], ESLDict2)) == 1
         @onrankof avids[10] @test length(neighborids(sim, avids[10], ESLDict2)) == 1
+        @onrankof avids[1] @test length(neighborids_iter(sim, avids[1], ESLDict2)) == 1
+        @onrankof avids[10] @test length(neighborids_iter(sim, avids[10], ESLDict2)) == 1
 
         es = edges(sim, a1id, ESLDict1)
         @onrankof a1id @test (es)[1].from == avids[1]
         @onrankof a1id @test (es)[10].from == avids[10]
         es = neighborids(sim, avids[10], ESLDict2)
+        @onrankof avids[10] @test es[1] == avfids[10]
+        es = neighborids_iter(sim, avids[10], ESLDict2) |> collect
         @onrankof avids[10] @test es[1] == avfids[10]
         Vahana.disable_transition_checks(false)
     end
@@ -197,7 +201,9 @@ end
     @testset "neighborstates" begin
         Vahana.disable_transition_checks(true)
         @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
+        @onrankof a1id @test AImm(1) in collect(neighborstates(sim, a1id, ESLDict1, AImm))
         @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
+        @onrankof a1id @test AMortal(3) in collect(neighborstates_flexible_iter(sim, a1id, ESDict))
         Vahana.disable_transition_checks(false)
     end
 

@@ -1,8 +1,9 @@
-export Edge, edgestates
+export Edge, edgestates, edgestates_iter
 export add_edge!, add_edges!, edges
 export num_edges, has_edge
 export neighborstates, neighborstates_flexible
-export neighborids
+export neighborstates_iter, neighborstates_flexible_iter
+export neighborids, neighborids_iter
 export remove_edges!
 
 # For many function declared in this file, the concrete impementation depends
@@ -133,9 +134,9 @@ If there is no edge with agent `id` as target, `edges` returns `nothing`.
 
 edges is not defined if `E` has the hint :IgnoreFrom or :Stateless.
 
-See also [`apply!`](@ref), [`checked`](@ref), [`neighborids`](@ref),
-[`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`neighborstates`](@ref)
+See also [`apply!`](@ref), [`neighborids`](@ref),
+[`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref) and
+[`neighborstates`](@ref)
 """
 function edges(::Simulation, id::AgentID, edgetype::Type) end
 
@@ -150,11 +151,36 @@ If there is no edge with agent `id` as target, `neighborids` returns `nothing`.
 
 `neighborids` is not defined if `E` has the hint :IgnoreFrom.
 
-See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
+!!! tip 
+
+    If the edge type `E` does not have the :Stateless or :SingleEdge 
+    hint, `neighborids` allocates memory for the vector of agent
+    ids. To avoid this allocation, you can use `neighborids_iter` 
+    instead.
+
+See also [`apply!`](@ref), [`edges`](@ref),
 [`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
 and [`neighborstates`](@ref)
 """
 function neighborids(::Simulation, id::AgentID, edgetype::Type) end
+
+
+"""
+    neighborids_iter(sim, id::AgentID, ::Type{E}) 
+
+Returns an iterator of the IDs of the agents on the source side of edges
+of type `E` with agent `id` as target.
+
+If there is no edge with agent `id` as target, the function returns `nothing`.
+
+`neighborids` is not defined if `E` has the hint :SingleEdge or :IgnoreFrom.
+
+See also [`apply!`](@ref), [`neighborids`](@ref), [`edges`](@ref),
+[`edgestates`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
+and [`neighborstates`](@ref)
+"""
+function neighborids_iter(::Simulation, id::AgentID, edgetype::Type) end
+
 
 """
     edgestates(sim, id::AgentID, ::Type{E}) 
@@ -166,11 +192,36 @@ If there is no edge with agent `id` as target, `edgestates` returns `nothing`.
 
 `edgestates` is not defined if `E` has the hint :Stateless.
 
-See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`neighborstates`](@ref)
+!!! tip 
+
+    If the edge type `E` does not have the :Stateless or :SingleEdge
+    hint, `edgestates` allocates memory for the vector of states. To
+    avoid this allocation, you can use `edgestates_iter` instead.
+
+See also [`apply!`](@ref), [`edges`](@ref), [`neighborids`](@ref),
+[`num_edges`](@ref), [`has_edge`](@ref) and [`neighborstates`](@ref)
 """
 function edgestates(::Simulation, id::AgentID, edgetype::Type) end
+
+"""
+    edgestates_iter(sim, id::AgentID, ::Type{E}) 
+
+Returns an iterator of the states of the edges of type `E` with agent
+`id` as target.
+
+If there is no edge with agent `id` as target, the function returns
+`nothing`.
+
+`edgestates_iter` is not defined if `E` has the hint :Stateless or
+:SingleEdge.
+
+
+See also [`apply!`](@ref), [`edgestates`](@ref), [`edges`](@ref),
+[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref) and
+[`neighborstates`](@ref)
+"""
+function edgestates_iter(::Simulation, id::AgentID, edgetype::Type) end
+
 
 """
     neighborstates(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
@@ -188,11 +239,38 @@ types, and it is impossible to determine the Type{A} you can use
 
 `neighborstates` is not defined if T has the hint :IgnoreFrom 
 
-See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`edgestates`](@ref)
+!!! tip 
+
+    If the edge type `E` does not have the :SingleEdge hint,
+    `neighborstates` allocates memory for the vector of agent
+    states. To avoid this allocation, you can use
+    `neighborstates_iter` instead.
+
+See also [`apply!`](@ref), [`edges`](@ref), [`neighborids`](@ref),
+[`num_edges`](@ref), [`has_edge`](@ref) and [`edgestates`](@ref)
 """
 function neighborstates(::Simulation, id::AgentID, edgetype::Type, agenttype::Type) end
+
+"""
+    neighborstates_iter(sim::Simulation, id::AgentID, ::Type{E}, ::Type{A}) 
+
+Returns an iterator for the states of the agents with type `A` 
+on the source of the edges  of type `E` with agent `id` as target.
+
+If there is no edge with agent `id` as target, the function returns `nothing`.
+
+When the agents on the source side of the edges can have different
+types, and it is impossible to determine the Type{A} you can use
+[`neighborstates_flexible_iter`](@ref) instead.
+
+`neighborstates_iter` is not defined if T has the hint :IgnoreFrom or
+:SingleEdge.
+
+See also [`neighborstates`](@ref), [`apply!`](@ref), [`edges`](@ref),
+[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref) and
+[`edgestates`](@ref) 
+"""
+function neighborstates_iter(::Simulation, id::AgentID, edgetype::Type, agenttype::Type) end
 
 
 """
@@ -211,13 +289,48 @@ type of agent can not be determined.
 
 `neighborstates_flexible` is not defined if T has the hint :IgnoreFrom.
 
-See also [`apply!`](@ref), [`checked`](@ref), [`edges`](@ref),
-[`neighborids`](@ref), [`num_edges`](@ref), [`has_edge`](@ref)
-and [`edgestates`](@ref)
+!!! tip 
+
+    If the edge type `E` does not have the :SingleEdge hint,
+    `neighborstates_flexible` allocates memory for the vector of 
+    agent states. To avoid this allocation, you can use
+    `neighborstates_flexible_iter` instead.
+
+See also [`apply!`](@ref), [`edges`](@ref), [`neighborids`](@ref),
+[`num_edges`](@ref), [`has_edge`](@ref) and [`edgestates`](@ref)
 """
 function neighborstates_flexible(sim::Simulation, id::AgentID, edgetype::Type)
     nids = neighborids(sim, id, edgetype)
     isnothing(nids) ? nothing : map(id -> agentstate_flexible(sim, id), nids)  
+end
+
+"""
+    neighborstates_flexible_iter(sim::Simulation, id::AgentID, ::Type{E}) 
+
+Returns an iterator for the states of the agents on the source of the edges 
+of type `E` with agent `id` as target.
+
+If there is no edge with agent `id` as target, the function
+returns `nothing`.
+
+`neighborstates_flexible_iter` is the type instable version of
+[`neighborstates_iter`](@ref) and should be only used in the case that the
+type of agent can not be determined.
+
+`neighborstates_flexible_iter` is not defined if T has the hint
+:IgnoreFrom or the hint :SingleEdge.
+
+See also [`neighborstates_flexible`](@ref), [`apply!`](@ref),
+[`edges`](@ref), [`neighborids`](@ref), [`num_edges`](@ref),
+[`has_edge`](@ref) and [`edgestates`](@ref)
+"""
+function neighborstates_flexible_iter(sim::Simulation, id::AgentID, edgetype::Type)
+    nids = neighborids(sim, id, edgetype)
+    if nids === nothing
+        nothing
+    else
+        (agentstate_flexible(sim, nid) for nid in nids)
+    end
 end
 
 """
@@ -250,7 +363,7 @@ and [`neighborstates`](@ref)
 function has_edge(::Simulation, id::AgentID, edgetype::Type) end
 
 """
-    num_edges(sim, ::Type{T}, [sum_ranks=false])
+    num_edges(sim, ::Type{T}, [sum_ranks=true])
 
 If `all_ranks` is `true` this function retrieves the number of edges of type `T`
 of the simulation `sim`. When it is set to `false`, the function will only return the
