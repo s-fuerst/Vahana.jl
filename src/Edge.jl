@@ -405,6 +405,6 @@ identifiers across all ranks.
 
 See also [`add_edge!`](@ref) and [`num_edges`](@ref).
 """
-function all_edges(sim, edgetype::Type, all_ranks = true) where T
+function all_edges(sim, edgetype::Type, all_ranks = true) 
     @error "all_edges is called for the unregisterted edgetype $(edgetype)"
 end
