@@ -435,6 +435,32 @@ end
         finish_simulation!(sim)
     end
 
+    @testset "add_agent_per_process!" begin
+        sim = create_simulation(model)
+        
+        # Add some initial agents
+        for i in 1:10
+            add_agent!(sim, AMortal(i))
+        end
+        
+        finish_init!(sim)
+        
+        # Test adding an agent per process
+        new_id = add_agent_per_process!(sim, AMortal(100))
+        
+        
+        # Check that the total number of agents has increased by the number of processes
+        @test num_agents(sim, AMortal) == 10 + mpi.size
+        
+        # Test that the function cannot be called within a transition
+        apply!(sim, AMortal, AMortal, AMortal) do state, id, sim
+            @test_throws AssertionError add_agent_per_process!(sim, AMortal(200))
+            state
+        end
+        
+        finish_simulation!(sim)
+    end    
+
     # this hack should help that the output is not scrambled
     sleep(mpi.rank * 0.05)
 end

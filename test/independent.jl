@@ -216,8 +216,6 @@ model = ModelTypes() |>
     @test num_edges(simimmortal, AEdge) == num_edges(simnot, AEdge)
     @test num_edges(simimmortal, AFooEdge) == num_edges(simnot, AFooEdge)
 
-    @infiltrate
-    
     finish_simulation!(sim)
     finish_simulation!(simnot)
     finish_simulation!(simimmortal)

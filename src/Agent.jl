@@ -21,7 +21,7 @@
 
 export AgentID, ProcessID#, AgentNr
 
-export add_agent!, add_agents!
+export add_agent!, add_agents!, add_agent_per_process!
 export agentstate, agentstate_flexible
 export all_agents, all_agentids
 
@@ -314,5 +314,50 @@ function num_agents(sim, ::Type{T}, sum_ranks = true) where T
     else
         local_num
     end
+end
+
+"""
+    add_agent_per_process!(sim::Simulation, agent::T) where T
+
+Add a single agent of type `T` to each process in the simulation. This
+function is designed to be used after initialization (when the
+simulation is distributed to the different processes in a parallel
+run) but outside of transition functions. It allows each process to
+have its own dedicated agent, useful for tasks like random agent
+selection or process-specific operations.
+
+The function takes the simulation and the agent to be added as arguments. It
+returns the `AgentID` of the agent created on the current process.
+
+!!! warning 
+
+    This function is not designed or optimized for adding many agents. Use
+    it sparingly, typically to create a single agent per process for special
+    purposes. For adding multiple agents, use the standard `add_agent!` or
+    `add_agents!` functions within the appropriate simulation phases.
+
+See also [`add_agent!`](@ref) and [`add_agents!`](@ref).
+"""
+function add_agent_per_process!(sim::Simulation, agent::T) where T
+    # Check if the function is called correctly
+    @assert sim.initialized """
+    add_agent_per_process! can only be called after finish_init!"""
+
+    @assert !sim.intransition """
+    add_agent_per_process! cannot be called within a transition function"""
+
+    prepare_write!(sim, [], true, T)
+    # we fake that we a in a transition function, so that the assertion
+    # in add_agent! does not trigger
+    sim.intransition = true
+
+    # Add agent on each process
+    id = add_agent!(sim, agent)
+
+    sim.intransition = false
+    finish_write!(sim, T)
+
+    # return only the id of the agent created on the process 
+    id
 end
 
