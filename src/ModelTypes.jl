@@ -66,6 +66,11 @@ simulation) by returning `nothing` in the transition function (see
 [`apply!`](@ref). In the case that agents are never removed, the hint
 :Immortal can be given to improve the performance of the simulation.
 
+If agents of this type never access the state of other agents of the
+same type in a transition function (e.g., via agentstate or neighborstates
+calls), then the :Independent hint can be given. This avoids
+unnecessary copies of the agents.
+
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
 function register_agenttype!(types::ModelTypes, ::Type{T}, hints...) where T

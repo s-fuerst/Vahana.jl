@@ -44,8 +44,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             nr
         else   # immortal or no reusable row was found, use the next row
             nr = @nextid($T)
-            # TODO AGENT: add an assterions that we have ids left
+            # TODO AGENT: add an assertions that we have ids left
             @nextid($T) = nr + 1
+            # this time we do not need an extra handling for the independent
+            # hint, as we can not resize the read array (which is a
+            # MPI shared array). Instead we copy in the case that the
+            # array increased the new elements in finish_write.
             if nr > length(@writestate($T))
                 resize!(@writestate($T), nr)
                 # the length of writestate and writedied is always
