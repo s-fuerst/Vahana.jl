@@ -180,7 +180,7 @@ end
         finish_init!(sim)
 
         # And then remove every second agents of type AgentB.
-        apply!(sim, AgentB, AgentB, AgentB; add_existing = ET) do self, id, sim
+        apply!(sim, AgentB, AgentB, AgentB) do self, id, sim
             self.foo % 2 == 0 ? self : nothing
         end
 

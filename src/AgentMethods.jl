@@ -37,9 +37,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     @eval function _get_next_id(sim::$simsymbol, ::Type{$T})
         if $mortal && length(@readreuseable($T)) > 0
             nr = pop!(@readreuseable($T))
-            if $independent
-                @readdied($T)[nr] = false
-            end
             @writedied($T)[nr] = false
             nr
         else   # immortal or no reusable row was found, use the next row
@@ -386,11 +383,13 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             @readstate($T) = fill($T(), length(@writestate($T)))
         end
 
-        if $mortal && must_copy_mem
-            if $independent && sim.initialized
-                memcpy!(@writedied($T), @readdied($T),
-                        length(@readdied($T)) * sizeof(Bool))
-            end
+        # for the independent case, we can not set died to true directly
+        # in the transition function, as in the case that the reused id is
+        # after the id of the agent that add the agent, we will
+        # call the new agent already in the same iteration.
+        # So we have no seperate handling for the indepent case for
+        # the died vector.
+        if $mortal 
             if ! isnothing(@windows($T).shmdied)
                 MPI.free(@windows($T).shmdied)
             end

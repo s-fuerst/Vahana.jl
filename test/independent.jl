@@ -158,10 +158,9 @@ model = ModelTypes() |>
                end
            end
     
-    
     @test num_agents(sim, AIndependent) == num_agents(simnot, ANotIndependent)
-    @test num_edges(sim, AEdge) == num_edges(sim, AEdge)
-    @test num_edges(sim, AFooEdge) == num_edges(sim, AFooEdge)
+    @test num_edges(sim, AEdge) == num_edges(simnot, AEdge)
+    @test num_edges(sim, AFooEdge) == num_edges(simnot, AFooEdge)
     @test num_agents(simimmortal, AIndependentImmortal) == num_agents(simnot, ANotIndependent)
     @test num_edges(simimmortal, AEdge) == num_edges(simnot, AEdge)
     @test num_edges(simimmortal, AFooEdge) == num_edges(simnot, AFooEdge)
@@ -208,10 +207,9 @@ model = ModelTypes() |>
                state
            end
     
-
     @test num_agents(sim, AIndependent) == num_agents(simnot, ANotIndependent)
-    @test num_edges(sim, AEdge) == num_edges(sim, AEdge)
-    @test num_edges(sim, AFooEdge) == num_edges(sim, AFooEdge)
+    @test num_edges(sim, AEdge) == num_edges(simnot, AEdge)
+    @test num_edges(sim, AFooEdge) == num_edges(simnot, AFooEdge)
     @test num_agents(simimmortal, AIndependentImmortal) == num_agents(simnot, ANotIndependent)
     @test num_edges(simimmortal, AEdge) == num_edges(simnot, AEdge)
     @test num_edges(simimmortal, AFooEdge) == num_edges(simnot, AFooEdge)
