@@ -1019,7 +1019,7 @@ end
 
     finish_read!(sim, $T)
         
-    if all_ranks
+    if all_ranks && mpi.active
         join(c)
     else
         c

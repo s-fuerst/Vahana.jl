@@ -235,7 +235,7 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
 
         [ states[i] for i in 1:length(died) if died[i] == false ]
     end
-    if all_ranks
+    if all_ranks && mpi.active
         join(l)
     else
         l
