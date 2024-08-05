@@ -126,9 +126,10 @@ function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
             field = getfield(sim.globals, i)
             if typeof(field) <: Vector
                 if nrow(df) > 0 && nrow(df) != length(field)
-                    printstyled("""
-Length of :$(fieldname(T,i)) does not match the length of the other vectors, 
-so this field will not be added to the dataframe"""; color = :red)
+#                     @rootonly printstyled("""
+# Length of :$(fieldname(T,i)) does not match the length of the other vectors, 
+# so this field will not be added to the dataframe
+# """; color = :red)
                 else
                     df[!,fieldname(T,i)] = field
                 end

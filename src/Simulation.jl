@@ -1,5 +1,6 @@
 import Base.deepcopy
 import Logging.with_logger
+import Graphs.nv
 
 export create_model
 export create_simulation, finish_simulation!, copy_simulation
@@ -411,7 +412,11 @@ function finish_init!(sim;
                         vahanasimplegraph(sim; show_ignorefrom_warning = false)
                     end
                     part = _log_time(sim, "call Metis.partition", true) do
-                        Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+                        # it's possible to load the graph after the initialization
+                        # in this case we have nothing to partition here
+                        if Graphs.nv(vsg) > 0
+                            Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
+                        end
                     end
                     _log_debug(sim, "<Begin> remap ids")
                     for (i, p) in enumerate(part)
@@ -622,7 +627,13 @@ state after the transition function was called for all agents.
 When an edge state type is in `write`, the current edges of that type
 are removed from the simulation. If you want keep the existing edges
 for a specific type, you can add this type to the optional
-`add_existing` collection.
+`add_existing` collection. 
+
+Similarly, agent types that are in the `write` but not in the `call`
+argument can be part of the `add_existing` collection, so that the
+existing agents of this type are retained and can only be added. For
+agent types in `call`, however, this is achieved by returning their
+state in the transition function.
 
 With the keyword `with_edge` it is possible to restrict the set of
 agents for which the transition function is called to those agents who are on
@@ -666,6 +677,13 @@ function apply!(sim::Simulation,
     write = applicable(iterate, write) ? write : [ write ]
     add_existing = applicable(iterate, add_existing) ?
         add_existing : [ add_existing ]
+
+    for c in call
+        @assert ! (c in add_existing) "$c can not be element of `add_existing`"
+    end
+    for ae in add_existing
+        @assert ae in write "$ae is in `add_existing` but not in `write`"
+    end
 
     readableET = filter(w -> w in sim.typeinfos.edges_types, read)
     foreach(T -> prepare_read!(sim, read, T), readableET)
