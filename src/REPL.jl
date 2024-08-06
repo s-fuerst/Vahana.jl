@@ -24,10 +24,16 @@ function Base.show(io::IO, ::MIME"text/plain", model::Model)
     end
     for T in nodes_types
         node_hints = model.types.nodes_attr[T][:hints]
+        firsthint = true
         print(io, "\n\t Type $T")
-        if :Immortal in node_hints
-            printstyled(io, " with Hint: ")
-            print(io, ":Immortal")
+        for k in node_hints
+            if firsthint
+                firsthint = false
+                printstyled(io, " with Hint(s): ")
+                print(io, "$k")
+            else
+                print(io, ", $k")
+            end
         end
     end
 
@@ -39,15 +45,13 @@ function Base.show(io::IO, ::MIME"text/plain", model::Model)
         edge_hints = model.types.edges_attr[T][:hints]
         firsthint = true
         print(io, "\n\t Type $T")
-        for k in [ :Stateless, :IgnoreFrom, :SingleEdge, :IgnoreSourceState, :SingleType ]
-            if k in edge_hints
-                if firsthint
-                    firsthint = false
-                    printstyled(io, " with Hint(s): ")
-                    print(io, "$k")
-                else
-                    print(io, ", $k")
-                end
+        for k in edge_hints
+            if firsthint
+                firsthint = false
+                printstyled(io, " with Hint(s): ")
+                print(io, "$k")
+            else
+                print(io, ", $k")
             end
         end
         if :SingleType in edge_hints
@@ -270,10 +274,10 @@ If a field of an agent on the source side of an edge is listed in the
 `neighborstate` vector, the value of this field will be also shown.
 """
 function show_agent(sim::Simulation,
-             t::Type{T},
-             id = 0;
-             max::Int = 5,
-             neighborstate = []) where T
+                    t::Type{T},
+                    id = 0;
+                    max::Int = 5,
+                    neighborstate = []) where T
     if !sim.initialized
         println("show_agent can not be called before finish_init!.")
         return
