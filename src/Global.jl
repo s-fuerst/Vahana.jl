@@ -1,4 +1,4 @@
-export set_global!, get_global, push_global!
+export set_global!, get_global, push_global!, modify_global!
 
 """
     get_global(sim::Simulation, name)
@@ -16,12 +16,29 @@ Set the value of the field `name` of the `globals` struct for simulation `sim`.
 
 `set_global!` must not be called within a transition function. 
 
-See also [`create_simulation`](@ref), [`mapreduce`](@ref), [`push_global!`](@ref) and
+See also [`create_simulation`](@ref), [`mapreduce`](@ref), [`modify_global!`](@ref) [`push_global!`](@ref) and
 [`get_global`](@ref)
 """
 function set_global!(sim, name, value)
     sim.globals_last_change = sim.num_transitions - 1
     setfield!(sim.globals, name, value)
+end
+
+
+"""
+    modify_global!(sim::Simulation, name, f)
+
+Modify the value of the `name` field of the `globals` structure for the
+simulation `sim` using the `f` function, which receives the current value as an
+argument.
+
+This is a combination of [`set_global!`](@ref) and [`get_global`](@ref):
+`set_global!(sim, name, f(get_global(sim, name)))`.
+
+`modify_global!` must not be called within a transition function. 
+"""
+function modify_global!(sim, name, f)
+    set_global!(sim, name, f(get_global(sim, name)))
 end
 
 """
