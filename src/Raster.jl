@@ -352,7 +352,7 @@ function rastervalues(sim, raster::Symbol, field::Symbol)
     end
 
     @assert sim.initialized """
-    calc_rasterstate can be only called after finish_init!"""
+    rastervalues can be only called after finish_init!"""
 
     ids = sim.rasters[raster]
     idsvec = reshape(ids, length(ids))

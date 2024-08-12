@@ -15,6 +15,7 @@ You can add a new or additional value to the `globals` struct with:
 ```@docs
 set_global!
 push_global!
+modify_global!
 Vahana.mapreduce
 ```
 

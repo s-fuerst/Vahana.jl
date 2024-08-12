@@ -1,5 +1,10 @@
 using Documenter, Vahana
 
+using Pkg
+Pkg.status("Vahana")
+
+@show names(Vahana)
+
 using GraphMakie, Makie, DataFrames
 
 # this is a really dirty workaround, but for whatever reason the
@@ -47,9 +52,9 @@ makedocs(sitename="Vahana Documentation",
                  "Configuration" => "config.md",
                  "Misc" => "misc.md"
                  # "All" => "index.md"
-             ]
+             ],
 #             "Glossary" => "glossary.md",
-#             "Change Log" => "changelog.md"
+             "Change Log" => "changelog.md"
          ])
 
 deploydocs(
