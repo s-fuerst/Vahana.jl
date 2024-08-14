@@ -105,9 +105,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             # highest priority: does the agent is still living
             if $mortal
                 nr = agent_nr(id)
-                if @readdied($T)[nr] 
-                    return nothing
-                end
+                @mayassert ! @readdied($T)[nr] """
+                agentstate was requested for agent $id that has been removed
+                """
             end
             # if it's living, but has no state, we can return directly
             if $stateless
@@ -127,9 +127,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 # same procedure as above, but with access to shared memory
                 if $mortal
                     nr = agent_nr(id)
-                    if @agent($T).shmdied[sr + 1][nr]
-                        return nothing
-                    end
+                    @mayassert ! @agent($T).shmdied[sr + 1][nr] """
+                    agentstate was requested for agent $id that has been removed
+                    """
                 end
                 if $stateless
                     return $T()
@@ -141,9 +141,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             else
                 # same procedure as above, but with access to foreign nodes
                 if $mortal
-                    if @agent($T).foreigndied[id]
-                        return nothing
-                    end
+                    @mayassert ! @agent($T).foreigndied[id] """
+                    agentstate was requested for agent $id that has been removed
+                    """
                 end
                 if $stateless
                     return $T()
@@ -169,9 +169,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         else
             if isnothing(newstate)
                 push!(@writereuseable($T), idx)
-                if $independent
-                    @inbounds @readdied($T)[idx] = true
-                end
                 @inbounds @writedied($T)[idx] = true
             else
                 if $independent
