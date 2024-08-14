@@ -409,7 +409,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                        @windows($T).shmstate;
                                        rank = i - 1) for i in 1:mpi.shmsize ]
         end
-        if $mortal && must_copy_mem
+        if $mortal
             @agent($T).shmdied = 
                 [ MPI.Win_shared_query(Array{Bool},
                                        @windows($T).shmdied;
