@@ -215,9 +215,17 @@ identifiers across all ranks.
 The states and IDs of the agents returned by `all_agents` and
 [`all_agentids`](@ref) are in the same order.
 
+!!! info
+
+    `all_agents` cannot be called within a transition function if the 
+    argument `all_ranks` is set to true.
+
 See also [`all_agentids`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
 """
 function all_agents(sim, ::Type{T}, all_ranks = true) where T
+    @mayassert (! sim.intransition) || all_ranks == false """
+    all_agents with all_ranks == true can not be called within a transition function
+    """
     @assert fieldcount(T) > 0 """\n
         all_agents can be only called for agent types that have fields.
         To get the number of agents, you can call num_agents instead.
@@ -260,9 +268,18 @@ identifiers across all ranks.
 The states and IDs of the agents returned by [`all_agents`](@ref) and
 `all_agentids` are in the same order.
 
+!!! info
+
+    `all_agentids` cannot be called within a transition function if the 
+    argument `all_ranks` is set to true.
+
 See also [`all_agents`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
 """
 function all_agentids(sim, ::Type{T}, all_ranks = true) where T
+    @mayassert (! sim.intransition) || all_ranks == false """
+    all_agentids with all_ranks == true can not be called within a transition function
+    """
+    
     # we are only interessted in the states field to get the length
     # as this vector is also used for stateless agenttypes
     states = sim.initialized ?
