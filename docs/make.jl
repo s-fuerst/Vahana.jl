@@ -3,8 +3,6 @@ using Documenter, Vahana
 using Pkg
 Pkg.status("Vahana")
 
-@show names(Vahana)
-
 using GraphMakie, Makie, DataFrames
 
 # this is a really dirty workaround, but for whatever reason the
@@ -13,7 +11,7 @@ using GraphMakie, Makie, DataFrames
 
 # But we do not need the sandboxing, as we can have different models
 # in a single julia session.
-import Documenter.Utilities.get_sandbox_module!
+import Documenter.get_sandbox_module!
 get_sandbox_module!(_, _, _) = Main
 
 import Literate
@@ -26,6 +24,20 @@ Literate.markdown(joinpath(@__DIR__, "examples", "predator.jl"), "src"; execute 
 
 Literate.markdown(joinpath(@__DIR__, "examples", "hegselmann.jl"), "src"; execute = false)
 
+###
+makedocs(sitename="Vahana Documentation",
+         modules = [Vahana],
+#         format = Documenter.LaTeX(),
+         format = Documenter.HTML(prettyurls = false,
+                                  edit_link = :commit),
+         clean = false, 
+         pages = [
+             "Tutorials" => [
+                 "Tutorial" => "tutorial1.md",
+             ]
+         ])
+
+###
 makedocs(sitename="Vahana Documentation",
          modules = [Vahana],
 #         format = Documenter.LaTeX(),

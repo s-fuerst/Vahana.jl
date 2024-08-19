@@ -413,7 +413,7 @@ function finish_init!(sim;
                     end
                     part = _log_time(sim, "call Metis.partition", true) do
                         # it's possible to load the graph after the initialization
-                        # in this case we have nothing to partition here
+                        # in this case we have nothing to partition here.
                         if Graphs.nv(vsg) > 0
                             Metis.partition(vsg, mpi.size; alg = :RECURSIVE)
                         end

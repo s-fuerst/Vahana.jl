@@ -1,4 +1,4 @@
-using GraphMakie, Makie, ColorSchemes
+using GraphMakie, Makie, ColorSchemes, Colors
 
 import Graphs, Graphs.SimpleGraphs
 
