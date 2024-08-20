@@ -2,6 +2,8 @@ import DataFrames: DataFrame, subset!, nrow
 
 export DataFrame, GlobalsDataFrame
 
+show_parallel_dataframe_usage_warning = true
+
 """
     DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
 
@@ -20,18 +22,15 @@ of these agents.
     `DataFrame` is only available when the DataFrame.jl package is imported
     by the model implementation. 
 
-!!! warning 
+!!! warning
 
-    In a parallel simulation, the DataFrame method only converts the
-    local part of the graph (agents or edges) that exists on the current
-    MPI rank. It does not provide a global view of the entire distributed
-    graph. For agents the [`all_agents`](@ref) method can be used to 
-    get a vector of the states of all agents.
-
-    In parallel simulations, the DataFrame method converts only the local  
-    graph partition (agents or edges) on the current MPI rank, not providing
-    a global view of the distributed graph. For a complete lists of all agent 
-    states the [`all_agents`](@ref) can be used.
+    In parallel simulations, the `DataFrame` method converts only the
+    local graph partition (agents or edges) residing on the current
+    MPI rank. It does not provide a global view of the entire
+    distributed graph. To obtain a complete list of all agent states
+    across all ranks, use the [`all_agents`](@ref) function. Similarly, for
+    edges, use the [`all_edges`](@ref) function to get a global view of all
+    edges in the distributed graph.
 
 """
 function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
@@ -39,6 +38,22 @@ function DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
         types = true
     end
 
+    if mpi.active && mpi.rank == 0 &&
+        show_parallel_dataframe_usage_warning == true &&
+        config.quiet == false
+        print("""
+
+In a parallel simulation, the `DataFrame(sim...)` function call returns only
+the agents or edges corresponding to the local graph partition for each
+rank.
+
+This warning is displayed once per Julia session and can be suppressed
+by invoking `suppress_warnings(true)` after importing the Vahana package.
+    
+""")
+        global show_parallel_dataframe_usage_warning = false
+    end
+        
     df = DataFrame()
     tinfos = sim.typeinfos
     if T in tinfos.nodes_types # Agents
