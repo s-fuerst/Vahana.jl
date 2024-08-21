@@ -1,7 +1,10 @@
 import LinearAlgebra
 
+import StatsBase: sample, Weights
+
 export add_raster!, connect_raster_neighbors!
 export calc_raster, calc_rasterstate, rastervalues, move_to!, cellid
+export random_pos, random_cell
 
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
@@ -486,3 +489,68 @@ function _checkpos(pos::CartesianIndex, dims, periodic)
         end
     end
 end
+
+"""
+    random_pos(sim, raster::Symbol, weights::Matrix)
+
+Return a CartesianIndex with random position coordinates, weighted by a
+probability matrix `weights`.
+
+The likelihood of selecting a particular cell/index is proportional
+to its corresponding value in the `weights` matrix.
+
+See also [`random_pos(sim, raster)`](@ref) and [`random_cell`](@ref)
+"""
+function random_pos(sim, raster::Symbol, weights::Array)
+    dims = size(sim.rasters[raster])
+    @assert dims == size(weights) """
+    `weights` must have the same dimension as the raster :$(raster)
+    """
+    W = Weights(vec(weights))
+    positions = CartesianIndices(dims) |> collect
+    positions[sample(eachindex(positions), W)]
+end
+
+"""
+    random_pos(sim, raster::Symbol)
+
+Return a CartesianIndex with random position coordinates.
+
+The returned index is sampled from the rasters indizies where each
+index has the same probability.
+
+See also [`random_pos(sim, raster, weights)`](@ref) and
+[`random_cell`](@ref)
+"""
+function random_pos(sim, raster::Symbol)
+    dims = size(sim.rasters[raster])
+    positions = CartesianIndices(dims) |> collect
+    positions[sample(eachindex(positions))]
+end
+
+"""
+    random_cell(sim, raster::Symbol)
+
+Return a random cell id of the raster `raster` from the
+simulation `sim`.
+
+"""
+function random_cell(sim, name::Symbol)
+
+    rand(sim.rasters[name])
+end
+
+"""
+    random_cell(sim, raster::Symbol, weights::Array)
+
+Return a random cell id of the raster `raster` from the simulation
+`sim`. The likelihood of selecting a particular cell is proportional
+to its corresponding value in the `weights` matrix.
+
+See also [`random_cell(sim, raster)`](@ref) and [`random_pos`](@ref)
+"""
+function random_cell(sim, raster::Symbol, weights::Array)
+    W = Weights(vec(weights))
+    sample(vec(sim.rasters[raster]), W)
+end
+

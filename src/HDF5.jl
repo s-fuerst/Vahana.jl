@@ -84,7 +84,10 @@ In the case that an HDF5 file was already created for the simulation
 
 `create_h5file!` can be only called after [`finish_init!`](@ref)
 
-See also [`close_h5file!`](@ref), [`write_agents`](@ref), [`write_edges`](@ref), [`write_globals`](@ref), [`read_agents!`](@ref), [`read_edges!`](@ref), [`read_globals`](@ref), [`read_snapshot!`](@ref) and [`list_snapshots`](@ref)
+See also [`close_h5file!`](@ref), [`write_agents`](@ref),
+[`write_edges`](@ref), [`write_globals`](@ref),
+[`read_agents!`](@ref), [`read_edges!`](@ref), [`read_globals`](@ref),
+[`read_snapshot!`](@ref) and [`list_snapshots`](@ref)
 """
 function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = sim.overwrite_file)
     #in the case that the simulation is already attached to a h5file, we relase it first

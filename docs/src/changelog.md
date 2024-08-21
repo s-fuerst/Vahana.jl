@@ -20,6 +20,9 @@ CurrentModule = Vahana
 - Instead of writing structs for Parameters and Globals it is now also possible
   to use [`register_param!`](@ref) and [`register_global!`](@ref).
 
+- Random cells or positions of a grid can be obtained via
+  [`random_pos`](@ref) and [`random_cell`](@ref)
+
 - The function [`cellid`](@ref) allows to retrieve the id of a cell on
   a given position.
 

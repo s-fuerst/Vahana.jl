@@ -435,3 +435,23 @@ end
     sleep(mpi.rank * 0.05)
 end
 
+@testset "MoveTo_Dist" begin
+    sim = create_simulation(raster_model)
+
+    add_raster!(sim,
+                :raster,
+                (10,20,30),
+                p -> Grid3D(p, true))
+
+    finish_init!(sim)
+
+    w = zeros(10, 20, 30)
+    w[7, 19, 23] = 1.0
+    
+    @test random_pos(sim, :raster, w) == CartesianIndex(7, 19, 23)
+
+    disable_transition_checks(true)
+    @test agentstate(sim, random_cell(sim, :raster, w), Grid3D).pos ==
+        (7, 19, 23)
+    disable_transition_checks(false)
+end
