@@ -30,13 +30,12 @@ function create_enum_converter()
     @eval convert(::Type{T}, i::Int32) where { T <: Enum } = T(i)
 end
 
-# TODO: this does not work as expected, write a stable hash function
-import Base.hash
-hash(model::Model) = hash(model.types.edges_attr) +
-    hash(model.types.edges_types) +
-    hash(model.types.nodes_attr) +
-    hash(model.types.nodes_types) +
-    hash(model.types.nodes_type2id) 
+# import Base.hash
+# hash(model::Model) = hash(model.types.edges_attr) +
+#     hash(model.types.edges_types) +
+#     hash(model.types.nodes_attr) +
+#     hash(model.types.nodes_types) +
+#     hash(model.types.nodes_type2id) 
 
 transition_str(sim) = "t_$(sim.num_transitions-1)"
 

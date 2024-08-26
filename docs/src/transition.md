@@ -91,6 +91,6 @@ also be used inside a transition function, namely:
 
 Since v1.2 it's also possible to remove edges:
 
-* [`remove_edges!`](@ref)
-
-
+```@docs
+remove_edges!
+```

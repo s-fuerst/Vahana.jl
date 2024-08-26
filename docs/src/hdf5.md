@@ -65,6 +65,8 @@ read_params
 read_globals
 read_agents!
 read_edges!
+read_agents
+read_edges
 ```
 
 ## Transition 
@@ -100,7 +102,9 @@ simulation.
 
 ```@docs
 write_metadata
+write_sim_metadata
 read_metadata
+read_sim_metadata
 ```
 
 ## Restrictions and Workarounds

@@ -76,6 +76,15 @@ functions.
 connect_raster_neighbors!
 move_to!
 ```
+## Set Parameters
+
+TODO DOC
+
+```@docs
+set_param!
+```
+
+
 
 ## Finish initialization
 

@@ -1,14 +1,22 @@
-# # Opinion Model
+# # Utilizing Graphs.jl
 
-# In this example we demonstrate how we can use the Graphs.jl package
-# to add graphs from other sources (or created by the Graphs.jl
-# package itself) to a Vahana simulation.
+# # Goal
 
-# For this, we implement a simple version of the [Hegselmann and
-# Krause (2002)](http://jasss.soc.surrey.ac.uk/5/3/2.html) opinion
-# dynamics model. An alternative implementation of the same model
-# using the Agents.jl package can be found
-# [here](https://juliadynamics.github.io/Agents.jl/v4.0/examples/hk/).
+#=
+
+This tutorial illustrates how to integrate graphs that support the
+`AbstractGraph` interface from the Graphs.jl package into a Vahana
+simulation and the visualization support for Vahana graphs.
+
+For this purpose, we implement the opinion dynamics model of
+[Hegselmann and Krause
+(2002)](http://jasss.soc.surrey.ac.uk/5/3/2.html). An alternative
+implementation of the same model using the Agents.jl package can be found
+[here](https://juliadynamics.github.io/Agents.jl/v4.0/examples/hk/).
+
+=#
+
+# # Agent and Edge Types
 
 using Vahana, Statistics
 
@@ -20,48 +28,43 @@ struct HKAgent
     opinion::Float64
 end
 
-# This time we also have only one network that determine the agents
-# that will be considered when an agent updates its opinion.
+# This time we have only one network that determine the agents that
+# will be considered when an agent updates its opinion.
 
 struct Knows end
 
-# There is a *confidence bound* $\epsilon > 0$, opinions with a
-# difference greater then $\epsilon$ are ignored by the agents in the
-# transition function. All agents have the same confidence bound, so we
-# introduce this bound as a parameter.
-
-struct HKParams
-    ε::Float64
-end
-
-# We have now all elements to create an uninitialized simulation.
+# Beside these two types there is a *confidence bound* $\epsilon > 0$,
+# opinions with a difference greater than $\epsilon$ are ignored by
+# the agents in the transition function. All agents have the same
+# confidence bound, so we introduce this bound as a parameter.
 
 const hkmodel = ModelTypes() |>
     register_agenttype!(HKAgent) |>
     register_edgetype!(Knows) |>
+    register_param!(:ϵ, 0.02) |> # the confidence bound
     create_model("Hegselmann-Krause");
 
-# # Add the graph 
+# # Adding a Graph 
 
-# Vahana allows to add `SimpleGraphs` and `SimpleDiGraphs` from the
+# Vahana allows adding `SimpleGraphs` and `SimpleDiGraphs` from the
 # [Graphs.jl](https://juliagraphs.org/Graphs.jl/dev/) package via the
-# [`add_graph!`](@ref) function. So it's possible to use e.g.
+# [`add_graph!`](@ref) function. So it is possible to use e.g.
 # [SNAPDatasets](https://github.com/JuliaGraphs/SNAPDatasets.jl) to
-# run the opinion model on real datasets. Or the SimpleGraphs module
+# run the opinion model on real datasets, or the SimpleGraphs module
 # from Graphs.jl to create synthetic graphs.
 
-# We show here for both use cases one example and are creating for each
-# one an own simulation
+# We demonstrate here both use cases and are creating a separate
+# simulation for each one.
 
-const cgsim = create_simulation(hkmodel, HKParams(0.2), nothing);
-const snapsim = create_simulation(hkmodel, HKParams(0.2), nothing)
+const cgsim = create_simulation(hkmodel);
+const snapsim = create_simulation(hkmodel)
 
 # ## SimpleGraphs 
 
 # First we will show how we can add a synthetic graph. For this we
 # need to import the SimpleGraphs module. Since there are many
 # functions in the Graphs.jl package with the same name as in Vahana
-# (e.g. add_edge!) it is advisable to import only the needed parts of
+# (e.g. add_edge!), it is advisable to import only the needed parts of
 # Graphs.jl instead of loading the whole package via `using Graphs`.
 
 import Graphs.SimpleGraphs
@@ -73,7 +76,7 @@ import Graphs.SimpleGraphs
 g = SimpleGraphs.complete_graph(50)
 
 # Vahana needs the information how to convert the nodes and edges of
-# the SimpleGraphs object to the Vahana structure, this is done by the
+# the SimpleGraphs object to the Vahana structure. This is done by the
 # constructor functions in the third and forth arguments of
 # [`add_graph!`](@ref). We do not need the Graph.vertex and Graph.edge
 # arguments of this constructor functions, but for other use cases
@@ -94,7 +97,7 @@ finish_init!(cgsim)
 
 # ## SNAPDataset.jl
 
-# The SNAPDataset.jl package deliver Graphs.jl formatted datasets from
+# The SNAPDataset.jl package delivers Graphs.jl formatted datasets from
 # the [Stanford Large Network Dataset
 # Collection](https://snap.stanford.edu/data/index.html).
 
@@ -109,13 +112,13 @@ const snapids = add_graph!(snapsim,
                            _ -> HKAgent(rand()),
                            _ -> Knows());
 
-# Again each agent also adds its own opinion to the calculation.
+# Again each agent adds its own opinion to the calculation.
 
 foreach(id -> add_edge!(snapsim, id, id, Knows()), snapids) 
 
 finish_init!(snapsim)
 
-# ## Transition Function
+# # The Transition Function
 # Opinions are updated synchronously according to 
 # ```math
 # \begin{aligned}
@@ -126,15 +129,15 @@ finish_init!(snapsim)
 
 # So we first filter all agents from the neighbors with an opinion
 # outside of the confidence bound, and then calculate the mean of the
-# opinions of the remaining agents. As we have 
+# opinions of the remaining agents. 
 
 function step(agent, id, sim)
-    ε = param(sim, :ε)
+    ϵ = param(sim, :ϵ)
 
     opinions = map(a -> a.opinion, neighborstates(sim, id, Knows, HKAgent))
 
     accepted = filter(opinions) do opinion
-        abs(opinion - agent.opinion) < ε
+        abs(opinion - agent.opinion) < ϵ
     end
     
     HKAgent(mean(accepted))
@@ -148,7 +151,7 @@ apply!(cgsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 
 apply!(snapsim, step, HKAgent, [ HKAgent, Knows ], HKAgent)
 
-# # Create plots
+# # Creating Plots
 
 # Finally, we show the visualization possibilities for graphs, and import the
 # necessary packages for this and create a colormap for the nodes.
@@ -158,7 +161,8 @@ import CairoMakie, GraphMakie, NetworkLayout, Colors, Graphs, Makie
 # Since the full graph is very cluttered and the Facebook dataset is
 # too large, we construct a Clique graph using Graphs.jl.
 
-const cysim = create_simulation(hkmodel, HKParams(0.25), nothing);
+const cysim = create_simulation(hkmodel) |> set_param!(:ϵ, 0.25);
+
 const cyids = add_graph!(cysim,
                          SimpleGraphs.clique_graph(7, 8),
                          _ -> HKAgent(rand()),
@@ -188,13 +192,13 @@ Makie.hidedecorations!(axis(vp))
 
 figure(vp)
 
-# We want that nodes to show the agent's opinion. Instead of modifing
+# We want the nodes to show the agent's opinion. Instead of modifying
 # the Makie plot `node_color` property directly, it's also possible to
-# define a helper functions with methods for the different agent and
-# edge types, that are called by `create_graphplot` to determine
-# properties of the nodes and edges of the plot and also supports
-# interactive plot in the case that GLMakie is used as Makie
-# backend. For details please check [`create_graphplot`](@ref).
+# define helper functions with methods for the different agent and edge
+# types, that are called by `create_graphplot` to determine properties
+# of the nodes and edges of the plot and also support interactive plots
+# in the case that GLMakie is used as the Makie backend. For details,
+# please check [`create_graphplot`](@ref).
 
 # We define such a function and are calling it modify_vis, and will set the
 # `update_fn` keyword of `create_graphplot` to this function. 
@@ -235,7 +239,7 @@ end
 
 plot_opinion(cysim)
 
-# # Finish the simulation
+# # Finish the Simulation
 
 # As always, it is important to call `finish_simulation` at the end of the
 # simulation to avoid memory leaks.

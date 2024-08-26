@@ -153,10 +153,11 @@ function construct_prettyprinting_methods(simsymbol)
             end
         end
         
+        printstyled(io, "\nModel Name: ", sim.model.name; color = :magenta)
         printstyled(io, "\nSimulation Name: ", sim.name; color = :magenta)
-        show_struct(io, sim.params, "Parameter")
         show_agent_types(io, sim)
         show_edge_types(io, sim)
+        show_struct(io, sim.params, "Parameter")
         show_raster(io, sim)
         #   print(io, "Globals: ", sim.globals)
         show_struct(io, sim.globals, "Global")

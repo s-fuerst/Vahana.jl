@@ -71,7 +71,19 @@ create_model
 Model
 ```
 
+## register parameters and globals
+
+TODO DOC
+
+```@docs
+register_param!
+register_global!
+```
+
+
 # Create a Simulation
+
+TODO DOC
 
 ```@docs
 create_simulation

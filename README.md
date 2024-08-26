@@ -54,6 +54,26 @@ is available [here](https://s-fuerst.github.io/Vahana.jl/).
 
 A JuliaCon 2023 Pre-recorded Video about Vahana is available [here](https://www.youtube.com/watch?v=-318ec-kCBM).
 
+The preprint of a Vahana.jl paper is available [here](https://doi.org/10.48550/arXiv.2406.14441)
+
+## Citation
+
+If you use this package in a publication, or simply want to refer to it, please cite the paper below:
+
+```
+@article{vahana2024,
+  title={Vahana.jl - A framework (not only) for large-scale agent-based models},
+  author={F{\"u}rst, Steffen and Conrad, Tim and Jaeger, Carlo and Wolf, Sarah},
+  journal={arXiv preprint arXiv:2406.14441},
+  year={2024},
+  doi={10.48550/arXiv.2406.14441},
+  url={https://doi.org/10.48550/arXiv.2406.14441},
+  eprint={2406.14441},
+  archivePrefix={arXiv},
+  primaryClass={cs.MA}
+}
+```
+
 ## Acknowledgments
 
 ![mathplus logo](/mathplus.png)

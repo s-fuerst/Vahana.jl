@@ -1,7 +1,7 @@
 import Base.deepcopy
 import Logging.with_logger
 import Graphs.nv
-
+using DataFrames
 export create_model
 export create_simulation, finish_simulation!, copy_simulation
 export finish_init!
@@ -562,15 +562,28 @@ See also [`create_model`](@ref)
 param(sim, name) = getfield(sim.params, name)
 
 """
-DOCTODO
+    set_param!(sim::Simulation, param::Symbol, value)
+
+Assign the specified `value` to the `param` parameter. This operation
+is only permitted after invoking the `finish_init!` method.
+
+A pipeable version of `set_param!` is also available.
+
 """
-function set_param!(sim, name, value)
+function set_param!(sim::Simulation, param::Symbol, value)
     @assert !sim.initialized """\n
          You can call `set_param!` only before `finish_init!`. For values that 
          change while the simulation is running, register them as globals and use 
          `set_global!` instead.
-            """
-    setfield!(sim.params, name, value)
+             """
+    setfield!(sim.params, param, value)
+end
+
+function set_param!(param::Symbol, value)
+    sim -> begin
+        set_param!(sim, param, value)
+        sim
+    end
 end
 
 function maybeadd(coll,
@@ -602,7 +615,7 @@ isiterable(v) = applicable(iterate, v)
 Apply the transition function `func` to the simulation state. 
 
 `call` must be a single agent type or a collection of agent types,
-likewise "read" and "write" must be a single agent/edge type or a
+likewise `read` and `write` must be a single agent/edge type or a
 collection of agent/edge types.
 
 `call` determines for which agent types the transition function `func`
@@ -625,9 +638,9 @@ the simulation, otherwise the agent with id `id` will get the returned
 state after the transition function was called for all agents.
 
 When an edge state type is in `write`, the current edges of that type
-are removed from the simulation. If you want keep the existing edges
-for a specific type, you can add this type to the optional
-`add_existing` collection. 
+are removed from the simulation. If you want to keep the existing
+edges for a specific type, you can add this type to the optional
+`add_existing` collection.
 
 Similarly, agent types that are in the `write` but not in the `call`
 argument can be part of the `add_existing` collection, so that the
@@ -653,7 +666,13 @@ end
 ```
 but saves all the `has_edge` checks.
 
-See also [`apply`](@ref)
+This `with_edge` keyword should only be set when a small subset of
+agents possess edges of this particular type, as performance will be
+adversely impacted in other scenarios. Also the keyword can only be
+used for edgetypes without the :SingleType hint.
+
+See also [`apply`](@ref) and the [Applying Transition Function section
+in the tutorial](tutorial1.md#Applying-Transition-Functions)
 """
 function apply!(sim::Simulation,
          func::Function,
@@ -663,6 +682,12 @@ function apply!(sim::Simulation,
          add_existing = [],
          with_edge = nothing)
     @assert sim.initialized "You must call finish_init! before apply!"
+
+    @assert with_edge === nothing || !has_hint(sim, with_edge, :SingleType) """
+    The `with_edge` keyword can only be used for edgetypes without the
+    :SingleType hint.
+    """
+
     with_logger(sim) do
         @info "<Begin> apply!" func transition=sim.num_transitions+1
     end

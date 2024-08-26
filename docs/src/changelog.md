@@ -50,7 +50,7 @@ CurrentModule = Vahana
   agents of this type.
   
 - For [`neighborstates`](@ref), [`neighborstates_flexible`](@ref),
-  [`neighborstates`](@ref) and [`neighborids`](@ref) there are now
+  [`neighborids`](@ref) and [`edgestates`](@ref) there are now
   also functions that return an iterator for of states/ids instead
   of a vector these states/ids. They have the same function name,
   extended with `_iter`, e.g. [`neighborstates_iter`](@ref).
@@ -58,7 +58,7 @@ CurrentModule = Vahana
 - The function [`add_agent_per_process!`](@ref) allows you to add a single
   agent of an agent type to each process of a parallel simulation.
   
-- The function [`modify_global!`](@ref) is a combination of
+- New function [`modify_global!`](@ref) which is a combination of
   [`set_global!`](@ref) and [`get_global`](@ref).
   
 ## Improvements
@@ -102,7 +102,7 @@ CurrentModule = Vahana
 
 - [`show_agent`](@ref) didn't work for all agent hint combinations.
 
-- It was necessary (and not documented) that [`add_raster`](@ref) was
+- It was necessary (and not documented) that [`add_raster!`](@ref) was
   called from all ranks. Now it is possible to call it only from rank
   0 (like [`add_agent!`](@ref) etc.).
 

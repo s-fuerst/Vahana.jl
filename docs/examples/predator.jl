@@ -1,38 +1,51 @@
-# # Predator/Prey Model
+# # Adding Spatial Information
 
-# This example shows how spatial information can be integrated into a
-# model. In its current version, Vahana is not the ideal tool for
-# models that depend mainly on the movement of agents, but as shown
-# here, it is still possible, even though we are actually only working
-# with graphs.
+#=
 
-# The model is based on the [Predator-Prey for High-Performance
-# Computing](https://peerj.com/articles/cs-36/) (PPHPC) model. In
-# PPHPC the agents move randomly, in our implementation the prey move
-# to locations with grass (if one is in sight) and the predators move to
-# locations with prey to demonstrate how features like this can be
-# implemented in Vahana.
+This example demonstrates how spatial information can be integrated
+into an agent-based model using Vahana. While Vahana's primary focus
+is on graph-based simulations, it support the inclusion of spatial
+information into models.  It allows you to define a spatial grid,
+associate agents with specific locations, and implement interactions
+based on spatial proximity, even though the underlying implementation
+still operates on graph structures.
 
-using CairoMakie
+It's worth noting that in its current version, Vahana may not be the
+optimal choice for models that primarily depend on frequent movement
+of agents across space. However, as this example will show, it is
+entirely possible to implement those models.
 
-using Vahana
+It allows you to define a spatial grid, associate agents with specific
+locations, and implement interactions based on spatial proximity, all
+while leveraging Vahana's efficient graph-based computations.
 
-using Random
+For the understanding of how Vahana handles spatial information and
+rasters, you may find it helpful to watch also the [corresponding
+section of the Vahana.jl Juliacon
+video](https://youtu.be/-318ec-kCBM?si=YNnWLrb-_7RPSEPB&t=1198). The
+video provides a visual explanation of how rasters are implemented
+within Vahana's graph-based framework and demonstrates some key
+concepts that we'll be applying in this tutorial.
+
+In this tutorial, we'll implement a predator-prey model with spatial
+components, showcasing how Vahana's raster functionality can be used
+to create a spatially-explicit ecological simulation.
+
+The model is based on the [Predator-Prey for High-Performance
+Computing](https://peerj.com/articles/cs-36/) (PPHPC) model. In
+PPHPC the agents move randomly, in our implementation the prey move
+to locations with grass (if one is in sight) and the predators move to
+locations with prey to demonstrate how features like this can be
+implemented in Vahana.
+
+=#
+
+# # Agent and Edge Types
+
+using CairoMakie, Vahana, Random
 
 Random.seed!(1); #hide
-
-# We want to run the model with optimized performance, see
-# [Performance Tuning](performance.md) for details.
-
-detect_stateless(true)
-
-enable_asserts(false);
-
-# ## AgentTypes
-
-# Beside the predator and the prey we also have the grid cells, which
-# represent the spatial environment but are also implemented as agents
-# and thus as nodes of the graph.
+detect_stateless(true) #hide
 
 struct Predator
     energy::Int64
@@ -44,12 +57,14 @@ struct Prey
     pos::CartesianIndex{2}
 end
 
+# Besides the predator and the prey, we also have the grid cells, which
+# represent the spatial environment but are also implemented as agents
+# and thus as nodes of the graph.
+
 struct Cell
     pos::CartesianIndex{2}
     countdown::Int64
 end
-
-# ## Edges
 
 # All agents have their position as part of their state, but a
 # cell can only "see" the animals if they are connected to the cell via
@@ -90,6 +105,19 @@ struct VisiblePrey end
 struct Die end
 
 struct Eat end
+
+
+
+const predator_types = (pos = PredatorPosition,
+                       view = PredatorView,
+                       constructor = Predator,
+                       types = [ Predator, PredatorPosition, PredatorView ])
+const prey_types = (pos = PreyPosition,
+                   view = PreyView,
+                   constructor = Prey,
+                   types = [ Prey, PreyPosition, PreyView ])
+
+
 
 # ## Params
 
@@ -156,14 +184,7 @@ const ppsim = ModelTypes() |>
 init_cell(pos::CartesianIndex) =
     Cell(pos, rand() < 0.5 ? 0 : rand(1:param(ppsim, :restart)))
 
-add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell)
-
-# Predator and Pray are starting on a random position.
-
-function random_pos(sim)
-    size = param(sim, :raster_size)
-    CartesianIndex(rand(1:size[1]), rand(1:size[2]))
-end;
+add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell);
 
 # We define two helper functions to move an animal to a new
 # position. This will add a single (pos)edge from the animal to the
@@ -171,9 +192,10 @@ end;
 # distance of 1 also (view)edges from those cell to the animal and
 # from the animal to the cell.
 
-function move!(sim, id, newpos, posedge, viewedge)
-    move_to!(sim, :raster, id, newpos, nothing, posedge)
-    move_to!(sim, :raster, id, newpos, viewedge, viewedge;
+
+function move!(sim, id, newpos, types)
+    move_to!(sim, :raster, id, newpos, nothing, types.pos())
+    move_to!(sim, :raster, id, newpos, types.view(), types.view();
              distance = 1, metric = :manhatten)
 end;
 
@@ -182,23 +204,22 @@ end;
 
 energyrange = 1:(2*param(ppsim, :prey).gain_from_food)
 foreach(1:param(ppsim, :num_prey)) do _
-    energy = rand(energyrange)
-    pos = random_pos(ppsim)
-    id = add_agent!(ppsim, Prey(energy, pos))
-    move!(ppsim, id, pos, PreyPosition(), PreyView())
+    pos = random_pos(ppsim, :raster)
+    id = add_agent!(ppsim, Prey(rand(energyrange), pos))
+    move!(ppsim, id, pos, prey_types)
 end
 
 energyrange = 1:(2*param(ppsim, :predator).gain_from_food)
 foreach(1:param(ppsim, :num_predators)) do _
-    energy = rand(energyrange)
-    pos = random_pos(ppsim)
-    id = add_agent!(ppsim, Predator(energy, pos))
-    move!(ppsim, id, pos, PredatorPosition(), PredatorView())
+    pos = random_pos(ppsim, :raster)
+    id = add_agent!(ppsim, Predator(rand(energyrange), pos))
+    move!(ppsim, id, pos, predator_types)
 end
 
 # At the end of the initialization phase we have to call finish_init!
 
 finish_init!(ppsim)
+
 
 # ## Transition Functions
 
@@ -212,12 +233,14 @@ finish_init!(ppsim)
 # `invariant_compute`, if this is set to true as we do this later when
 # we call `find_prey`, Vahana knows that the state of the agents being
 # called will not be change and the return values of the transition
-# functions are ignored.
+# functions are ignored. TODO rewrite
 
 function find_prey(_, id, sim)
-    checked(foreach, neighborids(sim, id, PreyPosition)) do preyid
-        checked(foreach, neighborids(sim, id, PredatorView)) do predid
-            add_edge!(sim, preyid, predid, VisiblePrey())
+    if has_edge(sim, id, PreyPosition) && has_edge(sim, id, PredatorView)
+        for preyid in neighborids(sim, id, PreyPosition)
+            for predid in neighborids(sim, id, PredatorView)
+                add_edge!(sim, preyid, predid, VisiblePrey())
+            end
         end
     end
 end;
@@ -241,7 +264,7 @@ function move(state::Predator, id, sim)
         else
             rand(prey).pos
         end
-        move!(sim, id, newpos, PredatorPosition(), PredatorView())
+        move!(sim, id, newpos, predator_types)
         Predator(e, newpos)
     else
         nothing
@@ -265,7 +288,7 @@ function move(state::Prey, id, sim)
             rand(withgrass)
         end
         newpos = agentstate(sim, nextcellid, Cell).pos
-        move!(sim, id, newpos, PreyPosition(), PreyView())
+        move!(sim, id, newpos, prey_types)
         Prey(e, newpos)
     else
         nothing
@@ -333,17 +356,17 @@ end;
 # `add_agent` call and the offspring is also moved it to the same
 # position as its parent.
 
-function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
+function try_reproduce_imp(state, id, sim, types, species_params)
     if has_edge(sim, id, Eat)
-        state = C(state.energy + species_params.gain_from_food, state.pos)
+        state = types.constructor(state.energy + species_params.gain_from_food, state.pos)
     end
     if state.energy > species_params.repro_thres &&
         rand() * 100 < species_params.repro_prob
 
         energy_offspring = Int64(round(state.energy / 2))
-        newid = add_agent!(sim, C(energy_offspring, state.pos))
-        move!(sim, newid, state.pos, posedge, viewedge)
-        C(state.energy - energy_offspring, state.pos)
+        newid = add_agent!(sim, types.constructor(energy_offspring, state.pos))
+        move!(sim, newid, state.pos, types)
+        types.constructor(state.energy - energy_offspring, state.pos)
     else
         state
     end
@@ -353,8 +376,7 @@ end;
 # arguments.
 
 try_reproduce(state::Predator, id, sim) =
-    try_reproduce_imp(state, id, sim, Predator,
-                    PredatorPosition(), PredatorView(), param(sim, :predator))
+    try_reproduce_imp(state, id, sim, predator_types, param(sim, :predator))
 
 # The prey animal needs an extra step because it might have been eaten
 # by a predator. So we check if there is a `Die` edge leading to the
@@ -366,8 +388,7 @@ function try_reproduce(state::Prey, id, sim)
     if has_edge(sim, id, Die)
         return nothing
     end
-    try_reproduce_imp(state, id, sim, Prey,
-                    PreyPosition(), PreyView(), param(sim, :prey))
+    try_reproduce_imp(state, id, sim, prey_types, param(sim, :prey))
 end;
 
 # We update the global values and use the `mapreduce` method to count
@@ -502,4 +523,4 @@ end |> heatmap |> add_colorbar
 # As always, it is important to call `finish_simulation` at the end of the
 # simulation to avoid memory leaks.
 
-finish_simulation!(ppsim);
+#finish_simulation!(ppsim);

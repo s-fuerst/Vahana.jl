@@ -32,30 +32,18 @@ makedocs(sitename="Vahana Documentation",
                                   edit_link = :commit),
          clean = false, 
          pages = [
-             "Tutorials" => [
-                 "Tutorial" => "tutorial1.md",
-             ]
-         ])
-
-###
-makedocs(sitename="Vahana Documentation",
-         modules = [Vahana],
-#         format = Documenter.LaTeX(),
-         format = Documenter.HTML(prettyurls = false,
-                                  edit_link = :commit),
-         clean = false, 
-         pages = [
              "Introduction" => "index.md",
              "Tutorials" => [
-                 "Tutorial" => "tutorial1.md",
-                 "Opinion Model" => "hegselmann.md",
-                 "Predator / Prey" => "predator.md"
+                 "First Steps" => "tutorial1.md",
+                 "Utilizing Graphs.jl" => "hegselmann.md",
+                 "Adding Spatial Information" => "predator.md"
              ],
              "Performance Tuning" => "performance.md",
              "API" => [
                  "Model Definition" => "definition.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
+                 "Raster" => "raster.md",
                  "Global Layer" => "global.md",
 #                 "REPL helpers" => "repl.md",
                  "Plots" => "plots.md",

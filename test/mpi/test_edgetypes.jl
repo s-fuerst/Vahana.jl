@@ -97,7 +97,6 @@ model = ModelTypes() |>
 # AS1_3 -> AS1_1
 # AS1_3 -> AS2_1
 
-# TODO: Implement agentstate, then we can check that the edges are correct
 function check(ET)
     (agent, id, sim) -> begin
         @test has_edge(sim, id, ET)

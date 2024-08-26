@@ -59,6 +59,11 @@ mainly to think about how to express the model as a SyGDS, rather than
 thinking about technical details of the implementation such as which
 data structure is best to use.
 
+In addition to this documentation, Fürst et al. (2024)[^2] provides a
+comprehensive discussion of the SyGDS extension for Vahana.jl. It also
+includes two case studies and performance analyses.
+
 [^1]: Adiga, A., Kuhlman, C.J., Marathe, M.V. et al. Graphical dynamical systems and their applications to bio-social systems. [https://doi.org/10.1007/s12572-018-0237-6](https://doi.org/10.1007/s12572-018-0237-6)
 
+[^2]: Fürst, S., Conrad, T., Jaeger, C., & Wolf, S. (2024). Vahana.jl - A framework (not only) for large-scale agent-based models. arXiv:2406.14441. [https://doi.org/10.48550/arXiv.2406.14441](https://doi.org/10.48550/arXiv.2406.14441)
 

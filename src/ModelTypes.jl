@@ -71,6 +71,11 @@ same type in a transition function (e.g., via agentstate or neighborstates
 calls), then the :Independent hint can be given. This avoids
 unnecessary copies of the agents.
 
+A pipeable version of `register_agenttype!` is also available,
+enabling the construction of a Model via a sequence of `register_*`
+calls. This pipeline starts with `ModelTypes()` as the source and
+terminates in the [`create_model`](@ref) function as the destination.
+
 See also [`add_agent!`](@ref) and [`add_agents!`](@ref) 
 """
 function register_agenttype!(types::ModelTypes, ::Type{T}, hints...) where T
@@ -141,6 +146,11 @@ not explicitly specified, it will be set implicitly
 If it is known how many agents of this type exist, this can also be
 specified via the optional `size` keyword. This can improve
 performance, but can also increase the memory usage.
+
+A pipeable version of `register_edgetype!` is also available,
+enabling the construction of a Model via a sequence of `register_*`
+calls. This pipeline starts with `ModelTypes()` as the source and
+terminates in the [`create_model`](@ref) function as the destination.
 
 See also [Edge Hints](./performance.md#Edge-Hints), [`add_edge!`](@ref) and 
 [`add_edges!`](@ref) 
@@ -232,7 +242,20 @@ has_hint(sim, T::DataType, hint::Symbol, ge = :Edge) =
     end
 
 """
-DOCTODO
+    register_param!(types::ModelTypes, name::Symbol, default_value::T)
+
+There are two ways to set up parameters for a simulation. Either the
+instance of a struct defined by the modeler must be passed via the `param`
+argument to [`create_simulation`](@ref), or the individual parameters
+are passed using `register_param!` before [`create_model`](@ref) is
+called. The parameters can also be set after
+[`create_simulation`](@ref) and before [`finish_init!`](@ref) is
+called.
+
+A pipeable version of `register_param!` is also available,
+enabling the construction of a Model via a sequence of `register_*`
+calls. This pipeline starts with `ModelTypes()` as the source and
+terminates in the [`create_model`](@ref) function as the destination.
 """
 function register_param!(types::ModelTypes, name::Symbol, default_value::T) where T
     push!(types.params, Param{T}(name, default_value))
@@ -243,7 +266,18 @@ register_param!(name, default_value::T) where T =
     types -> register_param!(types, name, default_value) 
 
 """
-DOCTODO
+    register_global!(types::ModelTypes, name::Symbol, default_value::T)
+
+There are two ways to set up globals for a simulation. Either the
+instance of a struct defined by the modeler must be passed via the `globals`
+argument to [`create_simulation`](@ref), or the individual parameters
+are passed using `register_global!` before [`create_model`](@ref) is
+called. 
+
+A pipeable version of `register_global!` is also available,
+enabling the construction of a Model via a sequence of `register_*`
+calls. This pipeline starts with `ModelTypes()` as the source and
+terminates in the [`create_model`](@ref) function as the destination.
 """
 function register_global!(types::ModelTypes, name::Symbol, init_value::T) where T
     push!(types.globals, Global{T}(name, init_value))
