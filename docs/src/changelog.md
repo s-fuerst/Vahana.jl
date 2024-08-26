@@ -1,12 +1,16 @@
 ```@meta
 CurrentModule = Vahana
 ```
-# v1.2
-## Breaking changes
+
+# Change Log
+
+## v1.2
+
+### Breaking changes
 
 - The `all_ranks` default value for [`num_agents`](@ref) changed to true.
 
-## New features
+### New features
 
 - The functions [`all_agentids`](@ref) and [`all_edges`](@ref) allows
   to get the ids of all agents or the edges on the rank or the
@@ -61,7 +65,7 @@ CurrentModule = Vahana
 - New function [`modify_global!`](@ref) which is a combination of
   [`set_global!`](@ref) and [`get_global`](@ref).
   
-## Improvements
+### Improvements
 
 - [`read_snapshot!`](@ref) can be also used to read data that was
   written via calls to [`write_agents`](@ref), [`write_edges`](@ref)
@@ -79,7 +83,7 @@ CurrentModule = Vahana
   Iterators. Vahana's edge iterators have now been adapted to
   accommodate this breaking change.
 
-## Performance Improvements
+### Performance Improvements
 
 - [`move_to!`](@ref) improvements.
 
@@ -87,7 +91,7 @@ CurrentModule = Vahana
   in the `add_existing` argument, but not in the `read` argument of a
   transition function.
 
-## Fixes
+### Fixes
 
 - When edges were removed as a consequence of removing agents, this
   change was not written to the hdf5 file until also other changes to
@@ -106,24 +110,24 @@ CurrentModule = Vahana
   called from all ranks. Now it is possible to call it only from rank
   0 (like [`add_agent!`](@ref) etc.).
 
-# v1.1
+## v1.1
 
-## New features
+### New features
 
 - New functions [`set_hdf5_path`](@ref) allows to set the path for
   hdf5 files.
 
-## Improvements
+### Improvements
 
 - Removed usage of Base.memcpy! do be compatible with Julia 1.10.
 
 - Improved error messages.
 
-## Performance Improvements
+### Performance Improvements
 
 - For [`calc_raster`](@ref) and [`calc_rasterstate`](@ref).
 
-## Fixes
+### Fixes
 
 - Empty arrays where not supported for parameters or globals when
   they where writted to a hdf5 file.

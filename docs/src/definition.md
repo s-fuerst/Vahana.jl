@@ -3,16 +3,16 @@ CurrentModule = Vahana
 ```
 # Model Definition
 
-This page describes all the functions and structures used to define
-the model and to create an uninitialized simulation. In Vahana the
-simulation state and the transition functions that changes the state
-are decoupled, therefore we do not need to define the transition
-functions before we create the simulation. 
+This page describes the functions and data structures employed to
+define the model and to instantiate an uninitialized simulation. In
+Vahana the simulation state and the transition functions that changes
+the state are decoupled, eliminating the need to define the
+transition functions prior to creating the simulation instance.
 
 The usual workflow is as follows:
-- Define all Agent and Edge types
+- Define the Agent and Edge types
 - Create a [`ModelTypes`](@ref) instance
-- Register the defined Agent and Edge types 
+- Register the Agent and Edge types and optionally the Parameters and Globals
 - Call [`create_model`](@ref) to create an model (state space) object
 - Call [`create_simulation`](@ref) to create an uninitialized simulation of this model
 
@@ -48,6 +48,13 @@ Which means that optimized methods that can be used to access or
 modify the simulation state during the transition function are
 generated. See [Performance Tuning](./performance.md) for details.
 
+The `ModelTypes` instance can subsequently be utilized to construct
+the model. This involves that optimized methods are generated, enabling
+access or modification of the simulation state during the execution of
+the transition function. For comprehensive details regarding this
+process, please refer to the [Performance Tuning](./performance.md)
+documentation.
+
 !!! tip
 
 	As [`create_model`](@ref) adds new methods, it increments the
@@ -71,9 +78,13 @@ create_model
 Model
 ```
 
-## register parameters and globals
+## Register Parameters and Globals
 
-TODO DOC
+Parameters are constant values used throughout the simulation, while
+globals are variables that can change during the simulation run. You
+can register them using `register_param!` and `register_global!`, or
+by defining custom types and pass instances of this types to
+[`create_simulation`](@ref).
 
 ```@docs
 register_param!
@@ -83,8 +94,19 @@ register_global!
 
 # Create a Simulation
 
-TODO DOC
+Finally, create an uninitialized simulation based on your model using 
 
 ```@docs
 create_simulation
 ```
+
+This creates a blank simulation ready for initialization.
+
+Remember, in Vahana, a "model" specifies the possible state space,
+while a simulation is a concrete realization within this
+space. Transition functions, defined later, determine how the
+simulation evolves over time.
+
+By following these steps, you set up the structure of your
+simulation. The next phase involves initializing the simulation with
+agents and edges.

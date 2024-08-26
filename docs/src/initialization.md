@@ -53,38 +53,21 @@ vahanasimplegraph
 
 ## Raster 
 
-Spatial information can be added to the simulation in the form of one
-or more n-dimensional rasters. 
+The process for adding raster data to a simulation is documented
+[here](raster.md).
 
-```@docs
-add_raster!
-```
 
-Such a raster is only a collection of nodes in the graph incl. an
-Vahana internal mapping from the cartesian coordinates to the cell
-IDs. Beside this mapping, cells are also just agents, but there are
-some Vahana functions like [`calc_raster`](@ref) that utilize the
-internal cartesian coordinates to create a n-dimensional
-representation of the state space.
 
-The ID and the state of the cells can not be accessed directly,
-instead it's necessary to create edges between the cells, or between
-the cells and agents of other types via the following two helper
-functions.
-
-```@docs
-connect_raster_neighbors!
-move_to!
-```
 ## Set Parameters
 
-TODO DOC
+
+After creating a simulation, you can modify parameter values using
+[`set_param!`](@ref) until the simulation is initialized with
+[`finish_init!`](@ref).
 
 ```@docs
 set_param!
 ```
-
-
 
 ## Finish initialization
 

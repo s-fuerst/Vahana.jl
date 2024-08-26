@@ -4,31 +4,25 @@ CurrentModule = Vahana
 
 # Transition Function
 
-As mentioned in the [`create_model`](@ref) documentation, the model
-struct is created dynamically incl. the name for this
-struct. E.g. in the "Hegselmann" Example this type is
-`Vahana.var"Hegselmann"{Params, Globals} `. All of this types are
-subtypes of the abstract type `Simulation`.
-
 After the initialization, the state of the simulation is modified by
-so called transition functions. 
+so called transition functions. See [Defining Transition
+Functions](tutorial1.html#Defining-Transition-Functions) for details.
 
 ```@docs
 apply!
 apply
 ```
 
-
 !!! tip 
 
-	The agent types must be immutable, but in most cases the agent
+	The agent types must be immutable, but in many cases the agent
 	returned by a transition function will have a different state than the
 	agent specified as a parameter. If only one field is changed, we still
 	need to copy all other fields. The Setfield.jl package can be very
 	useful in this case.
 
-
-Inside a transition function the following functions can be used to access the state of the simulation:
+Inside a transition function the following functions can be used to
+access the state of the simulation:
 
 ## Globals and Parameters
 ```@docs
@@ -43,10 +37,11 @@ agentstate
 agentstate_flexible
 ```
 
-To get the states of all agents that are connected to an agent (with
-the agent as target) via edges of a specific edge type, the
-neighborstates(_iter) functions can be useful (they are combing
-[`neighborids`](@ref) and [`agentstate`](@ref)).
+To retrieve the states of all agents connected to a target agent
+through edges of a specific type, the `neighborstates_iter` functions
+can be beneficial. These functions combine the capabilities of
+[`neighborids`](@ref) and [`agentstate`](@ref), allowing you to
+easy access the desired information.
 
 ```@docs
 neighborstates

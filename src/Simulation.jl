@@ -565,7 +565,7 @@ param(sim, name) = getfield(sim.params, name)
     set_param!(sim::Simulation, param::Symbol, value)
 
 Assign the specified `value` to the `param` parameter. This operation
-is only permitted after invoking the `finish_init!` method.
+is only allowed prior to calling the `finish_init!` method.
 
 A pipeable version of `set_param!` is also available.
 

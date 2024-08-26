@@ -39,19 +39,20 @@ makedocs(sitename="Vahana Documentation",
                  "Adding Spatial Information" => "predator.md"
              ],
              "Performance Tuning" => "performance.md",
+             "Parallel Simulations" => "parallel.md", 
              "API" => [
                  "Model Definition" => "definition.md",
                  "Initialization" => "initialization.md",
                  "Transition Function" => "transition.md",
-                 "Raster" => "raster.md",
                  "Global Layer" => "global.md",
+                 "Raster" => "raster.md",
 #                 "REPL helpers" => "repl.md",
                  "Plots" => "plots.md",
                  "File storage" => "hdf5.md",
                  "Logging" => "logging.md",
                  "Configuration" => "config.md",
-                 "Misc" => "misc.md"
-                 # "All" => "index.md"
+                 "Misc" => "misc.md",
+                 "Index" => "apiindex.md"
              ],
 #             "Glossary" => "glossary.md",
              "Change Log" => "changelog.md"

@@ -2,13 +2,38 @@
 EditURL = "../examples/predator.jl"
 ```
 
-# Predator/Prey Model
+# Adding Spatial Information
 
-This example shows how spatial information can be integrated into a
-model. In its current version, Vahana is not the ideal tool for
-models that depend mainly on the movement of agents, but as shown
-here, it is still possible, even though we are actually only working
-with graphs.
+# Goal
+
+This example demonstrates how spatial information can be integrated
+into an agent-based model using Vahana. While Vahana's primary focus
+is on graph-based simulations, it support the inclusion of spatial
+information into models.  It allows you to define a spatial grid,
+associate agents with specific locations, and implement interactions
+based on spatial proximity, even though the underlying implementation
+still operates on graph structures.
+
+It's worth noting that in its current version, Vahana may not be the
+optimal choice for models that primarily depend on frequent movement
+of agents across space. However, as this example will show, it is
+entirely possible to implement those models.
+
+It allows you to define a spatial grid, associate agents with specific
+locations, and implement interactions based on spatial proximity, all
+while leveraging Vahana's efficient graph-based computations.
+
+For the understanding of how Vahana handles spatial information and
+rasters, you may find it helpful to watch also the [corresponding
+section of the Vahana.jl Juliacon
+video](https://youtu.be/-318ec-kCBM?si=YNnWLrb-_7RPSEPB&t=1198). The
+video provides a visual explanation of how rasters are implemented
+within Vahana's graph-based framework and demonstrates some key
+concepts that we'll be applying in this tutorial.
+
+In this tutorial, we'll implement a predator-prey model with spatial
+components, showcasing how Vahana's raster functionality can be used
+to create a spatially-explicit ecological simulation.
 
 The model is based on the [Predator-Prey for High-Performance
 Computing](https://peerj.com/articles/cs-36/) (PPHPC) model. In
@@ -17,32 +42,17 @@ to locations with grass (if one is in sight) and the predators move to
 locations with prey to demonstrate how features like this can be
 implemented in Vahana.
 
+# Agent and Edge Types
+
 ````@example predator
-using CairoMakie
-
-using Vahana
-
-using Random
+using CairoMakie, Vahana, Random
 
 Random.seed!(1); #hide
-nothing #hide
+detect_stateless(true) #hide
 ````
 
-We want to run the model with optimized performance, see
-[Performance Tuning](performance.md) for details.
-
-````@example predator
-detect_stateless(true)
-
-enable_asserts(false);
-nothing #hide
-````
-
-## AgentTypes
-
-Beside the predator and the prey we also have the grid cells, which
-represent the spatial environment but are also implemented as agents
-and thus as nodes of the graph.
+In our spatial predator-prey model, we define separate structures for
+predators and prey, even though they share the same fields:
 
 ````@example predator
 struct Predator
@@ -54,56 +64,65 @@ struct Prey
     energy::Int64
     pos::CartesianIndex{2}
 end
+````
 
+Despite their identical structure, we define them as separate types
+because Vahana uses these types as tags for differentiating between
+agent categories.
+
+In the following sections, we'll use "Species" as an umbrella term to
+refer to both Predator and Prey. Functions that are applicable to both
+types will take the type as a parameter, which we'll denote as Species
+in the function arguments.
+
+Aside from the predator and prey agents, the spatial environment is
+represented by grid cells, which are also implemented as agents and
+consequently function as nodes within the graph structure.
+
+````@example predator
 struct Cell
     pos::CartesianIndex{2}
     countdown::Int64
 end
 ````
 
-## Edges
+All agents maintain their position as part of their internal
+state. However, a cell can only perceive the animals if they are
+directly connected to the cell through an edge. Vahana facilitates the
+establishment of such edges via the [`move_to!`](@ref) function.
 
-All agents have their position as part of their state, but a
-cell can only "see" the animals if they are connected to the cell via
-an edge. Vahana supports the creation of such edges via the
-[`move_to!`](@ref) function.
-
-Prey/PredatorPosition are edges from the prey/predator to the
-cell. We use two different types (and not just one type Position)
-because this allows the cell to differentiate between prey or
-predators by the type of the edges.
+Edges represent connections from prey or predators to cells. We define
+Position as a parametric type, enabling cells to distinguish between
+prey and predators based on the type of the edges.
 
 ````@example predator
-struct PreyPosition end
-
-struct PredatorPosition end
+struct Position{T} end
 ````
 
-PreyView and PredatorView are edges from the cells to the prey and
-predator respectively. These edges represent the cells that are
-visible to a prey or predator so that, for example, it is possible to
-check which cell in the visible area contains food.
+Views are also edges from the cells to the prey and predators
+respectively. These edges represent the cells that are visible to a
+prey or predator so that, for example, it is possible to check which
+cell in the visible area contains food.
 
 ````@example predator
-struct PreyView end
-
-struct PredatorView end
+struct View{T} end
 ````
 
-VisiblePrey are edges from prey to predator. So far, all edge types
-connect animals to cells, and without an incoming edge from a prey,
-a predator don't know anything about the prey positions. The
-VisiblePrey edges are created by the cells through the `find_prey`
-transition function, as the cells know which Prey is directly on the
-cell via the PreyPosition edges and therefore in the view of an
-predator via the PredatorView edges.
+VisiblePrey edges represent connections from prey to
+predator. Currently, all edge types link animals to cells, and without
+an incoming edge from prey, a predator lacks awareness of prey
+positions. The VisiblePrey edges are generated by cells through the
+`find_prey` transition function, as cells possess knowledge of which Prey
+entities are directly located on the cell via the Position{Prey} edges,
+and consequently within the view of a predator via the View{Predator}
+edges.
 
 ````@example predator
 struct VisiblePrey end
 ````
 
 The last two edge types are messages to inform the agents that they
-must die or found something to eat.
+must die or find something to eat.
 
 ````@example predator
 struct Die end
@@ -111,13 +130,15 @@ struct Die end
 struct Eat end
 ````
 
-## Params
+# Params and Globals
 
-We follow the parameter structure from the PPHPC model, but use the
-same parameters for Prey and Predator for the example run.
+We follow the parameter structure from the PPHPC model, but use
+(besides the initial population) the same parameters for Prey and Predator
+for the example run.
 
 ````@example predator
-Base.@kwdef struct SpeciesParams
+Base.@kwdef mutable struct SpeciesParams
+    init_population::Int64 = 500
     gain_from_food::Int64 = 5
     loss_per_turn::Int64 = 1
     repro_thres::Int64 = 5
@@ -129,16 +150,15 @@ Base.@kwdef struct AllParams
     restart::Int64 = 5
     predator::SpeciesParams = SpeciesParams()
     prey::SpeciesParams = SpeciesParams()
-    num_predators::Int64 = 500
-    num_prey::Int64 = 2000
 end;
+
+params = AllParams()
+params.prey.init_population = 2000;
 nothing #hide
 ````
 
-## Globals
-
-We are creating timeseries (in form of `Vector`s) for the predator and
-prey population, the number of cells with food and the average
+We are creating timeseries (in the form of `Vector`s) for the predator
+and prey population, the number of cells with food, and the average
 energy of the predators and prey.
 
 ````@example predator
@@ -155,82 +175,73 @@ nothing #hide
 ## Create the Simulation
 
 We have now defined all the Julia structs needed to create the model
-and a simulation. We also add some hints to some edgetypes, mainly
-for performance reasons.
+and a simulation.
 
 ````@example predator
 const ppsim = ModelTypes() |>
     register_agenttype!(Predator) |>
     register_agenttype!(Prey) |>
     register_agenttype!(Cell) |>
-    register_edgetype!(PredatorPosition, :SingleType; target = Cell) |>
-    register_edgetype!(PreyPosition, :SingleType; target = Cell) |>
-    register_edgetype!(PredatorView) |>
-    register_edgetype!(PreyView) |>
-    register_edgetype!(VisiblePrey, :SingleType; target = Predator) |>
-    register_edgetype!(Die, :HasEdgeOnly) |>
-    register_edgetype!(Eat, :HasEdgeOnly) |>
+    register_edgetype!(Position{Predator}) |>
+    register_edgetype!(Position{Prey}) |>
+    register_edgetype!(View{Predator}) |>
+    register_edgetype!(View{Prey}) |>
+    register_edgetype!(VisiblePrey) |>
+    register_edgetype!(Die) |>
+    register_edgetype!(Eat) |>
     create_model("Predator Prey") |>
-    create_simulation(AllParams(), PPGlobals())
+    create_simulation(params, PPGlobals())
 ````
 
 ## Initialization
 
 First we add the Cells to the Simulation. Therefore we define a
-constructor functions for the cells. There is a 50% probability that a cell
+constructor function for the cells. There is a 50% probability that a cell
 contains food (and in this case `countdown` is 0).
 
 ````@example predator
 init_cell(pos::CartesianIndex) =
     Cell(pos, rand() < 0.5 ? 0 : rand(1:param(ppsim, :restart)))
 
-add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell)
-````
-
-Predator and Pray are starting on a random position.
-
-````@example predator
-function random_pos(sim)
-    size = param(sim, :raster_size)
-    CartesianIndex(rand(1:size[1]), rand(1:size[2]))
-end;
+add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell);
 nothing #hide
 ````
 
-We define two helper functions to move an animal to a new
-position. This will add a single (pos)edge from the animal to the
-cell at the `newpos` position, and for all cells in the manhatten
-distance of 1 also (view)edges from those cell to the animal and
-from the animal to the cell.
+We define a auxiliary functions to facilitate the relocation of an
+agent to a new position. These functions will add a single `Position`
+edge from the animal to the cell at the `newpos` position, and for all
+cells within a Manhattan distance of 1, `View` edges will be
+established from those cells to and from the animal, as well as to the
+cell itself.
 
 ````@example predator
-function move!(sim, id, newpos, posedge, viewedge)
-    move_to!(sim, :raster, id, newpos, nothing, posedge)
-    move_to!(sim, :raster, id, newpos, viewedge, viewedge;
+function move!(sim, id, newpos, Species)
+    move_to!(sim, :raster, id, newpos, nothing, Position{Species}())
+    move_to!(sim, :raster, id, newpos, View{Species}(), View{Species}();
              distance = 1, metric = :manhatten)
 end;
 nothing #hide
 ````
 
-Now we can add the Predator and Pray to the simulation, and use
-the `move!` function to create also the position and view edges.
+The add_animals function is a generic initializer for both predators and
+prey, taking species-specific parameters and the species type as
+arguments. It creates a specified number of agents, each with a
+random position on the raster and a random initial energy within a
+defined range, then adds them to the simulation and places them on
+the raster using the move! function.
 
 ````@example predator
-energyrange = 1:(2*param(ppsim, :prey).gain_from_food)
-foreach(1:param(ppsim, :num_prey)) do _
-    energy = rand(energyrange)
-    pos = random_pos(ppsim)
-    id = add_agent!(ppsim, Prey(energy, pos))
-    move!(ppsim, id, pos, PreyPosition(), PreyView())
+function add_animals(params, Species)
+    energyrange = 1:(2*params.gain_from_food)
+    foreach(1:params.init_population) do _
+        pos = random_pos(ppsim, :raster)
+        id = add_agent!(ppsim, Species(rand(energyrange), pos))
+        move!(ppsim, id, pos, Species)
+    end
 end
 
-energyrange = 1:(2*param(ppsim, :predator).gain_from_food)
-foreach(1:param(ppsim, :num_predators)) do _
-    energy = rand(energyrange)
-    pos = random_pos(ppsim)
-    id = add_agent!(ppsim, Predator(energy, pos))
-    move!(ppsim, id, pos, PredatorPosition(), PredatorView())
-end
+add_animals(param(ppsim, :prey), Prey)
+add_animals(param(ppsim, :predator), Predator)
 ````
 
 At the end of the initialization phase we have to call finish_init!
@@ -241,23 +252,29 @@ finish_init!(ppsim)
 
 ## Transition Functions
 
-As mentioned in the comment for the PredatorView, the cells are
-responsible to connect the Prey with the Predators. So each cell
+As mentioned in the comment for the View type, the cells are
+responsible for connecting the Prey with the Predators. So each cell
 iterate over each prey on the cell and add edges to all predators
-the can view the cell.
+that can view the cell.
 
-It may seem strange that the transition function does not return the state of
-the cell. The `apply!` method has the keyword argument
-`invariant_compute`, if this is set to true as we do this later when
-we call `find_prey`, Vahana knows that the state of the agents being
-called will not be change and the return values of the transition
-functions are ignored.
+The underscore (_) as the first argument in the find_prey function signifies
+that we don't need to access the state of the cell itself. This is
+because the function only needs to check for the presence of edges and create
+new connections based on those edges, without using any information from
+the cell's internal state. As a result, when we call apply! for
+find_prey, we don't include Cell in the read argument. Consequently,
+Vahana passes Val(Cell) as the first argument to find_prey for multiple
+dispatch purposes, rather than the actual cell state. This approach
+optimizes performance by avoiding unnecessary data access and allows
+the function to operate solely on the graph structure of the simulation.
 
 ````@example predator
-function find_prey(_, id, sim)
-    checked(foreach, neighborids(sim, id, PreyPosition)) do preyid
-        checked(foreach, neighborids(sim, id, PredatorView)) do predid
-            add_edge!(sim, preyid, predid, VisiblePrey())
+function find_prey(_::Val{Cell}, id, sim)
+    if has_edge(sim, id, Position{Prey}) && has_edge(sim, id, View{Predator})
+        for preyid in neighborids(sim, id, Position{Prey})
+            for predid in neighborids(sim, id, View{Predator})
+                add_edge!(sim, preyid, predid, VisiblePrey())
+            end
         end
     end
 end;
@@ -279,12 +296,12 @@ function move(state::Predator, id, sim)
         # we need to access the pos of the prey which is part of it's state
         prey = neighborstates(sim, id, VisiblePrey, Prey)
         newpos = if isnothing(prey)
-            nextcellid = rand(neighborids(sim, id, PredatorView))
+            nextcellid = rand(neighborids(sim, id, View{Predator}))
             agentstate(sim, nextcellid, Cell).pos
         else
             rand(prey).pos
         end
-        move!(sim, id, newpos, PredatorPosition(), PredatorView())
+        move!(sim, id, newpos, Predator)
         Predator(e, newpos)
     else
         nothing
@@ -293,25 +310,28 @@ end;
 nothing #hide
 ````
 
-The difference in the movement of the prey compared to the movement of
-the predator is that the prey is looking for cells with grass instead of
-prey. In the PPHPC model implemented here, grass is available when
-the `countdown` field of a cell is equal to 0.
+The movement logic for prey differs from that of predators in terms of
+their target. While predators seek cells containing prey, prey agents
+search for cells with available grass. In our implementation of the
+PPHPC (Predator-Prey for High-Performance Computing) model, grass
+availability is indicated by the countdown field of a
+cell. Specifically, grass is considered available for consumption when a
+cell's countdown value equals 0.
 
 ````@example predator
 function move(state::Prey, id, sim)
     e = state.energy - param(sim, :prey).loss_per_turn
     if e > 0
-        withgrass = filter(neighborids(sim, id, PreyView)) do id
+        withgrass = filter(neighborids(sim, id, View{Prey})) do id
             agentstate(sim, id, Cell).countdown == 0
         end
         nextcellid = if length(withgrass) == 0
-            rand(neighborids(sim, id, PreyView))
+            rand(neighborids(sim, id, View{Prey}))
         else
             rand(withgrass)
         end
         newpos = agentstate(sim, nextcellid, Cell).pos
-        move!(sim, id, newpos, PreyPosition(), PreyView())
+        move!(sim, id, newpos, Prey)
         Prey(e, newpos)
     else
         nothing
@@ -330,26 +350,21 @@ end;
 nothing #hide
 ````
 
-In the try_eat transition function, each cell checks whether predator and
-prey are on the cell at the same time. In this case, the cell
-generates random matches between predator and prey, wherby each prey
-is selected only once at most (only one predator can eat a single
-prey, and each predator eat not more then one prey).
-
-For these matches, `Die` edges are generated from the cell to the
-prey and `Eat` edges are generated from the cell to the
-predator. Since it is not important for the model at which location
-a prey animal was eaten, the `Die` and `Eat` edgetypes have the
-property `:HasEdgeOnly`.
-
-If prey on the cell has survived and the cell contains grass
-(countdown == 0), an `Eat` edge is created with one of the surviving
-prey as the target.
+The try_eat transition function simulates the predator-prey interactions and
+feeding processes within each cell. When both predators and prey
+occupy the same cell, the function generates random predator-prey pairings,
+ensuring each prey is targeted at most once and each predator consumes
+no more than one prey. These interactions are represented by creating
+Die edges from the cell to the consumed prey and Eat edges from the
+cell to the successful predators. If any prey survive this process and
+the cell contains available grass (indicated by a countdown of 0), an
+Eat edge is established between the cell and a randomly selected
+surviving prey, simulating grazing behavior.
 
 ````@example predator
 function try_eat(state::Cell, id, sim)
-    predators = neighborids(sim, id, PredatorPosition)
-    prey = neighborids(sim, id, PreyPosition)
+    predators = neighborids(sim, id, Position{Predator})
+    prey = neighborids(sim, id, Position{Prey})
 
     # first the predators eat the prey, in case that both are on the cell
     if ! isnothing(predators) && ! isnothing(prey)
@@ -375,30 +390,31 @@ end;
 nothing #hide
 ````
 
-The reproduction rule for predator and prey is almost the same, so we
-first define a function that can be used for both species. In this function we first
-check if the animal found something to eat. In this case on of the
-previous transition functions did create a edge of typ `Eat` with
-the animal as target, so we can use the `has_edge` function to check
-if this is the case.
+The reproduction mechanism for both predators and prey follows a similar
+pattern, allowing us to define a generic function applicable to both
+species. This function first determines if the animal found something to eat
+by checking for the presence of an Eat edge targeting the animal, a
+result of previous transition functions. If such an edge exists, the
+animal's energy increases.
 
-If the energy of the animal is above the threshold given as
-parameter, an offspring is added to the simulation via the
-`add_agent` call and the offspring is also moved it to the same
-position as its parent.
+The function then evaluates if the animal's energy
+exceeds a specified threshold parameter. When this condition is met,
+reproduction occurs: a new offspring is introduced to the simulation
+via the add_agent call, inheriting half of its parent's energy, and is
+positioned at the same location as its parent using the move! function.
 
 ````@example predator
-function try_reproduce_imp(state, id, sim, C, posedge, viewedge, species_params)
+function try_reproduce_imp(state, id, sim, species_params, Species)
     if has_edge(sim, id, Eat)
-        state = C(state.energy + species_params.gain_from_food, state.pos)
+        state = Species(state.energy + species_params.gain_from_food, state.pos)
     end
     if state.energy > species_params.repro_thres &&
         rand() * 100 < species_params.repro_prob
 
         energy_offspring = Int64(round(state.energy / 2))
-        newid = add_agent!(sim, C(energy_offspring, state.pos))
-        move!(sim, newid, state.pos, posedge, viewedge)
-        C(state.energy - energy_offspring, state.pos)
+        newid = add_agent!(sim, Species(energy_offspring, state.pos))
+        move!(sim, newid, state.pos, Species)
+        Species(state.energy - energy_offspring, state.pos)
     else
         state
     end
@@ -411,12 +427,11 @@ arguments.
 
 ````@example predator
 try_reproduce(state::Predator, id, sim) =
-    try_reproduce_imp(state, id, sim, Predator,
-                    PredatorPosition(), PredatorView(), param(sim, :predator))
+    try_reproduce_imp(state, id, sim, param(sim, :predator), Predator)
 ````
 
 The prey animal needs an extra step because it might have been eaten
-by a predator. So we check if there is a `Die` edge leading to the
+by a predator. So, we check if there is a `Die` edge leading to the
 prey animal, and if so, the prey animal is removed from the
 simulation (by returning nothing). Otherwise, we again just call the
 reproduce function defined above.
@@ -426,8 +441,7 @@ function try_reproduce(state::Prey, id, sim)
     if has_edge(sim, id, Die)
         return nothing
     end
-    try_reproduce_imp(state, id, sim, Prey,
-                    PreyPosition(), PreyView(), param(sim, :prey))
+    try_reproduce_imp(state, id, sim, param(sim, :prey), Prey)
 end;
 nothing #hide
 ````
@@ -452,7 +466,7 @@ end;
 nothing #hide
 ````
 
-We add to our time series the initialzation values.
+We add to our time series also the values after the initialization.
 
 ````@example predator
 update_globals(ppsim);
@@ -461,10 +475,7 @@ nothing #hide
 
 And finally we define in which order our transitions functions are called.
 Worth mentioning here are the keyword arguments in `find_prey` and
-`try_reproduce`. In the `find_prey` transition the state of the cell
-itself does not change, it only creates `VisiblePrey` edges. By
-`invariant_compute = true` Vahana knows that the state of the cells
-are constant with respect to this transition function.
+`try_reproduce`.
 
 The add_existing keyword in the try_reproduce transition function signify that
 the currently existing position and view edges should not be
@@ -475,32 +486,33 @@ position of the potential offspring.
 function step!(sim)
     apply!(sim, move,
            [ Prey ],
-           [ Prey, PreyView, Cell ],
-           [ Prey, PreyView, PreyPosition ])
+           [ Prey, View{Prey}, Cell ],
+           [ Prey, View{Prey}, Position{Prey} ])
 
     apply!(sim, find_prey,
            [ Cell ],
-           [ PreyPosition, PredatorView ],
+           [ Position{Prey}, View{Predator} ],
            [ VisiblePrey ])
 
     apply!(sim, move,
            [ Predator ],
-           [ Predator, PredatorView, Cell, Prey, VisiblePrey ],
-           [ Predator, PredatorView, PredatorPosition ])
+           [ Predator, View{Predator}, Cell, Prey, VisiblePrey ],
+           [ Predator, View{Predator}, Position{Predator} ])
 
     apply!(sim, grow_food, Cell, Cell, Cell)
 
     apply!(sim, try_eat,
            [ Cell ],
-           [ Cell, PredatorPosition, PreyPosition ],
+           [ Cell, Position{Predator}, Position{Prey} ],
            [ Cell, Die, Eat ])
 
     apply!(sim, try_reproduce,
            [ Predator, Prey ],
            [ Predator, Prey, Die, Eat ],
-           [ Predator, Prey, PredatorPosition, PreyPosition, PredatorView, PreyView ];
-           add_existing = [ PredatorPosition, PreyPosition,
-                                       PredatorView, PreyView ])
+           [ Predator, Prey, Position{Predator}, Position{Prey},
+             View{Predator}, View{Prey} ];
+           add_existing = [ Position{Predator}, Position{Prey},
+                            View{Predator}, View{Prey} ])
 
     update_globals(sim)
 end;
@@ -519,12 +531,12 @@ To visualize the results we use the Makie package.
 
 ### Time series
 
-First we create a linechart for the time series stored in the global state.
-For this purpose Vahana offers the function `plot_globals`. Since
-This function returns not only the Makie Figure itself, but also the
-Axis and Plots, so that the result can be processed further.
-If the default result is displayed, the Julia function `first` can be used
-to extract the mapping from the returned tuple.
+First, we will generate a line chart for the time series data stored in
+the global state. Vahana provides the `plot_globals` function for this
+purpose. This function not only returns the Makie Figure itself but also the
+Axis and Plots, allowing for further processing of the result. If you
+wish to display the default result, you can utilize the Julia `first`
+function to extract the figure from the returned tuple.
 
 ````@example predator
 plot_globals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first
@@ -533,18 +545,9 @@ plot_globals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |> first
 ### Spatial distribution
 
 To visualize the spatial information we can use `heatmap` in
-combination with the function `calc_raster` of Vahana. E.g. the number of
-PreyPosition or PredatorPosition edges connected to an edge give us
-the number of Prey/Predator currently on that cell.
-
-Note that the function name `num_edges` can be confusing when it
-appears in conjunction with grids. In Vahana, neighbors are always
-neighbors in a graph, so in our specific case, the neighbors of a
-cell in the Predator/PreyPosition network are the Predators/Prey
-that are exactly on the cell, and not in the spatial neighborhood of
-the cell. Only in the case when a network is constructed with the
-function `connect_raster_neighbors!` the neighborhood of the nodes
-in the network coincides with a spatial neighborhood.
+combination with the Vahana's `calc_raster` function. E.g. the
+number of Position{Prey} edges connected to a cell give us the
+number of Prey individuals currently on that cell.
 
 It would be nice to have a colorbar for the heatmaps so we define a small
 helper function that can be used in a pipe.
@@ -560,16 +563,16 @@ nothing #hide
 #### Predators Positions
 
 ````@example predator
-calc_raster(ppsim, :raster, Int64, [ PredatorPosition ]) do id
-    num_edges(ppsim, id, PredatorPosition)
+calc_raster(ppsim, :raster, Int64, [ Position{Predator} ]) do id
+    num_edges(ppsim, id, Position{Predator})
 end |> heatmap |> add_colorbar
 ````
 
 #### Prey Positions
 
 ````@example predator
-calc_raster(ppsim, :raster, Int64, [ PreyPosition ]) do id
-    num_edges(ppsim, id, PreyPosition)
+calc_raster(ppsim, :raster, Int64, [ Position{Prey} ]) do id
+    num_edges(ppsim, id, Position{Prey})
 end |> heatmap |> add_colorbar
 ````
 
@@ -581,7 +584,7 @@ calc_raster(ppsim, :raster, Int64, [ Cell ]) do id
 end |> heatmap |> add_colorbar
 ````
 
-# Finish the simulation
+# Finish the Simulation
 
 As always, it is important to call `finish_simulation` at the end of the
 simulation to avoid memory leaks.
