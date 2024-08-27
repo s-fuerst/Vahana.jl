@@ -1548,7 +1548,7 @@ version = "1.21.0"
 deps = ["ColorSchemes", "Colors", "DataFrames", "Dates", "GLMakie", "GraphMakie", "Graphs", "HDF5", "LinearAlgebra", "Logging", "MPI", "MPIPreferences", "Makie", "Metis", "NamedTupleTools", "Preferences", "Printf", "Requires", "StatsBase"]
 path = "/home/fuerst/.julia/dev/Vahana"
 uuid = "e9033725-1633-496a-b29a-3bc5a5543602"
-version = "1.1.0"
+version = "1.2.0"
 
 [[deps.Wayland_jll]]
 deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
