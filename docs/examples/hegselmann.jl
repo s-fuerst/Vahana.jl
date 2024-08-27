@@ -192,17 +192,18 @@ Makie.hidedecorations!(axis(vp))
 
 figure(vp)
 
-# We want the nodes to show the agent's opinion. Instead of modifying
-# the Makie plot `node_color` property directly, it's also possible to
-# define helper functions with methods for the different agent and edge
-# types, that are called by `create_graphplot` to determine properties
-# of the nodes and edges of the plot and also support interactive plots
-# in the case that GLMakie is used as the Makie backend. For details,
-# please check [`create_graphplot`](@ref).
+# To visualize the agents' opinions, we can leverage Vahana's
+# integration with Makie's plotting capabilities. Instead of directly
+# modifying the `node_color` property of the Makie plot, we can define
+# custom visualization functions. These functions, which can have
+# methods for different agent and edge types, are used by [`create_graphplot`](@ref)
+# to determine various properties of nodes and edges in the plot.
 
-# We define such a function and are calling it modify_vis, and will set the
-# `update_fn` keyword of `create_graphplot` to this function. 
-
+# This approach not only allows for more dynamic and type-specific
+# visualizations but also supports interactive plots when using GLMakie as
+# the backend. We'll define a function called `modify_vis` that specifies how
+# different elements should be displayed. This function will be passed to
+# [`create_graphplot`](@ref) via the `update_fn` keyword argument.
 
 colors = Colors.range(Colors.colorant"red", stop=Colors.colorant"green", length=100)
 
@@ -212,10 +213,6 @@ modify_vis(state::HKAgent, _ ,_) = Dict(:node_color => colors[state.opinion * 10
 
 modify_vis(_::Knows, _, _, _) = Dict(:edge_color => :lightgrey,
                                      :edge_width => 0.5);
-
-
-# We are using a helper function to modify the node colors to
-# indicate the agent's opinion and add a color bar to the plot.
 
 function plot_opinion(sim)
     vp = create_graphplot(cysim,

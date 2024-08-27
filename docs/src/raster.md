@@ -26,7 +26,7 @@ move_to!
 The id of a cell for a given position can be archived via `cellid`
 
 ```@docs
-The
+cellid
 ```
 
 cellid id or position of a random cell can be drawn via:

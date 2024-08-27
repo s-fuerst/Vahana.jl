@@ -15,6 +15,28 @@ This approach works without any additional changes in the model
 code. However, there are ways to further optimize performance in a
 parallel simulation:
 
+## MPI.jl Integration
+
+Vahana utilizes the MPI.jl package for its parallel computing
+capabilities. While no specific MPI knowledge is required to use
+Vahana's parallel features, users may find it beneficial to review the
+[Configuration
+section](https://juliaparallel.org/MPI.jl/stable/configuration/) of
+the [MPI.jl documentation](https://juliaparallel.org/MPI.jl/stable/)
+for a deeper understanding of the underlying parallel computing
+framework.  For advanced users or specific scenarios, it's possible to
+work directly with MPI.jl functions within your Vahana model. When
+using Vahana in parallel mode, MPI is automatically initialized, and
+the following MPI-related variables are available:
+
+- `mpi.comm`: The MPI communicator object.
+- `mpi.rank`: An integer identifying the current process (0-based).
+- `mpi.size`: The total number of processes in the parallel computation.
+
+Remember that while direct use of MPI functions can provide additional
+flexibility, it also requires careful handling to maintain consistency
+across all processes and avoid potential race conditions or deadlocks.
+
 ## Partitioning
 
 The simulation graph is partitioned and distributed in the
