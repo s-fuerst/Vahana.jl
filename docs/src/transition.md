@@ -6,7 +6,7 @@ CurrentModule = Vahana
 
 After the initialization, the state of the simulation is modified by
 so called transition functions. See [Defining Transition
-Functions](tutorial1.html#Defining-Transition-Functions) for details.
+Functions](tutorial1.md#Defining-Transition-Functions) for details.
 
 ```@docs
 apply!
