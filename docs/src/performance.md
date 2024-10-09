@@ -26,7 +26,6 @@ or edges to improve the runtime performance and/or reduce memory
 requirements. You can use either hint independently or combine them as
 needed for your specific types.
 
-
 Aside from the `:SingleEdge` hint, there is generally no requirement
 to modify the model code when a type hint is introduced to a type. The
 interface to Vahana remains consistent, with the restriction that
@@ -53,7 +52,7 @@ nothing in a transition function). The `:Immortal` hint allows Vahana to
 skip certain checks and operations related to agent removal,
 potentially improving performance.
 
-The :Independent hint indicates that agents of this type do not access
+The `:Independent` hint indicates that agents of this type do not access
 the state of other agents of the same type during transition
 functions. This information allows Vahana to optimize memory usage and
 reduce unnecessary data copying.

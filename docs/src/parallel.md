@@ -55,7 +55,7 @@ In order to optimize the partitioning for your specific model, it can
 be very useful to perform your own partitioning and pass it to
 [`finish_init!`](@ref). An example of this can be seen in the
 `create_partition` function of the [Vahana Episim
-Example](https://git.zib.de/sfuerst/vahana-episim/-/blob/main/src/init.jl).
+Example](https://git.zib.de/sfuerst/vahana-episim/-/blob/main/src/episim.jl).
 
 ## Using @rootonly
 
