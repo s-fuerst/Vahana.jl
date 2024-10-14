@@ -56,9 +56,16 @@ You can then construct a `Foo` instance using a regular string:
 `Foo("abc")`.
 
 If `add_show_method` is set to `true` (the default), `show` methods are
-also defined for these `SVector`s. To avoid confusion in the REPL, where
-the value might appear as a `String` while actually being an `SVector`,
-the output includes "(as UInt8-Vector)" after the value itself.
+also defined for these `SVector`s. To avoid confusion while working
+with Julia's REPL, where the value might appear as a `String` while
+actually being an `SVector`, the output includes "(as UInt8-Vector)"
+after the value itself.
+
+When `add_show_method` is set to `true` (which is the default behavior),
+`show` methods are automatically defined for the `SVector` types. To
+prevent potential confusion arising from the display of `SVector`
+values as `String`s, the output is formatted to include the annotation
+"::UInt8[]" following the value itself. 
 """
 function create_string_converter(add_show_method::Bool = true)
     @eval function Base.convert(::Type{SVector{N, UInt8}}, str::String) where N
@@ -66,6 +73,10 @@ function create_string_converter(add_show_method::Bool = true)
         SVector{N, UInt8}(collect(codeunits(rpad(str, N))))
     end
 
+    @eval function SVector{N, UInt8}(str::String) where N
+        convert(SVector{N, UInt8}, str)
+    end
+    
     @eval Base.promote_rule(::Type{SVector{N, UInt8}}, ::Type{String}) where N =
         SVector{N, UInt8}
 
@@ -81,10 +92,13 @@ function create_string_converter(add_show_method::Bool = true)
 
     if add_show_method
         @eval function Base.show(io::IO, mime::MIME"text/plain", x::SVector{N, UInt8}) where N
-            print(io, String(x) * " (as UInt8-Vector)")
+            print(io, String(x) * "::UInt8[]")
         end
         @eval function Base.show(io::IO, x::SVector{N, UInt8}) where N
-            print(io, String(x) * " (as UInt8-Vector)")
+            print(io, String(x) * "::UInt8[]")
+        end
+        @eval function Base.print(io::IO, x::SVector{N, UInt8}) where N
+            print(io, String(x))
         end
     end
 end

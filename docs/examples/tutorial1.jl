@@ -298,19 +298,14 @@ execution. After these points, the ID should not be considered
 reliable for further use or reference.
 
 If your model requires persistent identification of agents, you should
-implement this yourself by adding an ID field to your agent struct. For
-example:
-
-```
-struct BuyerWithID
-    id::UUID  # created via the UUIDs standard library
-    α::Float64
-    B::Float64
-end
-```
-
-You would then manage these IDs yourself, ensuring they remain
-constant throughout the simulation.
+implement this yourself by adding an ID field to your agent
+struct. You would then manage these IDs yourself, ensuring they remain
+constant throughout the simulation. When working with string-based
+identifiers or other string fields within a struct that need to be
+stored in an HDF5 file, please consult the documentation for the
+[`create_string_converter`](@ref) function. It is also important to note that
+the HDF5 format does not support 128-bit integers. Consequently, the
+UUID package is not compatible with the current version of HDF5.jl.
 
 In our case, we use the IDs returned by add_agents! to iterate over
 all buyer IDs, randomly select `numSellers` seller IDs for each
