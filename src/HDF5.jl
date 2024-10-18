@@ -1542,7 +1542,9 @@ function write_metadata(sim::Simulation,
                  key::Symbol,
                  value)
     if sim.h5file === nothing
-        push!(_preinit_meta, (type, field, key, value))
+        if ! ((type, field, key, value) in _preinit_meta)
+            push!(_preinit_meta, (type, field, key, value))
+        end
         return
     end
 

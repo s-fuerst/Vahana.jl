@@ -4,6 +4,13 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.2.1
+
+### New feature
+
+- Added workaround for strings in structs stored to a HDF5-file. Check
+  the documentation of [`create_string_converter`](@ref) for details.
+
 ## v1.2
 
 ### Breaking changes
