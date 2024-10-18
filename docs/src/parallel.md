@@ -113,7 +113,7 @@ function instead.
 
 
 The [Vahana Episim
-example](https://git.zib.de/sfuerst/vahana-episim/episim.jl) serves as
+example](https://git.zib.de/sfuerst/vahana-episim/-/blob/main/src/episim.jl?ref_type=heads) serves as
 a demonstration of how to implement this approach effectively.
 
 ## The :IgnoreSourceState hint

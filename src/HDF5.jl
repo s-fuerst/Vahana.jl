@@ -1,4 +1,4 @@
-using MPI, HDF5
+using MPI, HDF5, StaticArrays
 
 import NamedTupleTools: ntfromstruct, structfromnt
 import Dates: format, now
@@ -8,7 +8,7 @@ export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export read_agents, read_edges
 export list_snapshots
-export create_namedtuple_converter, create_enum_converter
+export create_namedtuple_converter, create_enum_converter, create_string_converter
 export write_metadata, read_metadata, write_sim_metadata, read_sim_metadata
 
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
@@ -28,6 +28,79 @@ function create_enum_converter()
     @eval hdf5_type_id(::Type{T}, ::Val{false}) where {I, T <: Enum{I}} = hdf5_type_id(I)
 
     @eval convert(::Type{T}, i::Int32) where { T <: Enum } = T(i)
+end
+
+
+"""
+    create_string_converter(add_show_method::Bool = true)
+
+The HDF5.jl library (version 0.17.2) does not support `InlineStrings`
+or `StaticStrings` in structs. Standard `String`s are also not suitable
+for agent and edge types, as these must be bits types.
+
+To address this limitation, `create_string_converter` generates
+gconversion methods between `String` and `SVector{N, UInt8}` instances
+(from the `StaticArrays` package).  Here, N represents the maximum
+number of bytes that can be stored, which for Unicode strings may
+exceed the character count due to variable-length encoding.
+
+For example, you could create a Person struct with a fixed-size name field:
+
+```julia
+struct Foo
+    foo::SVector{20, UInt8}
+end
+```
+
+You can then construct a `Foo` instance using a regular string:
+`Foo("abc")`.
+
+If `add_show_method` is set to `true` (the default), `show` methods are
+also defined for these `SVector`s. To avoid confusion while working
+with Julia's REPL, where the value might appear as a `String` while
+actually being an `SVector`, the output includes "(as UInt8-Vector)"
+after the value itself.
+
+When `add_show_method` is set to `true` (which is the default behavior),
+`show` methods are automatically defined for the `SVector` types. To
+prevent potential confusion arising from the display of `SVector`
+values as `String`s, the output is formatted to include the annotation
+"::UInt8[]" following the value itself. 
+"""
+function create_string_converter(add_show_method::Bool = true)
+    @eval function Base.convert(::Type{SVector{N, UInt8}}, str::String) where N
+        @mayassert length(codeunits(str)) <= N "str can not be longer then $N bytes"
+        SVector{N, UInt8}(collect(codeunits(rpad(str, N))))
+    end
+
+    @eval function SVector{N, UInt8}(str::String) where N
+        convert(SVector{N, UInt8}, str)
+    end
+    
+    @eval Base.promote_rule(::Type{SVector{N, UInt8}}, ::Type{String}) where N =
+        SVector{N, UInt8}
+
+    @eval function Base.convert(::Type{String}, vec::SVector{N, UInt8}) where N
+        String(vec)
+    end
+
+    @eval function Base.convert(::Type{String}, vec::SVector{N, UInt8}) where N
+        rstrip(String(collect(vec)))
+    end
+
+    @eval Base.String(vec::SVector{N, UInt8}) where N = convert(String, vec)
+
+    if add_show_method
+        @eval function Base.show(io::IO, mime::MIME"text/plain", x::SVector{N, UInt8}) where N
+            print(io, String(x) * "::UInt8[]")
+        end
+        @eval function Base.show(io::IO, x::SVector{N, UInt8}) where N
+            print(io, String(x) * "::UInt8[]")
+        end
+        @eval function Base.print(io::IO, x::SVector{N, UInt8}) where N
+            print(io, String(x))
+        end
+    end
 end
 
 # import Base.hash
@@ -1469,7 +1542,9 @@ function write_metadata(sim::Simulation,
                  key::Symbol,
                  value)
     if sim.h5file === nothing
-        push!(_preinit_meta, (type, field, key, value))
+        if ! ((type, field, key, value) in _preinit_meta)
+            push!(_preinit_meta, (type, field, key, value))
+        end
         return
     end
 

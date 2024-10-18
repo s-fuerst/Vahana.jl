@@ -116,8 +116,9 @@ supported.
 The following functions are workarounds for two current restrictions.
 
 ```@docs
-create_namedtuple_converter
 create_enum_converter
+create_namedtuple_converter
+create_string_converter
 ```
 
 ## Example Model
