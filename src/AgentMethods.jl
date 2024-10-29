@@ -248,7 +248,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                                ET::DataType)
         @mayassert !has_hint(sim, ET, :SingleType) """
         Only edge types without the :SingeType hint can be added to
-        to the `with_edge` keyword of an apply! call, but $ET                          has the :SingleType hint.    
+        to the `with_edge` keyword of an apply! call, but $ET
+        has the :SingleType hint.    
         """
         for id in keys(edgeread(sim, ET))
             idx = agent_nr(id)
