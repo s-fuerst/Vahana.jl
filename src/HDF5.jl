@@ -675,7 +675,7 @@ types, that should not be written.
 
 See also [`create_h5file!`](@ref)
 """
-function write_snapshot(sim::Simulation, comment::String = ""; ignore = [])
+function write_snapshot(sim::Simulation, comment::String = ""; ignore = [], step = -1)
     ignore = applicable(iterate, ignore) ? ignore : [ ignore ]
 
     if sim.h5file === nothing
@@ -719,12 +719,14 @@ function open_h5file(sim::Union{Simulation, Nothing}, filename)
     end
 
     if ! (isfile(filename * ".h5") || isfile(filename * "_0.h5"))
-        filename = mkpath("h5") * "/" * filename
-        if ! (isfile(filename * ".h5") || isfile(filename * "_0.h5"))
+        filenameh5 = mkpath("h5") * "/" * filename
+        if ! (isfile(filenameh5 * ".h5") || isfile(filenameh5 * "_0.h5"))
             println("""
-                No hdf5 file(s) for $(filename) found in $(pwd()) or $(pwd())/h5
+                No hdf5 file(s) for $(filename) or $(filenameh5) found in $(pwd()) or $(pwd())/h5
             """)
             return []
+        else
+            filename = filenameh5
         end
     end    
     # we can have a single file written in parallel mode, or mpi.size files
@@ -890,6 +892,21 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     idmapping
 end
 
+function _read_globals_or_params(hid, empty_array_str)
+    eid = hid[empty_array_str]
+    all_keys = map(string,
+                   filter(k -> k[1] != '_',
+                          [keys(hid); keys(attrs(eid))]))
+
+    Dict(map(all_keys) do k
+             k => if attrs(hid[k])["array"] 
+                 hid[k][]
+             else
+                 hid[k][1]
+             end
+         end)
+end
+
 function _read_globals_or_params(hid, T, empty_array_str)
     eid = hid[empty_array_str]
     all_keys = map(string,
@@ -914,6 +931,7 @@ end
     read_params(filename::String, T::DataType)
     read_params(sim::Simulation, T::DataType)
     read_params(sim::Simulation, nr::Int64, T::DataType)
+    read_params(filename::String)
 
 Read the parameters from an HDF5 file. If `filename` is given, the
 parameters are read from the file with this filename from the `h5`
@@ -926,9 +944,10 @@ If the `overwrite_file` argument of [`create_simulation`](@ref) is set
 to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
-In any case, the DataType `T` of the argument `params` of
-[`create_simulation`](@ref) used for the simulation that wrote the
-parameters must be specified.
+In the case that the DataType `T` of the argument `globals` of
+[`create_simulation`](@ref) used for the simulation is specified, the
+result will be an instance of T, elsewhere it will be a Dict with
+the fields of the written Globals type as keys.
 """
 function read_params(filename::String, T::DataType)
     fids = open_h5file(nothing, filename)
@@ -951,10 +970,40 @@ read_params(sim::Simulation, T::DataType) =
 read_params(sim::Simulation, nr::Int64, T::DataType) =
     read_params(add_number_to_file(sim.filename, nr), T)
 
+function read_params(filename)
+    fids = open_h5file(nothing, filename)
+    if length(fids) == 0
+        return
+    end
+
+    values = _read_globals_or_params(fids[1]["params"],
+                                     empty_array_string(fids))
+
+    foreach(close, fids)
+
+    values
+end
+
+function _transition_from_comment(sim_or_filename, comment)
+    if comment == ""
+        return nothing
+    end
+    
+    snaps = list_snapshots(sim_or_filename)
+    tnr = filter(r -> r[2] == "$(comment)", snaps)
+    if length(tnr) == 0
+        println("Found no snapshot with comment $(comment)")
+        nothing
+    else
+        tnr[1][1]
+    end
+end
+
 """
-    read_globals(name::String, T::DataType; [ transition = typemax(Int64) ])
-    read_globals(sim::Simulation, T::DataType; [ transition = typemax(Int64) ])
-    read_globals(sim::Simulation, nr::Int64, T::DataType; [ transition = typemax(Int64) ])
+    read_globals(filename::String, T::DataType; [ transition = typemax(Int64), comment = "" ])
+    read_globals(sim::Simulation, T::DataType; [ transition = typemax(Int64), comment = "" ])
+    read_globals(sim::Simulation, nr::Int64, T::DataType; [ transition = typemax(Int64), comment = "" ])
+    read_globals(filename::String; [ transition = typemax(Int64), comment = "" ])
 
 Read the global values from an HDF5 file. If `filename` is given, the
 parameters are read from the file with this filename from the `h5`
@@ -967,17 +1016,29 @@ If the `overwrite_file` argument of [`create_simulation`](@ref) is set
 to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
-In any case, the DataType `T` of the argument `globals` of
-[`create_simulation`](@ref) used for the simulation that wrote the
-parameters must be specified.
+In the case that the DataType `T` of the argument `globals` of
+[`create_simulation`](@ref) used for the simulation is specified, the
+result will be an instance of T, elsewhere it will be a Dict with
+the fields of the written Globals type as keys.
 
 Per default, the last written globals are read. The `transition`
-keyword allows to read also earlier versions. See also [Write simulations to dics](./hdf5.md) for details.
+keyword allows to read also earlier versions. Alternatively, the
+comment that was specified when write_snapshot was called can be
+specified with the `comment` keyword to read the corresponding
+snapshot.
+
+See also [File storage](./hdf5.md) for details.
 """
-function read_globals(name::String, T::DataType; transition = typemax(Int64))
+function read_globals(name::String, T::DataType;
+               transition = typemax(Int64),
+               comment = "")
     fids = open_h5file(nothing, name)
     if length(fids) == 0
         return
+    end
+
+    if _transition_from_comment(name, comment) !== nothing
+        transition = _transition_from_comment(name, comment)
     end
 
     values = _read_globals_or_params(find_transition_group(fids[1]["globals"],
@@ -996,24 +1057,54 @@ read_globals(sim, T::DataType; transition = typemax(Int64)) =
 read_globals(sim, nr::Int64, T::DataType; transition = typemax(Int64)) =
     read_globals(add_number_to_file(sim.filename, nr), T; transition)
 
+function read_globals(filename; transition = typemax(Int64), comment = "")
+    fids = open_h5file(nothing, filename)
+    if length(fids) == 0
+        return
+    end
+
+    if _transition_from_comment(filename, comment) !== nothing
+        transition = _transition_from_comment(filename, comment)
+    end
+    
+    values = _read_globals_or_params(find_transition_group(fids[1]["globals"],
+                                                           transition),
+                                      empty_array_string(fids))
+
+    foreach(close, fids)
+
+    values
+end
 
 """
     read_agents(filename::String, type; transition = typemax(Int64))
 
-Read the agentstates of type `type` from an HDF5 file with the name
-`filename`. The agent are read from the `h5` subfolder of the current
-working directory, or from the subfolder set with
-[`set_hdf5_path`](@ref).
+Read the agentstates of `type` (which can be a DataType, String or
+Symbol) from an HDF5 file with the name `filename`. The agent are read
+from the `h5` subfolder of the current working directory, or from the
+subfolder set with [`set_hdf5_path`](@ref).
 
 Per default, the last written agents are read. The `transition`
-keyword allows to read also earlier versions. See also [Write
-simulations to disc](./hdf5.md) for details.
+keyword allows to read also earlier versions. Alternatively, the
+comment that was specified when write_snapshot was called can be
+specified with the `comment` keyword to read the corresponding
+snapshot.
 
 Returns a vector of agentstates.
 """
-function read_agents(filename::String, type; transition = typemax(Int64))
+function read_agents(filename::String, type;
+              transition = typemax(Int64),
+              comment = "")
     type = string(type)
     fids = open_h5file(nothing, filename)
+    if length(fids) == 0
+        return
+    end
+
+    if _transition_from_comment(filename, comment) !== nothing
+        transition = _transition_from_comment(filename, comment)
+    end
+    
     aid = fids[1]["agents"][type]
     t = find_transition_nr(aid, transition)
     immortal = attrs(aid)[":Immortal"]
@@ -1027,7 +1118,7 @@ function read_agents(filename::String, type; transition = typemax(Int64))
             fid["agents/$(type)/t_$t/died"][]
         end |> Iterators.flatten
     end
-        
+    
     foreach(close, fids)
 
     if immortal
@@ -1039,8 +1130,8 @@ end
 
 
 """
-    read_agents!(sim::Simulation, [name::String = sim.filename; transition = typemax(Int64), types::Vector{DataType} ])
-    read_agents!(sim::Simulation, nr::Int64; [transition = typemax(Int64), types::Vector{DataType}])
+    read_agents!(sim::Simulation, [name::String = sim.filename; transition = typemax(Int64), types::Vector{DataType}, comment = "" ])
+    read_agents!(sim::Simulation, nr::Int64; [transition = typemax(Int64), types::Vector{DataType}, comment = "" ])
 
 Read the agents from an HDF5 file into the simulation `sim`. If `name`
 is given, the agent are read from the file with this filename from the
@@ -1053,8 +1144,10 @@ to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
 Per default, the last written agents are read. The `transition`
-keyword allows to read also earlier versions. See also [Write
-simulations to dics](./hdf5.md) for details.
+keyword allows to read also earlier versions. Alternatively, the
+comment that was specified when write_snapshot was called can be
+specified with the `comment` keyword to read the corresponding
+snapshot.
 
 If only the agents of a subset of agent types are to be read, this
 subset can be specified via the optional `types` argument.
@@ -1066,10 +1159,15 @@ threaded simulation, the IDs of the agents are modified.
 function read_agents!(sim::Simulation,
                name::String = sim.filename;
                transition = typemax(Int64),
-               types::Vector{DataType} = sim.typeinfos.nodes_types)
+               types::Vector{DataType} = sim.typeinfos.nodes_types,
+               comment = "")
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
+    end
+
+    if _transition_from_comment(name, comment) !== nothing
+        transition = _transition_from_comment(name, comment)
     end
 
     original_size = attrs(fids[1])["mpisize"]
@@ -1156,22 +1254,35 @@ read_agents!(sim::Simulation,
 
 
 """
-    read_edges(filename::String, type; transition = typemax(Int64))
+    read_edges(filename::String, type; transition = typemax(Int64), comment = "")
 
-Read the edgestates of type T from an HDF5 file with the name
-`filename`. The edgestates are read from the `h5` subfolder of the
+Read the edgestates of `type` (which can be a DataType, String or
+Symbol) from an HDF5 file with the name `filename`. 
+The edgestates are read from the `h5` subfolder of the
 current working directory, or from the subfolder set with
 [`set_hdf5_path`](@ref).
 
 Per default, the last written edgestates are read. The `transition`
-keyword allows to read also earlier versions. See also [Write
-simulations to disc](./hdf5.md) for details.
+keyword allows to read also earlier versions. Alternatively, the
+comment that was specified when write_snapshot was called can be
+specified with the `comment` keyword to read the corresponding
+snapshot.
 
 Returns a vector of edgestates.
 """
-function read_edges(filename::String, type; transition = typemax(Int64))
+function read_edges(filename::String, type;
+             transition = typemax(Int64),
+             comment = "")
     type = string(type)
     fids = open_h5file(nothing, filename)
+    if length(fids) == 0
+        return
+    end
+
+    if _transition_from_comment(filename, comment) !== nothing
+        transition = _transition_from_comment(filename, comment)
+    end
+    
     eid = fids[1]["edges"][type]
     t = find_transition_nr(eid, transition)
     stateless = attrs(eid)[":Stateless"]
@@ -1184,15 +1295,15 @@ function read_edges(filename::String, type; transition = typemax(Int64))
         fid["edges/$(type)/t_$t"][]
     end |> Iterators.flatten 
 
-        
+    
     foreach(close, fids)
 
     state |> collect
 end
 
 """
-    read_edges!(sim::Simulation, [name::String = sim.filename; idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType}])
-    read_edges!(sim::Simulation, nr::Int64; [ idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType} ])
+    read_edges!(sim::Simulation, [name::String = sim.filename; idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType}, comment = "" ])
+    read_edges!(sim::Simulation, nr::Int64; [ idmapfunc = identity, transition = typemax(Int64), types::Vector{DataType}, comment = "" ])
 
 Read the edges from an HDF5 file into the simulation `sim`. If
 `name` is given, the edges are read from the file with this filename
@@ -1204,9 +1315,11 @@ If the `overwrite_file` argument of [`create_simulation`](@ref) is set
 to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
-Per default, the last written edges are read. The `transition` keyword
-allows to read also earlier versions. See also [Write simulations to
-disc](./hdf5.md) for details.
+Per default, the last written edges are read. The `transition`
+keyword allows to read also earlier versions. Alternatively, the
+comment that was specified when write_snapshot was called can be
+specified with the `comment` keyword to read the corresponding
+snapshot.
 
 If only the edges of a subset of edge types are to be read, this
 subset can be specified via the optional `types` argument.
@@ -1222,7 +1335,8 @@ function read_edges!(sim::Simulation,
               name::String = sim.filename;
               idmapfunc = identity,
               transition = typemax(Int64),
-              types::Vector{DataType} = sim.typeinfos.edges_types)
+              types::Vector{DataType} = sim.typeinfos.edges_types,
+              comment = "")
     fids = open_h5file(sim, name)
     if length(fids) == 0
         return
@@ -1230,6 +1344,10 @@ function read_edges!(sim::Simulation,
     @assert length(fids) == mpi.size || idmapfunc !== identity """
       read_edges! can be only merging a distributed graph when an idmap is given
     """
+
+    if _transition_from_comment(name, comment) !== nothing
+        transition = _transition_from_comment(name, comment)
+    end
 
     original_size = attrs(fids[1])["mpisize"]
     merge = original_size > mpi.size
@@ -1287,9 +1405,10 @@ read_edges!(sim::Simulation,
             nr::Int64;
             idmapfunc = identity,
             transition = typemax(Int64),
-            types::Vector{DataType} = sim.typeinfos.nodes_types) = 
+            types::Vector{DataType} = sim.typeinfos.nodes_types,
+            comment = "") = 
                 read_edges!(sim, add_number_to_file(sim.filename, nr);
-                            idmapfunc, transition, types)
+                            idmapfunc, transition, types, comment)
 
 
 function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
@@ -1387,8 +1506,8 @@ read_rasters!(sim::Simulation,
 
 
 """
-    read_snapshot!(sim::Simulation, [name::String; transition = typemax(Int64), writeable = false, ignore_params = false])
-    read_snapshot!(sim::Simulation, nr::Int64; [transition = typemax(Int64), writeable = false, ignore_params = false])
+    read_snapshot!(sim::Simulation, [name::String; transition = typemax(Int64), comment = "", writeable = false, ignore_params = false])
+    read_snapshot!(sim::Simulation, nr::Int64; [transition = typemax(Int64), comment = "", writeable = false, ignore_params = false])
 
 Read a complete snapshot from a file into the simulation `sim`. If
 `name` is given, the snapshot is read from the file with this filename
@@ -1401,8 +1520,10 @@ to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
 Per default, the last written snapshot is read. The `transition`
-keyword allows to read also earlier versions. See also
-[Transition](./hdf5.md#Transition) for details.
+keyword allows to read also earlier versions. Alternatively, the
+comment that was specified when write_snapshot was called can be
+specified with the `comment` keyword to read the corresponding
+snapshot.
 
 If `writeable` is set to true, the file is also attached to the simulation
 and following `write_` functions like [`write_snapshot`](@ref) will be
@@ -1416,6 +1537,7 @@ Returns false when no snapshot was found
 function read_snapshot!(sim::Simulation,
                  name::String = sim.filename;
                  transition = typemax(Int64),
+                 comment = "",
                  writeable = false,
                  ignore_params = false)
     # First we free the memory allocated by the current state of sim
@@ -1425,6 +1547,11 @@ function read_snapshot!(sim::Simulation,
     if length(fids) == 0
         return false
     end
+
+    if _transition_from_comment(name, comment) !== nothing
+        transition = _transition_from_comment(name, comment)
+    end
+    
     sim.initialized = attrs(fids[1])["initialized"]
     sim.num_transitions = transition == typemax(Int64) ?
         attrs(fids[1])["last_snapshot"] : transition
@@ -1464,10 +1591,12 @@ end
 read_snapshot!(sim::Simulation,
                nr::Int64;
                transition = typemax(Int64),
+               comment = "",
                writeable = false,
                ignore_params = false) =
                    read_snapshot!(sim, add_number_to_file(sim.filename, nr);
-                                  transition, writeable, ignore_params)
+                                  transition, comment,
+                                  writeable, ignore_params)
 
 
 """
@@ -1583,13 +1712,6 @@ end
 """
     read_metadata(sim::Simulation, type::Union{Symbol, DataType}[, field::Symbol, key::Symbol ])
     read_metadata(filename::String, type::Union{Symbol, DataType}[, field::Symbol, key::Symbol ])
-
-Attach metadata to a `field` of an agent- or edgetype or the
-`globals` or `params` struct (see [`create_simulation`](@ref)) or to a
-raster (in that case `field` must be the name of the raster). `type`
-must be an agent- or edgetype, :Global, :Param or :Raster. Metadata is
-stored via `key`, `value` pairs, so that multiple data of different
-
 
 Read metadata for a `field` of an agent- or edgetype or the `globals` or
 `params` struct (see [`create_simulation`](@ref)) or to a raster (in that

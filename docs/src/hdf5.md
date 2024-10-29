@@ -65,9 +65,21 @@ read_params
 read_globals
 read_agents!
 read_edges!
+```
+
+For e.g. postprocessing it is possible to read the simulation state
+without defining a model and simulation. Just import Vahana, use
+`set_hdf5_path` to determine where the simulations are stored and use:
+
+```@docs
 read_agents
 read_edges
 ```
+
+You can also read the parameters and globals of a simulation in the
+same way using the method implementations of [`read_params`](@ref) and
+[`read_globals`](@ref) without specifing a DataType (this will return
+Dicts of parameters/globals).
 
 ## Transition 
 
