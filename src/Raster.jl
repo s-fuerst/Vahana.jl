@@ -424,20 +424,25 @@ node.
 Using the keyword arguments, it is possible to add additional edges to
 the surroundings of the cell at position `pos` in the same raster,
 i.e. to all cells at distance `distance` under metric `metric`, where
-valid metrics are :chebyshev, :euclidean and :manhatten`. And the
+valid metrics are `:chebyshev`, `:euclidean` and `:manhatten`. And the
 keyword `periodic` determines whether all dimensions are cyclic.
+
+When the `only_surrounding` keyword is set to true, only edges to the
+surroundings cells of `pos` will be created, not to the cell at
+position `pos` itself.
 
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
 function move_to!(sim,
-                  name::Symbol,
-                  id::AgentID,
-                  pos,
-                  edge_from_raster,
-                  edge_to_raster;
-                  distance = 0,
-                  metric::Symbol = :chebyshev,
-                  periodic = true)
+           name::Symbol,
+           id::AgentID,
+           pos,
+           edge_from_raster,
+           edge_to_raster;
+           distance = 0,
+           metric::Symbol = :chebyshev,
+           periodic = true,
+           only_surrounding = false)
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized
@@ -445,11 +450,13 @@ function move_to!(sim,
         dims = size(raster)
         pos = CartesianIndex(pos)
 
-        if ! isnothing(edge_from_raster)
-            add_edge!(sim, raster[pos], id, edge_from_raster)
-        end
-        if ! isnothing(edge_to_raster)
-            add_edge!(sim, id, raster[pos], edge_to_raster)
+        if ! only_surrounding
+            if ! isnothing(edge_from_raster)
+                add_edge!(sim, raster[pos], id, edge_from_raster)
+            end
+            if ! isnothing(edge_to_raster)
+                add_edge!(sim, id, raster[pos], edge_to_raster)
+            end
         end
         
         if distance >= 1 
