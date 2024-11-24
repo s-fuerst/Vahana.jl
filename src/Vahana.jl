@@ -90,7 +90,7 @@ suppress_warnings = (suppress::Bool) -> config.quiet = suppress
 ####################
 
 """
-    detect_stateless(detect::Bool)
+    detect_stateless(detect::Bool = true)
 
 Per default, Vahana expects that the :Stateless hint is set manually.
 
@@ -100,7 +100,7 @@ for example, the [`edges`](@ref) is not available.
 This behaviour can be customized by calling `detect_stateless` before
 calling [`register_edgetype!`](@ref).
 """
-detect_stateless = (detect::Bool) -> config.detect_stateless = detect
+detect_stateless = (detect::Bool = true) -> config.detect_stateless = detect
 
 """
     set_compression(level::Int, parallel_hdf5_compression = false)

@@ -330,6 +330,8 @@ function create_simulation(model::Model,
         @info "New simulation created" name params date=Dates.now() starttime=time()
     end
 
+    finalizer(finish_simulation!, sim)
+
     sim
 end
 
@@ -503,13 +505,15 @@ end
 
 function _free_memory!(sim)
     for T in sim.typeinfos.nodes_types
-        shmstatewin = getproperty(sim, Symbol(T)).mpiwindows.shmstate
+        shmstatewin = windows(sim, T).shmstate
         if ! isnothing(shmstatewin)
             MPI.free(shmstatewin)
+            windows(sim, T).shmstate = nothing
         end
-        shmdiedwin = getproperty(sim, Symbol(T)).mpiwindows.shmdied
+        shmdiedwin = windows(sim, T).shmdied
         if ! isnothing(shmdiedwin)
             MPI.free(shmdiedwin)
+            windows(sim, T).shmdied = nothing
         end
         init_field!(sim, T)
     end       
@@ -528,7 +532,13 @@ the memory footprint. The `parameters` and `globals` of the simulation
 are still available, the remaining state of the simulation is
 undefined.
 
-Returns the globals of the simulation.
+The function serves as a finalizer for the simulation object ('sim'). While it
+executes automatically during garbage collection, it can also be
+called explicitly to provide more precise control over memory
+management (e.g. if you only want to keep the `globals` as the result
+from the simulation).  
+
+Returns the `globals` of the simulation.
 """
 function finish_simulation!(sim)
     _log_info(sim, "<Begin> finish_simulation!")
@@ -548,6 +558,7 @@ function finish_simulation!(sim)
 
     sim.globals
 end
+
 ######################################## Transition
 
 
