@@ -542,7 +542,10 @@ Returns the `globals` of the simulation.
 """
 function finish_simulation!(sim)
     _log_info(sim, "<Begin> finish_simulation!")
-    _free_memory!(sim)
+
+    if ! MPI.Finalized()
+        _free_memory!(sim)
+    end
     
     close_h5file!(sim)
 
@@ -554,7 +557,9 @@ function finish_simulation!(sim)
         close(sim.logger.file)
     end
 
-    MPI.Barrier(MPI.COMM_WORLD)
+    if ! MPI.Finalized()
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
 
     sim.globals
 end
