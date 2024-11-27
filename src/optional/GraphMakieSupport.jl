@@ -23,6 +23,8 @@ Base.@kwdef mutable struct VahanaPlot
     jitter_val = Dict{AgentID, NTuple{2, Float64}}()
     # the function to call for updating the attributes of the graph
     update_fn = nothing
+    # the edgetypes used for creating the vahanagraph
+    edgetypes
 end
 
 function _set_plot_attrs!(vp, idx, attrs, aid, T)
@@ -50,13 +52,15 @@ function _set_agents_plot_attrs!(f, vp)
     disable_transition_checks(true)
     changed_attrs = Set{Symbol}()
     for T in vp.vg.agenttypes
-        for id in 1:length(readstate(vp.sim, T))
-            if length(readdied(vp.sim, T)) == 0 || readdied(vp.sim, T)[id] == false
-                aid = agent_id(vp.sim, AgentNr(id), T)
-                state = agentstate(vp.sim, aid, T)
-                new::Dict{Symbol, Any} = f(state, aid, vp)
-                _set_plot_attrs!(vp, vp.vg.v2g[aid], new, aid, T)
-                foreach(a -> push!(changed_attrs, a), keys(new))
+        if hasmethod(f, (T, AgentID, VahanaPlot))
+            for id in 1:length(readstate(vp.sim, T))
+                if length(readdied(vp.sim, T)) == 0 || readdied(vp.sim, T)[id] == false
+                    aid = agent_id(vp.sim, AgentNr(id), T)
+                    state = agentstate(vp.sim, aid, T)
+                    new::Dict{Symbol, Any} = f(state, aid, vp)
+                    _set_plot_attrs!(vp, vp.vg.v2g[aid], new, aid, T)
+                    foreach(a -> push!(changed_attrs, a), keys(new))
+                end
             end
         end
     end
@@ -72,20 +76,19 @@ function _set_edge_plot_properties!(f, vp)
     changed_attrs = Set{Symbol}()
     for i in 1:Graphs.ne(vp.vg)
         tid = vp.vg.edgetypeidx[i]
-        T = vp.sim.typeinfos.edges_types[tid]
-        vedge = vp.vg.edges[i]
-        from = vp.vg.g2v[vedge.src]
-        to = vp.vg.g2v[vedge.dst]
-        es = edges(vp.sim, to, T)
-        if isnothing(es) # this can happen after a state change of sim
-            continue
+        T = vp.edgetypes[tid]
+        if hasmethod(f, (T, AgentID, AgentID, VahanaPlot))
+            vedge = vp.vg.edges[i]
+            from = vp.vg.g2v[vedge.src]
+            to = vp.vg.g2v[vedge.dst]
+            es = has_hint(vp.sim, T, :Stateless) ? T() :
+                (filter(edges(vp.sim, to, T)) do edge
+                     edge.from == from
+                 end |> only).state
+            new = f(es, from, to, vp)
+            _set_plot_attrs!(vp, i, new, 0, T)
+            foreach(a -> push!(changed_attrs, a), keys(new))
         end
-        es = has_hint(vp.sim, T, :Stateless) ? T() : (filter(es) do edge
-                                                           edge.from == from
-                                                       end |> only).state
-        new = f(es, from, to, vp)
-        _set_plot_attrs!(vp, i, new, 0, T)
-        foreach(a -> push!(changed_attrs, a), keys(new))
     end
     for a in changed_attrs
         vp.plot[a][] = vp.plot[a][]
@@ -101,7 +104,7 @@ display(vp::VahanaPlot) = Base.display(vp.figure)
 obsrange(x) = 1:length(x)
 
 """
-    create_graphplot(sim; [agenttypes, edgestatetypes, update_fn, pos_jitter])
+    create_graphplot(sim; [agenttypes, edgetypes, update_fn, pos_jitter])
 
 Creates an interactive Makie plot for the the simulation `sim`.
 
@@ -110,7 +113,7 @@ and `edgestatetypes`, see [`vahanagraph`](@ref) for details.
 
 To modify the properties of the edges and agents a `update_fn` can be
 defined. This function is called for each agent and edge (of types in agenttypes
-and edgestatetypes) and must have for agents the signature
+and edgetypes) and must have for agents the signature
 
     f(state, id, vp::VahanaPlot)
 
@@ -124,12 +127,24 @@ agents at the source or target of the edge. `vp` is the struct
 returned by `create_graphplot` and can be used to determine the id of
 last clicked agent by calling `clicked_agent(vp)`. The function must
 return a Dict with property names (as Symbol) as keys and their values
-as values. The following properties are available: `node_color`,
-`node_size`, `node_marker`, `nlabels`, `nlabels_align`, `nlabels_color`,
-`nlabels_distance`, `nlabels_offset`, `nlabels_textsize`, `edge_color`,
-`edge_width`, `elables`, `elables_align`, `elables_color`, `elables_distance`,
+as values. The following properties are available: `node_pos`,
+`node_color`, `node_size`, `node_marker`, `nlabels`, `nlabels_align`,
+`nlabels_color`, `nlabels_distance`, `nlabels_offset`,
+`nlabels_textsize`, `edge_color`, `edge_width`, `elables`,
+`elables_align`, `elables_color`, `elables_distance`,
 `elables_offset`, `elables_rotation`, `elables_shift`, `elables_side`,
 `elabes_textsize`, `arrow_shift`, and `arrow_size`.
+
+In the case that create_graphplot is not called from a parallel
+simulation, it is possible to call inside `update_fn` functions that
+are normally only available inside of a transition function (like
+[`agentstate`](@ref), [`neighborstates`](@ref) etc.).
+
+The `pos_jitter` argument must be a dictonary of agentstypes to float
+values. The node positions will be then (x + rand() * jitter - jitter/2,
+y + rand() * jitter - jitter/2).
+
+The `edge_plottype` keyword is forwarded to GraphMakie.graphplot.
 
 Returns a VahanaPlot structure that can be used to access the Makie
 figure, axis and plot via call to the methods `figure`, `axis` and
@@ -153,23 +168,25 @@ figure, axis and plot via call to the methods `figure`, `axis` and
 See also [`vahanagraph`](@ref)
 """
 function create_graphplot(sim::Simulation;
-              agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
-              edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
-              update_fn = nothing,
-              pos_jitter = nothing)
+                   agenttypes::Vector{DataType} = sim.typeinfos.nodes_types,
+                   edgetypes::Vector{DataType} = sim.typeinfos.edges_types,
+                   update_fn = nothing,
+                   pos_jitter = nothing,
+                   edge_plottype = Makie.automatic)
     vg = vahanagraph(sim;
                      agenttypes = agenttypes,
                      edgetypes = edgetypes,
                      drop_multiedges = true)
 
-    f, ax, p = _plot(vg)
+    f, ax, p = _plot(vg, edge_plottype)
 
     vp = VahanaPlot(sim = sim,
                     vg = vg,
                     figure = f,
                     axis = ax,
                     plot = p,
-                    update_fn = update_fn)
+                    update_fn = update_fn,
+                    edgetypes = edgetypes)
 
     if !isnothing(pos_jitter)
         vp.pos_jitter = Dict(pos_jitter)
@@ -273,13 +290,14 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
     end
 end
 
-function _plot(vg::VahanaGraph)
+function _plot(vg::VahanaGraph, edge_plottype)
     edgecolors = ColorSchemes.glasbey_bw_minc_20_maxl_70_n256
     agentcolors = ColorSchemes.glasbey_bw_minc_20_hue_150_280_n256
 
     rv = 1:nv(vg)
     re = 1:ne(vg)
     p = graphplot(vg,
+                  edge_plottype = edge_plottype,
                   node_color = [ agentcolors[type_nr(vg.g2v[i])]
                                  for i in rv ],
                   node_size = [ 12 for _ in rv ],

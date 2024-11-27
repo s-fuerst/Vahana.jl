@@ -132,7 +132,7 @@ function vahanasimplegraph(sim::Simulation;
                 printstyled("""
     
                 Edgetype $t has the :IgnoreFrom hint, therefore edges of this 
-                type can not added those edges to the created subgraph
+                type can not added to the created subgraph
 
                 """; color = :red)
             end
@@ -240,7 +240,7 @@ function vahanagraph(sim;
                 printstyled("""
     
                 Edgetype $T has the :IgnoreFrom hint, therefore edges of this 
-                type can not added those edges to the created subgraph
+                type can not added to the created subgraph
 
                 """; color = :red)
             end
@@ -251,7 +251,7 @@ function vahanagraph(sim;
             t = get(v2g, to, nothing)
             if f !== nothing && t !== nothing
                 if (f, t) in existing && drop_multiedges
-                    println("Edge $e to agent $(string(to, base=16)) will not be shown")
+                    println("Edge $(string(e, base=16)) to agent $(string(to, base=16)) will not be shown")
                 else
                     if drop_multiedges
                         push!(existing, (f, t))
