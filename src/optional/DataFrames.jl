@@ -1,9 +1,20 @@
 import DataFrames: DataFrame, subset!, nrow
+import PrettyTables: pretty_table
 
 export DataFrame, GlobalsDataFrame
 
 show_parallel_dataframe_usage_warning = true
 
+# function Base.show(io::IO, mime::MIME"text/plain", df::DataFrame)
+#     pretty_table(io, df,
+#                  formatters = (v,i,j) -> isa(v, UInt64) && agent_nr(v) != v ?
+#                      "0x$(uppercase(string(v, base=16)))" : v)
+# end
+function Base.show(io::IO, df::DataFrame)
+    pretty_table(io, df,
+                 formatters = (v,i,j) -> isa(v, UInt64) && agent_nr(v) != v ?
+                     "0x$(uppercase(string(v, base=16)))" : v)
+end
 """
     DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
 

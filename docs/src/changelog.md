@@ -4,6 +4,28 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.3
+
+### New features
+
+- Added the `only_surrounding` keyword argument to [`move_to!`](@ref),
+  which restricts edge creation to adjacent cells only.
+
+### Improvements
+
+- [`read_params`](@ref) and [`read_globals`](@ref) no longer require
+  predefined struct definitions
+
+- Added automatic simulation cleanup through finalizers that invoke
+  [`finish_simulation!`](@ref) (Note: Manual calls to
+  [`finish_simulation!`](@ref) are still recommended for optimal
+  memory management)
+
+- Implemented PrettyTables integration for DataFrames, now displaying
+  Agent IDs in hexadecimal format
+
+- Enhanced GraphMakie compatibility and support
+  
 ## v1.2.1
 
 ### New feature
