@@ -592,7 +592,11 @@ function set_param!(sim::Simulation, param::Symbol, value)
          change while the simulation is running, register them as globals and use 
          `set_global!` instead.
              """
-    setfield!(sim.params, param, value)
+    if ! hasproperty(sim.params, param)
+        @warn "Parameter $(param) is unknown" _file=nothing _line=nothing _module=nothing
+    else
+        setfield!(sim.params, param, value)
+    end
 end
 
 function set_param!(param::Symbol, value)
