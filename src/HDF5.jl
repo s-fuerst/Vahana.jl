@@ -8,7 +8,8 @@ export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
 export read_agents, read_edges
 export list_snapshots
-export create_namedtuple_converter, create_enum_converter, create_string_converter
+export create_namedtuple_converter, create_enum_converter
+export VString, create_string_converter
 export write_metadata, read_metadata, write_sim_metadata, read_sim_metadata
 
 # hdf5 does not allow to store (unnamed) tuples, but the CartesianIndex
@@ -30,6 +31,8 @@ function create_enum_converter()
     @eval convert(::Type{T}, i::Int32) where { T <: Enum } = T(i)
 end
 
+
+VString{N} = SVector{N, UInt8}
 
 """
     create_string_converter(add_show_method::Bool = true)
@@ -69,8 +72,11 @@ values as `String`s, the output is formatted to include the annotation
 """
 function create_string_converter(add_show_method::Bool = true)
     @eval function Base.convert(::Type{SVector{N, UInt8}}, str::String) where N
-        @mayassert length(codeunits(str)) <= N "str can not be longer then $N bytes"
-        SVector{N, UInt8}(collect(codeunits(rpad(str, N))))
+        cu = codeunits(str)
+        if length(cu) > N
+            cu = first(cu, N)
+        end
+        SVector{N, UInt8}([cu; fill(UInt8(0), N - length(cu))])
     end
 
     @eval function SVector{N, UInt8}(str::String) where N
