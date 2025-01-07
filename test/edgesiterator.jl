@@ -139,11 +139,12 @@ end
 
         @test num_edges(sim, ET) == 0  
 
+        finish_simulation!(sim)
+
         if has_hint(sim, ET, :IgnoreFrom)
             return
         end
 
-        finish_simulation!(sim)
         # we create edges between all agent of type AgentB and Agent
         # with the same index i.
         sim = create_simulation(model_edges, nothing, nothing)

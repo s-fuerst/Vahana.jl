@@ -285,6 +285,16 @@ end
 plot_opinion(cysim)
 ````
 
+# Finish the Simulation
+
+As always, it is important to call `finish_simulation` at the end of the
+simulation.
+
+````@example hegselmann
+finish_simulation!(cysim);
+nothing #hide
+````
+
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

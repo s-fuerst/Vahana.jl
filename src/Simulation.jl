@@ -330,7 +330,10 @@ function create_simulation(model::Model,
         @info "New simulation created" name params date=Dates.now() starttime=time()
     end
 
-    finalizer(finish_simulation!, sim)
+    # using the finalizer in a parallel simulation can cause deadlocks
+    if ! mpi.active
+        finalizer(finish_simulation!, sim)
+    end
 
     sim
 end
@@ -527,16 +530,17 @@ end
 """
     finish_simulation!(sim)
 
-Remove all agents/edges and rasters from the simulation to minimize
-the memory footprint. The `parameters` and `globals` of the simulation
-are still available, the remaining state of the simulation is
-undefined.
+This function removes all agents/edges and rasters from the simulation to minimize
+the memory footprint, closes all open files and finalizes MPI. The
+`parameters` and `globals` of the simulation are still available, the
+remaining state of the simulation is undefined.
 
-The function serves as a finalizer for the simulation object ('sim'). While it
-executes automatically during garbage collection, it can also be
-called explicitly to provide more precise control over memory
-management (e.g. if you only want to keep the `globals` as the result
-from the simulation).  
+
+!!! warning
+
+    In a REPL session the function serves as a finalizer for the simulation object
+    ('sim'). But for parallel simulation it is essential that this function is
+    called manually before the termination of the simulation.
 
 Returns the `globals` of the simulation.
 """
@@ -563,6 +567,7 @@ function finish_simulation!(sim)
 
     sim.globals
 end
+
 
 ######################################## Transition
 

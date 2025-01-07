@@ -584,6 +584,16 @@ calc_raster(ppsim, :raster, Int64, [ Cell ]) do id
 end |> heatmap |> add_colorbar
 ````
 
+# Finish the Simulation
+
+As always, it is important to call `finish_simulation` at the end of the
+simulation.
+
+````@example hegselmann
+finish_simulation!(cysim);
+nothing #hide
+````
+
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
