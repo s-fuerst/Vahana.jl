@@ -764,13 +764,13 @@ end
 #- neighborstates
 if singleedge
     @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                           edgetype::Type{$T}, agenttype::Type) 
+                           edgetype::Type{$T}, agenttype::Type)::Union{agenttype, Nothing} 
         nid = neighborids(sim, id, edgetype)
         isnothing(nid) ? nothing : agentstate(sim, nid, agenttype) 
     end
 else
     @eval function neighborstates(sim::$simsymbol, id::AgentID,
-                           edgetype::Type{$T}, agenttype::Type)
+                           edgetype::Type{$T}, agenttype::DataType)::Union{Vector{agenttype}, Nothing} 
         nids = neighborids(sim, id, edgetype)
         if nids === nothing
             nothing
