@@ -253,7 +253,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         """
         for id in keys(edgeread(sim, ET))
             idx = agent_nr(id)
-            @mayassert ! @readdied($T)[idx]
+            if $mortal
+                @mayassert ! @readdied($T)[idx]
+            end
             newstate = tfunc(Val($T), id, sim)
             wfunc(sim, idx, newstate, $T)
         end
