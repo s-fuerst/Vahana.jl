@@ -672,7 +672,7 @@ function write_edges(sim::Simulation,
 end
 
 """
-    write_snapshot(sim::Simulation, [comment::String = "", ignore = []])
+    write_snapshot(sim::Simulation, [comment::String = ""; ignore = []])
 
 Writes the current state of the simulation `sim` to the attached HDF5
 file. `comment` can be used to identify the snapshot via
@@ -684,7 +684,7 @@ this function.
 
 See also [`create_h5file!`](@ref), [`read_snapshot!`](@ref)
 """
-function write_snapshot(sim::Simulation, comment::String = ""; ignore = [], step = -1)
+function write_snapshot(sim::Simulation, comment::String = ""; ignore = [])
     ignore = applicable(iterate, ignore) ? ignore : [ ignore ]
 
     if sim.h5file === nothing
