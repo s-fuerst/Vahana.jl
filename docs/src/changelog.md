@@ -4,6 +4,25 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.4
+
+### Improvements
+
+- [`create_string_converter`](@ref) incl. `VString{N}` definition
+
+- [`set_param!`](@ref) can be called for an unknown parameter (this
+  will show a warning)
+  
+- Enhanced type stability in the implementation of the
+  [`neighborstates`](@ref) function
+
+### Fixes
+
+An invalid assertion occured when all of the following conditions are met:
+1. The `:Immortal` hint is active for the agent type
+2. The agent type is not included in the `read` argument
+3. The `with_edge` keyword is being utilized
+
 ## v1.3
 
 ### New features
@@ -17,9 +36,8 @@ CurrentModule = Vahana
   predefined struct definitions
 
 - Added automatic simulation cleanup through finalizers that invoke
-  [`finish_simulation!`](@ref) (Note: Manual calls to
-  [`finish_simulation!`](@ref) are still recommended for optimal
-  memory management)
+  [`finish_simulation!`](@ref) (Note: For parallel simulations 
+  [`finish_simulation!`](@ref) calls are still mendentory)
 
 - Implemented PrettyTables integration for DataFrames, now displaying
   Agent IDs in hexadecimal format

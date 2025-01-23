@@ -47,11 +47,13 @@ gconversion methods between `String` and `SVector{N, UInt8}` instances
 number of bytes that can be stored, which for Unicode strings may
 exceed the character count due to variable-length encoding.
 
+Instead of `SVector{N, UInt8}` also `VString{N}` can be used.
+
 For example, you could create a Person struct with a fixed-size name field:
 
 ```julia
 struct Foo
-    foo::SVector{20, UInt8}
+    foo::VString{20}
 end
 ```
 
