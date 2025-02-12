@@ -1,7 +1,8 @@
 import LinearAlgebra
 
-import Random: AbstractRNG, default_rng
 import StatsBase: sample, Weights
+
+import NearestNeighbors: KDTree, knn, inrange
 
 export add_raster!, connect_raster_neighbors!
 export calc_raster, calc_rasterstate, rastervalues, move_to!, cellid
@@ -73,7 +74,7 @@ function broadcastids(sim, raster, idmapping::Dict)
         MPI.Bcast!(rsize, MPI.COMM_WORLD)
         sim.rasters[raster] = Array{AgentID}(undef, rsize[])
         MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
-                  
+        
     end
 
     _log_info(sim, "<End> broadcastids")
@@ -137,11 +138,11 @@ already registered via [`register_agenttype!`](@ref).
 See also [`add_raster!`](@ref)
 """
 function connect_raster_neighbors!(sim,
-                                   name::Symbol,
-                                   edge_constructor;
-                                   distance = 1,
-                                   metric::Symbol = :chebyshev,
-                                   periodic = true)
+                            name::Symbol,
+                            edge_constructor;
+                            distance = 1,
+                            metric::Symbol = :chebyshev,
+                            periodic = true)
     with_logger(sim) do
         @info "<Begin> connect_raster_neighbors!" name 
     end
@@ -166,7 +167,40 @@ function connect_raster_neighbors!(sim,
     _log_info(sim, "<End> connect_raster_neighbors!")
 end
 
-"""
+
+function connect_spatial_neighbors(sim,
+                            agenttypes::Vector{DataType},
+                            edge_constructor;
+                            distance = 1.0,
+                            # metric = :chebyshev,
+                            periodic = :true,
+                            fieldname = :pos)
+                            # leafsize,
+                            # reorder)
+
+    # TODO: periodic is not implemented
+    
+    for T in agenttypes
+        ids = all_agentids(sim, T, false)
+        states = all_agents(sim, T, false)
+        pos = map(s -> getproperty(s, fieldname), states)
+        local_ = zip(ids, pos)
+        global_ = join(local_)
+        global_pos = map((_, pos) -> pos, global_)
+        matrix = vcat(map(x -> [x[1] x[2]], global_pos)...) |> transpose
+
+        kdtree = KDTree(matrix)
+        for (id, pos) in local_
+            found = inrange(kdtree, pos, distance)
+            for idx in found
+                add_edge!(sim, ids[idx], id, edge_constructor(pos[idx], pos))
+            end
+        end
+    end        
+end
+
+
+    """
     calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
 
 Calculate values for the raster `raster` by applying `f` to each
@@ -203,45 +237,45 @@ Can be only called after [`finish_init!`](@ref).
 
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function calc_raster(sim::Simulation, raster::Symbol, f, f_returns::DataType,
-                     accessible::Vector{DataType})
-    with_logger(sim) do
-        @info "<Begin> calc_raster!" raster
-    end
-
-    @assert sim.initialized "calc_raster can be only called after finish_init!"
-
-    ids = sim.rasters[raster]
-    idsvec = reshape(ids, length(ids))
-
-    onprocess = Vector{Tuple{Int64, f_returns}}()
-
-    foreach(T -> prepare_read!(sim, Vector{DataType}(), T), accessible)
-    for (idx, id) = enumerate(ids)
-        if process_nr(id) == mpi.rank
-            push!(onprocess, (idx, f(id)))
+    function calc_raster(sim::Simulation, raster::Symbol, f, f_returns::DataType,
+                         accessible::Vector{DataType})
+        with_logger(sim) do
+            @info "<Begin> calc_raster!" raster
         end
+
+        @assert sim.initialized "calc_raster can be only called after finish_init!"
+
+        ids = sim.rasters[raster]
+        idsvec = reshape(ids, length(ids))
+
+        onprocess = Vector{Tuple{Int64, f_returns}}()
+
+        foreach(T -> prepare_read!(sim, Vector{DataType}(), T), accessible)
+        for (idx, id) = enumerate(ids)
+            if process_nr(id) == mpi.rank
+                push!(onprocess, (idx, f(id)))
+            end
+        end
+        foreach(T -> finish_read!(sim, T), accessible)
+
+        all = join(onprocess)
+
+        resvec = zeros(f_returns, length(idsvec))
+        for (idx, val) in all
+            resvec[idx] = val
+        end
+
+        _log_info(sim, "<End> calc_raster!")
+        reshape(resvec, size(sim.rasters[raster]))
     end
-    foreach(T -> finish_read!(sim, T), accessible)
-
-    all = join(onprocess)
-
-    resvec = zeros(f_returns, length(idsvec))
-    for (idx, val) in all
-        resvec[idx] = val
-    end
-
-    _log_info(sim, "<End> calc_raster!")
-    reshape(resvec, size(sim.rasters[raster]))
-end
 
 
-calc_raster(f, sim::Simulation, raster::Symbol, f_returns::DataType,
-            accessible::Vector{DataType}) =
-                calc_raster(sim, raster, f, f_returns, accessible)
+    calc_raster(f, sim::Simulation, raster::Symbol, f_returns::DataType,
+                accessible::Vector{DataType}) =
+                    calc_raster(sim, raster, f, f_returns, accessible)
 
 
-"""
+    """
     calc_rasterstate(sim, raster::Symbol, f, f_returns::DataType = Nothing, ::Type{T} = Nothing)
 
 Combined calc_raster with agentstate for the cells of the raster.
@@ -279,55 +313,55 @@ Can be only called after [`finish_init!`](@ref).
     
 See also [`add_raster!`](@ref), [`calc_rasterstate`](@ref) and [`rastervalues`](@ref)
 """
-function calc_rasterstate(sim, raster::Symbol, f,
-                   f_returns::DataType = Nothing, ::Type{T} = Nothing) where T
-    with_logger(sim) do
-        @info "<Begin> calc_rasterstate" raster
-    end
+    function calc_rasterstate(sim, raster::Symbol, f,
+                              f_returns::DataType = Nothing, ::Type{T} = Nothing) where T
+        with_logger(sim) do
+            @info "<Begin> calc_rasterstate" raster
+        end
 
-    @assert sim.initialized """
+        @assert sim.initialized """
     calc_rasterstate can be only called after finish_init!"""
 
-    ids = sim.rasters[raster]
-    idsvec = reshape(ids, length(ids))
+        ids = sim.rasters[raster]
+        idsvec = reshape(ids, length(ids))
 
-    disable_transition_checks(true)
+        disable_transition_checks(true)
 
-    if f_returns == Nothing
-        f_returns = typeof(f(agentstate_flexible(sim, idsvec[1])))
-    end
-    
-    onprocess = Vector{Tuple{Int64, f_returns}}()
+        if f_returns == Nothing
+            f_returns = typeof(f(agentstate_flexible(sim, idsvec[1])))
+        end
+        
+        onprocess = Vector{Tuple{Int64, f_returns}}()
 
-    if T != Nothing
-        for (idx, id) = enumerate(ids)
-            if Vahana.process_nr(id) == mpi.rank
-                push!(onprocess, (idx, f(agentstate(sim, id, T))))
+        if T != Nothing
+            for (idx, id) = enumerate(ids)
+                if Vahana.process_nr(id) == mpi.rank
+                    push!(onprocess, (idx, f(agentstate(sim, id, T))))
+                end
+            end
+        else
+            for (idx, id) = enumerate(ids)
+                if Vahana.process_nr(id) == mpi.rank
+                    push!(onprocess, (idx, f(agentstate_flexible(sim, id))))
+                end
             end
         end
-    else
-        for (idx, id) = enumerate(ids)
-            if Vahana.process_nr(id) == mpi.rank
-                push!(onprocess, (idx, f(agentstate_flexible(sim, id))))
-            end
+        
+        disable_transition_checks(false)
+
+        all = join(onprocess)
+
+        resvec = zeros(f_returns, length(idsvec))
+        for (idx, val) in all
+            resvec[idx] = val
         end
-    end
-    
-    disable_transition_checks(false)
 
-    all = join(onprocess)
-
-    resvec = zeros(f_returns, length(idsvec))
-    for (idx, val) in all
-        resvec[idx] = val
+        _log_info(sim, "<End> calc_rasterstate")
+        reshape(resvec, size(sim.rasters[raster]))
     end
 
-    _log_info(sim, "<End> calc_rasterstate")
-    reshape(resvec, size(sim.rasters[raster]))
-end
 
-
-"""
+    """
     rastervalues(sim, raster::Symbol, fieldname::Symbol)
 
 Creates a matrix with the same dims as the raster `raster` with the
@@ -350,48 +384,48 @@ Can be only called after [`finish_init!`](@ref).
     
 See also [`add_raster!`](@ref) and [`calc_rasterstate`](@ref)
 """
-function rastervalues(sim, raster::Symbol, field::Symbol) 
-    with_logger(sim) do
-        @info "<Begin> calc_rasterstate" raster
-    end
+    function rastervalues(sim, raster::Symbol, field::Symbol) 
+        with_logger(sim) do
+            @info "<Begin> calc_rasterstate" raster
+        end
 
-    @assert sim.initialized """
+        @assert sim.initialized """
     rastervalues can be only called after finish_init!"""
 
-    ids = sim.rasters[raster]
-    idsvec = reshape(ids, length(ids))
+        ids = sim.rasters[raster]
+        idsvec = reshape(ids, length(ids))
 
-    T = type_of(sim, ids[1,1])
+        T = type_of(sim, ids[1,1])
 
-    f_returns = fieldtype(T, field)
+        f_returns = fieldtype(T, field)
 
-    onprocess = Vector{Tuple{Int64, f_returns}}()
+        onprocess = Vector{Tuple{Int64, f_returns}}()
 
-    disable_transition_checks(true)
-    for (idx, id) = enumerate(ids)
-        if Vahana.process_nr(id) == mpi.rank
-            push!(onprocess, (idx, getproperty(agentstate(sim, id, T), field)))
+        disable_transition_checks(true)
+        for (idx, id) = enumerate(ids)
+            if Vahana.process_nr(id) == mpi.rank
+                push!(onprocess, (idx, getproperty(agentstate(sim, id, T), field)))
+            end
         end
+        disable_transition_checks(false)
+
+        all = join(onprocess)
+
+        resvec = zeros(f_returns, length(idsvec))
+        for (idx, val) in all
+            resvec[idx] = val
+        end
+
+        _log_info(sim, "<End> calc_rasterstate")
+        reshape(resvec, size(sim.rasters[raster]))
     end
-    disable_transition_checks(false)
 
-    all = join(onprocess)
-
-    resvec = zeros(f_returns, length(idsvec))
-    for (idx, val) in all
-        resvec[idx] = val
-    end
-
-    _log_info(sim, "<End> calc_rasterstate")
-    reshape(resvec, size(sim.rasters[raster]))
-end
-
-###
+    ###
 
 
-###
+    ###
 
-"""
+    """
     cellid(sim, name::Symbol, pos)
 
 Returns the ID of the agent (node) from the raster `name` at the
@@ -400,12 +434,12 @@ position `pos`. `pos` must be of type CartesianIndex or a Dims{N}.
 See also [`add_raster!`](@ref), [`move_to!`](@ref),
 [`add_edge!`](@ref) and [`agentstate`](@ref)
 """
-function cellid(sim, name::Symbol, pos)
-    sim.rasters[name][CartesianIndex(pos)]
-end
+    function cellid(sim, name::Symbol, pos)
+        sim.rasters[name][CartesianIndex(pos)]
+    end
 
 
-"""
+    """
     move_to!(sim, name::Symbol, id::AgentID, pos, edge_from_raster, edge_to_raster; [distance = 0, metric = :chebyshev, periodic = true]) 
 
 Creates up to two edges of type between the agent with ID `id` and the cell from the raster `name` at the position `pos`.
@@ -434,72 +468,72 @@ position `pos` itself.
 
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
-function move_to!(sim,
-           name::Symbol,
-           id::AgentID,
-           pos,
-           edge_from_raster,
-           edge_to_raster;
-           distance = 0,
-           metric::Symbol = :chebyshev,
-           periodic = true,
-           only_surrounding = false)
-    # before a simulation is initialized, the raster existing
-    # only on the root 
-    if mpi.isroot || sim.initialized
-        raster = sim.rasters[name]
-        dims = size(raster)
-        pos = CartesianIndex(pos)
+    function move_to!(sim,
+                      name::Symbol,
+                      id::AgentID,
+                      pos,
+                      edge_from_raster,
+                      edge_to_raster;
+                      distance = 0,
+                      metric::Symbol = :chebyshev,
+                      periodic = true,
+                      only_surrounding = false)
+        # before a simulation is initialized, the raster existing
+        # only on the root 
+        if mpi.isroot || sim.initialized
+            raster = sim.rasters[name]
+            dims = size(raster)
+            pos = CartesianIndex(pos)
 
-        if ! only_surrounding
-            if ! isnothing(edge_from_raster)
-                add_edge!(sim, raster[pos], id, edge_from_raster)
+            if ! only_surrounding
+                if ! isnothing(edge_from_raster)
+                    add_edge!(sim, raster[pos], id, edge_from_raster)
+                end
+                if ! isnothing(edge_to_raster)
+                    add_edge!(sim, id, raster[pos], edge_to_raster)
+                end
             end
-            if ! isnothing(edge_to_raster)
-                add_edge!(sim, id, raster[pos], edge_to_raster)
-            end
-        end
-        
-        if distance >= 1 
-            for s in stencil(metric, ndims(raster), distance)
-                shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)
-                if ! isnothing(shifted)
-                    if ! isnothing(edge_from_raster)
-                        add_edge!(sim, raster[shifted], id, edge_from_raster)
-                    end
-                    if ! isnothing(edge_to_raster)
-                        add_edge!(sim, id, raster[shifted], edge_to_raster)
+            
+            if distance >= 1 
+                for s in stencil(metric, ndims(raster), distance)
+                    shifted = _checkpos(CartesianIndex(pos) + s, dims, periodic)
+                    if ! isnothing(shifted)
+                        if ! isnothing(edge_from_raster)
+                            add_edge!(sim, raster[shifted], id, edge_from_raster)
+                        end
+                        if ! isnothing(edge_to_raster)
+                            add_edge!(sim, id, raster[shifted], edge_to_raster)
+                        end
                     end
                 end
             end
         end
     end
-end
 
-function _checkpos(pos::CartesianIndex, dims, periodic)
-    cpos = Array{Int64}(undef, length(dims))
-    outofbounds = false
-    for i in 1:length(dims)
-        if pos[i] < 1 || pos[i] > dims[i]
-            outofbounds = true
-            cpos[i] = mod1(pos[i], dims[i])
+    function _checkpos(pos::CartesianIndex, dims, periodic)
+        cpos = Array{Int64}(undef, length(dims))
+        outofbounds = false
+        for i in 1:length(dims)
+            if pos[i] < 1 || pos[i] > dims[i]
+                outofbounds = true
+                cpos[i] = mod1(pos[i], dims[i])
+            else
+                cpos[i] = pos[i]
+            end
+        end
+        if ! outofbounds
+            pos
         else
-            cpos[i] = pos[i]
+            if periodic
+                CartesianIndex(cpos...)
+            else
+                nothing
+            end
         end
     end
-    if ! outofbounds
-        pos
-    else
-        if periodic
-            CartesianIndex(cpos...)
-        else
-            nothing
-        end
-    end
-end
 
-"""
-    random_pos([rng], sim, raster::Symbol, weights::Matrix)
+    """
+    random_pos(sim, raster::Symbol, weights::Matrix)
 
 Return a CartesianIndex with random position coordinates, weighted by a
 probability matrix `weights`.
@@ -509,21 +543,18 @@ to its corresponding value in the `weights` matrix.
 
 See also [`random_pos(sim, raster)`](@ref) and [`random_cell`](@ref)
 """
-function random_pos(rng::AbstractRNG, sim::Simulation, raster::Symbol, weights::Array)
-    dims = size(sim.rasters[raster])
-    @assert dims == size(weights) """
+    function random_pos(sim, raster::Symbol, weights::Array)
+        dims = size(sim.rasters[raster])
+        @assert dims == size(weights) """
     `weights` must have the same dimension as the raster :$(raster)
     """
-    W = Weights(vec(weights))
-    positions = CartesianIndices(dims) |> collect
-    positions[sample(rng, eachindex(positions), W)]
-end
+        W = Weights(vec(weights))
+        positions = CartesianIndices(dims) |> collect
+        positions[sample(eachindex(positions), W)]
+    end
 
-random_pos(sim::Simulation, raster::Symbol, weights::Array) =
-    random_pos(default_rng(), sim, raster, weights)
-
-"""
-    random_pos([rng], sim, raster::Symbol)
+    """
+    random_pos(sim, raster::Symbol)
 
 Return a CartesianIndex with random position coordinates.
 
@@ -533,32 +564,26 @@ index has the same probability.
 See also [`random_pos(sim, raster, weights)`](@ref) and
 [`random_cell`](@ref)
 """
-function random_pos(rng::AbstractRNG, sim::Simulation, raster::Symbol)
-    dims = size(sim.rasters[raster])
-    positions = CartesianIndices(dims) |> collect
-    positions[sample(rng, eachindex(positions))]
-end
+    function random_pos(sim, raster::Symbol)
+        dims = size(sim.rasters[raster])
+        positions = CartesianIndices(dims) |> collect
+        positions[sample(eachindex(positions))]
+    end
 
-random_pos(sim::Simulation, raster::Symbol) =
-    random_pos(default_rng(), sim, raster)
-
-
-"""
-    random_cell([rng], sim, raster::Symbol)
+    """
+    random_cell(sim, raster::Symbol)
 
 Return a random cell id of the raster `raster` from the
 simulation `sim`.
 
 """
-function random_cell(rng::AbstractRNG, sim::Simulation, name::Symbol)
-    rand(rng, sim.rasters[name])
-end
+    function random_cell(sim, name::Symbol)
 
-random_cell(sim::Simulation, name::Symbol) =
-    random_cell(default_rng(), sim, name)
+        rand(sim.rasters[name])
+    end
 
-"""
-    random_cell([rng], sim, raster::Symbol, weights::Array)
+    """
+    random_cell(sim, raster::Symbol, weights::Array)
 
 Return a random cell id of the raster `raster` from the simulation
 `sim`. The likelihood of selecting a particular cell is proportional
@@ -566,11 +591,8 @@ to its corresponding value in the `weights` matrix.
 
 See also [`random_cell(sim, raster)`](@ref) and [`random_pos`](@ref)
 """
-function random_cell(rng::AbstractRNG, sim::Simulation, raster::Symbol, weights::Array)
-    W = Weights(vec(weights))
-    sample(rng, vec(sim.rasters[raster]), W)
-end
-
-random_cell(sim::Simulation, name::Symbol, weights::Array) =
-    random_cell(default_rng(), sim, name, weights)
+    function random_cell(sim, raster::Symbol, weights::Array)
+        W = Weights(vec(weights))
+        sample(vec(sim.rasters[raster]), W)
+    end
 
