@@ -35,6 +35,12 @@ echo "============="
 mpirun -n 4 julia --project hdf5_snapshot.jl 
 
 echo
+echo "HDF5 read agents/edges"
+echo "======================"
+mpirun -n 4 julia --project hdf5_read_into_vector.jl 
+
+echo
 echo "HDF5 Merge"
 echo "============="
 julia --project hdf5_merge.jl 
+

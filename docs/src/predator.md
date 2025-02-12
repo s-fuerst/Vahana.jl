@@ -587,10 +587,10 @@ end |> heatmap |> add_colorbar
 # Finish the Simulation
 
 As always, it is important to call `finish_simulation` at the end of the
-simulation.
+simulation to avoid memory leaks.
 
-````@example hegselmann
-finish_simulation!(cysim);
+````@example predator
+finish_simulation!(ppsim);
 nothing #hide
 ````
 

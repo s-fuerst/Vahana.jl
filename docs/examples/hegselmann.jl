@@ -235,3 +235,11 @@ for _ in 1:500
 end
 
 plot_opinion(cysim)
+
+# # Finish the Simulation
+
+# As always, it is important to call `finish_simulation` at the end of the
+# simulation to avoid memory leaks.
+
+finish_simulation!(cysim);
+

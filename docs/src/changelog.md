@@ -4,6 +4,13 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.4.1
+
+### Fixes
+
+- [`read_agents`](@ref) and [`read_edges`](@ref) returned wrong
+  results when used in parallel simulations.
+
 ## v1.4
 
 ### Improvements

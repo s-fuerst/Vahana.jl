@@ -636,6 +636,20 @@ first(DataFrame(sim, Bought; types = true), 10)
 
 GlobalsDataFrame(sim)
 
+# # Finish the Simulation
+
+#=
+
+Vahana employs an internal C library for memory allocation during
+simulations. Upon completing a simulation, it is necessary to invoke
+the `finish_simulation` function to properly deallocate the memory resources
+utilized. This function returns the global variables associated with the
+concluded simulation.  
+
+=#
+
+finish_simulation!(sim)
+
 
 # # Understanding Vahana's Edge Structure
 

@@ -1087,6 +1087,21 @@ function read_globals(filename; transition = typemax(Int64), comment = "")
     values
 end
 
+function determine_fid_indices_to_read(fids)
+    original_size = attrs(fids[1])["mpisize"]
+    parallel = attrs(fids[1])["HDF5parallel"]
+    merge = original_size > mpi.size
+    @assert ! merge || mpi.size == 1 """
+    You try to read data from a parallel simulation with $(original_size)
+    processes into $(mpi.size) processes. This is not supported.
+    """
+    
+    fidxs = merge && ! parallel ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
+
+    (fidxs, merge, parallel)
+end
+
+
 """
     read_agents(filename::String, type; transition = typemax(Int64))
 
@@ -1095,13 +1110,18 @@ Symbol) from an HDF5 file with the name `filename`. The agent are read
 from the `h5` subfolder of the current working directory, or from the
 subfolder set with [`set_hdf5_path`](@ref).
 
-Per default, the last written agents are read. The `transition`
-keyword allows to read also earlier versions. Alternatively, the
-comment that was specified when write_snapshot was called can be
-specified with the `comment` keyword to read the corresponding
-snapshot.
+Per default, the agent states from the last transition function written to
+the file are read. The `transition` keyword allows to read also
+earlier versions. Alternatively, the comment that was specified when
+write_snapshot was called can be specified with the `comment` keyword
+to read the corresponding snapshot.
 
-Returns a vector of agentstates.
+Returns a vector of named tuples that represent the agent states. In
+parallel simulations, the vector includes only the agent states where
+the write operation originated from the same rank as the current
+process. When the current session runs with a single process (size =
+1), the agent states from all ranks are consolidated into the returned
+vector.
 """
 function read_agents(filename::String, type;
               transition = typemax(Int64),
@@ -1115,28 +1135,34 @@ function read_agents(filename::String, type;
     if _transition_from_comment(filename, comment) !== nothing
         transition = _transition_from_comment(filename, comment)
     end
+
+    (_, merge, _) = determine_fid_indices_to_read(fids)
     
-    aid = fids[1]["agents"][type]
+    aid = fids[mpi.rank + 1]["agents"][type]
     t = find_transition_nr(aid, transition)
-    immortal = attrs(aid)[":Immortal"]
+    tid = aid["t_$t"]
+    vec_num_agents = attrs(tid)["size_per_rank"]
+    vec_displace = attrs(tid)["displace"]
+    size = vec_num_agents[mpi.rank + 1]
+    start = vec_displace[mpi.rank + 1] + 1
+    last = start + vec_num_agents[mpi.rank + 1] - 1
 
-    state = map(fids) do fid
-        fid["agents/$(type)/t_$t/state"][]
-    end |> Iterators.flatten 
-
-    if ! immortal
-        died = map(fids) do fid
-            fid["agents/$(type)/t_$t/died"][]
-        end |> Iterators.flatten
+    living = if size > 0
+        state = merge ? tid["state"][] : tid["state"][start:last]
+        
+        if attrs(aid)[":Immortal"]
+            state |> collect
+        else
+            died = merge ? tid["died"][] : tid["died"][start:last]
+            map(z -> z[1], filter(z -> !z[2], zip(state, died) |> collect))
+        end
+    else
+        Vector()
     end
-    
+
     foreach(close, fids)
 
-    if immortal
-        state |> collect
-    else
-        map(z -> z[1], filter(z -> !z[2], zip(state, died) |> collect))
-    end
+    living
 end
 
 
@@ -1154,11 +1180,11 @@ If the `overwrite_file` argument of [`create_simulation`](@ref) is set
 to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
-Per default, the last written agents are read. The `transition`
-keyword allows to read also earlier versions. Alternatively, the
-comment that was specified when write_snapshot was called can be
-specified with the `comment` keyword to read the corresponding
-snapshot.
+Per default, the agent states from the last transition function written to
+the file are read. The `transition` keyword allows to read also
+earlier versions. Alternatively, the comment that was specified when
+write_snapshot was called can be specified with the `comment` keyword
+to read the corresponding snapshot.
 
 If only the agents of a subset of agent types are to be read, this
 subset can be specified via the optional `types` argument.
@@ -1181,12 +1207,7 @@ function read_agents!(sim::Simulation,
         transition = _transition_from_comment(name, comment)
     end
 
-    original_size = attrs(fids[1])["mpisize"]
-    parallel = attrs(fids[1])["HDF5parallel"]
-    merge = original_size > mpi.size
-    @assert !merge || mpi.size == 1
-    
-    fidxs = merge && ! parallel ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
+    (fidxs, merge, parallel) = determine_fid_indices_to_read(fids)
 
     sim.intransition = true
 
@@ -1273,13 +1294,17 @@ The edgestates are read from the `h5` subfolder of the
 current working directory, or from the subfolder set with
 [`set_hdf5_path`](@ref).
 
-Per default, the last written edgestates are read. The `transition`
-keyword allows to read also earlier versions. Alternatively, the
-comment that was specified when write_snapshot was called can be
-specified with the `comment` keyword to read the corresponding
-snapshot.
+Per default, the edge states from the last transition function written to the
+file are read. The `transition` keyword allows to read also earlier
+versions. Alternatively, the comment that was specified when
+write_snapshot was called can be specified with the `comment` keyword
+to read the corresponding snapshot.
 
-Returns a vector of edgestates.
+Returns a vector of edges. In parallel simulations, the vector
+includes only edges where the write operation originated from the same
+rank as the current process. When the current session runs with a single
+process (size = 1), the edges from all ranks are consolidated into the
+returned vector.
 """
 function read_edges(filename::String, type;
              transition = typemax(Int64),
@@ -1293,19 +1318,25 @@ function read_edges(filename::String, type;
     if _transition_from_comment(filename, comment) !== nothing
         transition = _transition_from_comment(filename, comment)
     end
+
+    (_, merge, _) = determine_fid_indices_to_read(fids)
     
     eid = fids[1]["edges"][type]
     t = find_transition_nr(eid, transition)
     stateless = attrs(eid)[":Stateless"]
-
     if stateless
         error("Can not read the state of stateless edges")
     end
 
-    state = map(fids) do fid
-        fid["edges/$(type)/t_$t"][]
-    end |> Iterators.flatten 
+    tid = eid["t_$t"]
+    vec_num_edges = attrs(tid)["size_per_rank"]
+    vec_displace = attrs(tid)["displace"]
+    size = vec_num_edges[mpi.rank + 1]
+    start = vec_displace[mpi.rank + 1] + 1
+    last = start + vec_num_edges[mpi.rank + 1] - 1
 
+
+    state = merge ? tid[] : tid[start:last] 
     
     foreach(close, fids)
 
@@ -1326,16 +1357,16 @@ If the `overwrite_file` argument of [`create_simulation`](@ref) is set
 to true, and the file names are supplemented with a number, the number of
 the meant file can be specified via the `nr` argument.
 
-Per default, the last written edges are read. The `transition`
-keyword allows to read also earlier versions. Alternatively, the
-comment that was specified when write_snapshot was called can be
-specified with the `comment` keyword to read the corresponding
-snapshot.
+Per default, the edge states from the last transition function written to the
+file are read. The `transition` keyword allows to read also earlier
+versions. Alternatively, the comment that was specified when
+write_snapshot was called can be specified with the `comment` keyword
+to read the corresponding snapshot.
 
 If only the edges of a subset of edge types are to be read, this
 subset can be specified via the optional `types` argument.
 
-When the agents from a distributed simulation is read into a single
+When the edges from a distributed simulation is read into a single
 threaded simulation, the IDs of the agents are modified.  The
 `idmapfunc` must be a function that must return the new agent id for a
 given old agent id. [`read_agents!`](@ref) returns a `Dict{AgentID,
@@ -1365,7 +1396,7 @@ function read_edges!(sim::Simulation,
     @assert !merge || mpi.size == 1
     
     fidxs = merge ? (1:original_size) : (mpi.rank+1:mpi.rank+1)
-    
+
     # we call add_edge! but there is a check that this is only done
     # at initialization time or in a transition function
     sim.intransition = true
