@@ -32,6 +32,8 @@ include("globals.jl")
 
 include("raster.jl")
 
+include("spatial_neighbors.jl")
+
 include("graphs.jl")
 
 

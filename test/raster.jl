@@ -20,39 +20,16 @@ struct MovingAgent
     value::Int64
 end
 
-struct AgentWithPos
-    pos::Tuple{Int64, Int64}
-end    
-
 struct OnPosition  end
 
 raster_model = ModelTypes() |>
     register_agenttype!(GridA) |>
     register_agenttype!(Grid3D) |> 
-    register_agenttype!(AgentWithPos) |> 
     register_edgetype!(GridE) |>
     register_agenttype!(Position) |>
     register_agenttype!(MovingAgent) |>
     register_edgetype!(OnPosition) |>
     create_model("Raster_Test")
-
-@testset "connect_spatial_neighbors" begin
-    sim = create_simulation(raster_model)
-
-    ids = add_raster!(sim, :grid, (10,10), p -> GridA(p, true))
-
-    # we add 2 agents to the positions (5,5)
-    # and one to (4,4), (4,5), (4,6) 
-    add_agent!(sim, AgentWithPos((5,5)))
-    add_agent!(sim, AgentWithPos((5,5)))
-    add_agent!(sim, AgentWithPos((4,4)))
-    add_agent!(sim, AgentWithPos((4,5)))
-    add_agent!(sim, AgentWithPos((4,6)))
-
-    finish_init!(sim)
-
-    connect_spatial_neighbors(sim, [AgentWithPos], 
-end
 
 
 @testset "Raster" begin
