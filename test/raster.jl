@@ -454,4 +454,7 @@ end
     @test agentstate(sim, random_cell(sim, :raster, w), Grid3D).pos ==
         (7, 19, 23)
     disable_transition_checks(false)
+
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end

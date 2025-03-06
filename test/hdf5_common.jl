@@ -1,5 +1,7 @@
 using Vahana
 
+@rootonly @info "parallel_write active?" Vahana.parallel_write()
+
 using Test
 
 suppress_warnings(true)
