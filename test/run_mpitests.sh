@@ -30,6 +30,11 @@ echo "======"
 mpirun -n 4 julia --project mpi/test_raster.jl 
 
 echo
+echo "Spatial Neighbors"
+echo "================="
+mpirun -n 4 julia --project mpi/test_spatial_neighbors.jl 
+
+echo
 echo "HDF5 Snapshot"
 echo "============="
 mpirun -n 4 julia --project hdf5_snapshot.jl 

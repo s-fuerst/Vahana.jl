@@ -366,7 +366,9 @@ end
 """
     finish_init!(sim::Simulation; [distribute = true, 
                  partition::Dict{AgentID, ProcessID}, 
-                 partition_algo = :Metis])
+                 partition_algo = :Metis,
+                 return_idmapping = false,
+                 distribute = true])
 
 Finish the initialization phase of the simulation. 
 
@@ -382,24 +384,32 @@ two algorithms are supported:
     - :EqualAgentNumbers just ensures that per agent type more or less
       the same number of agents are distributed to each process.
 
-`finish_init!` must be called before applying a transition function. 
+In a distributed simulation, per default the graph found on rank 0
+will be partitioned using Metis, and distributed to the different
+ranks. Which means that it's allowed to run the initialization phase
+on all ranks (there is no need for a mpi.isroot check), but then all
+added agents and edges on other ranks then 0 will be discarded. If
+this is not intended `distribute` must be set to false.
+
+This distribution changes the id of the agents (as some bits of the id
+contains the mpi rank of the agent). In the case that
+`return_idmapping` is set to true, the function returns a dictonary
+with the old ids as keys and the new ids as values.  The keys are the
+ids of the agents created on rank 0, as all others constructed graphs
+are discarded.
 
 !!! info 
 
-    When a simulation is run on multiple PEs, per default the graph
-    found on rank 0 will be partitioned using Metis, and distributed
-    to the different ranks. Which means that it's allowed to run the
-    initialization phase on all ranks (there is no need for a
-    mpi.isroot check), but then all added agents and edges on other
-    ranks then 0 will be discarded. If this is not intended
-    `distribute` must be set to false.
+    `finish_init!` must be called before applying a transition function.
 
 See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 [`apply!`](@ref) and [`finish_simulation!`](@ref)
 """
 function finish_init!(sim;
                partition = Dict{AgentID, ProcessID}(),
-               return_idmapping = false, partition_algo = :Metis, distribute = true)
+               partition_algo = :Metis,
+               return_idmapping = false,
+               distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
 
     _log_info(sim, "<Begin> finish_init!")
@@ -468,8 +478,13 @@ function finish_init!(sim;
 
     sim.initialized = true
     sim.num_transitions = 1
+    r = if return_idmapping
+        Dict(join([(k, v) for (k, v) in idmapping]))
+    else
+        nothing
+    end
     _log_info(sim, "<End> finish_init!")
-    distribute && return_idmapping ? idmapping : nothing
+    r
 end 
 
 # this function is not exported and should be only used for unit tests

@@ -178,5 +178,7 @@ include("GraphsSupport.jl")
 
 include("Logging.jl")
 
+include("ConnectSpatial.jl")
+
 end
 
