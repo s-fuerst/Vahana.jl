@@ -1,6 +1,12 @@
+using Revise
+
 using Vahana
 
 using Test
+
+using StaticArrays
+
+using Infiltrator
 
 import Vahana: @onrankof, disable_transition_checks
 
@@ -17,103 +23,151 @@ struct Agent3DFrom
 end
 
 struct Agent3DTo
-    pos::Tuple{Float64, Float64, Float64}
+    pos::SVector{3, Float64}
 end
 
 struct Neighbor end
 
 spatial_model = ModelTypes() |>
     register_agenttype!(AgentWithPosFrom) |> 
-    register_agenttype!(AgentWithPosTo) |>
+    register_agenttype!(AgentWithPosTo, :Immortal) |>
     register_agenttype!(Agent3DFrom) |> 
     register_agenttype!(Agent3DTo) |>
     register_edgetype!(Neighbor) |>
     create_model("Spatial_Neighbors")
 
+
+
 @testset "connect_spatial_neighbors" begin
+    function count_edges(edgelist, idmap, id)
+        # to test this on every rank, we must remove the mpi.rank
+        # from the id, as we distribute only the graph that is
+        # created on rank 0
+        aid = Vahana.agent_id(Vahana.type_nr(id), 0, Vahana.agent_nr(id))
+        count(e -> e[1] == idmap[aid], edgelist)
+    end
+
     sim = create_simulation(spatial_model)
 
+    # e.g. lowercase: from, uppercase: to
+    #   1   2   3   4   5
+    # 1 aAB             b
+    # 2 c   C
+    # 3 d
+    # 4
+    # 5 D
+    # 6             e   E
     # We add source agents (From) with different positions
-    from1 = add_agent!(sim, AgentWithPosFrom((5,5)))
-    from2 = add_agent!(sim, AgentWithPosFrom((5,5)))
-    from3 = add_agent!(sim, AgentWithPosFrom((4,4)))
-    from4 = add_agent!(sim, AgentWithPosFrom((4,5)))
-    from5 = add_agent!(sim, AgentWithPosFrom((4,6)))
+    from_a = add_agent!(sim, AgentWithPosFrom((1,1)))
+    from_b = add_agent!(sim, AgentWithPosFrom((5,1)))
+    from_c = add_agent!(sim, AgentWithPosFrom((1,2)))
+    from_d = add_agent!(sim, AgentWithPosFrom((1,3)))
+    from_e = add_agent!(sim, AgentWithPosFrom((4,6)))
 
     # And target agents (To) at the same positions
-    to1 = add_agent!(sim, AgentWithPosTo((5,5)))
-    to2 = add_agent!(sim, AgentWithPosTo((5,5)))
-    to3 = add_agent!(sim, AgentWithPosTo((4,4)))
-    to4 = add_agent!(sim, AgentWithPosTo((4,5)))
-    to5 = add_agent!(sim, AgentWithPosTo((4,6)))
+    to_A = add_agent!(sim, AgentWithPosTo((1,1)))
+    to_B = add_agent!(sim, AgentWithPosTo((1,1)))
+    to_C = add_agent!(sim, AgentWithPosTo((2,2)))
+    to_D = add_agent!(sim, AgentWithPosTo((1,5)))
+    to_E = add_agent!(sim, AgentWithPosTo((5,6)))
 
-    finish_init!(sim)
+    idmap = finish_init!(sim; return_idmapping = true)
 
-    # Connect agents within distance 1.5
-    # This should connect FromAgents to ToAgents within the distance
-    # - (5,5) with (4,5) (distance = 1.0)
-    # - (4,4) with (4,5) (distance = 1.0)
-    # - (4,5) with (4,6) (distance = 1.0)
-    # - (4,4) with (4,6) (distance = 2.0 > 1.5, not connected)
-    # - (5,5) with (4,4) (distance = √2 ≈ 1.414 < 1.5)
-    # - (5,5) with (4,6) (distance = √2 ≈ 1.414 < 1.5)
-    connect_spatial_neighbors!(sim, AgentWithPosFrom, AgentWithPosTo, 
+    connect_spatial_neighbors!(sim,
+                               AgentWithPosFrom,
+                               pos_tuple(:pos, 2),
+                               AgentWithPosTo, 
+                               pos_tuple(:pos, 2),
+                               Neighbor;
+                               distance = 1.5)
+
+    # using all_edges allow to run the tests als in parallel
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, to_A) == 2
+    @test count_edges(es, idmap, to_B) == 2
+    @test count_edges(es, idmap, to_C) == 3
+    @test count_edges(es, idmap, to_D) == 0
+    @test count_edges(es, idmap, to_E) == 1
+
+    connect_spatial_neighbors!(sim,
+                               AgentWithPosFrom,
+                               pos_tuple(:pos, 2),
+                               AgentWithPosTo, 
+                               pos_tuple(:pos, 2),
+                               Neighbor;
+                               distance = 2.0)
+
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, to_A) == 3
+    @test count_edges(es, idmap, to_B) == 3
+    @test count_edges(es, idmap, to_C) == 3
+    @test count_edges(es, idmap, to_D) == 1
+    @test count_edges(es, idmap, to_E) == 1
+
+    # test also connections of the same type, both To
+    # should not contain the agent itself
+    connect_spatial_neighbors!(sim,
+                               AgentWithPosTo,
+                               pos_tuple(:pos, 2),
+                               AgentWithPosTo, 
+                               pos_tuple(:pos, 2),
+                               Neighbor;
+                               distance = 3.0)
+
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, to_A) == 2
+    @test count_edges(es, idmap, to_B) == 2
+    @test count_edges(es, idmap, to_C) == 2
+    @test count_edges(es, idmap, to_D) == 0
+    @test count_edges(es, idmap, to_E) == 0
+    
+    finish_simulation!(sim)
+    
+    sim = create_simulation(spatial_model)
+
+    # e.g. lowercase: from, uppercase: to
+    # z:4                5               6
+    #   1  2  3  4       1  2  3  4      1  2  3  4
+    # 3 aA             3 c             3
+    # 4                4 C             4 d        D
+    # 5                5               5
+    # 6 b        B     6               6 E        e
+
+    # Add from agents with 3D positions
+    from_a = add_agent!(sim, Agent3DFrom((1.0, 3.0, 4.0)))
+    from_b = add_agent!(sim, Agent3DFrom((1.0, 6.0, 4.0)))
+    from_c = add_agent!(sim, Agent3DFrom((1.0, 3.0, 5.0)))
+    from_d = add_agent!(sim, Agent3DFrom((1.0, 4.0, 6.0)))
+    from_e = add_agent!(sim, Agent3DFrom((4.0, 6.0, 6.0)))
+    
+    # Add to agents with 3D positions at the same locations
+    to_A = add_agent!(sim, Agent3DTo(SVector(1.0, 3.0, 4.0)))
+    to_B = add_agent!(sim, Agent3DTo(SVector(4.0, 6.0, 4.0)))
+    to_C = add_agent!(sim, Agent3DTo(SVector(1.0, 4.0, 5.0)))
+    to_D = add_agent!(sim, Agent3DTo(SVector(4.0, 4.0, 6.0)))
+    to_E = add_agent!(sim, Agent3DTo(SVector(1.0, 6.0, 6.0)))
+    
+    idmap = finish_init!(sim; return_idmapping = true)
+    
+    connect_spatial_neighbors!(sim,
+                               Agent3DFrom,
+                               pos_tuple(:pos, 3),
+                               Agent3DTo,
+                               pos_tuple(:pos, 3),
                                Neighbor,
                                distance = 1.5)
     
-    # Verify that connections were created correctly
-    # FromAgents at (5,5) should connect to ToAgents at (5,5), (4,4), (4,5), and (4,6)
-    # FromAgents at (4,4) should connect to ToAgents at (4,4), (4,5), and (5,5)
-    # etc.
-    
-    disable_transition_checks(true)
-    # First from agent at (5,5) should connect to 5 to agents: (5,5)x2, (4,4), (4,5), (4,6)
-    @test num_edges(sim, to1, Neighbor) == 5
-    # Second to agent at (5,5) should also connect to 5 to agents
-    @test num_edges(sim, to2, Neighbor) == 5
-    # To agent at (4,4) should connect to 3 to agents: (4,4), (4,5), (5,5)x2
-    @test num_edges(sim, to3, Neighbor) == 4
-    # To agent at (4,5) should connect to 5 to agents: (4,5), (4,4), (4,6), (5,5)x2
-    @test num_edges(sim, to4, Neighbor) == 5
-    # To agent at (4,6) should connect to 4 to agents: (4,6), (4,5), (5,5)x2
-    @test num_edges(sim, to5, Neighbor) == 4
-    
-    disable_transition_checks(false)
-    
-    finish_simulation!(sim)
-    
-    sim = create_simulation(spatial_model)
-    
-    # Add from agents with 3D positions
-    from1 = add_agent!(sim, Agent3DFrom((0.0, 0.0, 0.0)))
-    from2 = add_agent!(sim, Agent3DFrom((1.0, 0.0, 0.0)))
-    from3 = add_agent!(sim, Agent3DFrom((0.0, 1.0, 0.0)))
-    from4 = add_agent!(sim, Agent3DFrom((0.0, 0.0, 1.0)))
-    from5 = add_agent!(sim, Agent3DFrom((2.0, 2.0, 2.0)))
-    
-    # Add to agents with 3D positions at the same locations
-    to1 = add_agent!(sim, Agent3DTo((0.0, 0.0, 0.0)))
-    to2 = add_agent!(sim, Agent3DTo((1.0, 0.0, 0.0)))
-    to3 = add_agent!(sim, Agent3DTo((0.0, 1.0, 0.0)))
-    to4 = add_agent!(sim, Agent3DTo((0.0, 0.0, 1.0)))
-    to5 = add_agent!(sim, Agent3DTo((2.0, 2.0, 2.0)))
-    
-    finish_init!(sim)
-    
-    # Connect agents within distance 1.5
-    connect_spatial_neighbors!(sim, Agent3DFrom, Agent3DTo,
-                               Neighbor,
-                               distance = 1)
-    
     # Verify 3D connections
-    disable_transition_checks(true)
-    @test num_edges(sim, to1, Neighbor) == 4  # Connected to all to-agents within distance 1.5
-    @test num_edges(sim, to2, Neighbor) == 2  # Connected to to1 and to2
-    @test num_edges(sim, to3, Neighbor) == 2  # Connected to to1 and to3
-    @test num_edges(sim, to4, Neighbor) == 2  # Connected to to1 and to4
-    @test num_edges(sim, to5, Neighbor) == 1  # Connected only to to5
-    disable_transition_checks(false)
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, to_A) == 2
+    @test count_edges(es, idmap, to_B) == 0
+    @test count_edges(es, idmap, to_C) == 3
+    @test count_edges(es, idmap, to_D) == 0
+    @test count_edges(es, idmap, to_E) == 0
     
     finish_simulation!(sim)
+
+    # this hack should help that the output is not scrambled
+    sleep(mpi.rank * 0.05)
 end
 

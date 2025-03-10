@@ -28,13 +28,18 @@ mpirun -n 4 julia --project mpi/test_edgesiterator.jl
 
 echo
 echo "Independent"
-echo "============="
+echo "-----------"
 mpirun -n 4 julia --project mpi/test_independent.jl 
 
 echo
 echo "Raster"
 echo "------"
 mpirun -n 4 julia --project mpi/test_raster.jl 
+
+echo
+echo "Spatial Neighbors"
+echo "-----------------"
+mpirun -n 4 julia --project mpi/test_spatial_neighbors.jl 
 
 echo
 echo "Agentstate (non shared memory)"
