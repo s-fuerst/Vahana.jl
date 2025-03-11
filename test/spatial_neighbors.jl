@@ -120,6 +120,40 @@ spatial_model = ModelTypes() |>
     @test count_edges(es, idmap, to_C) == 2
     @test count_edges(es, idmap, to_D) == 0
     @test count_edges(es, idmap, to_E) == 0
+
+    # test periodic boundaries
+    connect_spatial_neighbors!(sim,
+                               AgentWithPosFrom,
+                               pos_tuple(:pos, 2),
+                               AgentWithPosTo, 
+                               pos_tuple(:pos, 2),
+                               Neighbor;
+                               distance = 1.0,
+                               periodic_boundaries = [(1,5), (1,6)])
+    
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, to_A) == 3
+    @test count_edges(es, idmap, to_B) == 3
+    @test count_edges(es, idmap, to_C) == 1
+    @test count_edges(es, idmap, to_D) == 0
+    @test count_edges(es, idmap, to_E) == 2
+
+    connect_spatial_neighbors!(sim,
+                               AgentWithPosFrom,
+                               pos_tuple(:pos, 2),
+                               AgentWithPosTo, 
+                               pos_tuple(:pos, 2),
+                               Neighbor;
+                               distance = 1.0,
+                               periodic_boundaries = [(1,5), ()])
+    
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, to_A) == 3
+    @test count_edges(es, idmap, to_B) == 3
+    @test count_edges(es, idmap, to_C) == 1
+    @test count_edges(es, idmap, to_D) == 0
+    @test count_edges(es, idmap, to_E) == 1
+    
     
     finish_simulation!(sim)
     
@@ -167,6 +201,52 @@ spatial_model = ModelTypes() |>
     
     finish_simulation!(sim)
 
+    # testing periodic bounding for floating point position/ranges
+    sim = create_simulation(spatial_model)
+    a1 = add_agent!(sim, Agent3DTo((0.0, 0.0, 0.0)))
+    a2 = add_agent!(sim, Agent3DTo((1.0, 0.0, 0.0)))
+    a3 = add_agent!(sim, Agent3DTo((0.1, 0.1, 0.0)))
+    a4 = add_agent!(sim, Agent3DTo((0.0, 0.0, 0.1)))
+    a5 = add_agent!(sim, Agent3DTo((0.0, 0.0, 1.0)))
+    a6 = add_agent!(sim, Agent3DTo((1.0, 0.0, 1.0)))
+    idmap = finish_init!(sim; return_idmapping = true)
+
+    connect_spatial_neighbors!(sim,
+                               Agent3DTo,
+                               pos_tuple(:pos, 3),
+                               Agent3DTo,
+                               pos_tuple(:pos, 3),
+                               Neighbor,
+                               periodic_boundaries = [(0.0,1.0), (), ()], 
+                               distance = 0.1001)
+    
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, a1) == 2 # a2, a4
+    @test count_edges(es, idmap, a2) == 2 # a1, a4
+    @test count_edges(es, idmap, a3) == 0
+    @test count_edges(es, idmap, a4) == 2 # a1, a2
+    @test count_edges(es, idmap, a5) == 1 # a6
+    @test count_edges(es, idmap, a6) == 1 # a1
+
+    connect_spatial_neighbors!(sim,
+                               Agent3DTo,
+                               pos_tuple(:pos, 3),
+                               Agent3DTo,
+                               pos_tuple(:pos, 3),
+                               Neighbor,
+                               periodic_boundaries =
+                                   [(0.0,1.0), (0.0,1.0), (0.0, 1.0)], 
+                               distance = 0.1001)
+@infiltrate    
+    es = all_edges(sim, Neighbor)
+    @test count_edges(es, idmap, a1) == 4 # a2, a4, a5, a6
+    @test count_edges(es, idmap, a2) == 4 # a1, a4, a5, a6
+    @test count_edges(es, idmap, a3) == 0
+    @test count_edges(es, idmap, a4) == 4 # a1, a2, a5, a6
+    @test count_edges(es, idmap, a5) == 4 # a1, a2, a5, a6
+    @test count_edges(es, idmap, a6) == 4 # a1, a2, a5, a6
+    
+    
     # this hack should help that the output is not scrambled
     sleep(mpi.rank * 0.05)
 end

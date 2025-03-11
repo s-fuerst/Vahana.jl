@@ -2,22 +2,15 @@ export connect_spatial_neighbors!
 export pos_sarray, pos_tuple
 
 using StaticArrays
-###
+import Combinatorics: combinations
+import NearestNeighbors: KDTree, knn, inrange, Euclidean
+
+### TODO DOC
 pos_sarray(fieldname::Symbol) = state -> getproperty(state, fieldname)
 
 pos_tuple(fieldname::Symbol, size) =
     state -> getproperty(state, fieldname) |> collect |> SVector{size}
 
-# struct Person2
-#   foo::Tuple{Int64,Int64}
-#   bar::Vector{Int64}
-# end
-
-# p = Person2((1, 1), [2, 2])
-
-# pos_tuple(:foo)(p)
-
-###
 
 """
     connect_spatial_neighbors!(sim, from_type::DataType, to_type::DataType, edge_constructor; distance = 1.0, periodic = true, fieldname = :pos)
@@ -33,8 +26,6 @@ The connections are created with edges of type `edge_type`. The
 `edge_type` must be stateless and registered like all
 other edgetypes via `register_edgetype!`.
 
-The keyword `periodic` determines whether the space has periodic boundaries,
-however this feature is not yet implemented.
 
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref)
 """
@@ -45,15 +36,17 @@ function connect_spatial_neighbors!(sim,
                              to_posfunc,
                              edge_type;
                              distance = 1.0,
-                             periodic = true)
-    # leafsize,
-    # reorder)
+                             periodic_boundaries = nothing,
+                             metric = Euclidean(),
+                             leafsize = 25,
+                             reorder = true)
+    # TODO update doc
 
+    # TODO: assertiongs for distance,periodic bounding,
+    # compare eltype of periodic bounding with eltype of positions
     with_logger(sim) do
         @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
     end
-
-    # TODO: periodic is not implemented
 
     from_ids = all_agentids(sim, from_type, true)
 
@@ -66,7 +59,7 @@ function connect_spatial_neighbors!(sim,
         if eltype(matrix) <: Int
             matrix = Float64.(matrix)
         end
-        kdtree = KDTree(matrix)
+        kdtree = KDTree(matrix, metric; leafsize = 25, reorder = reorder)
 
         # Prepare writing edges if simulation is not initialized
         if sim.initialized
@@ -83,6 +76,54 @@ function connect_spatial_neighbors!(sim,
             for fidx in found
                 if from_ids[fidx] != to_ids[tidx]
                     add_edge!(sim, from_ids[fidx], to_ids[tidx], edge_type())
+                end
+            end
+        end
+
+        if periodic_boundaries !== nothing
+            # we start by determining for with dimensions boundaries
+            # are given and calculating from the boundaries tuple
+            # the offset that must be added to the position in
+            # form of a unit_vector.
+            num_dims = length(periodic_boundaries)
+            active = zeros(Bool, num_dims)
+            unit_vectors = fill(SVector{num_dims}(zeros(num_dims)), num_dims)
+            for i in 1:num_dims
+                if typeof(periodic_boundaries[i]) != Tuple{}
+                    offset = periodic_boundaries[i][2] -
+                        periodic_boundaries[i][1]
+                    o2 = eltype(periodic_boundaries[i]) <: Int ? 1 : 0
+                    unit_vectors[i] = setindex(unit_vectors[i], offset + o2, i)
+                    active[i] = true
+                end
+            end
+            # then we iterate over all positions
+            for (tidx, pos) in enumerate(to_pos)
+                adjust_pos = SVector{num_dims}[]
+                # and checking for which dimensions the agent pos in
+                # in the distance of a boundary. For this dimensions we
+                # calculating the unit vectors to the adjust_pos vector
+                for i in 1:num_dims
+                    if active[i] > 0
+                        if pos[i] - distance < periodic_boundaries[i][1] 
+                            push!(adjust_pos, unit_vectors[i])
+                        elseif pos[i] + distance > periodic_boundaries[i][2]
+                            push!(adjust_pos, -unit_vectors[i])
+                        end
+                    end
+                end
+                # finally we create all combinations of the unit_vectors and
+                # adjust the position for each of this combination, and
+                # searching for the neighbors
+                for c in combinations(adjust_pos)
+                    avec = reduce(+, c)
+                    found = inrange(kdtree, collect(pos + avec), distance)
+                    for fidx in found
+                        if from_ids[fidx] != to_ids[tidx]
+                            add_edge!(sim, from_ids[fidx], to_ids[tidx],
+                                      edge_type())
+                        end
+                    end
                 end
             end
         end
