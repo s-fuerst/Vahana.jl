@@ -8,8 +8,6 @@ export add_raster!, connect_raster_neighbors!, connect_spatial_neighbors!
 export calc_raster, calc_rasterstate, rastervalues, move_to!, cellid
 export random_pos, random_cell
 
-using Infiltrator
-
 """
     add_raster!(sim, name::Symbol, dims::NTuple{N, Int}, agent_constructor)
 
