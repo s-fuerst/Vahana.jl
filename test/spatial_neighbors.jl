@@ -6,8 +6,6 @@ using Test
 
 using StaticArrays
 
-using Infiltrator
-
 import Vahana: @onrankof, disable_transition_checks
 
 struct AgentWithPosFrom
@@ -237,7 +235,6 @@ spatial_model = ModelTypes() |>
                                periodic_boundaries =
                                    [(0.0,1.0), (0.0,1.0), (0.0, 1.0)], 
                                distance = 0.1001)
-@infiltrate    
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, a1) == 4 # a2, a4, a5, a6
     @test count_edges(es, idmap, a2) == 4 # a1, a4, a5, a6
