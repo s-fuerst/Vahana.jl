@@ -904,7 +904,7 @@ end
 function _read_globals_or_params(hid, empty_array_str)
     eid = hid[empty_array_str]
     all_keys = map(string,
-                   filter(k -> k[1] != '_',
+                   filter(k -> k[1] != '_' && haskey(hid, k),
                           [keys(hid); keys(attrs(eid))]))
 
     Dict(map(all_keys) do k
