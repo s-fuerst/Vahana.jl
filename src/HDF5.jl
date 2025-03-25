@@ -1698,12 +1698,12 @@ end
 """
     write_metadata(sim::Simulation, type::Union{Symbol, DataType}, field::Symbol, key::Symbol, value)
 
-Attach metadata to a `field` of an agent- or edgetype or the
-`globals` or `params` struct (see [`create_simulation`](@ref)) or to a
-raster (in that case `field` must be the name of the raster). `type`
-must be an agent- or edgetype, :Global, :Param or :Raster. Metadata is
-stored via `key`, `value` pairs, so that multiple data of different
-types can be attached to a single field.
+Attach metadata to a `field` of an agent- or edgetype or the `globals`
+or `params` struct (see [`create_simulation`](@ref)) or to a raster
+(in that case `field` must be the name of the raster). `type` must be
+an agent- or edgetype, or one of these symbols: :Global, :Param or
+:Raster. Metadata is stored via `key, value` pairs, so that multiple
+metadata can be attached to a single field.
 
 See also: [`read_metadata`](@ref)
 """
@@ -1756,14 +1756,15 @@ end
     read_metadata(filename::String, type::Union{Symbol, DataType}[, field::Symbol, key::Symbol ])
 
 Read metadata for a `field` of an agent- or edgetype or the `globals` or
-`params` struct (see [`create_simulation`](@ref)) or to a raster (in that
-case `field` must be the name of the raster). `type` must be an agent-
-or edgetype :Global, :Param or :Raster. Metadata is stored via `key`,
-value pairs. Multiple data of different types can be attached to a
-single field, a single piece of the metadata can be retrived via the
-`key` parameter. If this is not set (or set to Symbol()), a
-Dict{Symbol, Any} with the complete metadata of this field is
-returned.
+`params` struct (see [`create_simulation`](@ref)) or to a raster (in
+that case `field` must be the name of the raster). `type` must be an
+agent- or edgetype, or one of these symbols: :Global, :Param or
+:Raster. Metadata is stored via `key, value` pairs. Multiple pairs can
+be attached to a single field, a single piece of the metadata can be
+retrived via the `key` parameter. If this is not set (or set to
+Symbol()), a Dict{Symbol, Any} with the complete metadata of this
+field is returned. If also `field` is not set, the metadata of all fields
+are returned.
 
 See also: [`write_metadata`](@ref)
 """
@@ -1792,8 +1793,10 @@ end
 function _read_metadata_all_fields(fids, type::Symbol)
     all = Dict()
 
-    for f in _read_metadata(fids, type, Symbol(), Symbol(), false)
-        all[Symbol(f)] = _read_metadata(fids, type, f, Symbol(), false)
+    if _read_metadata(fids, type, Symbol(), Symbol(), false) !== nothing
+        for f in _read_metadata(fids, type, Symbol(), Symbol(), false)
+            all[Symbol(f)] = _read_metadata(fids, type, f, Symbol(), false)
+        end
     end
 
     foreach(close, fids)
@@ -1819,10 +1822,11 @@ function _read_metadata(fids, type, field, key, close_file)
         type in map(Symbol, keys(fids[1]["edges"]))
         fids[1]["edges"][String(type)]["_meta"]
     else
-        @error """
-        Can not read metadata, `type` must be an agenttype or edgetype 
+        @warn """
+        Can not read metadata for `type` $(type). This must be an agenttype or edgetype 
         or one of the following symbols: :Param, :Global, :Raster.
         """
+        return nothing
     end
 
     if field == Symbol()
