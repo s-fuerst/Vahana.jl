@@ -1,10 +1,9 @@
 import LinearAlgebra
 
+import Random: AbstractRNG, default_rng
 import StatsBase: sample, Weights
 
-import NearestNeighbors: KDTree, knn, inrange
-
-export add_raster!, connect_raster_neighbors!, connect_spatial_neighbors!
+export add_raster!, connect_raster_neighbors!
 export calc_raster, calc_rasterstate, rastervalues, move_to!, cellid
 export random_pos, random_cell
 
@@ -31,9 +30,9 @@ See also [`calc_raster`](@ref) [`connect_raster_neighbors!`](@ref) and
 [`move_to!`](@ref).
 """
 function add_raster!(sim,
-                     name::Symbol,
-                     dims::NTuple{N, Int},
-                     agent_constructor) where N
+              name::Symbol,
+              dims::NTuple{N, Int},
+              agent_constructor) where N
     with_logger(sim) do
         @info "<Begin> add_raster!" name dims
     end
@@ -74,7 +73,7 @@ function broadcastids(sim, raster, idmapping::Dict)
         MPI.Bcast!(rsize, MPI.COMM_WORLD)
         sim.rasters[raster] = Array{AgentID}(undef, rsize[])
         MPI.Bcast!(sim.rasters[raster], MPI.COMM_WORLD)
-        
+                  
     end
 
     _log_info(sim, "<End> broadcastids")
@@ -166,9 +165,6 @@ function connect_raster_neighbors!(sim,
 
     _log_info(sim, "<End> connect_raster_neighbors!")
 end
-
-
-
 
 """
     calc_raster(sim, raster::Symbol, f, f_returns::DataType, accessible::Vector{DataType})
@@ -284,7 +280,7 @@ Can be only called after [`finish_init!`](@ref).
 See also [`add_raster!`](@ref), [`calc_rasterstate`](@ref) and [`rastervalues`](@ref)
 """
 function calc_rasterstate(sim, raster::Symbol, f,
-                          f_returns::DataType = Nothing, ::Type{T} = Nothing) where T
+                   f_returns::DataType = Nothing, ::Type{T} = Nothing) where T
     with_logger(sim) do
         @info "<Begin> calc_rasterstate" raster
     end
@@ -439,15 +435,15 @@ position `pos` itself.
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref) 
 """
 function move_to!(sim,
-                  name::Symbol,
-                  id::AgentID,
-                  pos,
-                  edge_from_raster,
-                  edge_to_raster;
-                  distance = 0,
-                  metric::Symbol = :chebyshev,
-                  periodic = true,
-                  only_surrounding = false)
+           name::Symbol,
+           id::AgentID,
+           pos,
+           edge_from_raster,
+           edge_to_raster;
+           distance = 0,
+           metric::Symbol = :chebyshev,
+           periodic = true,
+           only_surrounding = false)
     # before a simulation is initialized, the raster existing
     # only on the root 
     if mpi.isroot || sim.initialized
@@ -503,7 +499,7 @@ function _checkpos(pos::CartesianIndex, dims, periodic)
 end
 
 """
-    random_pos(sim, raster::Symbol, weights::Matrix)
+    random_pos([rng], sim, raster::Symbol, weights::Matrix)
 
 Return a CartesianIndex with random position coordinates, weighted by a
 probability matrix `weights`.
@@ -513,18 +509,21 @@ to its corresponding value in the `weights` matrix.
 
 See also [`random_pos(sim, raster)`](@ref) and [`random_cell`](@ref)
 """
-function random_pos(sim, raster::Symbol, weights::Array)
+function random_pos(rng::AbstractRNG, sim::Simulation, raster::Symbol, weights::Array)
     dims = size(sim.rasters[raster])
     @assert dims == size(weights) """
     `weights` must have the same dimension as the raster :$(raster)
     """
     W = Weights(vec(weights))
     positions = CartesianIndices(dims) |> collect
-    positions[sample(eachindex(positions), W)]
+    positions[sample(rng, eachindex(positions), W)]
 end
 
+random_pos(sim::Simulation, raster::Symbol, weights::Array) =
+    random_pos(default_rng(), sim, raster, weights)
+
 """
-    random_pos(sim, raster::Symbol)
+    random_pos([rng], sim, raster::Symbol)
 
 Return a CartesianIndex with random position coordinates.
 
@@ -534,26 +533,32 @@ index has the same probability.
 See also [`random_pos(sim, raster, weights)`](@ref) and
 [`random_cell`](@ref)
 """
-function random_pos(sim, raster::Symbol)
+function random_pos(rng::AbstractRNG, sim::Simulation, raster::Symbol)
     dims = size(sim.rasters[raster])
     positions = CartesianIndices(dims) |> collect
-    positions[sample(eachindex(positions))]
+    positions[sample(rng, eachindex(positions))]
 end
 
+random_pos(sim::Simulation, raster::Symbol) =
+    random_pos(default_rng(), sim, raster)
+
+
 """
-    random_cell(sim, raster::Symbol)
+    random_cell([rng], sim, raster::Symbol)
 
 Return a random cell id of the raster `raster` from the
 simulation `sim`.
 
 """
-function random_cell(sim, name::Symbol)
-
-    rand(sim.rasters[name])
+function random_cell(rng::AbstractRNG, sim::Simulation, name::Symbol)
+    rand(rng, sim.rasters[name])
 end
 
+random_cell(sim::Simulation, name::Symbol) =
+    random_cell(default_rng(), sim, name)
+
 """
-    random_cell(sim, raster::Symbol, weights::Array)
+    random_cell([rng], sim, raster::Symbol, weights::Array)
 
 Return a random cell id of the raster `raster` from the simulation
 `sim`. The likelihood of selecting a particular cell is proportional
@@ -561,8 +566,11 @@ to its corresponding value in the `weights` matrix.
 
 See also [`random_cell(sim, raster)`](@ref) and [`random_pos`](@ref)
 """
-function random_cell(sim, raster::Symbol, weights::Array)
+function random_cell(rng::AbstractRNG, sim::Simulation, raster::Symbol, weights::Array)
     W = Weights(vec(weights))
-    sample(vec(sim.rasters[raster]), W)
+    sample(rng, vec(sim.rasters[raster]), W)
 end
+
+random_cell(sim::Simulation, name::Symbol, weights::Array) =
+    random_cell(default_rng(), sim, name, weights)
 
