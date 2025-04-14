@@ -215,13 +215,16 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         Only edge types without the :SingeType hint can be added to
         to the `with_edge` keyword of an apply! call, but $ET 
         has the :SingleType hint.    
-        """
-        for id in keys(edgeread(sim, ET))
-            idx = agent_nr(id)
-            state = @readstate($T)[idx]
-            @mayassert ! @readdied($T)[idx]
-            newstate = tfunc(state, id, sim)
-            wfunc(sim, idx, newstate, $T)
+            """
+        tnr = type_nr(sim, $T)
+        for (id, _) in edgeread(sim, ET)
+            if type_nr(id) == tnr
+                idx = agent_nr(id)
+                state = @readstate($T)[idx]
+                @mayassert ! @readdied($T)[idx]
+                newstate = tfunc(state, id, sim)
+                wfunc(sim, idx, newstate, $T)
+            end
         end
     end
 
@@ -251,13 +254,16 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         to the `with_edge` keyword of an apply! call, but $ET
         has the :SingleType hint.    
         """
-        for id in keys(edgeread(sim, ET))
-            idx = agent_nr(id)
-            if $mortal
-                @mayassert ! @readdied($T)[idx]
+        tnr = type_nr(sim, $T)
+        for (id, _) in edgeread(sim, ET)
+            if type_nr(id) == tnr
+                idx = agent_nr(id)
+                if $mortal
+                    @mayassert ! @readdied($T)[idx]
+                end
+                newstate = tfunc(Val($T), id, sim)
+                wfunc(sim, idx, newstate, $T)
             end
-            newstate = tfunc(Val($T), id, sim)
-            wfunc(sim, idx, newstate, $T)
         end
     end
 
