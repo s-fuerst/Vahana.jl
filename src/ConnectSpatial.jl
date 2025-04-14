@@ -148,11 +148,11 @@ function _spatial_neighbors!(sim,
                       to_type::DataType,
                       to_posfunc,
                       edge_constructor,
-                      edge_with_state,
-                      search_func; # inrange or knn for NearestNeighbors
-                      distance=nothing, # only used for inrange
-                      periodic_boundaries=nothing, # only used for inrange
-                      metric=Euclidean(),
+                      search_func,
+                      from_filter; # inrange or knn for NearestNeighbors
+                      distance = nothing, # only used for inrange
+                      periodic_boundaries = nothing, # only used for inrange
+                      metric = Euclidean(),
                       leafsize = 25,
                       reorder = true)
     # TODO update doc
@@ -165,7 +165,7 @@ function _spatial_neighbors!(sim,
     if length(from_ids) > 0
         # first we construct the KDTree with the information
         # of the agents from all processes.
-        (from_states, from_pos) = if edge_with_state
+        (from_states, from_pos) = if typeof(edge_constructor) != DataType
             states = all_agents(sim, from_type, true)
             pos = map(from_posfunc, states)
             (states, pos)
@@ -180,11 +180,12 @@ function _spatial_neighbors!(sim,
         kdtree = KDTree(matrix, metric; leafsize=25, reorder=reorder)
 
         # Prepare writing edges if simulation is not initialized
-        edge_type = if edge_with_state
+        edge_type = if typeof(edge_constructor) != DataType
             typeof(edge_constructor(from_states[1]))
         else
             typeof(edge_constructor())
         end
+
         if sim.initialized
             prepare_write!(sim, [], false, edge_type)
         end
@@ -196,7 +197,7 @@ function _spatial_neighbors!(sim,
 
         for (tidx, pos) in enumerate(to_pos)
             search_func(kdtree, collect(pos),
-                        from_ids, from_states, to_ids[tidx])
+                        from_ids, from_states, from_filter, to_ids[tidx])
         end
 
         if periodic_boundaries !== nothing
@@ -237,7 +238,7 @@ function _spatial_neighbors!(sim,
                 for c in combinations(adjust_pos)
                     avec = reduce(+, c)
                     search_func(kdtree, collect(pos + avec),
-                                from_ids, from_states, to_ids[tidx])
+                                from_ids, from_states, from_filter, to_ids[tidx])
                 end
             end
         end
@@ -250,8 +251,11 @@ function _spatial_neighbors!(sim,
             finish_write!(sim, edge_type)
         end
     end
-
 end
+
+# TODO: add tests for edge_constructor with state and
+# from_filter. Write documentation
+
 
 function connect_spatial_neighbors!(sim,
                              from_type::DataType,
@@ -259,23 +263,23 @@ function connect_spatial_neighbors!(sim,
                              to_type::DataType,
                              to_posfunc,
                              edge_constructor;
-                             edge_with_state = false,
+                             from_filter = nothing,
                              distance = 1.0,
                              periodic_boundaries = nothing,
                              metric = Euclidean(),
                              leafsize = 25,
                              reorder = true)
-    function search_with_state(kdtree, pos, from_ids, from_states, to)
+    function search_with_state(kdtree, pos, from_ids, from_states, from_filt, to)
         found = inrange(kdtree, pos, distance)
         for fidx in found
-            if from_ids[fidx] != to
-                add_edge!(sim, from_ids[fidx], to,
-                          edge_constructor(from_states[fidx]))
+            from_state = from_states[fidx]
+            if from_ids[fidx] != to && from_filt(from_state)
+                add_edge!(sim, from_ids[fidx], to, edge_constructor(from_state))
             end
         end
     end
 
-    function search_wout_state(kdtree, pos, from_ids, from_states, to)
+    function search_wout_state(kdtree, pos, from_ids, from_states, _, to)
         found = inrange(kdtree, pos, distance)
         for fidx in found
             if from_ids[fidx] != to
@@ -287,6 +291,20 @@ function connect_spatial_neighbors!(sim,
     with_logger(sim) do
         @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
     end
+
+    (search_func, filt) = if typeof(edge_constructor) == DataType 
+        @assert from_filter == nothing """
+        `from_filter` can only be set to a predicate function in the case that
+        the edge_constructor is also a function with the agent state as an argument.
+        """
+        (search_wout_state, nothing)
+    else
+        if from_filter == nothing
+            (search_with_state, (a) -> true)
+        else
+            (search_with_state, from_filter)
+        end
+    end
     
     _spatial_neighbors!(sim,
                         from_type,
@@ -294,8 +312,8 @@ function connect_spatial_neighbors!(sim,
                         to_type,
                         to_posfunc,
                         edge_constructor,
-                        edge_with_state,
-                        edge_with_state ? search_with_state : search_wout_state;
+                        search_func,
+                        filt;
                         distance,
                         periodic_boundaries,
                         metric,
