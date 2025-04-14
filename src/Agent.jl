@@ -89,6 +89,15 @@ function type_nr(id::AgentID)::TypeID
     id >> SHIFT_TYPE
 end
 
+function type_nr(sim, dt::DataType)::TypeID
+    for (i, t) in enumerate(sim.typeinfos.nodes_types)
+        if t == dt
+            return TypeID(i)
+        end
+    end
+    TypeID(0)
+ end
+
 function type_of(sim, id::AgentID)
     sim.typeinfos.nodes_types[type_nr(id)]
 end
