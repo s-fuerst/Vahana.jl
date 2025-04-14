@@ -1,5 +1,3 @@
-using Revise
-
 using Vahana
 
 using Test
@@ -231,7 +229,7 @@ spatial_model = ModelTypes() |>
                                pos_tuple(:pos, 3),
                                Agent3DTo,
                                pos_tuple(:pos, 3),
-                               Neighbor,
+                               (a) -> Neighbor(),
                                periodic_boundaries =
                                    [(0.0,1.0), (0.0,1.0), (0.0, 1.0)], 
                                distance = 0.1001)
@@ -243,6 +241,7 @@ spatial_model = ModelTypes() |>
     @test count_edges(es, idmap, a5) == 4 # a1, a2, a5, a6
     @test count_edges(es, idmap, a6) == 4 # a1, a2, a5, a6
     
+    finish_simulation!(sim)
     
     # this hack should help that the output is not scrambled
     sleep(mpi.rank * 0.05)
