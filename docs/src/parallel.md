@@ -77,7 +77,7 @@ To execute instructions only on the root process, you can use the
 example](https://git.zib.de/sfuerst/vahana-episim) includes the
 following code before the [`finish_init!`](@ref) call:
 
-```
+```julia
     @rootonly begin
         worldid = add_agent!(sim, World())
         healthauthid = add_agent!(sim, HealthAuthority(0, 0, 0))
@@ -98,19 +98,12 @@ collectively from all processes.
 
 ## Write a snapshot after `finish_init!`
 
-If creating the initial state takes time and the process is
-deterministic, it is a good idea to save the state after
-[`finish_init!`](@ref) with [`write_snapshot`](@ref) and read this snapshot with
-[`read_snapshot!`](@ref) instead of recreating the graph
-each time. 
-
-If the process of generating the initial state is time-consuming, it
-is advisable to save the state after the `finish_init!` function
-completes. This can be achieved by calling the `write_snapshot`
-function. Subsequently, instead of recreating the initial graph for
-each simulation, you can read this snapshot using the `read_snapshot!`
-function instead.
-
+If the process of generating the initial state is time-consuming and
+the process is deterministic, it is advisable to save the state after
+the [`finish_init!`](@ref) function completes. This can be achieved by
+calling the [`write_snapshot`](@ref) function. Subsequently, instead
+of recreating the initial graph for each simulation, you can read this
+snapshot using the [`read_snapshot!`](@ref) function instead.
 
 The [Vahana Episim
 example](https://git.zib.de/sfuerst/vahana-episim/-/blob/main/src/episim.jl?ref_type=heads) serves as
@@ -149,3 +142,26 @@ generate an edge to their neighbors if the cell is active. If this
 edge has the `:NumEdgesOnly` hint, it will directly trigger the
 counting process of the neighbors without the need to transfer the
 full state to other agents/processes.
+
+## HPC Resources for German Researchers
+
+For researchers at German universities interested in running
+large-scale Vahana simulations, the NHR (National High Performance
+Computing Alliance) offers access to high-performance computing
+resources through several project categories.
+
+Of particular interest to those new to HPC is the **NHR-Starter**
+category. This one-time opportunity is designed for researchers
+without prior experience in HPC resource applications. It provides:
+
+- Simplified application process
+- Limited HPC resources for one year
+- Dedicated consulting and support
+- Preparation for subsequent "Normal" or "Large" project applications
+
+This path is especially valuable for researchers looking to scale up
+their agent-based models using Vahana's parallel computing
+capabilities without having extensive HPC background.
+
+For more information about NHR resource allocation and application
+procedures, visit the [NHR website](https://www.nhr-verein.de/rechnernutzung).

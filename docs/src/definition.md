@@ -62,7 +62,7 @@ documentation.
 	This means, that you can not construct the model in the same function
 	as you initialize it. But you can call [`create_simulation`](@ref) in the same function so
 	
-	```
+	```julia
     const model = create_model(modeltypes, "Minimal Example") 
 	
 	function create_and_init()
@@ -84,7 +84,8 @@ Parameters are constant values used throughout the simulation, while
 globals are variables that can change during the simulation run. You
 can register them using `register_param!` and `register_global!`, or
 by defining custom types and pass instances of this types to
-[`create_simulation`](@ref).
+[`create_simulation`](@ref), as shown in the [Predator/Prey
+example](./predator.md).
 
 ```@docs
 register_param!

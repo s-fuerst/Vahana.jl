@@ -1,5 +1,9 @@
 # Vahana - A framework (not only) for large-scale agent-based models 
 
+[![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://s-fuerst.github.io/Vahana.jl/)
+[![DOI](https://img.shields.io/badge/DOI-10.48550%2FarXiv.2406.14441-blue)](https://doi.org/10.48550/arXiv.2406.14441)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Vahana is a high-performance, agent-based modelling library developed
 in Julia, specifically (but not only) designed for large-scale
 simulations of complex social networks. It leverages the power of Graph
@@ -47,14 +51,13 @@ the configuration/installation sections of the
 [HDF5.jl](https://juliaio.github.io/HDF5.jl/stable/#Installation)
 libraries.
 
-## Documentation 
+## Resources & Documentation
 
-Full documentation, including tutorials, guides, and API references, 
-is available [here](https://s-fuerst.github.io/Vahana.jl/).
-
-A JuliaCon 2023 Pre-recorded Video about Vahana is available [here](https://www.youtube.com/watch?v=-318ec-kCBM).
-
-The preprint of a Vahana.jl paper is available [here](https://doi.org/10.48550/arXiv.2406.14441)
+- [Official Documentation](https://s-fuerst.github.io/Vahana.jl/) - Tutorials, guides, and API references
+- [Research Paper](https://doi.org/10.48550/arXiv.2406.14441) - Technical details and methodology
+- [JuliaCon 2023 Video](https://www.youtube.com/watch?v=-318ec-kCBM) - Introduction to Vahana.jl
+- [Workshop Materials](https://github.com/s-fuerst/Vahana-Workshop) - Hands-on examples and exercises
+- [Advanced Example Model](https://git.zib.de/sfuerst/vahana-episim/) - Reimplementation of MATSim-Episim
 
 ## Citation
 

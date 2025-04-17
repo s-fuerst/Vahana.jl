@@ -15,8 +15,7 @@ Vahana.mapreduce
 
 !!! warning
 
-	The state of the globals struct (the `globals` argument of the 
-	[`create_simulation`](@ref) function can not be changed 
+	The state of the globals can not be changed 
 	inside of a transition function, as a transition function is calculated on 
 	a per agent basis with many evaluations in parallel, and changes to the
 	global layer must be a single, synchronized operation.

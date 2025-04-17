@@ -235,6 +235,12 @@ types of relationships (edges) can exist between them, and what global
 parameters and variables are available. However, it doesn't dictate
 how these elements interact or evolve over time.
 
+Avoid creating a model multiple times for different simulations. 
+Instead, assign your model to a global variable and use this variable 
+to create simulations. This approach not only improves efficiency but 
+also prevents potential [`World age problems`](https://discourse.julialang.org/t/world-age-problem-explanation/9714/2), 
+since Vahana uses `eval` to generate optimized methods for each model.
+
 A simulation, on the other hand, is a concrete realization within this
 state space. It's an actual graph with specific agents and edges,
 representing the current state of your simulated world at a given
@@ -256,10 +262,15 @@ the model:
 
 const model = create_model(modeltypes, "Excess Demand")
 
+# You can have multiple different models in the same Julia session, 
+# but each must have a distinct model name. Internally, Vahana uses these 
+# model names for multiple dispatch to ensure that each simulation calls 
+# the correct methods for its specific model.
+
 # Once we have a model, we can create a simulation based on that model using
 # the [`create_simulation`](@ref) function:
     
-const sim = create_simulation(model)
+sim = create_simulation(model)
 
 #=
 

@@ -13,7 +13,7 @@ Vahana includes some checks on the usage of the Vahana API that can
 impact runtime performance. For example, in [`agentstate`](@ref),
 there are checks to ensure that the specified agenttype matches the
 agent's ID. These assertions that could degrade performance can be
-disabled by calling `disable_asserts(false)`.
+disabled by calling [`enable_asserts(false)`](@ref).
 
 The recommended approach is to enable assertions during the model
 development phase but disable them when the model "goes into
