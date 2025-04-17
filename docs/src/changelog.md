@@ -4,6 +4,16 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.4.2
+
+### Fixes
+
+- Fixed a bug in the `with_edge` keyword parameter of the
+  [`apply!`](@ref) function. Previously, the transition function
+  failed when the specified edge type connected to multiple different
+  agent types at the target position. The function now correctly
+  handles edges that connect to heterogeneous target agent types.
+
 ## v1.4.1
 
 ### Fixes
