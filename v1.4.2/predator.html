@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Adding Spatial Information · Vahana Documentation</title><meta name="title" content="Adding Spatial Information · Vahana Documentation"/><meta property="og:title" content="Adding Spatial Information · Vahana Documentation"/><meta property="twitter:title" content="Adding Spatial Information · Vahana Documentation"/><meta name="description" content="Documentation for Vahana Documentation."/><meta property="og:description" content="Documentation for Vahana Documentation."/><meta property="twitter:description" content="Documentation for Vahana Documentation."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="index.html">Vahana Documentation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="index.html">Introduction</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="tutorial1.html">First Steps</a></li><li><a class="tocitem" href="hegselmann.html">Utilizing Graphs.jl</a></li><li class="is-active"><a class="tocitem" href="predator.html">Adding Spatial Information</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Goal"><span>Goal</span></a></li><li class="toplevel"><a class="tocitem" href="#Agent-and-Edge-Types"><span>Agent and Edge Types</span></a></li><li class="toplevel"><a class="tocitem" href="#Params-and-Globals"><span>Params and Globals</span></a></li><li><a class="tocitem" href="#Create-the-Simulation"><span>Create the Simulation</span></a></li><li><a class="tocitem" href="#Initialization"><span>Initialization</span></a></li><li><a class="tocitem" href="#Transition-Functions"><span>Transition Functions</span></a></li><li><a class="tocitem" href="#Plots"><span>Plots</span></a></li><li class="toplevel"><a class="tocitem" href="#Finish-the-Simulation"><span>Finish the Simulation</span></a></li></ul></li></ul></li><li><a class="tocitem" href="performance.html">Performance Tuning</a></li><li><a class="tocitem" href="parallel.html">Parallel Simulations</a></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="definition.html">Model Definition</a></li><li><a class="tocitem" href="initialization.html">Initialization</a></li><li><a class="tocitem" href="transition.html">Transition Function</a></li><li><a class="tocitem" href="global.html">Global Layer</a></li><li><a class="tocitem" href="raster.html">Raster</a></li><li><a class="tocitem" href="plots.html">Plots</a></li><li><a class="tocitem" href="hdf5.html">File storage</a></li><li><a class="tocitem" href="logging.html">Logging</a></li><li><a class="tocitem" href="config.html">Configuration</a></li><li><a class="tocitem" href="misc.html">Misc</a></li><li><a class="tocitem" href="apiindex.html">Index</a></li></ul></li><li><a class="tocitem" href="changelog.html">Change Log</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href="predator.html">Adding Spatial Information</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="predator.html">Adding Spatial Information</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/s-fuerst/Vahana.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/s-fuerst/Vahana.jl/blob/8a15424fea91a12b32e3a3c880360554f7cb79d4/docs/examples/predator.jl" title="View source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Adding-Spatial-Information"><a class="docs-heading-anchor" href="#Adding-Spatial-Information">Adding Spatial Information</a><a id="Adding-Spatial-Information-1"></a><a class="docs-heading-anchor-permalink" href="#Adding-Spatial-Information" title="Permalink"></a></h1><h1 id="Goal"><a class="docs-heading-anchor" href="#Goal">Goal</a><a id="Goal-1"></a><a class="docs-heading-anchor-permalink" href="#Goal" title="Permalink"></a></h1><p>This example demonstrates how spatial information can be integrated into an agent-based model using Vahana. While Vahana&#39;s primary focus is on graph-based simulations, it support the inclusion of spatial information into models.  It allows you to define a spatial grid, associate agents with specific locations, and implement interactions based on spatial proximity, even though the underlying implementation still operates on graph structures.</p><p>It&#39;s worth noting that in its current version, Vahana may not be the optimal choice for models that primarily depend on frequent movement of agents across space. However, as this example will show, it is entirely possible to implement those models.</p><p>It allows you to define a spatial grid, associate agents with specific locations, and implement interactions based on spatial proximity, all while leveraging Vahana&#39;s efficient graph-based computations.</p><p>For the understanding of how Vahana handles spatial information and rasters, you may find it helpful to watch also the <a href="https://youtu.be/-318ec-kCBM?si=YNnWLrb-_7RPSEPB&amp;t=1198">corresponding section of the Vahana.jl Juliacon video</a>. The video provides a visual explanation of how rasters are implemented within Vahana&#39;s graph-based framework and demonstrates some key concepts that we&#39;ll be applying in this tutorial.</p><p>In this tutorial, we&#39;ll implement a predator-prey model with spatial components, showcasing how Vahana&#39;s raster functionality can be used to create a spatially-explicit ecological simulation.</p><p>The model is based on the <a href="https://peerj.com/articles/cs-36/">Predator-Prey for High-Performance Computing</a> (PPHPC) model. In PPHPC the agents move randomly, in our implementation the prey move to locations with grass (if one is in sight) and the predators move to locations with prey to demonstrate how features like this can be implemented in Vahana.</p><h1 id="Agent-and-Edge-Types"><a class="docs-heading-anchor" href="#Agent-and-Edge-Types">Agent and Edge Types</a><a id="Agent-and-Edge-Types-1"></a><a class="docs-heading-anchor-permalink" href="#Agent-and-Edge-Types" title="Permalink"></a></h1><pre><code class="language-julia hljs">using CairoMakie, Vahana, Random</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">true</code></pre><p>In our spatial predator-prey model, we define separate structures for predators and prey, even though they share the same fields:</p><pre><code class="language-julia hljs">struct Predator
+    energy::Int64
+    pos::CartesianIndex{2}
+end
+
+struct Prey
+    energy::Int64
+    pos::CartesianIndex{2}
+end</code></pre><p>Despite their identical structure, we define them as separate types because Vahana uses these types as tags for differentiating between agent categories.</p><p>In the following sections, we&#39;ll use &quot;Species&quot; as an umbrella term to refer to both Predator and Prey. Functions that are applicable to both types will take the type as a parameter, which we&#39;ll denote as Species in the function arguments.</p><p>Aside from the predator and prey agents, the spatial environment is represented by grid cells, which are also implemented as agents and consequently function as nodes within the graph structure.</p><pre><code class="language-julia hljs">struct Cell
+    pos::CartesianIndex{2}
+    countdown::Int64
+end</code></pre><p>All agents maintain their position as part of their internal state. However, a cell can only perceive the animals if they are directly connected to the cell through an edge. Vahana facilitates the establishment of such edges via the <a href="raster.html#Vahana.move_to!"><code>move_to!</code></a> function.</p><p>Edges represent connections from prey or predators to cells. We define Position as a parametric type, enabling cells to distinguish between prey and predators based on the type of the edges.</p><pre><code class="language-julia hljs">struct Position{T} end</code></pre><p>Views are also edges from the cells to the prey and predators respectively. These edges represent the cells that are visible to a prey or predator so that, for example, it is possible to check which cell in the visible area contains food.</p><pre><code class="language-julia hljs">struct View{T} end</code></pre><p>VisiblePrey edges represent connections from prey to predator. Currently, all edge types link animals to cells, and without an incoming edge from prey, a predator lacks awareness of prey positions. The VisiblePrey edges are generated by cells through the <code>find_prey</code> transition function, as cells possess knowledge of which Prey entities are directly located on the cell via the Position{Prey} edges, and consequently within the view of a predator via the View{Predator} edges.</p><pre><code class="language-julia hljs">struct VisiblePrey end</code></pre><p>The last two edge types are messages to inform the agents that they must die or find something to eat.</p><pre><code class="language-julia hljs">struct Die end
+
+struct Eat end</code></pre><h1 id="Params-and-Globals"><a class="docs-heading-anchor" href="#Params-and-Globals">Params and Globals</a><a id="Params-and-Globals-1"></a><a class="docs-heading-anchor-permalink" href="#Params-and-Globals" title="Permalink"></a></h1><p>We follow the parameter structure from the PPHPC model, but use (besides the initial population) the same parameters for Prey and Predator for the example run.</p><pre><code class="language-julia hljs">Base.@kwdef mutable struct SpeciesParams
+    init_population::Int64 = 500
+    gain_from_food::Int64 = 5
+    loss_per_turn::Int64 = 1
+    repro_thres::Int64 = 5
+    repro_prob::Int64 = 20
+end
+
+Base.@kwdef struct AllParams
+    raster_size::Tuple{Int64, Int64} = (100, 100)
+    restart::Int64 = 5
+    predator::SpeciesParams = SpeciesParams()
+    prey::SpeciesParams = SpeciesParams()
+end;
+
+params = AllParams()
+params.prey.init_population = 2000;</code></pre><p>We are creating timeseries (in the form of <code>Vector</code>s) for the predator and prey population, the number of cells with food, and the average energy of the predators and prey.</p><pre><code class="language-julia hljs">Base.@kwdef mutable struct PPGlobals
+    predator_pop = Vector{Int64}()
+    prey_pop = Vector{Int64}()
+    cells_with_food = Vector{Int64}()
+    mean_predator_energy = Vector{Float64}()
+    mean_prey_energy = Vector{Float64}()
+end;</code></pre><h2 id="Create-the-Simulation"><a class="docs-heading-anchor" href="#Create-the-Simulation">Create the Simulation</a><a id="Create-the-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Create-the-Simulation" title="Permalink"></a></h2><p>We have now defined all the Julia structs needed to create the model and a simulation.</p><pre><code class="language-julia hljs">const ppsim = ModelTypes() |&gt;
+    register_agenttype!(Predator) |&gt;
+    register_agenttype!(Prey) |&gt;
+    register_agenttype!(Cell) |&gt;
+    register_edgetype!(Position{Predator}) |&gt;
+    register_edgetype!(Position{Prey}) |&gt;
+    register_edgetype!(View{Predator}) |&gt;
+    register_edgetype!(View{Prey}) |&gt;
+    register_edgetype!(VisiblePrey) |&gt;
+    register_edgetype!(Die) |&gt;
+    register_edgetype!(Eat) |&gt;
+    create_model(&quot;Predator Prey&quot;) |&gt;
+    create_simulation(params, PPGlobals())</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">
+<span class="sgr35">Model Name: Predator Prey</span>
+<span class="sgr35">Simulation Name: Predator Prey</span>
+<span class="sgr36">Agent(s):</span>
+	 Type Predator with 0 agent(s)
+	 Type Prey with 0 agent(s)
+	 Type Cell with 0 agent(s)
+<span class="sgr36">Edge(s):</span>
+	 Type Position{Predator} with 0 edge(s) for 0 agent(s)
+	 Type Position{Prey} with 0 edge(s) for 0 agent(s)
+	 Type View{Predator} with 0 edge(s) for 0 agent(s)
+	 Type View{Prey} with 0 edge(s) for 0 agent(s)
+	 Type VisiblePrey with 0 edge(s) for 0 agent(s)
+	 Type Die with 0 edge(s) for 0 agent(s)
+	 Type Eat with 0 edge(s) for 0 agent(s)
+<span class="sgr36">Parameter(s):</span>
+	 :raster_size : (100, 100)
+	 :restart : 5
+	 :predator : SpeciesParams(500, 5, 1, 5, 20)
+	 :prey : SpeciesParams(2000, 5, 1, 5, 20)
+<span class="sgr36">Global(s):</span>
+	 :predator_pop (empty)<span class="sgr33"> </span>
+	 :prey_pop (empty)<span class="sgr33"> </span>
+	 :cells_with_food (empty)<span class="sgr33"> </span>
+	 :mean_predator_energy (empty)<span class="sgr33"> </span>
+	 :mean_prey_energy (empty)<span class="sgr33"> </span>
+<span class="sgr31">Still in initialization process!.</span></code></pre><h2 id="Initialization"><a class="docs-heading-anchor" href="#Initialization">Initialization</a><a id="Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Initialization" title="Permalink"></a></h2><p>First we add the Cells to the Simulation. Therefore we define a constructor function for the cells. There is a 50% probability that a cell contains food (and in this case <code>countdown</code> is 0).</p><pre><code class="language-julia hljs">init_cell(pos::CartesianIndex) =
+    Cell(pos, rand() &lt; 0.5 ? 0 : rand(1:param(ppsim, :restart)))
+
+add_raster!(ppsim, :raster, param(ppsim, :raster_size), init_cell);</code></pre><p>We define a auxiliary functions to facilitate the relocation of an agent to a new position. These functions will add a single <code>Position</code> edge from the animal to the cell at the <code>newpos</code> position, and for all cells within a Manhattan distance of 1, <code>View</code> edges will be established from those cells to and from the animal, as well as to the cell itself.</p><pre><code class="language-julia hljs">function move!(sim, id, newpos, Species)
+    move_to!(sim, :raster, id, newpos, nothing, Position{Species}())
+    move_to!(sim, :raster, id, newpos, View{Species}(), View{Species}();
+             distance = 1, metric = :manhatten)
+end;</code></pre><p>The add_animals function is a generic initializer for both predators and prey, taking species-specific parameters and the species type as arguments. It creates a specified number of agents, each with a random position on the raster and a random initial energy within a defined range, then adds them to the simulation and places them on the raster using the move! function.</p><pre><code class="language-julia hljs">function add_animals(params, Species)
+    energyrange = 1:(2*params.gain_from_food)
+    foreach(1:params.init_population) do _
+        pos = random_pos(ppsim, :raster)
+        id = add_agent!(ppsim, Species(rand(energyrange), pos))
+        move!(ppsim, id, pos, Species)
+    end
+end
+
+add_animals(param(ppsim, :prey), Prey)
+add_animals(param(ppsim, :predator), Predator)</code></pre><p>At the end of the initialization phase we have to call finish_init!</p><pre><code class="language-julia hljs">finish_init!(ppsim)</code></pre><h2 id="Transition-Functions"><a class="docs-heading-anchor" href="#Transition-Functions">Transition Functions</a><a id="Transition-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Transition-Functions" title="Permalink"></a></h2><p>As mentioned in the comment for the View type, the cells are responsible for connecting the Prey with the Predators. So each cell iterate over each prey on the cell and add edges to all predators that can view the cell.</p><p>The underscore (<em>) as the first argument in the find</em>prey function signifies that we don&#39;t need to access the state of the cell itself. This is because the function only needs to check for the presence of edges and create new connections based on those edges, without using any information from the cell&#39;s internal state. As a result, when we call apply! for find<em>prey, we don&#39;t include Cell in the read argument. Consequently, Vahana passes Val(Cell) as the first argument to find</em>prey for multiple dispatch purposes, rather than the actual cell state. This approach optimizes performance by avoiding unnecessary data access and allows the function to operate solely on the graph structure of the simulation.</p><pre><code class="language-julia hljs">function find_prey(_::Val{Cell}, id, sim)
+    if has_edge(sim, id, Position{Prey}) &amp;&amp; has_edge(sim, id, View{Predator})
+        for preyid in neighborids(sim, id, Position{Prey})
+            for predid in neighborids(sim, id, View{Predator})
+                add_edge!(sim, preyid, predid, VisiblePrey())
+            end
+        end
+    end
+end;</code></pre><p>If a predator has enough energy left to move and there is a prey in the predator&#39;s field of view, a random prey is selected and its position is used as the new position. If no prey is visible, a random cell in the predator&#39;s field of view is selected as the new position.</p><p>If there is not enough energy left, the transition function returns <code>nothing</code>, which means that the predator dies and is no longer part of the graph.</p><pre><code class="language-julia hljs">function move(state::Predator, id, sim)
+    e = state.energy - param(sim, :predator).loss_per_turn
+    if e &gt; 0
+        # we need to access the pos of the prey which is part of it&#39;s state
+        prey = neighborstates(sim, id, VisiblePrey, Prey)
+        newpos = if isnothing(prey)
+            nextcellid = rand(neighborids(sim, id, View{Predator}))
+            agentstate(sim, nextcellid, Cell).pos
+        else
+            rand(prey).pos
+        end
+        move!(sim, id, newpos, Predator)
+        Predator(e, newpos)
+    else
+        nothing
+    end
+end;</code></pre><p>The movement logic for prey differs from that of predators in terms of their target. While predators seek cells containing prey, prey agents search for cells with available grass. In our implementation of the PPHPC (Predator-Prey for High-Performance Computing) model, grass availability is indicated by the countdown field of a cell. Specifically, grass is considered available for consumption when a cell&#39;s countdown value equals 0.</p><pre><code class="language-julia hljs">function move(state::Prey, id, sim)
+    e = state.energy - param(sim, :prey).loss_per_turn
+    if e &gt; 0
+        withgrass = filter(neighborids(sim, id, View{Prey})) do id
+            agentstate(sim, id, Cell).countdown == 0
+        end
+        nextcellid = if length(withgrass) == 0
+            rand(neighborids(sim, id, View{Prey}))
+        else
+            rand(withgrass)
+        end
+        newpos = agentstate(sim, nextcellid, Cell).pos
+        move!(sim, id, newpos, Prey)
+        Prey(e, newpos)
+    else
+        nothing
+    end
+end;</code></pre><p>If a cell has no grass and the countdown field is therefore &gt; 0, the countdown is decreased by 1.</p><pre><code class="language-julia hljs">function grow_food(state::Cell, _, _)
+    Cell(state.pos, max(state.countdown - 1, 0))
+end;</code></pre><p>The try_eat transition function simulates the predator-prey interactions and feeding processes within each cell. When both predators and prey occupy the same cell, the function generates random predator-prey pairings, ensuring each prey is targeted at most once and each predator consumes no more than one prey. These interactions are represented by creating Die edges from the cell to the consumed prey and Eat edges from the cell to the successful predators. If any prey survive this process and the cell contains available grass (indicated by a countdown of 0), an Eat edge is established between the cell and a randomly selected surviving prey, simulating grazing behavior.</p><pre><code class="language-julia hljs">function try_eat(state::Cell, id, sim)
+    predators = neighborids(sim, id, Position{Predator})
+    prey = neighborids(sim, id, Position{Prey})
+
+    # first the predators eat the prey, in case that both are on the cell
+    if ! isnothing(predators) &amp;&amp; ! isnothing(prey)
+        prey = Set(prey)
+        for pred in shuffle(predators)
+            if length(prey) &gt; 0
+                p = rand(prey)
+                add_edge!(sim, id, p, Die())
+                add_edge!(sim, id, pred, Eat())
+                delete!(prey, p)
+            end
+        end
+    end
+
+    # then check if there is prey left that can eat the grass
+    if  ! isnothing(prey) &amp;&amp; length(prey) &gt; 0 &amp;&amp; state.countdown == 0
+        add_edge!(sim, id, rand(prey), Eat())
+        Cell(state.pos, param(sim, :restart))
+    else
+        state
+    end
+end;</code></pre><p>The reproduction mechanism for both predators and prey follows a similar pattern, allowing us to define a generic function applicable to both species. This function first determines if the animal found something to eat by checking for the presence of an Eat edge targeting the animal, a result of previous transition functions. If such an edge exists, the animal&#39;s energy increases.</p><p>The function then evaluates if the animal&#39;s energy exceeds a specified threshold parameter. When this condition is met, reproduction occurs: a new offspring is introduced to the simulation via the add_agent call, inheriting half of its parent&#39;s energy, and is positioned at the same location as its parent using the move! function.</p><pre><code class="language-julia hljs">function try_reproduce_imp(state, id, sim, species_params, Species)
+    if has_edge(sim, id, Eat)
+        state = Species(state.energy + species_params.gain_from_food, state.pos)
+    end
+    if state.energy &gt; species_params.repro_thres &amp;&amp;
+        rand() * 100 &lt; species_params.repro_prob
+
+        energy_offspring = Int64(round(state.energy / 2))
+        newid = add_agent!(sim, Species(energy_offspring, state.pos))
+        move!(sim, newid, state.pos, Species)
+        Species(state.energy - energy_offspring, state.pos)
+    else
+        state
+    end
+end;</code></pre><p>For the Predator we can just call the reproduce function with the necessary arguments.</p><pre><code class="language-julia hljs">try_reproduce(state::Predator, id, sim) =
+    try_reproduce_imp(state, id, sim, param(sim, :predator), Predator)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">try_reproduce (generic function with 1 method)</code></pre><p>The prey animal needs an extra step because it might have been eaten by a predator. So, we check if there is a <code>Die</code> edge leading to the prey animal, and if so, the prey animal is removed from the simulation (by returning nothing). Otherwise, we again just call the reproduce function defined above.</p><pre><code class="language-julia hljs">function try_reproduce(state::Prey, id, sim)
+    if has_edge(sim, id, Die)
+        return nothing
+    end
+    try_reproduce_imp(state, id, sim, param(sim, :prey), Prey)
+end;</code></pre><p>We update the global values and use the <code>mapreduce</code> method to count the population and the number of cells with food. Based on the values, we can then also calculate the mean energy values.</p><pre><code class="language-julia hljs">function update_globals(sim)
+    push_global!(sim, :predator_pop, mapreduce(sim, _ -&gt; 1, +, Predator; init = 0))
+    push_global!(sim, :prey_pop, mapreduce(sim, _ -&gt; 1, +, Prey; init = 0))
+    push_global!(sim, :cells_with_food,
+                mapreduce(sim, c -&gt; c.countdown == 0, +, Cell))
+    push_global!(sim, :mean_predator_energy,
+                mapreduce(sim, p -&gt; p.energy, +, Predator; init = 0) /
+                    last(get_global(sim, :predator_pop)))
+    push_global!(sim, :mean_prey_energy,
+                mapreduce(sim, p -&gt; p.energy, +, Prey; init = 0) /
+                    last(get_global(sim, :prey_pop)))
+end;</code></pre><p>We add to our time series also the values after the initialization.</p><pre><code class="language-julia hljs">update_globals(ppsim);</code></pre><p>And finally we define in which order our transitions functions are called. Worth mentioning here are the keyword arguments in <code>find_prey</code> and <code>try_reproduce</code>.</p><p>The add<em>existing keyword in the try</em>reproduce transition function signify that the currently existing position and view edges should not be removed, and only additional edges should be added, in our case the position of the potential offspring.</p><pre><code class="language-julia hljs">function step!(sim)
+    apply!(sim, move,
+           [ Prey ],
+           [ Prey, View{Prey}, Cell ],
+           [ Prey, View{Prey}, Position{Prey} ])
+
+    apply!(sim, find_prey,
+           [ Cell ],
+           [ Position{Prey}, View{Predator} ],
+           [ VisiblePrey ])
+
+    apply!(sim, move,
+           [ Predator ],
+           [ Predator, View{Predator}, Cell, Prey, VisiblePrey ],
+           [ Predator, View{Predator}, Position{Predator} ])
+
+    apply!(sim, grow_food, Cell, Cell, Cell)
+
+    apply!(sim, try_eat,
+           [ Cell ],
+           [ Cell, Position{Predator}, Position{Prey} ],
+           [ Cell, Die, Eat ])
+
+    apply!(sim, try_reproduce,
+           [ Predator, Prey ],
+           [ Predator, Prey, Die, Eat ],
+           [ Predator, Prey, Position{Predator}, Position{Prey},
+             View{Predator}, View{Prey} ];
+           add_existing = [ Position{Predator}, Position{Prey},
+                            View{Predator}, View{Prey} ])
+
+    update_globals(sim)
+end;</code></pre><p>Now we can run the simulation</p><pre><code class="language-julia hljs">for _ in 1:400 step!(ppsim) end</code></pre><h2 id="Plots"><a class="docs-heading-anchor" href="#Plots">Plots</a><a id="Plots-1"></a><a class="docs-heading-anchor-permalink" href="#Plots" title="Permalink"></a></h2><p>To visualize the results we use the Makie package.</p><h3 id="Time-series"><a class="docs-heading-anchor" href="#Time-series">Time series</a><a id="Time-series-1"></a><a class="docs-heading-anchor-permalink" href="#Time-series" title="Permalink"></a></h3><p>First, we will generate a line chart for the time series data stored in the global state. Vahana provides the <code>plot_globals</code> function for this purpose. This function not only returns the Makie Figure itself but also the Axis and Plots, allowing for further processing of the result. If you wish to display the default result, you can utilize the Julia <code>first</code> function to extract the figure from the returned tuple.</p><pre><code class="language-julia hljs">plot_globals(ppsim, [ :predator_pop, :prey_pop, :cells_with_food ]) |&gt; first</code></pre><img src="predator-b8ae376b.png" alt="Example block output"/><h3 id="Spatial-distribution"><a class="docs-heading-anchor" href="#Spatial-distribution">Spatial distribution</a><a id="Spatial-distribution-1"></a><a class="docs-heading-anchor-permalink" href="#Spatial-distribution" title="Permalink"></a></h3><p>To visualize the spatial information we can use <code>heatmap</code> in combination with the Vahana&#39;s <code>calc_raster</code> function. E.g. the number of Position{Prey} edges connected to a cell give us the number of Prey individuals currently on that cell.</p><p>It would be nice to have a colorbar for the heatmaps so we define a small helper function that can be used in a pipe.</p><pre><code class="language-julia hljs">function add_colorbar(hm)
+    Makie.Colorbar(hm.figure[:,2], hm.plot)
+    hm
+end;</code></pre><h4 id="Predators-Positions"><a class="docs-heading-anchor" href="#Predators-Positions">Predators Positions</a><a id="Predators-Positions-1"></a><a class="docs-heading-anchor-permalink" href="#Predators-Positions" title="Permalink"></a></h4><pre><code class="language-julia hljs">calc_raster(ppsim, :raster, Int64, [ Position{Predator} ]) do id
+    num_edges(ppsim, id, Position{Predator})
+end |&gt; heatmap |&gt; add_colorbar</code></pre><img src="predator-22cc391a.png" alt="Example block output"/><h4 id="Prey-Positions"><a class="docs-heading-anchor" href="#Prey-Positions">Prey Positions</a><a id="Prey-Positions-1"></a><a class="docs-heading-anchor-permalink" href="#Prey-Positions" title="Permalink"></a></h4><pre><code class="language-julia hljs">calc_raster(ppsim, :raster, Int64, [ Position{Prey} ]) do id
+    num_edges(ppsim, id, Position{Prey})
+end |&gt; heatmap |&gt; add_colorbar</code></pre><img src="predator-85699e20.png" alt="Example block output"/><h4 id="Cells-that-contains-food"><a class="docs-heading-anchor" href="#Cells-that-contains-food">Cells that contains food</a><a id="Cells-that-contains-food-1"></a><a class="docs-heading-anchor-permalink" href="#Cells-that-contains-food" title="Permalink"></a></h4><pre><code class="language-julia hljs">calc_raster(ppsim, :raster, Int64, [ Cell ]) do id
+    agentstate(ppsim, id, Cell).countdown == 0
+end |&gt; heatmap |&gt; add_colorbar</code></pre><img src="predator-b19c8d10.png" alt="Example block output"/><h1 id="Finish-the-Simulation"><a class="docs-heading-anchor" href="#Finish-the-Simulation">Finish the Simulation</a><a id="Finish-the-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Finish-the-Simulation" title="Permalink"></a></h1><p>As always, it is important to call <code>finish_simulation</code> at the end of the simulation to avoid memory leaks.</p><pre><code class="language-julia hljs">finish_simulation!(ppsim);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="hegselmann.html">« Utilizing Graphs.jl</a><a class="docs-footer-nextpage" href="performance.html">Performance Tuning »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Thursday 17 April 2025 17:41">Thursday 17 April 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
