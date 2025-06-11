@@ -41,8 +41,10 @@ The HDF5.jl library (version 0.17.2) does not support `InlineStrings`
 or `StaticStrings` in structs. Standard `String`s are also not suitable
 for agent and edge types, as these must be bits types.
 
+Also, parallel HDF5 does not support `String`s for parameters or globals. 
+
 To address this limitation, `create_string_converter` generates
-gconversion methods between `String` and `SVector{N, UInt8}` instances
+conversion methods between `String` and `SVector{N, UInt8}` instances
 (from the `StaticArrays` package).  Here, N represents the maximum
 number of bytes that can be stored, which for Unicode strings may
 exceed the character count due to variable-length encoding.
@@ -89,11 +91,7 @@ function create_string_converter(add_show_method::Bool = true)
         SVector{N, UInt8}
 
     @eval function Base.convert(::Type{String}, vec::SVector{N, UInt8}) where N
-        String(vec)
-    end
-
-    @eval function Base.convert(::Type{String}, vec::SVector{N, UInt8}) where N
-        rstrip(String(collect(vec)))
+        String(rstrip(String(collect(filter(c -> c != 0x00, vec)))))
     end
 
     @eval Base.String(vec::SVector{N, UInt8}) where N = convert(String, vec)

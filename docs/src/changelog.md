@@ -4,9 +4,12 @@ CurrentModule = Vahana
 
 # Change Log
 
-## v1.4.2
+## v1.4.3
 
-### Fixes
+- Improved `VString` to `String` converter (check
+  [`create_string_converter`](@ref)) for context)
+
+## v1.4.2
 
 - Fixed a bug in the `with_edge` keyword parameter of the
   [`apply!`](@ref) function. Previously, the transition function
@@ -15,8 +18,6 @@ CurrentModule = Vahana
   handles edges that connect to heterogeneous target agent types.
 
 ## v1.4.1
-
-### Fixes
 
 - [`read_agents`](@ref) and [`read_edges`](@ref) returned wrong
   results when used in parallel simulations.
@@ -62,8 +63,6 @@ An invalid assertion occured when all of the following conditions are met:
 - Enhanced GraphMakie compatibility and support
   
 ## v1.2.1
-
-### New feature
 
 - Added workaround for strings in structs stored to a HDF5-file. Check
   the documentation of [`create_string_converter`](@ref) for details.
