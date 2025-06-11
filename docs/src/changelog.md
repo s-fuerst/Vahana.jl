@@ -7,7 +7,10 @@ CurrentModule = Vahana
 ## v1.4.3
 
 - Improved `VString` to `String` converter (check
-  [`create_string_converter`](@ref)) for context)
+  [`create_string_converter`](@ref)) for context).
+
+- Fixed a potential problem with parallel runs in combination with
+  agent types in modules.
 
 ## v1.4.2
 

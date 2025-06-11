@@ -404,7 +404,8 @@ function finish_init!(sim;
 
     _log_info(sim, "<Begin> finish_init!")
 
-    foreach(finish_write!(sim), keys(sim.typeinfos.nodes_type2id))
+    sorted_pairs = sort(collect(sim.typeinfos.nodes_type2id), by = x -> x[2])
+    foreach(finish_write!(sim), map(x -> x[1], sorted_pairs))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)
 
     if distribute
