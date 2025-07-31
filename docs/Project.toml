@@ -15,7 +15,6 @@ SNAPDatasets = "fc66bc1b-447b-53fc-8f09-bc9cfb0b0c10"
 Vahana = "e9033725-1633-496a-b29a-3bc5a5543602"
 
 [compat]
-CairoMakie = "^0.13"
 Colors = "^0.12"
 DataFrames = "^1"
 Documenter = "1.8.1"
