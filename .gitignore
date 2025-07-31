@@ -8,3 +8,4 @@
 *.h5
 *.log
 /docs/LocalPreferences.toml
+/coverage/
