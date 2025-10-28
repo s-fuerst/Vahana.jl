@@ -1,7 +1,7 @@
 name = "Vahana"
 uuid = "e9033725-1633-496a-b29a-3bc5a5543602"
 authors = ["Steffen Fürst <fuerst@zib.de> and contributors"]
-version = "1.4.3"
+version = "1.4.4"
 
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
@@ -31,7 +31,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [compat]
 ColorSchemes = "3"
 Colors = "^0.12, 0.13"
-Combinatorics = "1.0.2"
+Combinatorics = "1"
 DataFrames = "1"
 GraphMakie = "0.5, 0.6"
 Graphs = "^1.8"
@@ -43,12 +43,12 @@ Metis = "1"
 NamedTupleTools = "^0.14"
 NearestNeighbors = "0.4.21"
 Preferences = "1"
-PrettyTables = "2.3.2, 2.4.0"
+PrettyTables = "2, 3"
 Random = "1"
 Requires = "1"
-StaticArrays = "1.9.7"
+StaticArrays = "1"
 StatsBase = "0.34"
-julia = "1.9, 1.10, 1.11"
+julia = "1.9, 1.10, 1.11, 1.12"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
