@@ -9,43 +9,48 @@ echo "MPI"
 echo "==="
 echo "Core"
 echo "----"
-mpirun -n 4 julia --project mpi/test_core.jl 
+mpiexecjl -n 4 julia --project mpi/test_core.jl 
 
 echo 
 echo "Agents"
 echo "------"
-mpirun -n 4 julia --project mpi/test_remove_agents.jl 
+mpiexecjl -n 4 julia --project mpi/test_remove_agents.jl 
 
 echo 
 echo "Edgetypes"
 echo "---------"
-mpirun -n 4 julia --project mpi/test_edgetypes.jl 
+mpiexecjl -n 4 julia --project mpi/test_edgetypes.jl 
 
 echo
 echo "EdgesIterator"
 echo "-------------"
-mpirun -n 4 julia --project mpi/test_edgesiterator.jl 
+mpiexecjl -n 4 julia --project mpi/test_edgesiterator.jl 
 
 echo
 echo "Independent"
+<<<<<<< HEAD
 echo "============="
 mpirun -n 4 julia --project mpi/test_independent.jl 
+=======
+echo "-----------"
+mpiexecjl -n 4 julia --project mpi/test_independent.jl 
+>>>>>>> 5053b2e (use mpiexecjl in tests instead of mpirun)
 
 echo
 echo "Raster"
 echo "------"
-mpirun -n 4 julia --project mpi/test_raster.jl 
+mpiexecjl -n 4 julia --project mpi/test_raster.jl 
 
 echo
 echo "Agentstate (non shared memory)"
 echo "------------------------------"
-mpirun -n 4 julia --project mpi/test_agentstate.jl 
+mpiexecjl -n 4 julia --project mpi/test_agentstate.jl 
 
 echo
 echo "HDF5 Snapshot"
 echo "-------------"
 rm -r h5
-mpirun -n 4 julia --project hdf5_snapshot.jl 
+mpiexecjl -n 4 julia --project hdf5_snapshot.jl 
 
 echo
 echo "HDF5 Merge"
