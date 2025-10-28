@@ -1,4 +1,3 @@
-using Base: nothing_sentinel
 # the edge types and some other stuff is defined in edges.jl
 
 import Vahana: has_hint, @onrankof
