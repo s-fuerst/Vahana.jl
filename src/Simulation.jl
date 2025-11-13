@@ -341,10 +341,13 @@ end
 # pipeable versions 
 create_model(name::String) = types -> create_model(types, name)
 
-create_simulation(params::P = nothing,
-                  globals::G = nothing;
-                  kwargs...) where {P, G} =
-                      model -> create_simulation(model, params, globals; kwargs...)
+create_simulation(params::P = nothing, globals::G = nothing;
+                  kwargs...) where {P, G} = error("""
+
+The pipeable version of `create_simulation` was removed in v1.4.5
+because Julia 1.12 requires `create_simulation` to access the world
+age established by `create_model`.
+""")
 
 
 function _create_equal_partition(part_dict, ids)
@@ -589,8 +592,12 @@ param(sim, name) = getfield(sim.params, name)
 Assign the specified `value` to the `param` parameter. This operation
 is only allowed prior to calling the `finish_init!` method.
 
-A pipeable version of `set_param!` is also available.
+In the case that the expected type of the param is a NamedTuple, but
+`value` is an instance of an composite type, `value` is converted to a
+NamedTuple (by calling `ntfromstruct` from the NamedTupleTools
+package).
 
+A pipeable version of `set_param!` is also available.
 """
 function set_param!(sim::Simulation, param::Symbol, value)
     @assert !sim.initialized """\n
@@ -601,7 +608,17 @@ function set_param!(sim::Simulation, param::Symbol, value)
     if ! hasproperty(sim.params, param)
         @warn "Parameter $(param) is unknown" _file=nothing _line=nothing _module=nothing
     else
-        setfield!(sim.params, param, value)
+        expected_type = typeof(getfield(sim.params, param))
+
+        try
+            setfield!(sim.params, param, value)
+        catch e
+            if isa(e, TypeError) && !isprimitivetype(value)
+                setfield!(sim.params, param, ntfromstruct(value))
+            else
+                rethrow()
+            end
+        end 
     end
 end
 
