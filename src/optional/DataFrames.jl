@@ -12,8 +12,8 @@ show_parallel_dataframe_usage_warning = true
 # end
 function Base.show(io::IO, df::DataFrame)
     pretty_table(io, df,
-                 formatters = (v,i,j) -> isa(v, UInt64) && agent_nr(v) != v ?
-                     "0x$(uppercase(string(v, base=16)))" : v)
+                 formatters = [(v,i,j) -> isa(v, UInt64) && agent_nr(v) != v ?
+                     "0x$(uppercase(string(v, base=16)))" : v])
 end
 """
     DataFrame(sim::Simulation, T::DataType; types = false, localnr = false)
