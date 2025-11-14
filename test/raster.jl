@@ -396,11 +396,11 @@ end
     p1 = Vahana.updateids(idmapping, p1)
     p2 = Vahana.updateids(idmapping, p2)
     p3 = Vahana.updateids(idmapping, p3)
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     @onrankof p1 @test num_edges(sim, p1, OnPosition) == 25
     @onrankof p2 @test num_edges(sim, p2, OnPosition) == 13
     @onrankof p3 @test num_edges(sim, p3, OnPosition) == 21
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     finish_simulation!(sim)
 
     ######################################## 4D
@@ -425,10 +425,10 @@ end
     p1 = Vahana.updateids(idmapping, p1)
     p2 = Vahana.updateids(idmapping, p2)
 
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     @onrankof p1 @test num_edges(sim, p1, OnPosition) == 3*3*3*3
     @onrankof p2 @test num_edges(sim, p2, OnPosition) == 1+4*2
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     finish_simulation!(sim)
 
     # this hack should help that the output is not scrambled
@@ -450,10 +450,10 @@ end
     
     @test random_pos(sim, :raster, w) == CartesianIndex(7, 19, 23)
 
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     @test agentstate(sim, random_cell(sim, :raster, w), Grid3D).pos ==
         (7, 19, 23)
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
 
     # this hack should help that the output is not scrambled
     sleep(mpi.rank * 0.05)

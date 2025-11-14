@@ -9,15 +9,22 @@ apply.
 
 ## Optional Assertions
 
-Vahana includes some checks on the usage of the Vahana API that can
-impact runtime performance. For example, in [`agentstate`](@ref),
-there are checks to ensure that the specified agenttype matches the
-agent's ID. These assertions that could degrade performance can be
-disabled by calling [`enable_asserts(false)`](@ref).
+Vahana uses internal consistency checks that come at the cost of
+runtime performance. For example, [`agentstate`](@ref) verifies that 
+the specified agent type matches the agent's ID, which creates overhead.
+These performance-impacting assertions can be disabled by calling 
+`enable_asserts(false)`.
 
-The recommended approach is to enable assertions during the model
-development phase but disable them when the model "goes into
-production", such as before starting a parameter space exploration.
+The recommended workflow is to keep assertions enabled during model
+development, but disable them for production runs, such as before
+starting parameter space explorations.
+
+Due to Julia's world age system, changes made by `enable_asserts()` 
+will not take effect within the same function call where it is invoked.
+The new assertion behavior becomes active only after returning to the
+top level or in subsequently called functions. Call `enable_asserts()`
+at the top level or ensure there's a "world age barrier" before the
+assertions are expected to work.
 
 ## Type Hints
 

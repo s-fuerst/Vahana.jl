@@ -251,7 +251,7 @@ function vahanagraph(sim;
             t = get(v2g, to, nothing)
             if f !== nothing && t !== nothing
                 if (f, t) in existing && drop_multiedges
-                    println("Edge $(string(e, base=16)) to agent $(string(to, base=16)) will not be shown")
+                    println("Edge $(string(f, base=16)) to agent $(string(to, base=16)) will not be shown")
                 else
                     if drop_multiedges
                         push!(existing, (f, t))

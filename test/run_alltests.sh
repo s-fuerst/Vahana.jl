@@ -28,13 +28,8 @@ mpiexecjl -n 4 julia --project mpi/test_edgesiterator.jl
 
 echo
 echo "Independent"
-<<<<<<< HEAD
-echo "============="
-mpirun -n 4 julia --project mpi/test_independent.jl 
-=======
 echo "-----------"
 mpiexecjl -n 4 julia --project mpi/test_independent.jl 
->>>>>>> 5053b2e (use mpiexecjl in tests instead of mpirun)
 
 echo
 echo "Raster"

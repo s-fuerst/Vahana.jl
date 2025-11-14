@@ -256,6 +256,9 @@ edge_attrs(sim, T::DataType) = sim.typeinfos.edges_attr[T]
 nodes_attrs(sim, T::DataType) = sim.typeinfos.nodes_attr[T]
 
 
-disable_transition_checks = (disable::Bool) -> config.check_readable = ! disable
+function disable_transition_checks(sim, disable::Bool)
+    config.check_readable = ! disable
+    sim.intransition = disable
+end
 
 typeid(sim, T::DataType) = sim.typeinfos.nodes_type2id[T]

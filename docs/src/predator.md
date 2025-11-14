@@ -178,7 +178,7 @@ We have now defined all the Julia structs needed to create the model
 and a simulation.
 
 ````@example predator
-const ppsim = ModelTypes() |>
+const ppmodel = ModelTypes() |>
     register_agenttype!(Predator) |>
     register_agenttype!(Prey) |>
     register_agenttype!(Cell) |>
@@ -189,8 +189,9 @@ const ppsim = ModelTypes() |>
     register_edgetype!(VisiblePrey) |>
     register_edgetype!(Die) |>
     register_edgetype!(Eat) |>
-    create_model("Predator Prey") |>
-    create_simulation(params, PPGlobals())
+    create_model("Predator Prey")
+
+ppsim = create_simulation(ppmodel, params, PPGlobals())
 ````
 
 ## Initialization

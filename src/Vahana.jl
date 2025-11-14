@@ -22,17 +22,22 @@ end
 """
     enable_asserts(enable::Bool)
 
-Vahana comes with some internal consistency checks, at the cost of
-run-time performance (e.g., in [`agentstate`](@ref) there are checks
-that the specified agenttype matches the agent's ID, which creates of
-course some overhead). The assertions that could degrade the run
-performance can be disabled by calling `enable_asssertions(false)`.
+Vahana uses internal consistency checks that come at the cost of
+runtime performance. For example, [`agentstate`](@ref) verifies that 
+the specified agent type matches the agent's ID, which creates overhead.
+These performance-impacting assertions can be disabled by calling 
+`enable_asserts(false)`.
 
-The recommended approach is therefore to leave the assertions enabled
-during the development of the model, but to disable them when the
-model goes "into production", e.g. before the start of a parameter
-space exploration.
+The recommended workflow is to keep assertions enabled during model
+development, but disable them for production runs, such as before
+starting parameter space explorations.
 
+Due to Julia's world age system, changes made by `enable_asserts()` 
+will not take effect within the same function call where it is invoked.
+The new assertion behavior becomes active only after returning to the
+top level or in subsequently called functions. Call `enable_asserts()`
+at the top level or ensure there's a "world age barrier" before the
+assertions are expected to work.
 """
 function enable_asserts(enable::Bool)
     config.asserts_enabled = enable

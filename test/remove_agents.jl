@@ -1,7 +1,6 @@
 using Vahana
 import Vahana.@onrankof
 import Vahana.@rootonly
-import Vahana.disable_transition_checks
 import Graphs.SimpleGraphs
 
 struct DAgent idx::Int64 end

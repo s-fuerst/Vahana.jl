@@ -1,6 +1,6 @@
 import Vahana.@onrankof
 import Vahana.@rootonly
-import Vahana.disable_transition_checks
+import Vahana: disable_transition_checks
 
 # A for Agent, Imm for Immortal
 # Fixed and Oversize doesn't have a real meaning anymore, in earlier versions
@@ -161,7 +161,7 @@ end
     @testset "agentstate" begin
         @onrankof a2id @test_throws AssertionError agentstate(sim, a2id, AImm)
         @onrankof avids[1] @test_throws AssertionError agentstate(sim, avids[1], AMortal)
-        enable_asserts(false)
+        disable_transition_checks(sim, true)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) == AMortal(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
         @onrankof a1id @test agentstate_flexible(sim, a1id) == AMortal(1)
@@ -171,11 +171,11 @@ end
         @onrankof avids[10] @test agentstate(sim, avids[10], AImm) == AImm(10)
         @onrankof avfids[10] @test agentstate(sim, avfids[10], AImmFixed) == AImmFixed(10)
         #     # calling agentstate with the wrong typ should throw an AssertionError
-        enable_asserts(true)
+        disable_transition_checks(sim, false)
     end
 
     @testset "edges & neighborids" begin
-        Vahana.disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof a1id @test length(edges(sim, a1id, ESDict)) == 4
         @onrankof a1id @test length(edges(sim, a1id, ESLDict1)) == 10
         # # Check that we can call edges also for an empty set of neighbors
@@ -195,16 +195,16 @@ end
         @onrankof avids[10] @test es[1] == avfids[10]
         es = neighborids_iter(sim, avids[10], ESLDict2) |> collect
         @onrankof avids[10] @test es[1] == avfids[10]
-        Vahana.disable_transition_checks(false)
+        disable_transition_checks(sim, false)
     end
 
     @testset "neighborstates" begin
-        Vahana.disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof a1id @test AImm(1) in neighborstates(sim, a1id, ESLDict1, AImm)
         @onrankof a1id @test AImm(1) in collect(neighborstates(sim, a1id, ESLDict1, AImm))
         @onrankof a1id @test AMortal(3) in neighborstates_flexible(sim, a1id, ESDict)
         @onrankof a1id @test AMortal(3) in collect(neighborstates_flexible_iter(sim, a1id, ESDict))
-        Vahana.disable_transition_checks(false)
+        disable_transition_checks(sim, false)
     end
 
     @testset "all_agents & num_agents" begin
@@ -241,10 +241,11 @@ end
     end
 
     @testset "all_agentids" begin
-        sim_agentids = ModelTypes() |>
+        model = ModelTypes() |>
             register_agenttype!(AMortal) |>
-            create_model("all_agentids_test") |>
-            create_simulation()
+            create_model("all_agentids_test")
+        
+        sim_agentids = create_simulation(model)
 
         foreach(i -> add_agent!(sim_agentids, AMortal(i)), 1:10)
 
@@ -258,12 +259,12 @@ end
         @test length(all_agentids(sim_agentids, AMortal)) == 5
         finish_simulation!(sim_agentids)
         
-
         # test also for immortal agents
-        sim_agentids = ModelTypes() |>
+        model = ModelTypes() |>
             register_agenttype!(AImm) |>
-            create_model("all_agentids_test_immortal") |>
-            create_simulation()
+            create_model("all_agentids_test_immortal")
+
+        sim_agentids = create_simulation(model)
 
         foreach(i -> add_agent!(sim_agentids, AImm(i)), 1:10)
 
@@ -276,32 +277,31 @@ end
     end
 
     @testset "num_edges" begin
-        Vahana.disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof a1id @test num_edges(sim, a1id, ESDict) == 4
         @onrankof a2id @test num_edges(sim, a2id, ESDict) == 0
         @onrankof avids[1] @test num_edges(sim, avids[1], ESLDict2) == 1
-        Vahana.disable_transition_checks(false)
+        disable_transition_checks(sim, false)
     end
 
     finish_simulation!(sim)
     
     @testset "transition" begin
-        # check that with assertion enables, it is checked that the agent types
-        # are in `read`.
-        enable_asserts(true)
         (sim, a1id, a2id, a3id, avids, avfids) = createsim()
         # AImmFixed is missing
         @test_throws AssertionError apply!(sim, AImm, [ ESLDict2], []) do _, id, sim
             neighborstates_flexible(sim, id, ESLDict2)
         end
+        # the assertion leaves sim.intransition in the wrong state
+        sim.intransition = false
         finish_simulation!(sim)
 
         # normally it's not allowed to call add_edge! between transition
         # function, but because of the @onrankof this hack works here
-        enable_asserts(false)
         # we want to check two iterations with the sum_state_neighbors,
         # so we just add an edge loop for the agents where we check the sum
         (sim, a1id, a2id, a3id, avids, avfids) = createsim()
+        disable_transition_checks(sim, true)
         @onrankof a1id add_edge!(sim, a1id, a1id, ESLDict1())
         @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
         @onrankof avfids[1] add_edge!(sim, avfids[1], avfids[1], ESLDict1())
@@ -309,53 +309,57 @@ end
         @onrankof avfids[1] add_edge!(sim, avfids[2], avfids[1], ESLDict1())
         # and also avfids[2] should keep its value
         @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
-        enable_asserts(true)
+        disable_transition_checks(sim, false)
 
         # now check apply! for the different nodefieldfactories
         apply!(sim, create_sum_state_neighbors(ESLDict1),
                [ AMortal ], [ allagenttypes; ESLDict1 ],  [ AMortal ])
-        disable_transition_checks(true)
+
+        disable_transition_checks(sim, true)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
             AMortal(sum(1:10) + 1)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
         
         apply!(sim, create_sum_state_neighbors(ESLDict1),
                [ AMortal ], [ allagenttypes; ESLDict1 ], [ AMortal ])
-        disable_transition_checks(true)
+
+        disable_transition_checks(sim, true)
         @onrankof a1id @test agentstate(sim, a1id, AMortal) ==
             AMortal(2 * sum(1:10) + 1)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
+
         finish_simulation!(sim)
 
         # copyvec = deepcopy(copy)
         (sim, a1id, a2id, a3id, avids, avfids) = createsim()
         # @onrankof a1id add_edge!(sim, a1id, a1id, ESLDict1())
-        enable_asserts(false)
+        disable_transition_checks(sim, true)
         @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
-        enable_asserts(true)
+        disable_transition_checks(sim, false)
 
         apply!(sim, create_sum_state_neighbors(ESLDict2),
                [ AImm ], [ allagenttypes; ESLDict2 ], [ AImm ])
-        disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(2)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
 
         apply!(sim, create_sum_state_neighbors(ESLDict2),
                [ AImm ], [ allagenttypes; ESLDict2 ], [ AImm ])
-        disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(3)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
 
         apply!(sim, create_sum_state_neighbors(ESLDict2),
                [ AImm ], [ allagenttypes; ESLDict2 ], [ AImm ])
-        disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof avids[1] @test agentstate(sim, avids[1], AImm) == AImm(4)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
 
         finish_simulation!(sim)
         # copyvec = deepcopy(copy)
         (sim, a1id, a2id, a3id, avids, avfids) = createsim()
-        enable_asserts(false)
+
+        disable_transition_checks(sim, true)
         # @onrankof a1id add_edge!(sim, a1id, a1id, ESLDict1())
         # @onrankof avids[1] add_edge!(sim, avids[1], avids[1], ESLDict2())
         @onrankof avfids[1] add_edge!(sim, avfids[1], avfids[1], ESLDict1())
@@ -363,28 +367,28 @@ end
         @onrankof avfids[1] add_edge!(sim, avfids[2], avfids[1], ESLDict1())
         # and also avfids[2] should keep its value
         @onrankof avfids[2] add_edge!(sim, avfids[2], avfids[2], ESLDict1())
-        enable_asserts(true)
+        disable_transition_checks(sim, false)
 
         apply!(sim, create_sum_state_neighbors(ESLDict1),
                [ AImmFixed ], [ allagenttypes; ESLDict1 ], [ AImmFixed ])
-        disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(3)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
 
         apply!(sim, create_sum_state_neighbors(ESLDict1),
                [ AImmFixed ], [ allagenttypes; ESLDict1 ], [ AImmFixed ])
-        disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(5)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
 
         apply!(sim, create_sum_state_neighbors(ESLDict1),
                [ AImmFixed ], [ allagenttypes; ESLDict1 ], [ AImmFixed ])
-        disable_transition_checks(true)
+        disable_transition_checks(sim, true)
         @onrankof avfids[1] @test agentstate(sim, avfids[1], AImmFixed) ==
             AImmFixed(7)
-        disable_transition_checks(false)
+        disable_transition_checks(sim, false)
 
         finish_simulation!(sim)
     end

@@ -291,7 +291,7 @@ function calc_rasterstate(sim, raster::Symbol, f,
     ids = sim.rasters[raster]
     idsvec = reshape(ids, length(ids))
 
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
 
     if f_returns == Nothing
         f_returns = typeof(f(agentstate_flexible(sim, idsvec[1])))
@@ -313,7 +313,7 @@ function calc_rasterstate(sim, raster::Symbol, f,
         end
     end
     
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
 
     all = join(onprocess)
 
@@ -367,13 +367,13 @@ function rastervalues(sim, raster::Symbol, field::Symbol)
 
     onprocess = Vector{Tuple{Int64, f_returns}}()
 
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     for (idx, id) = enumerate(ids)
         if Vahana.process_nr(id) == mpi.rank
             push!(onprocess, (idx, getproperty(agentstate(sim, id, T), field)))
         end
     end
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
 
     all = join(onprocess)
 

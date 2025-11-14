@@ -49,7 +49,7 @@ function _set_plot_attrs!(vp, idx, attrs, aid, T)
 end
 
 function _set_agents_plot_attrs!(f, vp)
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     changed_attrs = Set{Symbol}()
     for T in vp.vg.agenttypes
         if hasmethod(f, (T, AgentID, VahanaPlot))
@@ -67,12 +67,12 @@ function _set_agents_plot_attrs!(f, vp)
     for a in changed_attrs 
         vp.plot[a][] = vp.plot[a][]
     end
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     nothing
 end
 
 function _set_edge_plot_properties!(f, vp)
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     changed_attrs = Set{Symbol}()
     for i in 1:Graphs.ne(vp.vg)
         tid = vp.vg.edgetypeidx[i]
@@ -93,7 +93,7 @@ function _set_edge_plot_properties!(f, vp)
     for a in changed_attrs
         vp.plot[a][] = vp.plot[a][]
     end
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     nothing
 end
 
@@ -248,9 +248,9 @@ clicked_agent(vp::VahanaPlot) = vp.clicked_agent
 
 function _agenttostring(vg, idx)
     id = vg.g2v[idx]
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     as = agentstate_flexible(vg.sim, id)
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     str = " $(typeof(as)) (Nr: $(Vahana.agent_nr(id)))"
     if nfields(as) > 0
         fnames = as |> typeof |> fieldnames
@@ -270,9 +270,9 @@ function _edgetostring(vg, idx) # from and to are vahanagraph indicies
     if :Stateless in vg.sim.typeinfos.edges_attr[totype][:hints]
         return string(totype)
     end
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     es = edges(vg.sim, to, totype)
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     if ! isnothing(es)
         es = (filter(es) do edge
                   edge.from == from
@@ -345,8 +345,8 @@ function _plot(vg::VahanaGraph, edge_plottype)
 end
 
 function nodestate(vg::VahanaGraph, idx::Int64)
-    disable_transition_checks(true)
+    disable_transition_checks(sim, true)
     s = agentstate_flexible(vg.sim, vg.g2v[idx])
-    disable_transition_checks(false)
+    disable_transition_checks(sim, false)
     s
 end

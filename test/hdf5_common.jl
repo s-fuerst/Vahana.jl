@@ -61,13 +61,16 @@ function sumi2o(state, _, _)
 end
 
 # the test model has the following structure:
-# we create mpi.size * 8 agent of type Agent
-
+# we create 16 agent of type Agent, where each agent has an edge
+# of type EdgeState to itself and to Agent 2. Also all Agents
+# have an edge of type StatelessEdge to the Agents 2 and 5.
+# we also add an raster of size 8, and create one RasterEdges
+# for each agent to the vertices of the Raster.
 function createsim(model, distribute = true)
-    sim = model |>
-        create_simulation(Params(1, [2.0, 2.1], (x = 3, y = 4, z = 5)),
-                       Globals(Pos(1, 2), 3, [4.0, 4.1], [5, 6, 7], []);
-                       logging = true, debug = true)
+    sim = create_simulation(model,
+                            Params(1, [2.0, 2.1], (x = 3, y = 4, z = 5)),
+                            Globals(Pos(1, 2), 3, [4.0, 4.1], [5, 6, 7], []);
+                            logging = true, debug = true)
 
     ids = add_agents!(sim, [ Agent(InnerStruct(i,i+1),i+2) for i in 1:16 ])
 

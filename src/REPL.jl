@@ -303,7 +303,7 @@ function show_agent(sim::Simulation,
     # we want to access the agentstate outside of a transition function,
     # assuming the the id is existing on the node 
     assert_state = asserting()
-    enable_asserts(false)
+    disable_transition_checks(sim, true)
     
     typeid = sim.typeinfos.nodes_type2id[T]
     # id can be always the local nr, so we first ensure that id
@@ -397,7 +397,7 @@ function show_agent(sim::Simulation,
     println()
 
     # set this back to the state at the beginning of the function
-    enable_asserts(assert_state)
+    disable_transition_checks(sim, false)
     
     id
 end
