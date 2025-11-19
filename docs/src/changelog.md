@@ -4,6 +4,20 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.4.5
+
+- Fixed compatibility issues with Julia 1.12. This includes a breaking
+  change: the pipeable version of `create_simulation` has been removed
+  due to world age problems that occur when piping after `create_model`.
+  
+- Fixed a bug in `read_edges` that sometimes occurred when the
+  following hints were used in `register_edgetype!`: :IgnoreFrom,
+  :Stateless, and :SingleType.
+
+## v1.4.4
+
+- Mainly updated compat entries.
+
 ## v1.4.3
 
 - Improved `VString` to `String` converter (check
