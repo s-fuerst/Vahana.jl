@@ -3,8 +3,6 @@ using MPI, HDF5, StaticArrays
 import NamedTupleTools: ntfromstruct, structfromnt
 import Dates: format, now
 
-using Infiltrator
-
 export create_h5file!, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!

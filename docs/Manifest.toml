@@ -244,9 +244,9 @@ version = "1.8.1"
 
 [[deps.DataStructures]]
 deps = ["OrderedCollections"]
-git-tree-sha1 = "6c72198e6a101cccdd4c9731d3985e904ba26037"
+git-tree-sha1 = "e357641bb3e0638d353c4b29ea0e40ea644066a6"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.19.1"
+version = "0.19.3"
 
 [[deps.DataValueInterfaces]]
 git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
@@ -260,9 +260,9 @@ version = "1.11.0"
 
 [[deps.DelaunayTriangulation]]
 deps = ["AdaptivePredicates", "EnumX", "ExactPredicates", "Random"]
-git-tree-sha1 = "5620ff4ee0084a6ab7097a27ba0c19290200b037"
+git-tree-sha1 = "783b21581a051ac91a3921ee37e26a23ed7f57a6"
 uuid = "927a84f5-c5f4-47a5-9785-b46e178433df"
-version = "1.6.4"
+version = "1.6.5"
 
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -291,10 +291,10 @@ uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 version = "0.9.5"
 
 [[deps.Documenter]]
-deps = ["ANSIColoredPrinters", "AbstractTrees", "Base64", "CodecZlib", "Dates", "DocStringExtensions", "Downloads", "Git", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "MarkdownAST", "Pkg", "PrecompileTools", "REPL", "RegistryInstances", "SHA", "TOML", "Test", "Unicode"]
-git-tree-sha1 = "352b9a04e74edd16429aec79f033620cf8e780d4"
+deps = ["ANSIColoredPrinters", "AbstractTrees", "Base64", "CodecZlib", "Dates", "DocStringExtensions", "Downloads", "Git", "IOCapture", "InteractiveUtils", "JSON", "LibGit2", "Logging", "Markdown", "MarkdownAST", "Pkg", "PrecompileTools", "REPL", "RegistryInstances", "SHA", "TOML", "Test", "Unicode"]
+git-tree-sha1 = "182a9a3fe886587ba230a417f1651a4cbc2b92d4"
 uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-version = "1.15.0"
+version = "1.8.1"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -382,9 +382,9 @@ version = "1.11.0"
 
 [[deps.FillArrays]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "173e4d8f14230a7523ae11b9a3fa9edb3e0efd78"
+git-tree-sha1 = "5bfcd42851cf2f1b303f51525a54dc5e98d408a3"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "1.14.0"
+version = "1.15.0"
 weakdeps = ["PDMats", "SparseArrays", "Statistics"]
 
     [deps.FillArrays.extensions]
@@ -476,9 +476,9 @@ version = "3.7.0+0"
 
 [[deps.Git_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "LibCURL_jll", "Libdl", "Libiconv_jll", "OpenSSL_jll", "PCRE2_jll", "Zlib_jll"]
-git-tree-sha1 = "96fbb1a5c700942301cf65d8546690dd3b2a6a79"
+git-tree-sha1 = "b6a684587ebe896d9f68ae777f648205940f0f70"
 uuid = "f8c6e375-362e-5223-8a59-34ff63f689eb"
-version = "2.51.2+0"
+version = "2.51.3+0"
 
 [[deps.Glib_jll]]
 deps = ["Artifacts", "GettextRuntime_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
@@ -653,9 +653,9 @@ version = "0.16.2"
 
 [[deps.IntervalArithmetic]]
 deps = ["CRlibm", "MacroTools", "OpenBLASConsistentFPCSR_jll", "Printf", "Random", "RoundingEmulator"]
-git-tree-sha1 = "bf0210c01fb7d67c31fed97d7c1d1716b98ea689"
+git-tree-sha1 = "02b61501dbe6da3b927cc25dacd7ce32390ee970"
 uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
-version = "1.0.1"
+version = "1.0.2"
 
     [deps.IntervalArithmetic.extensions]
     IntervalArithmeticArblibExt = "Arblib"
@@ -676,16 +676,18 @@ version = "1.0.1"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[deps.IntervalSets]]
-git-tree-sha1 = "5fbb102dcb8b1a858111ae81d56682376130517d"
+git-tree-sha1 = "03b4f40b4987baa6a653a21f6f33f902af6255f3"
 uuid = "8197267c-284f-5f27-9208-e0e47529a953"
-version = "0.7.11"
+version = "0.7.12"
 
     [deps.IntervalSets.extensions]
+    IntervalSetsPrintfExt = "Printf"
     IntervalSetsRandomExt = "Random"
     IntervalSetsRecipesBaseExt = "RecipesBase"
     IntervalSetsStatisticsExt = "Statistics"
 
     [deps.IntervalSets.weakdeps]
+    Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
     Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
     RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
     Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -733,16 +735,10 @@ uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.7.1"
 
 [[deps.JSON]]
-deps = ["Dates", "Logging", "Parsers", "PrecompileTools", "StructUtils", "UUIDs", "Unicode"]
-git-tree-sha1 = "06ea418d0c95878c8f3031023951edcf25b9e0ef"
+deps = ["Dates", "Mmap", "Parsers", "Unicode"]
+git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-version = "1.2.0"
-
-    [deps.JSON.extensions]
-    JSONArrowExt = ["ArrowTypes"]
-
-    [deps.JSON.weakdeps]
-    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
+version = "0.21.4"
 
 [[deps.JpegTurbo]]
 deps = ["CEnum", "FileIO", "ImageCore", "JpegTurbo_jll", "TOML"]
@@ -980,9 +976,9 @@ version = "0.1.2"
 
 [[deps.MathTeXEngine]]
 deps = ["AbstractTrees", "Automa", "DataStructures", "FreeTypeAbstraction", "GeometryBasics", "LaTeXStrings", "REPL", "RelocatableFolders", "UnicodeFun"]
-git-tree-sha1 = "a370fef694c109e1950836176ed0d5eabbb65479"
+git-tree-sha1 = "7eb8cdaa6f0e8081616367c10b31b9d9b34bb02a"
 uuid = "0a4f8689-d25c-4efe-a92b-7142dfc1aa53"
-version = "0.6.6"
+version = "0.6.7"
 
 [[deps.Metis]]
 deps = ["CEnum", "LinearAlgebra", "METIS_jll", "SparseArrays"]
@@ -1174,9 +1170,9 @@ version = "0.5.12"
 
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "1f7f9bbd5f7a2e5a9f7d96e51c9754454ea7f60b"
+git-tree-sha1 = "0662b083e11420952f2e62e17eddae7fc07d5997"
 uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
-version = "1.56.4+0"
+version = "1.57.0+0"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
@@ -1207,9 +1203,9 @@ version = "0.3.3"
 
 [[deps.PlotUtils]]
 deps = ["ColorSchemes", "Colors", "Dates", "PrecompileTools", "Printf", "Random", "Reexport", "StableRNGs", "Statistics"]
-git-tree-sha1 = "3ca9a356cd2e113c420f2c13bea19f8d3fb1cb18"
+git-tree-sha1 = "26ca162858917496748aad52bb5d3be4d26a228a"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
-version = "1.4.3"
+version = "1.4.4"
 
 [[deps.PolygonOps]]
 git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
@@ -1438,9 +1434,9 @@ weakdeps = ["ChainRulesCore"]
 
 [[deps.StableRNGs]]
 deps = ["Random"]
-git-tree-sha1 = "95af145932c2ed859b63329952ce8d633719f091"
+git-tree-sha1 = "4f96c596b8c8258cc7d3b19797854d368f243ddc"
 uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
-version = "1.0.3"
+version = "1.0.4"
 
 [[deps.StackViews]]
 deps = ["OffsetArrays"]
@@ -1482,9 +1478,9 @@ version = "1.7.1"
 
 [[deps.StatsBase]]
 deps = ["AliasTables", "DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
-git-tree-sha1 = "a136f98cefaf3e2924a66bd75173d1c891ab7453"
+git-tree-sha1 = "064b532283c97daae49e544bb9cb413c26511f8c"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.34.7"
+version = "0.34.8"
 
 [[deps.StatsFuns]]
 deps = ["HypergeometricFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
@@ -1523,20 +1519,6 @@ version = "0.7.2"
     LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-
-[[deps.StructUtils]]
-deps = ["Dates", "UUIDs"]
-git-tree-sha1 = "cd47aa083c9c7bdeb7b92de26deb46d6a33163c9"
-uuid = "ec057cc2-7a8d-4b58-b3b3-92acb9f63b42"
-version = "2.5.1"
-
-    [deps.StructUtils.extensions]
-    StructUtilsMeasurementsExt = ["Measurements"]
-    StructUtilsTablesExt = ["Tables"]
-
-    [deps.StructUtils.weakdeps]
-    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
-    Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [[deps.StyledStrings]]
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
@@ -1640,7 +1622,7 @@ version = "1.25.1"
 deps = ["ColorSchemes", "Colors", "DataFrames", "Dates", "GraphMakie", "Graphs", "HDF5", "LinearAlgebra", "Logging", "MPI", "MPIPreferences", "Makie", "Metis", "NamedTupleTools", "Preferences", "PrettyTables", "Printf", "Random", "Requires", "StaticArrays", "StatsBase"]
 path = "/home/fuerst/.julia/dev/Vahana"
 uuid = "e9033725-1633-496a-b29a-3bc5a5543602"
-version = "1.4.4"
+version = "1.4.5"
 
 [[deps.WebP]]
 deps = ["CEnum", "ColorTypes", "FileIO", "FixedPointNumbers", "ImageCore", "libwebp_jll"]
