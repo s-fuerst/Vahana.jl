@@ -10,9 +10,9 @@ function test_merge(model)
 
     fids = Vahana.open_h5file(restored, sim.name)
     @assert mpi.size == 1 && length(fids) > 1 """\n
-        this should test the merge functionality (reading a distributed
-        sim back to a single process), so the test should not be run 
-        with mpi but the files should be written from a mpi simulation 
+        This tests the merge functionality (reading distributed simulation 
+        files back into a single process). The test itself should run without
+        MPI, but should use files previously written by an MPI simulation.
     """
     foreach(close, fids)
 
@@ -97,7 +97,8 @@ end
         register_agenttype!(RasterAgent) |>
         register_edgetype!(EdgeState, :NumEdgesOnly) |>
         register_edgetype!(RasterEdge) |>
-        register_edgetype!(StatelessEdge, :HasEdgeOnly, :SingleType; target = Agent) |>
+        register_edgetype!(StatelessEdge, :HasEdgeOnly, :SingleType;
+                           target = Agent) |>
                                create_model("hdf5_neighbors")
 
     test_merge(model_neighbors)

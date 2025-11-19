@@ -3,6 +3,8 @@ using MPI, HDF5, StaticArrays
 import NamedTupleTools: ntfromstruct, structfromnt
 import Dates: format, now
 
+using Infiltrator
+
 export create_h5file!, close_h5file!
 export write_globals, write_agents, write_edges, write_snapshot
 export read_params, read_globals, read_agents!, read_edges!, read_snapshot!
@@ -136,6 +138,7 @@ last_change_string(fids) = attrs(fids[1])["fileformat"] == 1 ?
 _preinit_meta = Tuple{Union{Symbol, DataType}, Symbol, Symbol, Any}[]
 # the same for the simulation
 _preinit_meta_sim = Tuple{Symbol, Any}[]
+
 """
     create_h5file!(sim::Simulation, [filename = sim.filename; overwrite = sim.overwrite_file])
 
@@ -1461,19 +1464,25 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
     if _neighbors_only(sim, T)
         if has_hint(sim, T, :SingleType)
             AT = sim.typeinfos.edges_attr[T][:target]
+            # prepare the array
+            if fidx == 1
+                field.write = if has_hint(sim, T, :SingleEdge)
+                    zeros(Bool, num_agents(sim, AT))
+                else
+                    zeros(Int64, num_agents(sim, AT))
+                end
+            end
             typeid = sim.typeinfos.nodes_type2id[AT]
             data = if has_hint(sim, T, :SingleEdge)
                 HDF5.read(tid, Bool, start:last)
             else
                 HDF5.read(tid, Int64, start:last)
             end
+            # in the :SingleEdge case, num_edges is a bool and means "has_edge"
             for (idx, num_edges) in enumerate(data)
                 newid = idmapfunc(agent_id(typeid, fidx - 1, AgentNr(idx)))
                 newidx = agent_nr(newid)
-                # TODO: we know the size at the beginning, or?
-                if length(field.read) < newidx
-                    resize!(field.write, newidx)
-                end
+                @info fidx newidx num_edges
                 field.write[newidx] = num_edges
             end
         else
