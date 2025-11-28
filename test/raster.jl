@@ -13,7 +13,7 @@ end
 struct GridE end
 
 struct Position 
-    sum::Int64
+    ids_sum::Int64
 end
 
 struct MovingAgent 
@@ -307,7 +307,7 @@ end
     # pos is determined by the state of the current pos
     function value_on_pos(::Val{MovingAgent}, id, sim)
         # sum is not a sum operator, but a field of the agentstate of Position
-        value = first(neighborstates_flexible(sim, id, OnPosition)).sum
+        value = first(neighborstates_flexible(sim, id, OnPosition)).ids_sum
         move_to!(sim, :raster, id, (value, value), OnPosition(), OnPosition())
         MovingAgent(value)
     end
@@ -334,20 +334,20 @@ end
     finish_init!(sim)
 
     apply!(sim, sum_on_pos, [ Position ], [ MovingAgent, OnPosition ], [ Position ])
-    raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64, Position)
+    raster = calc_rasterstate(sim, :raster, c -> c.ids_sum, Int64, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
     @test raster[2,3] == 0
 
     # new versions of calc_rasterstate
-    raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64)
+    raster = calc_rasterstate(sim, :raster, c -> c.ids_sum, Int64)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
     @test raster[2,3] == 0
 
-    raster = calc_rasterstate(sim, :raster, c -> c.sum)
+    raster = calc_rasterstate(sim, :raster, c -> c.ids_sum)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 5
@@ -360,7 +360,7 @@ end
            [ OnPosition, MovingAgent ])
     apply!(sim, sum_on_pos,
            [ Position ], [ MovingAgent, OnPosition ], [ Position ])
-    raster = calc_rasterstate(sim, :raster, c -> c.sum, Int64, Position)
+    raster = calc_rasterstate(sim, :raster, c -> c.ids_sum, Int64, Position)
     @test raster[1,1] == 1
     @test raster[1,2] == 0
     @test raster[2,2] == 0
