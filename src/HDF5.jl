@@ -1424,7 +1424,7 @@ function read_edges!(sim::Simulation,
             tid = find_transition_group(fids[fidx]["edges"][string(T)],
                                         transition)
 
-            _read_edges!(sim, tid, idmapfunc, T, fidx)
+            _read_edges!(sim, tid, idmapfunc, T, fidx, merge)
         end
         finish_write!(sim, T)
 
@@ -1452,7 +1452,7 @@ read_edges!(sim::Simulation,
                             idmapfunc, transition, types, comment)
 
 
-function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
+function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx, merge)
     field = getproperty(sim, Symbol(T))
     vec_num_edges = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
@@ -1463,11 +1463,11 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
         if has_hint(sim, T, :SingleType)
             AT = sim.typeinfos.edges_attr[T][:target]
             # prepare the array
-            if fidx == 1
+            if ! merge || fidx == 1 # in the merge case, zero the field only once
                 field.write = if has_hint(sim, T, :SingleEdge)
-                    zeros(Bool, num_agents(sim, AT))
+                    zeros(Bool, num_agents(sim, AT, merge))
                 else
-                    zeros(Int64, num_agents(sim, AT))
+                    zeros(Int64, num_agents(sim, AT, merge))
                 end
             end
             typeid = sim.typeinfos.nodes_type2id[AT]
@@ -1480,8 +1480,16 @@ function _read_edges!(sim::Simulation, tid, idmapfunc, T, fidx)
             for (idx, num_edges) in enumerate(data)
                 newid = idmapfunc(agent_id(typeid, fidx - 1, AgentNr(idx)))
                 newidx = agent_nr(newid)
-                @info fidx newidx num_edges
                 field.write[newidx] = num_edges
+            end
+            # decrease the memory usage, if possible
+            if ! merge || fidx == length(vec_num_edges)
+                idx = findlast(! iszero, field.write)
+                if idx == nothing
+                    empty!(field.write)
+                else
+                    resize!(field.write, idx)
+                end
             end
         else
             # EdgeCount struct
