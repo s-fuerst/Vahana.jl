@@ -4,6 +4,12 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.4.6
+
+- The `read_edges` bugfix in v1.4.5 introduced a bug for parallel
+  calls to `read_edges` with the same hint combination, this is fixed
+  now.
+
 ## v1.4.5
 
 - Fixed compatibility issues with Julia 1.12. This includes a breaking
