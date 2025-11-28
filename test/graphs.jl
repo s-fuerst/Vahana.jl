@@ -2,7 +2,7 @@ import Graphs.SimpleGraphs
 
 struct GraphA 
     id::Int64
-    sum::Int64
+    sum_ids_neighbors::Int64
 end
 
 struct GraphE end
@@ -39,7 +39,7 @@ model_graph = ModelTypes() |>
     # we have a complete graph, and all agents sum the
     # ids of the neighbors (but ignoring the own)
     # so in overall we have the nagents-1 times the sum of all ids
-    @test mapreduce(sim, a -> a.sum, +, GraphA) ==
+    @test mapreduce(sim, a -> a.sum_ids_neighbors, +, GraphA) ==
         sum(1:nagents) * (nagents - 1)
 
     finish_simulation!(sim)

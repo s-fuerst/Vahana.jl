@@ -804,14 +804,14 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
     
     vec_num_agents = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
-    size = vec_num_agents[mpi.rank + 1]
+    num_agents_on_rank = vec_num_agents[mpi.rank + 1]
     start = vec_displace[mpi.rank + 1] + 1
     last = start + vec_num_agents[mpi.rank + 1] - 1
     
-    field.nextid = size + 1
+    field.nextid = num_agents_on_rank + 1
 
     if ! has_hint(sim, T, :Immortal, :Agent)
-        if size > 0
+        if num_agents_on_rank > 0
             field.write.died = HDF5.read(tid["died"],
                                          Bool,
                                          start:last)
@@ -820,7 +820,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
         end
     end
     if fieldcount(T) > 0
-        if size > 0
+        if num_agents_on_rank > 0
             field.write.state = HDF5.read(tid["state"],
                                           T,
                                           start:last)
@@ -828,7 +828,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
             field.write.state = Vector{T}()
         end    
     else
-        field.write.state = fill(T(), size)
+        field.write.state = fill(T(), num_agents_on_rank)
     end
 
     # this move the state to the shared memory (and to read) 
@@ -837,7 +837,7 @@ function _read_agents_restore!(sim::Simulation, field, tid, T::DataType)
     # We must also refresh the list of reuseable ids
     empty!(field.read.reuseable)
     if ! has_hint(sim, T, :Immortal, :Agent)
-        for i in 1:size
+        for i in 1:num_agents_on_rank
             if field.read.died[i]
                 push!(field.read.reuseable, i)
             end
@@ -859,17 +859,17 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     vec_num_agents = attrs(tid)["size_per_rank"]
     vec_displace = attrs(tid)["displace"]
     
-    size = parallel ? sum(vec_num_agents) : vec_num_agents[fidx]
+    num_agents_all_ranks = parallel ? sum(vec_num_agents) : vec_num_agents[fidx]
 
     died = if ! has_hint(sim, T, :Immortal, :Agent) 
         HDF5.read(tid["died"], Bool)
     else
-        fill(false, size)
+        fill(false, num_agents_all_ranks)
     end
     state = if fieldcount(T) > 0
         HDF5.read(tid["state"], T)
     else
-        fill(T(), size)
+        fill(T(), num_agents_all_ranks)
     end
 
     if parallel
@@ -887,7 +887,7 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
             end
         end
     else
-        for i in 1:size
+        for i in 1:num_agents_all_ranks
             if !died[i]
                 newid = add_agent!(sim, state[i])
                 push!(idmapping,
