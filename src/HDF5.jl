@@ -909,7 +909,9 @@ function _read_globals_or_params(hid, empty_array_str)
                           [keys(hid); keys(attrs(eid))]))
 
     Dict(map(all_keys) do k
-             k => if attrs(hid[k])["array"] 
+             k => if haskey(HDF5.attributes(eid), k)
+                 nothing
+             elseif attrs(hid[k])["array"] 
                  hid[k][]
              else
                  hid[k][1]
