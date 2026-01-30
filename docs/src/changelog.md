@@ -4,6 +4,14 @@ CurrentModule = Vahana
 
 # Change Log
 
+## v1.4.7
+
+- The `read_globals` version that does not utilize a Globals type
+  (returning a Dictionary rather than a Globals instance) failed to
+  function properly when for a Globals field no value had been
+  previously established through `set_global!` or `push_global!`
+  operations.
+
 ## v1.4.6
 
 - The `read_edges` bugfix in v1.4.5 introduced a bug for parallel
