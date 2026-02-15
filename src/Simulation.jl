@@ -315,7 +315,25 @@ function create_simulation(model::Model,
         external = Dict{Any, Any}() 
     )
 
+    if !isdefined(Vahana, :init_storage!) || !isdefined(Vahana, :init_field!)
+        error("""
+
+     It seems that `create_model` was used in the same function as `create_simulation`.
+    `create_model` increments Julia's "world age counter", so you cannot construct
+    the model and initialize it in the same function.
+    
+    Possible solution: Split your code:
+        const model = create_model(modeltypes, "MyModel")  # outside function
+        
+        function create_and_init()
+            sim = create_simulation(model)  # inside function
+            # ... initialization code
+        end
+        """)
+    end
+    
     for T in sim.typeinfos.edges_types
+        
         init_field!(sim, T)
         init_storage!(sim, T)
     end
