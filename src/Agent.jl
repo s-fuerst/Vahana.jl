@@ -96,7 +96,7 @@ function type_nr(sim, dt::DataType)::TypeID
         end
     end
     TypeID(0)
- end
+end
 
 function type_of(sim, id::AgentID)
     sim.typeinfos.nodes_types[type_nr(id)]
@@ -142,7 +142,7 @@ function add_agent!(::Simulation, agent)
 Maybe you forgot the `()` behind the DataType?
 """)
     else
-    error("""
+        error("""
 `add_agent!(sim, agent)` is called for the unregistered type $(typeof(agent))
     """)
     end
@@ -210,8 +210,9 @@ using [`agentstate`](@ref) is preferable as this improves performance.
 agentstate_flexible(sim, id::AgentID) =
     agentstate(sim, id, sim.typeinfos.nodes_id2type[type_nr(id)])
 
+
 """
-    all_agents(sim, ::Type{T}, [all_ranks=true])
+    all_agents(sim, ::Type{T}, [all_ranks=true]; statemapfunc = identity)
 
 This function retrieves a vector of the states for all agents of type T of the
 simulation `sim`.
@@ -219,7 +220,10 @@ simulation `sim`.
 The `all_ranks` argument determines whether to include agents from all
 ranks or just the current rank in parallel simulations. When
 `all_ranks` is `true`, the function returns a vector of all agent
-identifiers across all ranks.  
+identifiers across all ranks.
+
+To minimize the message transfer between ranks, the `statemapfunc` can
+be used to extract the needed part of the agent state.
 
 The states and IDs of the agents returned by `all_agents` and
 [`all_agentids`](@ref) are in the same order.
@@ -231,7 +235,8 @@ The states and IDs of the agents returned by `all_agents` and
 
 See also [`all_agentids`](@ref), [`add_agents!`](@ref) and [`num_agents`](@ref).
 """
-function all_agents(sim, ::Type{T}, all_ranks = true) where T
+function all_agents(sim, ::Type{T}, all_ranks = true;
+             statemapfunc = identity) where T
     @mayassert (! sim.intransition) || all_ranks == false """
     all_agents with all_ranks == true can not be called within a transition function
     """
@@ -243,21 +248,23 @@ function all_agents(sim, ::Type{T}, all_ranks = true) where T
         getproperty(sim, Symbol(T)).read.state : 
         getproperty(sim, Symbol(T)).write.state  
 
-    l = if has_hint(sim, T, :Immortal, :Agent)
-        states
+    living = if has_hint(sim, T, :Immortal, :Agent)
+        map(statemapfunc, states)
     else
         died = sim.initialized ?
             getproperty(sim, Symbol(T)).read.died :
             getproperty(sim, Symbol(T)).write.died  
 
-        [ states[i] for i in 1:length(died) if died[i] == false ]
+        [ statemapfunc(states[i]) for i in 1:length(died) if died[i] == false ]
     end
+
     if all_ranks && mpi.active
-        join(l)
+        join(living)
     else
-        l
+        living
     end
 end
+
 
 """
     all_agentids(sim, ::Type{T}, [all_ranks=true])
@@ -325,7 +332,7 @@ function num_agents(sim, ::Type{T}, sum_ranks = true) where T
     field = getproperty(sim, Symbol(T))
     attr = sim.typeinfos.nodes_attr[T]
 
-#    independent = :Independent in attr[:hints]
+    #    independent = :Independent in attr[:hints]
 
     local_num = if :Immortal in attr[:hints]
         # we can not just access the length of read.state, as for
