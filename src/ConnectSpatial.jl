@@ -9,7 +9,7 @@ import NearestNeighbors: KDTree, knn, inrange, Euclidean
 pos_sarray(fieldname::Symbol) = state -> getproperty(state, fieldname)
 
 pos_tuple(fieldname::Symbol, size) =
-    state -> getproperty(state, fieldname) |> collect |> SVector{size}
+    state -> getproperty(state, fieldname) |> SVector{size}
 
 
 """
@@ -140,90 +140,176 @@ See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref)
 #     _log_info(sim, "<End> connect_spatial_neighbors!")
 # end
 
-function _agents_ids_and_states(sim, ::Type{T}, all_ranks = true;
-                           statemapfunc = identity,
-                           filterfunc = nothing) where T
-    Vahana.@mayassert (! sim.intransition) || all_ranks == false """
-    all_agents with all_ranks == true can not be called within a transition function
-    """
+function _agents_ids_states_and_edges(sim, ::Type{T},
+                               pos_func, filter_pred, edge_cons) where T
+    # Note: This function should not be called within a transition function
     @assert fieldcount(T) > 0 """\n
         all_agents can be only called for agent types that have fields.
         To get the number of agents, you can call num_agents instead.
     """
+    @assert length(Base.return_types(pos_func)) == 1
+    @assert Base.return_types(pos_func)[1] != Vector{Any}
+    
     states = sim.initialized ?
         getproperty(sim, Symbol(T)).read.state : 
         getproperty(sim, Symbol(T)).write.state  
 
-    if filterfunc === nothing
-        living = if has_hint(sim, T, :Immortal, :Agent)
-            zip([ agent_id(typeid(sim, T), AgentNr(i))
-                  for i in 1:length(states) ],
-                map(statemapfunc, states))
+    ids = AgentNr[]
+    sizehint!(ids, length(states))
+
+    poss = Vector{Base.return_types(pos_func)[1]}()
+    sizehint!(poss, length(states))
+
+    if edge_cons !== nothing
+        @assert length(Base.return_types(edge_cons)) == 1
+        @assert Base.return_types(edge_cons)[1] != Vector{Any}
+        edges = Vector{Base.return_types(edge_cons)[1]}()
+        sizehint!(edges, length(states))
+    end
+    
+    if filter_pred === nothing
+        if has_hint(sim, T, :Immortal, :Agent)
+            for i in 1:length(states)
+                push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                push!(poss, pos_func(states[i]))
+                if edge_cons !== nothing
+                    if typeof(edge_cons) == DataType
+                        push!(edges, edge_cons())
+                    else
+                        push!(edges, edge_cons(states[i]))
+                    end
+                end
+            end
         else
             died = sim.initialized ?
                 getproperty(sim, Symbol(T)).read.died :
-                getproperty(sim, Symbol(T)).write.died  
-
-            [ (agent_id(typeid(sim, T), AgentNr(i)), statemapfunc(states[i]))
-              for i in 1:length(died) if died[i] == false ]
+                getproperty(sim, Symbol(T)).write.died
+            
+            for i in 1:length(died)
+                if died[i] == false
+                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    push!(poss, pos_func(states[i]))
+                    if edge_cons !== nothing
+                        if typeof(edge_cons) == DataType
+                            push!(edges, edge_cons())
+                        else
+                            push!(edges, edge_cons(states[i]))
+                        end
+                    end
+                end
+            end
         end
     else
         living = if has_hint(sim, T, :Immortal, :Agent)
-            zip([ agent_id(typeid(sim, T), AgentNr(i))
-                  for i in 1:length(states) if filterfunc(states[i]) ],
-                map(statemapfunc, states))
+            for i in 1:length(states)
+                if filter_pred(states[i])
+                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    push!(poss, pos_func(states[i]))
+                    if edge_cons !== nothing
+                        if typeof(edge_cons) == DataType
+                            push!(edges, edge_cons())
+                        else
+                            push!(edges, edge_cons(states[i]))
+                        end
+                    end
+                end
+            end
         else
             died = sim.initialized ?
                 getproperty(sim, Symbol(T)).read.died :
                 getproperty(sim, Symbol(T)).write.died  
 
-            [ (agent_id(typeid(sim, T), AgentNr(i)), statemapfunc(states[i]))
-              for i in 1:length(died) if died[i] == false && filterfunc(states[i])]
+            for i in 1:length(died)
+                if died[i] == false && filter_pred(states[i])
+                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    push!(poss, pos_func(states[i]))
+                    if edge_cons !== nothing
+                        if typeof(edge_cons) == DataType
+                            push!(edges, edge_cons())
+                        else
+                            push!(edges, edge_cons(states[i]))
+                        end
+                    end
+                end
+            end
         end
     end
 
-    if all_ranks && mpi.active
-        join(living)
+    if mpi.active
+        join(ids)
+        join(poss)
+        if edge_cons !== nothing
+            join(edges)
+        end
+    end
+
+    if edge_cons !== nothing
+        (ids, poss, edges)
     else
-        living
+        (ids, poss)
     end
 end
 
 
-function _spatial_neighbors!(sim,
-                      from_type::DataType,
-                      from_posfunc,
-                      to_type::DataType,
-                      to_posfunc,
-                      edge_constructor,
-                      search_func,
-                      from_filter; # inrange or knn for NearestNeighbors
-                      distance = nothing, # only used for inrange
-                      periodic_boundaries = nothing, # only used for inrange
-                      metric = Euclidean(),
-                      leafsize = 25,
-                      reorder = true)
-    # TODO update doc
+# function _spatial_neighbors!(sim,
+#                       from_type::DataType,
+#                       from_pos_func,
+#                       to_type::DataType,
+#                       to_pos_func,
+#                       edge_constructor,
+#                       search_func;
+#                       from_filter = nothing, # inrange or knn for NearestNeighbors
+#                       to_filter = nothing,
+#                       distance = nothing, # only used for inrange
+#                       periodic_boundaries = nothing, # only used for inrange
+#                       metric = Euclidean(),
+#                       leafsize = 25,
+#                       reorder = true)
+#     # TODO update doc
 
-    # TODO: assertiongs for distance,periodic bounding,
-    # compare eltype of periodic bounding with eltype of positions
+#     # TODO: assertiongs for distance,periodic bounding,
+#     # compare eltype of periodic bounding with eltype of positions
+
+# end
+
+# TODO: add tests for edge_constructor with state and
+# from_filter. Write documentation
 
 
-    ids_states_iter = _agent_ids_and_states(sim, from_type, from_pos_func, from_filter)
+function connect_spatial_neighbors!(sim,
+                             from_type::DataType,
+                             from_pos_func,
+                             to_type::DataType,
+                             to_pos_func,
+                             edge_constructor;
+                             from_filter = nothing,
+                             to_filter = nothing,
+                             distance = 1.0,
+                             periodic_boundaries = nothing,
+                             metric = Euclidean(),
+                             leafsize = 25,
+                             reorder = true)
+    with_logger(sim) do
+        @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
+    end
+
+    function search_func(kdtree, pos, distance, from_ids, from_states, to)
+        for fidx in inrange(kdtree, pos, distance)
+            if from_ids[fidx] != to 
+                add_edge!(sim, from_ids[fidx], to, from_edges[fidx])
+            end
+        end
+    end
+    
+    (from_ids, from_poss, from_edges) =
+        _agents_ids_states_and_edges(sim, from_type, from_pos_func, from_filter,
+                                    edge_constructor)
     
 
-    if length(ids_states_iter) > 0
+    if length(from_ids) > 0
         # first we construct the KDTree with the information
         # of the agents from all processes.
-        (from_states, from_pos) = if typeof(edge_constructor) != DataType
-            states = all_agents(sim, from_type, true)
-            pos = map(from_posfunc, states)
-            (states, pos)
-        else
-            (nothing, all_agents(sim, from_type, true; statemapfunc=from_posfunc))
-        end
-
-        matrix = reduce(hcat, from_pos)
+        matrix = reduce(hcat, from_poss)
         if eltype(matrix) <: Int
             matrix = Float64.(matrix)
         end
@@ -231,9 +317,11 @@ function _spatial_neighbors!(sim,
 
         # Prepare writing edges if simulation is not initialized
         edge_type = if typeof(edge_constructor) != DataType
-            typeof(edge_constructor(from_states[1]))
+            # edge_constructor is a function, get the type from the first edge
+            typeof(from_edges[1])
         else
-            typeof(edge_constructor())
+            # edge_constructor is a DataType, use it directly
+            edge_constructor
         end
 
         if sim.initialized
@@ -241,13 +329,12 @@ function _spatial_neighbors!(sim,
         end
         sim.intransition = true
 
-        to_ids = all_agentids(sim, to_type, false)
-        to_states = all_agents(sim, to_type, false)
-        to_pos = map(to_posfunc, to_states)
+        (to_ids, to_pos) =
+            _agents_ids_states_and_edges(sim, to_type, to_pos_func, to_filter,
+                                         nothing)
 
-        for (tidx, pos) in enumerate(to_pos)
-            search_func(kdtree, collect(pos),
-                        from_ids, from_states, from_filter, to_ids[tidx])
+        for (to_id, pos) in zip(to_ids, to_pos)
+            search_func(kdtree, collect(pos), distance, from_ids, from_edges, to_id)
         end
 
         if periodic_boundaries !== nothing
@@ -268,7 +355,7 @@ function _spatial_neighbors!(sim,
                 end
             end
             # then we iterate over all positions
-            for (tidx, pos) in enumerate(to_pos)
+            for (tidx, (to_id, pos)) in enumerate(zip(to_ids, to_pos))
                 adjust_pos = SVector{num_dims}[]
                 # and checking for which dimensions the agent pos in
                 # in the distance of a boundary. For this dimensions we
@@ -284,12 +371,12 @@ function _spatial_neighbors!(sim,
                 end
                 # finally we create all combinations of the unit_vectors and
                 # adjust the position for each of this combination, and
-                # searching for the neighborsi
+                # searching for the neighbors
                 for c in combinations(adjust_pos)
                     if c != Any[]
                         avec = reduce(+, c)
-                        search_func(kdtree, collect(pos + avec),
-                                    from_ids, from_states, from_filter, to_ids[tidx])
+                        search_func(kdtree, collect(pos + avec), distance, 
+                                    from_ids, from_edges, to_id)
                     end
                 end
             end
@@ -301,72 +388,6 @@ function _spatial_neighbors!(sim,
             finish_write!(sim, edge_type)
         end
     end
-end
-
-# TODO: add tests for edge_constructor with state and
-# from_filter. Write documentation
-
-
-function connect_spatial_neighbors!(sim,
-                             from_type::DataType,
-                             from_posfunc,
-                             to_type::DataType,
-                             to_posfunc,
-                             edge_constructor;
-                             from_filter = nothing,
-                             distance = 1.0,
-                             periodic_boundaries = nothing,
-                             metric = Euclidean(),
-                             leafsize = 25,
-                             reorder = true)
-    function search_with_state(kdtree, pos, from_ids, from_states, to)
-        found = inrange(kdtree, pos, distance)
-        for fidx in found
-            from_state = from_states[fidx]
-            if from_ids[fidx] != to 
-                add_edge!(sim, from_ids[fidx], to, edge_constructor(from_state))
-            end
-        end
-    end
-
-    function search_wout_state(kdtree, pos, from_ids, _, to)
-        found = inrange(kdtree, pos, distance)
-        for fidx in found
-            if from_ids[fidx] != to 
-                add_edge!(sim, from_ids[fidx], to, edge_constructor())
-            end
-        end
-    end
-
-    with_logger(sim) do
-        @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
-    end
-
-    search_func = if typeof(edge_constructor) == DataType 
-        search_wout_state
-    else
-        search_with_state
-    end
-
-    filt = if from_filter === nothing
-        _ -> true
-    else
-        from_filter
-    end
-    
-    _spatial_neighbors!(sim,
-                        from_type,
-                        from_posfunc,
-                        to_type,
-                        to_posfunc,
-                        edge_constructor,
-                        search_func,
-                        filt;
-                        distance,
-                        periodic_boundaries,
-                        metric,
-                        leafsize,
-                        reorder)
 
     _log_info(sim, "<End> connect_spatial_neighbors!")
 end
