@@ -149,6 +149,8 @@ function _agents_ids_states_and_edges(sim, ::Type{T},
     """
     @assert length(Base.return_types(pos_func)) == 1
     @assert Base.return_types(pos_func)[1] != Vector{Any}
+    @assert Base.return_types(pos_func)[1] != Any
+    @info Base.return_types(pos_func)[1] 
     
     states = sim.initialized ?
         getproperty(sim, Symbol(T)).read.state : 
@@ -236,10 +238,10 @@ function _agents_ids_states_and_edges(sim, ::Type{T},
     end
 
     if mpi.active
-        join(ids)
-        join(poss)
+        ids = join(ids)
+        poss = join(poss)
         if edge_cons !== nothing
-            join(edges)
+            edges = join(edges)
         end
     end
 
@@ -278,9 +280,9 @@ end
 
 function connect_spatial_neighbors!(sim,
                              from_type::DataType,
-                             from_pos_func,
+                             from_pos_func::Function,
                              to_type::DataType,
-                             to_pos_func,
+                             to_pos_func::Function,
                              edge_constructor;
                              from_filter = nothing,
                              to_filter = nothing,
@@ -390,4 +392,27 @@ function connect_spatial_neighbors!(sim,
     end
 
     _log_info(sim, "<End> connect_spatial_neighbors!")
+end
+
+function _make_pos_func_val(::Type{T}, ::Val{fieldname}) where {T, fieldname}
+    return state::T -> SVector(getfield(state, fieldname))
+end
+
+# Neue Methode die Symbole akzeptiert
+function connect_spatial_neighbors!(sim,
+                             ::Type{FromType},
+                             from_pos_field::Symbol,
+                             ::Type{ToType},
+                             to_pos_field::Symbol,
+                             edge_constructor;
+                             kwargs...) where {FromType, ToType}
+
+    from_pos_func = _make_pos_func_val(FromType, Val(from_pos_field))
+    to_pos_func = _make_pos_func_val(ToType, Val(to_pos_field))
+
+    
+    # Rufe die ursprüngliche Funktion auf
+    connect_spatial_neighbors!(sim, FromType, from_pos_func, 
+                              ToType, to_pos_func, edge_constructor;
+                              kwargs...)
 end
