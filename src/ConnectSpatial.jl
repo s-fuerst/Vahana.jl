@@ -5,8 +5,6 @@ using StaticArrays
 import Combinatorics: combinations
 import NearestNeighbors: KDTree, knn, inrange, Euclidean
 
-using Infiltrator
-
 function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
                                edge_cons, must_join) where T
     # Note: This function should not be called within a transition function
