@@ -210,7 +210,7 @@ function create_graphplot(sim::Simulation;
     #         vp.vg = vahanagraph(vp.sim; agenttypes = agenttypes, edgetypes = edgetypes)
     #         update_graphplot!(vp)
     #     end
-        
+    
     #     buttongrid[1, 2] = stepbutton = Button(f, label="Step")
     #     on(stepbutton.clicks) do _
     #         step_fn(vp.sim)
@@ -296,35 +296,52 @@ function _plot(vg::VahanaGraph, edge_plottype)
 
     rv = 1:nv(vg)
     re = 1:ne(vg)
-    p = graphplot(vg,
-                  edge_plottype = edge_plottype,
-                  node_color = [ agentcolors[type_nr(vg.g2v[i])]
-                                 for i in rv ],
-                  node_size = [ 12 for _ in rv ],
-                  node_marker = [ :circle for _ in rv ],
-                  #                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
-                  nlabels = [ "" for _ in rv ],
-                  nlabels_align = [ (:left, :bottom) for _ in rv ],
-                  nlabels_color = [ :black for _ in rv ],
-                  nlabels_distance = [ 0.0 for _ in rv ],
-                  nlabels_offset = [ Makie.Point(0, 0) for _ in rv ],
-                  nlabels_textsize = [ 14 for _ in rv ],
-                  edge_color = [ edgecolors[vg.edgetypeidx[i]]
-                                 for i in re ],
-                  edge_width = [ 1.0 for _ in re ],
-                  elabels = [ "" for _ in re ],
-                  elabels_align = [ (:left, :bottom) for _ in re ],
-                  elabels_color = [ :black for _ in re ],
-                  elabels_distance = [ 0.0 for _ in re ],
-                  elabels_offset = [ Makie.Point(0, 0) for _ in re ],
-                  elabels_rotation = Vector{Any}([ Makie.automatic for _ in re ]),
-                  elabels_shift = [ 0.5 for _ in re ],
-                  elabels_side = [ :left for _ in re ],
-                  elabels_textsize = [ 14 for _ in re ],
-                  arrow_shift = [ 0.5 for _ in re ],
-                  #arrow_show = [ true for _ in re ], ! supported by Makie
-                  arrow_size = [ 12.0 for _ in re ]
-                  )
+    if ne(vg) > 0
+        p = graphplot(vg,
+                      edge_plottype = edge_plottype,
+                      node_color = [ agentcolors[type_nr(vg.g2v[i])]
+                                     for i in rv ],
+                      node_size = [ 12 for _ in rv ],
+                      node_marker = [ :circle for _ in rv ],
+                      #                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
+                      nlabels = [ "" for _ in rv ],
+                      nlabels_align = [ (:left, :bottom) for _ in rv ],
+                      nlabels_color = [ :black for _ in rv ],
+                      nlabels_distance = [ 0.0 for _ in rv ],
+                      nlabels_offset = [ Makie.Point(0, 0) for _ in rv ],
+                      nlabels_textsize = [ 14 for _ in rv ],
+                      edge_color = [ edgecolors[vg.edgetypeidx[i]]
+                                     for i in re ],
+                      edge_width = [ 1.0 for _ in re ],
+                      elabels = [ "" for _ in re ],
+                      elabels_align = [ (:left, :bottom) for _ in re ],
+                      elabels_color = [ :black for _ in re ],
+                      elabels_distance = [ 0.0 for _ in re ],
+                      elabels_offset = [ Makie.Point(0, 0) for _ in re ],
+                      elabels_rotation = Vector{Any}([ Makie.automatic for _ in re ]),
+                      elabels_shift = [ 0.5 for _ in re ],
+                      elabels_side = [ :left for _ in re ],
+                      elabels_textsize = [ 14 for _ in re ],
+                      arrow_shift = [ 0.5 for _ in re ],
+                      #arrow_show = [ true for _ in re ], ! supported by Makie
+                      arrow_size = [ 12.0 for _ in re ]
+                      )
+    else
+        p = graphplot(vg,
+                      edge_plottype = edge_plottype,
+                      node_color = [ agentcolors[type_nr(vg.g2v[i])]
+                                     for i in rv ],
+                      node_size = [ 12 for _ in rv ],
+                      node_marker = [ :circle for _ in rv ],
+                      #                  node_attr = [ Dict{Symbol, Observable}() for _ in rv ],
+                      nlabels = [ "" for _ in rv ],
+                      nlabels_align = [ (:left, :bottom) for _ in rv ],
+                      nlabels_color = [ :black for _ in rv ],
+                      nlabels_distance = [ 0.0 for _ in rv ],
+                      nlabels_offset = [ Makie.Point(0, 0) for _ in rv ],
+                      nlabels_textsize = [ 14 for _ in rv ],
+                      )
+    end
 
     # hidedecorations!(p.axis)
     hidespines!(p.axis)
