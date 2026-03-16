@@ -1,7 +1,5 @@
 using Vahana
 
-using Infiltrator
-
 using Test
 
 using StaticArrays
@@ -9,16 +7,16 @@ using StaticArrays
 import Vahana: @onrankof, disable_transition_checks
 
 struct AgentWithPosFrom
-    pos::Tuple{Int64, Int64}
+    pos::SVector{2, Int64}
     age::Float64 # to check the filter option
 end    
 
 struct AgentWithPosTo
-    pos::Tuple{Int64, Int64}
+    pos::SVector{2, Int64}
 end    
 
 struct Agent3DFrom
-    pos::Tuple{Float64, Float64, Float64}
+    pos::SVector{3, Float64}
 end
 
 struct Agent3DTo
@@ -75,7 +73,7 @@ spatial_model = ModelTypes() |>
                                AgentWithPosTo, 
                                _ -> Neighbor();
                                distance = 1.0,
-                               periodic_boundaries = [(0,4), (0,5)])
+                               periodic_upper = SVector(4,5))
     
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, to_A) == 3
@@ -187,7 +185,8 @@ spatial_model = ModelTypes() |>
                                AgentWithPosTo, 
                                _ -> Neighbor();
                                distance = 1.0,
-                               periodic_boundaries = [(1,5), (1,6)])
+                               periodic_lower = SVector(1,1),
+                               periodic_upper = SVector(5,6))
     
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, to_A) == 3
@@ -201,7 +200,8 @@ spatial_model = ModelTypes() |>
                                AgentWithPosTo, 
                                _ -> Neighbor();
                                distance = 1,
-                               periodic_boundaries = [(1,5), ()])
+                               periodic_lower = SVector(1,0),
+                               periodic_upper = SVector(5,Inf))
     
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, to_A) == 3
@@ -269,7 +269,7 @@ spatial_model = ModelTypes() |>
                                Agent3DTo,
                                Agent3DTo,
                                _ -> Neighbor(),
-                               periodic_boundaries = [(0.0,1.0), (), ()], 
+                               periodic_upper = SVector(1.0, Inf, Inf),
                                distance = 0.1001)
     
     es = all_edges(sim, Neighbor)
@@ -284,8 +284,7 @@ spatial_model = ModelTypes() |>
                                Agent3DTo,
                                Agent3DTo,
                                (a) -> Neighbor(),
-                               periodic_boundaries =
-                                   [(0.0,1.0), (0.0,1.0), (0.0, 1.0)], 
+                               periodic_upper = SVector(1.0, 1.0, 1.0),
                                distance = 0.1001)
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, a1) == 4 # a2, a4, a5, a6
@@ -300,8 +299,7 @@ spatial_model = ModelTypes() |>
                                Agent3DTo,
                                Agent3DTo,
                                (a) -> Neighbor(),
-                               periodic_boundaries =
-                                   [(0,1), (0,1), (0, 1)], 
+                               periodic_upper = SVector(1.0, 1.0, 1.0),
                                distance = 0.1001)
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, a1) == 4 # a2, a4, a5, a6
