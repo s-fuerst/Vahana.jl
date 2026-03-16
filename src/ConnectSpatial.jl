@@ -118,9 +118,9 @@ end
 
 
 """
-    connect_spatial_neighbors!(sim, from_type::DataType, to_type::DataType, edge_constructor; distance = 1.0, periodic = true, fieldname = :pos)
+    connect_spatial_neighbors!(sim, from_type::DataType, to_type::DataType, edge_constructor; distance = 1.0, periodic = true, fieldname = :Creates)
 
-Creates edges between agents based on their spatial proximity.
+pos edges between agents based on their spatial proximity.
 
 Connects agents of type `from_type` to agents of type `to_type` when
 they are within `distance` of each other in spatial coordinates. The
@@ -135,9 +135,10 @@ other edgetypes via `register_edgetype!`.
 See also [`add_raster!`](@ref) and [`connect_raster_neighbors!`](@ref)
 """
 function connect_spatial_neighbors!(sim,
-                             ::Type{FromType},
-                             ::Type{ToType},
+                             from_types,
+                             to_types,
                              edge_constructor;
+                             add_existing = false,
                              from_pos_field::Symbol = :pos,
                              to_pos_field::Symbol = :pos,
                              from_filter = nothing,
@@ -146,18 +147,25 @@ function connect_spatial_neighbors!(sim,
                              periodic_boundaries = nothing,
                              metric = Euclidean(),
                              leafsize = 25,
-                             reorder = true) where {FromType, ToType}
+                             reorder = true)
 
     with_logger(sim) do
         @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
     end
 
-    from_pos_func = _make_pos_func_val(FromType, Val(from_pos_field))
-    to_pos_func = _make_pos_func_val(ToType, Val(to_pos_field))
+    from_types = applicable(iterate, from_types) ? from_types : [ from_types ]
+    to_types = applicable(iterate, to_types) ? to_types : [ to_types ]
+    
+
+    from_pos_funcs = map(t -> _make_pos_func_val(t, Val(from_pos_field)),
+                         from_types)
+
+    to_pos_funcs = map(t -> _make_pos_func_val(t, Val(to_pos_field)),
+                       to_types)
 
     function search_func(kdtree, pos, distance, from_ids, from_states, to)
         for fidx in inrange(kdtree, pos, distance)
-            if from_ids[fidx] != to 
+            if from_ids[fidx] != to
                 add_edge!(sim, from_ids[fidx], to, from_edges[fidx])
             end
         end
@@ -166,8 +174,21 @@ function connect_spatial_neighbors!(sim,
     # we must collect this always, even in the case that to_ids is empty
     # as we have collective MPI calls in this function
     (from_ids, from_poss, from_edges) =
-        _agents_ids_states_and_edges(sim, FromType, from_pos_func, from_filter,
+        _agents_ids_states_and_edges(sim, from_types[1],
+                                     from_pos_funcs[1], from_filter,
                                      edge_constructor, true)
+
+    if length(from_types) > 1
+        for n in 2:length(from_types)
+            i, p, e =
+                _agents_ids_states_and_edges(sim, from_types[n],
+                                             from_pos_funcs[n], from_filter,
+                                             edge_constructor, true)
+            append!(from_ids, i)
+            append!(from_poss, p)
+            append!(from_edges, e)
+        end
+    end
 
     if length(from_ids) > 0
         # first we construct the KDTree with the information
@@ -188,14 +209,28 @@ function connect_spatial_neighbors!(sim,
         end
 
         if sim.initialized
-            prepare_write!(sim, [], false, edge_type)
+            prepare_write!(sim, [], add_existing, edge_type)
         end
         sim.intransition = true
 
+        # collect the ids and pos vectors
         (to_ids, to_poss) =
-            _agents_ids_states_and_edges(sim, ToType, to_pos_func, to_filter,
+            _agents_ids_states_and_edges(sim, to_types[1],
+                                         to_pos_funcs[1], to_filter,
                                          nothing, false)
 
+        if length(to_types) > 1
+            for n in 2:length(to_types)
+                i, p=
+                    _agents_ids_states_and_edges(sim, to_types[n],
+                                             to_pos_funcs[n], to_filter,
+                                             nothing, true)
+                append!(to_ids, i)
+                append!(to_poss, p)
+            end
+        end
+
+        # iterate over the ids and search for neighbors
         if length(to_ids) > 0
             for (to_id, pos) in zip(to_ids, to_poss)
                 # we construct the edges inside the search_func
@@ -203,6 +238,7 @@ function connect_spatial_neighbors!(sim,
                             from_edges, to_id)
             end
 
+            # repeat this for agents near the boundaries with adjusted pos
             if periodic_boundaries !== nothing
                 # we start by determining for with dimensions boundaries
                 # are given and calculating from the boundaries tuple
@@ -215,17 +251,17 @@ function connect_spatial_neighbors!(sim,
                     if typeof(periodic_boundaries[i]) != Tuple{}
                         offset = periodic_boundaries[i][2] -
                             periodic_boundaries[i][1]
-                        # for integer periodics, the left and right side has a distance
-                        # of 1 (for float, the distance is 0), so we must incr.
-                        # the unit_vector size
+                        # for integer periodics, the left and right side has a
+                        # distance of 1 (for float, the distance is 0), 
+                        # must incr. the unit_vector size
                         o2 = eltype(to_poss[1][i]) <: Int ? 1 : 0
                         unit_vectors[i] =
                             setindex(unit_vectors[i], offset + o2, i)
                         active[i] = true
                     end
                 end
-                # then we iterate over all positions
 
+                # then we iterate over all positions
                 for (tidx, (to_id, pos)) in enumerate(zip(to_ids, to_poss))
                     adjust_pos = SVector{num_dims}[]
                     # and checking for which dimensions the agent pos in
@@ -253,7 +289,6 @@ function connect_spatial_neighbors!(sim,
                     end
                 end
             end
-
         end
         
         sim.intransition = false
@@ -267,18 +302,3 @@ function connect_spatial_neighbors!(sim,
 end
 
 
-# function connect_spatial_neighbors!(sim,
-#                              ::Type{FromType},
-#                              ::Type{ToType},
-#                              edge_constructor;
-#                              from_pos_field::Symbol = :pos,
-#                              to_pos_field::Symbol = :pos,
-#                              kwargs...) where {FromType, ToType}
-
-#     from_pos_func = _make_pos_func_val(FromType, Val(from_pos_field))
-#     to_pos_func = _make_pos_func_val(ToType, Val(to_pos_field))
-
-#     connect_spatial_neighbors!(sim, FromType, from_pos_func, 
-#                               ToType, to_pos_func, edge_constructor;
-#                               kwargs...)
-# end
