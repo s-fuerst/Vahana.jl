@@ -1,9 +1,9 @@
 export connect_spatial_neighbors!
-export pos_sarray, pos_tuple
+export vector_from_to
 
 using StaticArrays
 import Combinatorics: combinations
-import NearestNeighbors: KDTree, knn, inrange, Euclidean
+import NearestNeighbors: PeriodicTree, KDTree, knn, inrange, Euclidean
 
 function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
                                edge_cons, must_join) where T
@@ -109,7 +109,7 @@ end
 
 
 function _make_pos_func_val(::Type{T}, ::Val{fieldname}) where {T, fieldname}
-    state::T -> SVector(getfield(state, fieldname))
+    state::T -> getfield(state, fieldname)
 end
 
 # TODO update doc
@@ -143,10 +143,11 @@ function connect_spatial_neighbors!(sim,
                              from_filter = nothing,
                              to_filter = nothing,
                              distance = 1.0,
-                             periodic_boundaries = nothing,
+                             periodic_lower::Union{SVector{N, T1}, Nothing} = nothing,
+                             periodic_upper::Union{SVector{N, T2}, Nothing} = nothing,
                              metric = Euclidean(),
                              leafsize = 25,
-                             reorder = true) where {FromType, ToType}
+                             reorder = true) where {N, T1, T2, FromType, ToType}
 
     with_logger(sim) do
         @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
@@ -170,11 +171,21 @@ function connect_spatial_neighbors!(sim,
                                      edge_constructor, true)
 
     if length(from_ids) > 0
+        if periodic_upper !== nothing
+            if periodic_lower === nothing
+                periodic_lower = fill(0.0, length(periodic_upper)) |>
+                    SVector{length(periodic_upper)}
+            end
+        end
         # first we construct the KDTree with the information
         # of the agents from all processes.
         matrix = reduce(hcat, from_poss)
         if eltype(matrix) <: Int
             matrix = Float64.(matrix)
+            if periodic_upper !== nothing
+                periodic_lower = map(l -> Float64(l), periodic_lower)
+                periodic_upper = map(u -> Float64(u + 1), periodic_upper)
+            end
         end
         kdtree = KDTree(matrix, metric; leafsize=25, reorder=reorder)
 
@@ -197,62 +208,65 @@ function connect_spatial_neighbors!(sim,
                                          nothing, false)
 
         if length(to_ids) > 0
+            if periodic_upper !== nothing
+                kdtree = PeriodicTree(kdtree, periodic_lower, periodic_upper)
+            end
             for (to_id, pos) in zip(to_ids, to_poss)
                 # we construct the edges inside the search_func
                 search_func(kdtree, collect(pos), distance, from_ids,
                             from_edges, to_id)
             end
 
-            if periodic_boundaries !== nothing
-                # we start by determining for with dimensions boundaries
-                # are given and calculating from the boundaries tuple
-                # the offset that must be added to the position in
-                # form of a unit_vector.
-                num_dims = length(periodic_boundaries)
-                active = zeros(Bool, num_dims)
-                unit_vectors = fill(SVector{num_dims}(zeros(num_dims)), num_dims)
-                for i in 1:num_dims
-                    if typeof(periodic_boundaries[i]) != Tuple{}
-                        offset = periodic_boundaries[i][2] -
-                            periodic_boundaries[i][1]
-                        # for integer periodics, the left and right side has a distance
-                        # of 1 (for float, the distance is 0), so we must incr.
-                        # the unit_vector size
-                        o2 = eltype(to_poss[1][i]) <: Int ? 1 : 0
-                        unit_vectors[i] =
-                            setindex(unit_vectors[i], offset + o2, i)
-                        active[i] = true
-                    end
-                end
-                # then we iterate over all positions
+            # if periodic_boundaries !== nothing && use_periodic_tree == false
+            #     # we start by determining for with dimensions boundaries
+            #     # are given and calculating from the boundaries tuple
+            #     # the offset that must be added to the position in
+            #     # form of a unit_vector.
+            #     num_dims = length(periodic_boundaries)
+            #     active = zeros(Bool, num_dims)
+            #     unit_vectors = fill(SVector{num_dims}(zeros(num_dims)), num_dims)
+            #     for i in 1:num_dims
+            #         if typeof(periodic_boundaries[i]) != Tuple{}
+            #             offset = periodic_boundaries[i][2] -
+            #                 periodic_boundaries[i][1]
+            #             # for integer periodics, the left and right side has a distance
+            #             # of 1 (for float, the distance is 0), so we must incr.
+            #             # the unit_vector size
+            #             o2 = eltype(to_poss[1][i]) <: Int ? 1 : 0
+            #             unit_vectors[i] =
+            #                 setindex(unit_vectors[i], offset + o2, i)
+            #             active[i] = true
+            #         end
+            #     end
+            #     # then we iterate over all positions
 
-                for (tidx, (to_id, pos)) in enumerate(zip(to_ids, to_poss))
-                    adjust_pos = SVector{num_dims}[]
-                    # and checking for which dimensions the agent pos in
-                    # in the distance of a boundary. For this dimensions we
-                    # calculating the unit vectors to the adjust_pos vector
-                    for i in 1:num_dims
-                        if active[i] 
-                            if pos[i] - distance < periodic_boundaries[i][1]
-                                push!(adjust_pos, unit_vectors[i])
-                            elseif pos[i] + distance > periodic_boundaries[i][2]
-                                push!(adjust_pos, -unit_vectors[i])
-                            end
-                        end
-                    end
-                    # finally we create all combinations of the unit_vectors and
-                    # adjust the position for each of this combination, and
-                    # searching for the neighbors
-                    for c in combinations(adjust_pos)
-                        if c != Any[]
-                            avec = reduce(+, c)
-                            # we construct the edges inside the search_func
-                            search_func(kdtree, collect(pos + avec), distance, 
-                                        from_ids, from_edges, to_id)
-                        end
-                    end
-                end
-            end
+            #     for (tidx, (to_id, pos)) in enumerate(zip(to_ids, to_poss))
+            #         adjust_pos = SVector{num_dims}[]
+            #         # and checking for which dimensions the agent pos in
+            #         # in the distance of a boundary. For this dimensions we
+            #         # calculating the unit vectors to the adjust_pos vector
+            #         for i in 1:num_dims
+            #             if active[i] 
+            #                 if pos[i] - distance < periodic_boundaries[i][1]
+            #                     push!(adjust_pos, unit_vectors[i])
+            #                 elseif pos[i] + distance > periodic_boundaries[i][2]
+            #                     push!(adjust_pos, -unit_vectors[i])
+            #                 end
+            #             end
+            #         end
+            #         # finally we create all combinations of the unit_vectors and
+            #         # adjust the position for each of this combination, and
+            #         # searching for the neighbors
+            #         for c in combinations(adjust_pos)
+            #             if c != Any[]
+            #                 avec = reduce(+, c)
+            #                 # we construct the edges inside the search_func
+            #                 search_func(kdtree, collect(pos + avec), distance, 
+            #                             from_ids, from_edges, to_id)
+            #             end
+            #         end
+            #     end
+            # end
 
         end
         
@@ -282,3 +296,20 @@ end
 #                               ToType, to_pos_func, edge_constructor;
 #                               kwargs...)
 # end
+
+
+
+function vector_from_to(from::SVector{N, Float64}, to::SVector{N, Float64}, 
+                        low::SVector{N, Float64}, high::SVector{N, Float64}) where N
+    map(from, to, low, high) do f, t, l, h
+        r = h - l
+        d = t - f
+        abs(d) > r/2 ? d - r * sign(d) : d
+    end
+end
+
+function vector_from_to(from::SVector{N, Float64}, to::SVector{N, Float64}, 
+                        pb::NTuple{2, SVector{N, Float64}}) where N
+    vector_from_to(from, to, pb[1], pb[2])
+end
+#33
