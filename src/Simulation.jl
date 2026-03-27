@@ -1,6 +1,7 @@
 import Base.deepcopy
 import Logging.with_logger
 import Graphs.nv
+import NearestNeighbors.KDTree
 using DataFrames
 export create_model
 export create_simulation, finish_simulation!, copy_simulation
@@ -32,6 +33,7 @@ mutable struct MPIWindows
 end
 
 MPIWindows() = MPIWindows(nothing, nothing, false)
+
 
 mutable struct AgentFields{T}
     read::AgentReadWrite{T}
@@ -151,6 +153,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(num_transitions::Int64),
                   :(logger::Log),
                   :(h5file::Union{HDF5.File, Nothing}),
+                  :(neighbors_info::NeighborsInfo),
                   :(external::Dict{Any, Any}),
                   edgefields...,
                   nodefields...)
@@ -310,6 +313,7 @@ function create_simulation(model::Model,
         num_transitions = 0,
         logger = create_logger($name, $logging, $debug, $overwrite_file),
         h5file = nothing, # we need the sim instance to create the h5file
+        neighbors_info = NeighborsInfo(),
         # allows the client to attach arbitrary information, that will
         # be removed in finish_simulation.
         external = Dict{Any, Any}() 

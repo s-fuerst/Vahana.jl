@@ -5,6 +5,19 @@ using StaticArrays
 import Combinatorics: combinations
 import NearestNeighbors: PeriodicTree, KDTree, knn, inrange, Euclidean
 
+
+const _empty_kdtree = KDTree(zeros(1, 0))
+
+struct NeighborsInfo
+    kdtree::KDTree
+    ids::Vector
+    poss::Vector
+    edges::Union{Vector, Nothing}
+end
+
+NeighborsInfo() = NeighborsInfo(_empty_kdtree, [], [], nothing)
+    
+# edge_cons can be also the identity function to get the states instead
 function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
                                edge_cons, must_join) where T
     # Note: This function should not be called within a transition function
@@ -29,12 +42,14 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
             for i in 1:length(states)
                 push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
                 push!(poss, pos_func(states[i]))
-                if edge_cons !== nothing
+                if edge_cons !== nothing && edge_cons !== identity
                     if typeof(edge_cons) == DataType
                         push!(edges, edge_cons())
                     else
                         push!(edges, edge_cons(states[i]))
                     end
+                elseif edge_cons == identity
+                    edges = states
                 end
             end
         else
@@ -103,7 +118,7 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
     if edge_cons !== nothing
         (ids, poss, edges)
     else
-        (ids, poss)
+        (ids, poss, nothing)
     end
 end
 
@@ -115,6 +130,73 @@ end
 # TODO update doc
 # TODO: add tests for edge_constructor with state and
 # from_filter. Write documentation
+
+function _get_ids_poss_states(sim, types, pos_field, filter, edge_constructor)
+    _log_info(sim, "<Begin> _get_ids_poss_states!")
+
+    types = applicable(iterate, types) ? types : [ types ]
+
+    pos_funcs = map(t -> _make_pos_func_val(t, Val(pos_field)), types)
+
+    (ids, poss, edges) =
+        _agents_ids_states_and_edges(sim, types[1],
+                                     pos_funcs[1], filter,
+                                     edge_constructor, true)
+
+    if length(types) > 1
+        for n in 2:length(types)
+            i, p, e =
+                _agents_ids_states_and_edges(sim, types[n],
+                                             pos_funcs[n], filter,
+                                             edge_constructor, true)
+            append!(ids, i)
+            append!(poss, p)
+            if edge_cons !== nothing
+                append!(edges, e)
+            end
+        end
+    end
+
+    _log_info(sim, "<End> _get_ids_poss_states!")
+
+    (ids, poss, edges)
+end
+
+
+function _create_kdtree!(sim,
+                  from_poss,
+                  periodic_lower,
+                  periodic_upper,
+                  metric,
+                  leafsize,
+                  reorder)
+    _log_info(sim, "<Begin> _create_kdtree!")
+
+    if periodic_upper !== nothing
+        if periodic_lower === nothing
+            periodic_lower = fill(0.0, length(periodic_upper)) |>
+                SVector{length(periodic_upper)}
+        end
+    end
+
+    matrix = reduce(hcat, from_poss)
+    if eltype(matrix) <: Int
+        matrix = Float64.(matrix)
+        if periodic_upper !== nothing
+            periodic_lower = map(l -> Float64(l), periodic_lower)
+            periodic_upper = map(u -> Float64(u + 1), periodic_upper)
+        end
+    end
+    kdtree = KDTree(matrix, metric; leafsize=leafsize, reorder=reorder)
+
+    if periodic_upper !== nothing
+        kdtree = PeriodicTree(kdtree, periodic_lower, periodic_upper)
+    end
+    
+    _log_info(sim, "<End> _create_kdtree!")
+
+    kdtree
+end
 
 
 """
@@ -151,64 +233,23 @@ function connect_spatial_neighbors!(sim,
                              reorder = true) where {N, T1, T2}
 
     with_logger(sim) do
-        @info "<Begin> connect_spatial_neighbors!" from_type to_type distance
+        @info "<Begin> connect_spatial_neighbors!" from_types to_types
     end
 
-    from_types = applicable(iterate, from_types) ? from_types : [ from_types ]
-    to_types = applicable(iterate, to_types) ? to_types : [ to_types ]
-    
-
-    from_pos_funcs = map(t -> _make_pos_func_val(t, Val(from_pos_field)),
-                         from_types)
-
-    to_pos_funcs = map(t -> _make_pos_func_val(t, Val(to_pos_field)),
-                       to_types)
-
-    function search_func(kdtree, pos, distance, from_ids, from_states, to)
-        for fidx in inrange(kdtree, pos, distance)
-            if from_ids[fidx] != to
-                add_edge!(sim, from_ids[fidx], to, from_edges[fidx])
-            end
-        end
-    end
-
-    # we must collect this always, even in the case that to_ids is empty
-    # as we have collective MPI calls in this function
-    (from_ids, from_poss, from_edges) =
-        _agents_ids_states_and_edges(sim, from_types[1],
-                                     from_pos_funcs[1], from_filter,
-                                     edge_constructor, true)
-
-    if length(from_types) > 1
-        for n in 2:length(from_types)
-            i, p, e =
-                _agents_ids_states_and_edges(sim, from_types[n],
-                                             from_pos_funcs[n], from_filter,
-                                             edge_constructor, true)
-            append!(from_ids, i)
-            append!(from_poss, p)
-            append!(from_edges, e)
-        end
-    end
+    (from_ids, from_poss, from_edges) = _get_ids_poss_states(sim,
+                                                             from_types,
+                                                             from_pos_field,
+                                                             from_filter,
+                                                             edge_constructor)
 
     if length(from_ids) > 0
-        if periodic_upper !== nothing
-            if periodic_lower === nothing
-                periodic_lower = fill(0.0, length(periodic_upper)) |>
-                    SVector{length(periodic_upper)}
-            end
-        end
-        # first we construct the KDTree with the information
-        # of the agents from all processes.
-        matrix = reduce(hcat, from_poss)
-        if eltype(matrix) <: Int
-            matrix = Float64.(matrix)
-            if periodic_upper !== nothing
-                periodic_lower = map(l -> Float64(l), periodic_lower)
-                periodic_upper = map(u -> Float64(u + 1), periodic_upper)
-            end
-        end
-        kdtree = KDTree(matrix, metric; leafsize=25, reorder=reorder)
+        kdtree = _create_kdtree!(sim,
+                                 from_poss,
+                                 periodic_lower,
+                                 periodic_upper,
+                                 metric,
+                                 leafsize,
+                                 reorder)
 
         # Prepare writing edges if simulation is not initialized
         edge_type = if typeof(edge_constructor) != DataType
@@ -225,83 +266,22 @@ function connect_spatial_neighbors!(sim,
         sim.intransition = true
 
         # collect the ids and pos vectors
-        (to_ids, to_poss) =
-            _agents_ids_states_and_edges(sim, to_types[1],
-                                         to_pos_funcs[1], to_filter,
-                                         nothing, false)
-
-        if length(to_types) > 1
-            for n in 2:length(to_types)
-                i, p=
-                    _agents_ids_states_and_edges(sim, to_types[n],
-                                             to_pos_funcs[n], to_filter,
-                                             nothing, true)
-                append!(to_ids, i)
-                append!(to_poss, p)
-            end
-        end
+        (to_ids, to_poss) = _get_ids_poss_states(sim,
+                                                 to_types,
+                                                 to_pos_field,
+                                                 to_filter,
+                                                 nothing)
 
         # iterate over the ids and search for neighbors
         if length(to_ids) > 0
-            if periodic_upper !== nothing
-                kdtree = PeriodicTree(kdtree, periodic_lower, periodic_upper)
-            end
             for (to_id, pos) in zip(to_ids, to_poss)
-                # we construct the edges inside the search_func
-                search_func(kdtree, collect(pos), distance, from_ids,
-                            from_edges, to_id)
+                # we construct the edges 
+                for fidx in inrange(kdtree, pos, distance)
+                    if from_ids[fidx] != to_id
+                        add_edge!(sim, from_ids[fidx], to_id, from_edges[fidx])
+                    end
+                end
             end
-
-            # if periodic_boundaries !== nothing && use_periodic_tree == false
-            #     # we start by determining for with dimensions boundaries
-            #     # are given and calculating from the boundaries tuple
-            #     # the offset that must be added to the position in
-            #     # form of a unit_vector.
-            #     num_dims = length(periodic_boundaries)
-            #     active = zeros(Bool, num_dims)
-            #     unit_vectors = fill(SVector{num_dims}(zeros(num_dims)), num_dims)
-            #     for i in 1:num_dims
-            #         if typeof(periodic_boundaries[i]) != Tuple{}
-            #             offset = periodic_boundaries[i][2] -
-            #                 periodic_boundaries[i][1]
-            #             # for integer periodics, the left and right side has a distance
-            #             # of 1 (for float, the distance is 0), so we must incr.
-            #             # the unit_vector size
-            #             o2 = eltype(to_poss[1][i]) <: Int ? 1 : 0
-            #             unit_vectors[i] =
-            #                 setindex(unit_vectors[i], offset + o2, i)
-            #             active[i] = true
-            #         end
-            #     end
-            #     # then we iterate over all positions
-
-            #     for (tidx, (to_id, pos)) in enumerate(zip(to_ids, to_poss))
-            #         adjust_pos = SVector{num_dims}[]
-            #         # and checking for which dimensions the agent pos in
-            #         # in the distance of a boundary. For this dimensions we
-            #         # calculating the unit vectors to the adjust_pos vector
-            #         for i in 1:num_dims
-            #             if active[i] 
-            #                 if pos[i] - distance < periodic_boundaries[i][1]
-            #                     push!(adjust_pos, unit_vectors[i])
-            #                 elseif pos[i] + distance > periodic_boundaries[i][2]
-            #                     push!(adjust_pos, -unit_vectors[i])
-            #                 end
-            #             end
-            #         end
-            #         # finally we create all combinations of the unit_vectors and
-            #         # adjust the position for each of this combination, and
-            #         # searching for the neighbors
-            #         for c in combinations(adjust_pos)
-            #             if c != Any[]
-            #                 avec = reduce(+, c)
-            #                 # we construct the edges inside the search_func
-            #                 search_func(kdtree, collect(pos + avec), distance, 
-            #                             from_ids, from_edges, to_id)
-            #             end
-            #         end
-            #     end
-            # end
         end
         
         sim.intransition = false
@@ -314,25 +294,8 @@ function connect_spatial_neighbors!(sim,
     _log_info(sim, "<End> connect_spatial_neighbors!")
 end
 
-
-# function connect_spatial_neighbors!(sim,
-#                              ::Type{FromType},
-#                              ::Type{ToType},
-#                              edge_constructor;
-#                              from_pos_field::Symbol = :pos,
-#                              to_pos_field::Symbol = :pos,
-#                              kwargs...) where {FromType, ToType}
-
-#     from_pos_func = _make_pos_func_val(FromType, Val(from_pos_field))
-#     to_pos_func = _make_pos_func_val(ToType, Val(to_pos_field))
-
-#     connect_spatial_neighbors!(sim, FromType, from_pos_func, 
-#                               ToType, to_pos_func, edge_constructor;
-#                               kwargs...)
-# end
-
 function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64}, 
-                  periodic_upper::SVector{N, Float64}) where N
+                periodic_upper::SVector{N, Float64}) where N
     map(from, to, periodic_upper) do f, t, upper
         dist = t - f
         abs(dist) > upper/2 ? dist - upper * sign(dist) : dist
@@ -340,8 +303,8 @@ function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64},
 end
 
 function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64}, 
-                  periodic_lower::SVector{N, Float64},
-                  periodic_upper::SVector{N, Float64}) where N
+                periodic_lower::SVector{N, Float64},
+                periodic_upper::SVector{N, Float64}) where N
     map(from, to, periodic_lower, periodic_upper) do f, t, low, upper
         range = upper - low
         dist = t - f
@@ -350,11 +313,9 @@ function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64},
 end
 
 function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64}, 
-                  periodic_boundaries::NTuple{2, SVector{N, Float64}}) where N
+                periodic_boundaries::NTuple{2, SVector{N, Float64}}) where N
     vector_from_to(from, to, pb[1], pb[2])
 end
-
-
 
 function periodic_clamp(pos::SVector{N, T},
                  periodic_lower::SVector{N, T},
