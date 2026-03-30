@@ -16,7 +16,7 @@ struct NeighborsInfo
 end
 
 NeighborsInfo() = NeighborsInfo(_empty_kdtree, [], [], nothing)
-    
+
 # edge_cons can be also the identity function to get the states instead
 function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
                                edge_cons, must_join) where T
@@ -242,6 +242,16 @@ function connect_spatial_neighbors!(sim,
                                                              from_filter,
                                                              edge_constructor)
 
+
+    function search_func(kdtree, pos, from_ids, from_states, to)
+        for fidx in inrange(kdtree, pos, distance)
+            if from_ids[fidx] != to
+                add_edge!(sim, from_ids[fidx], to, from_edges[fidx])
+            end
+        end
+    end
+
+    
     if length(from_ids) > 0
         kdtree = _create_kdtree!(sim,
                                  from_poss,
@@ -251,6 +261,8 @@ function connect_spatial_neighbors!(sim,
                                  leafsize,
                                  reorder)
 
+
+        
         # Prepare writing edges if simulation is not initialized
         edge_type = if typeof(edge_constructor) != DataType
             # edge_constructor is a function, get the type from the first edge
@@ -275,12 +287,8 @@ function connect_spatial_neighbors!(sim,
         # iterate over the ids and search for neighbors
         if length(to_ids) > 0
             for (to_id, pos) in zip(to_ids, to_poss)
-                # we construct the edges 
-                for fidx in inrange(kdtree, pos, distance)
-                    if from_ids[fidx] != to_id
-                        add_edge!(sim, from_ids[fidx], to_id, from_edges[fidx])
-                    end
-                end
+                # we construct the edges in the search_func
+                search_func(kdtree, collect(pos), from_ids, from_edges, to_id)
             end
         end
         
