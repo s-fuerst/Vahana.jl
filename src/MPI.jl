@@ -168,7 +168,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                 continue
             end
             
-            edgefield = getproperty(sim, Symbol(ET))
+            edgefield = simfield(sim, ET)
             # there are two reasons why we must transmit the agentstate:
             # - the agentstates has changed since the last transmit:
             #   last_change >= last_transmit[ET]

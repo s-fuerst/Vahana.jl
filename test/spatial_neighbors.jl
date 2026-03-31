@@ -45,13 +45,13 @@ spatial_model = ModelTypes() |>
     sim = create_simulation(spatial_model)
 
     # e.g. lowercase: from, uppercase: to
-    #   1   2   3   4   5
-    # 1 aAB             b
-    # 2 c   C
-    # 3 d
-    # 4
-    # 5 D
-    # 6             e   E
+    #   0   1   2   3   4
+    # 0 aAB             b
+    # 1 c   C
+    # 2 d
+    # 3
+    # 4 D
+    # 5             e   E
     # We add source agents (From) with different positions
     from_a = add_agent!(sim, AgentWithPosFrom((0,0), 5))
     from_b = add_agent!(sim, AgentWithPosFrom((4,0), 20))
@@ -185,8 +185,8 @@ spatial_model = ModelTypes() |>
                                AgentWithPosTo, 
                                _ -> Neighbor();
                                distance = 1.0,
-                               periodic_lower = SVector(1,1),
-                               periodic_upper = SVector(5,6))
+                               periodic_lower = [1,1],
+                               periodic_upper = [5,6])
     
     es = all_edges(sim, Neighbor)
     @test count_edges(es, idmap, to_A) == 3
@@ -316,3 +316,44 @@ spatial_model = ModelTypes() |>
     sleep(mpi.rank * 0.05)
 end
 
+
+@testset "spatial apply" begin
+    sim = create_simulation(spatial_model)
+
+    # e.g. lowercase: from, uppercase: to
+    #   0   1   2   3   4
+    # 0 aAB             b
+    # 1 c   C
+    # 2 d
+    # 3
+    # 4 D
+    # 5             e   E
+    # We add source agents (From) with different positions
+    from_a = add_agent!(sim, AgentWithPosFrom((0,0), 5))
+    from_b = add_agent!(sim, AgentWithPosFrom((4,0), 20))
+    from_c = add_agent!(sim, AgentWithPosFrom((0,1), 20))
+    from_d = add_agent!(sim, AgentWithPosFrom((0,2), 5))
+    from_e = add_agent!(sim, AgentWithPosFrom((3,5), 20))
+
+    # And target agents (To) at the same positions
+    to_A = add_agent!(sim, AgentWithPosTo((0,0)))
+    to_B = add_agent!(sim, AgentWithPosTo((0,0)))
+    to_C = add_agent!(sim, AgentWithPosTo((1,1)))
+    to_D = add_agent!(sim, AgentWithPosTo((0,4)))
+    to_E = add_agent!(sim, AgentWithPosTo((4,5)))
+
+    idmap = finish_init!(sim; return_idmapping = true)
+
+    function check1(self, _, sim)
+        @test length(find_neighbors(sim, SVector(0,0), 1.0, AgentWithPosFrom)) == 3
+        @test length(find_neighbors_iter(sim, SVector(1,1), 1.0, AgentWithPosFrom, AgentWithPosFrom)) == 1
+        @test length(find_neighbors(sim, SVector(0,4), 1.0, AgentWithPosFrom)) == 0
+        @test length(find_neighbors_iter(sim, SVector(4,5), 1.0, AgentWithPosFrom, AgentWithPosFrom)) == 2
+    end
+    
+    apply!(sim, check1, AgentWithPosTo, AgentWithPosFrom , [];
+           spatial_neighbors = SpatialNeighbors(AgentWithPosFrom, [4,5]))
+               
+
+    sleep(mpi.rank * 0.05)
+end

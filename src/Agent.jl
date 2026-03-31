@@ -245,15 +245,15 @@ function all_agents(sim, ::Type{T}, all_ranks = true;
         To get the number of agents, you can call num_agents instead.
     """
     states = sim.initialized ?
-        getproperty(sim, Symbol(T)).read.state : 
-        getproperty(sim, Symbol(T)).write.state  
+        simfield(sim, T).read.state : 
+        simfield(sim, T).write.state  
 
     living = if has_hint(sim, T, :Immortal, :Agent)
         map(statemapfunc, states)
     else
         died = sim.initialized ?
-            getproperty(sim, Symbol(T)).read.died :
-            getproperty(sim, Symbol(T)).write.died  
+            simfield(sim, T).read.died :
+            simfield(sim, T).write.died  
 
         [ statemapfunc(states[i]) for i in 1:length(died) if died[i] == false ]
     end
@@ -299,15 +299,15 @@ function all_agentids(sim, ::Type{T}, all_ranks = true) where T
     # we are only interessted in the states field to get the length
     # as this vector is also used for stateless agenttypes
     states = sim.initialized ?
-        getproperty(sim, Symbol(T)).read.state : 
-        getproperty(sim, Symbol(T)).write.state  
+        simfield(sim, T).read.state : 
+        simfield(sim, T).write.state  
 
     l = if has_hint(sim, T, :Immortal, :Agent)
         [ agent_id(typeid(sim, T), AgentNr(i)) for i in 1:length(states) ]
     else
         died = sim.initialized ?
-            getproperty(sim, Symbol(T)).read.died :
-            getproperty(sim, Symbol(T)).write.died  
+            simfield(sim, T).read.died :
+            simfield(sim, T).write.died  
 
         [ agent_id(typeid(sim, T), AgentNr(i))
           for i in 1:length(died) if died[i] == false ]
@@ -329,7 +329,7 @@ number of agents managed by the process.
 See also [`add_agents!`] and [`all_agents`](@ref).
 """
 function num_agents(sim, ::Type{T}, sum_ranks = true) where T
-    field = getproperty(sim, Symbol(T))
+    field = simfield(sim, T)
     attr = sim.typeinfos.nodes_attr[T]
 
     #    independent = :Independent in attr[:hints]

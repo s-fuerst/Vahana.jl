@@ -38,6 +38,7 @@ Base.@kwdef struct ModelTypes
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
     params::Vector{Param} = Vector{Param}()
     globals::Vector{Global} = Vector{Global}()
+    assymbol::Dict{DataType, Symbol} = Dict{DataType, Symbol}()
 end
 
 """
@@ -86,6 +87,7 @@ function register_agenttype!(types::ModelTypes, ::Type{T}, hints...) where T
                                 maximal number of types already registered"
     push!(types.nodes_types, T)
     types.nodes_type2id[T] = type_number
+    types.assymbol[T] = Symbol(T)
     types.nodes_id2type[type_number] = T
 
     types.nodes_attr[T] = Dict{Symbol,Any}()
@@ -161,6 +163,7 @@ function register_edgetype!(types::ModelTypes, ::Type{T}, hints...;
     @assert isbitstype(T) "Edgetypes $T must be bitstypes"
     push!(types.edges_types, T)
     types.edges_attr[T] = kwargs
+    types.assymbol[T] = Symbol(T)
     hints = Set{Symbol}(hints)
     for hint in hints
         @assert hint in [:Stateless, :IgnoreFrom, :SingleEdge, :SingleType,
@@ -286,4 +289,5 @@ end
 
 register_global!(name, init_value::T) where T =
     types -> register_global!(types, name, init_value) 
+
 

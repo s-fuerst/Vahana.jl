@@ -1,46 +1,56 @@
 export connect_spatial_neighbors!
 export periodic_diff, periodic_clamp
+export SpatialNeighbors
+export find_neighbors, find_neighbors_iter
 
 using StaticArrays
 import Combinatorics: combinations
 import NearestNeighbors: PeriodicTree, KDTree, knn, inrange, Euclidean
 
-
-const _empty_kdtree = KDTree(zeros(1, 0))
-
-struct NeighborsInfo
-    kdtree::KDTree
-    ids::Vector
-    poss::Vector
-    edges::Union{Vector, Nothing}
+struct NeighborsInfo{T}
+    kdtree::Union{PeriodicTree, KDTree}
+    states::Vector{T}
+    snhash::UInt64
+    empty::Bool
 end
 
-NeighborsInfo() = NeighborsInfo(_empty_kdtree, [], [], nothing)
+NeighborsInfo(sn) = NeighborsInfo(KDTree(zeros(1, 0)), [], hash(sn), true)
 
 # edge_cons can be also the identity function to get the states instead
 function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
-                               edge_cons, must_join) where T
+                               edge_cons, must_join; ignore_ids = false) where T
     # Note: This function should not be called within a transition function
     
-    states = sim.initialized ?
-        getproperty(sim, Symbol(T)).read.state : 
-        getproperty(sim, Symbol(T)).write.state  
+    states::Vector{T} = sim.initialized ?
+        simfield(sim, T).read.state : 
+        simfield(sim, T).write.state  
 
-    ids = AgentNr[]
-    sizehint!(ids, length(states))
+    if ! ignore_ids
+        ids = AgentNr[]
+        sizehint!(ids, length(states))
+    end
 
     poss = Vector{Base.return_types(pos_func)[1]}()
     sizehint!(poss, length(states))
 
+    immortal = has_hint(sim, T, :Immortal, :Agent)
+    
     if edge_cons !== nothing
-        edges = Vector{Base.return_types(edge_cons)[1]}()
-        sizehint!(edges, length(states))
+        edges = if immortal && edge_cons == identity
+            states
+        else    
+            e = Vector{Base.return_types(edge_cons)[1]}()
+            sizehint!(e, length(states))
+            e
+        end
     end
     
     if filter_pred === nothing
-        if has_hint(sim, T, :Immortal, :Agent)
+        if immortal
             for i in 1:length(states)
-                push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                if ! ignore_ids
+                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                end
                 push!(poss, pos_func(states[i]))
                 if edge_cons !== nothing && edge_cons !== identity
                     if typeof(edge_cons) == DataType
@@ -48,18 +58,18 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
                     else
                         push!(edges, edge_cons(states[i]))
                     end
-                elseif edge_cons == identity
-                    edges = states
                 end
             end
         else
-            died = sim.initialized ?
-                getproperty(sim, Symbol(T)).read.died :
-                getproperty(sim, Symbol(T)).write.died
+            died::Vector{Bool} = sim.initialized ?
+                simfield(sim, T).read.died :
+                simfield(sim, T).write.died
             
             for i in 1:length(died)
                 if died[i] == false
-                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    if ! ignore_ids
+                        push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    end
                     push!(poss, pos_func(states[i]))
                     if edge_cons !== nothing
                         if typeof(edge_cons) == DataType
@@ -75,7 +85,9 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
         living = if has_hint(sim, T, :Immortal, :Agent)
             for i in 1:length(states)
                 if filter_pred(states[i])
-                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    if ! ignore_ids
+                        push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    end
                     push!(poss, pos_func(states[i]))
                     if edge_cons !== nothing
                         if typeof(edge_cons) == DataType
@@ -88,12 +100,14 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
             end
         else
             died = sim.initialized ?
-                getproperty(sim, Symbol(T)).read.died :
-                getproperty(sim, Symbol(T)).write.died  
+                simfield(sim, T).read.died :
+                simfield(sim, T).write.died  
 
             for i in 1:length(died)
                 if died[i] == false && filter_pred(states[i])
-                    push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    if ! ignore_ids
+                        push!(ids, agent_id(typeid(sim, T), AgentNr(i)))
+                    end
                     push!(poss, pos_func(states[i]))
                     if edge_cons !== nothing
                         if typeof(edge_cons) == DataType
@@ -108,17 +122,20 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
     end
 
     if must_join && mpi.active
-        ids = join(ids)
+        if ! ignore_ids
+            ids = join(ids)
+        end
         poss = join(poss)
         if edge_cons !== nothing
             edges = join(edges)
         end
     end
 
-    if edge_cons !== nothing
-        (ids, poss, edges)
+    e = edge_cons !== nothing ? edges : nothing
+    if ignore_ids
+        (nothing, poss, e)
     else
-        (ids, poss, nothing)
+        (ids, poss, e)
     end
 end
 
@@ -131,7 +148,8 @@ end
 # TODO: add tests for edge_constructor with state and
 # from_filter. Write documentation
 
-function _get_ids_poss_states(sim, types, pos_field, filter, edge_constructor)
+function _get_ids_poss_states(sim, types, pos_field, filter, edge_constructor;
+                       ignore_ids = false)
     _log_info(sim, "<Begin> _get_ids_poss_states!")
 
     types = applicable(iterate, types) ? types : [ types ]
@@ -141,7 +159,8 @@ function _get_ids_poss_states(sim, types, pos_field, filter, edge_constructor)
     (ids, poss, edges) =
         _agents_ids_states_and_edges(sim, types[1],
                                      pos_funcs[1], filter,
-                                     edge_constructor, true)
+                                     edge_constructor, true;
+                                     ignore_ids)
 
     if length(types) > 1
         for n in 2:length(types)
@@ -198,6 +217,22 @@ function _create_kdtree!(sim,
     kdtree
 end
 
+# we modify agenttypes in apply!
+Base.@kwdef mutable struct SpatialNeighbors
+    agenttypes::Union{Vector{DataType}, DataType}
+    state_func = identity
+    pos_field = :pos
+    filter::Union{Function, Nothing} = nothing
+    periodic_lower::Union{Vector, Nothing} = nothing
+    periodic_upper::Union{Vector, Nothing} = nothing
+    metric::Any = Euclidean()
+    leafsize = 25
+    reorder = false
+end
+
+SpatialNeighbors(agenttypes) = SpatialNeighbors(agenttypes = agenttypes)    
+SpatialNeighbors(agenttypes, periodic_upper) =
+    SpatialNeighbors(agenttypes = agenttypes, periodic_upper = periodic_upper)
 
 """
     connect_spatial_neighbors!(sim, from_type::DataType, to_type::DataType, edge_constructor; distance = 1.0, periodic = true, fieldname = :Creates)
@@ -226,11 +261,11 @@ function connect_spatial_neighbors!(sim,
                              from_filter = nothing,
                              to_filter = nothing,
                              distance = 1.0,
-                             periodic_lower::Union{SVector{N, T1}, Nothing} = nothing,
-                             periodic_upper::Union{SVector{N, T2}, Nothing} = nothing,
+                             periodic_lower = nothing,
+                             periodic_upper = nothing,
                              metric = Euclidean(),
                              leafsize = 25,
-                             reorder = true) where {N, T1, T2}
+                             reorder = true)
 
     with_logger(sim) do
         @info "<Begin> connect_spatial_neighbors!" from_types to_types
@@ -337,3 +372,88 @@ function periodic_clamp(pos::SVector{N, T},
     mod.(pos, periodic_upper) 
 end
 
+struct NeighborsIterator{T}
+    nstates::Vector{T}
+    fidx::Vector{Int}
+    len::Int
+end
+
+function iterate(niter::NeighborsIterator{T})::Union{Tuple{T, Int64}, Nothing} where T
+    iterate(niter, 1)
+end
+
+function iterate(niter::NeighborsIterator{T}, idx::Int)::Union{Tuple{T, Int64}, Nothing} where T
+    if niter.len >= idx
+        (niter.nstates[niter.fidx[idx]], idx + 1)
+    else
+        nothing
+    end
+end
+
+Base.eltype(::Type{NeighborsIterator{T}}) where T = T
+Base.length(niter::NeighborsIterator{T}) where T = niter.len
+Base.IteratorSize(::Type{NeighborsIterator{T}}) where T = Base.HasLength()
+Base.IteratorEltype(::Type{NeighborsIterator{T}}) where T = Base.HasEltype()
+
+function find_neighbors_iter(sim, pos::SVector{N, T}, distance, ::Type{AT}, ::Type{ST})::NeighborsIterator{ST} where {N, T, AT, ST}
+    @mayassert simfield(sim, AT).prepared_spatial_neighbors """
+    $AT is not element of the `spatial_neighbors` keyword of apply(!)
+    """
+
+    if sim.neighbors_infos[AT].empty
+        NeighborsIterator(ST[], Int[], 0)
+    else
+        ni::NeighborsInfo{ST} = sim.neighbors_infos[AT]
+        fidx = inrange(ni.kdtree, pos, distance)
+        NeighborsIterator(ni.states, fidx, length(fidx))
+    end
+end
+
+function find_neighbors(sim, pos::SVector{N, T}, distance, ::Type{AT}) where {N, T, AT}
+    @mayassert simfield(sim, AT).prepared_spatial_neighbors """
+    $AT is not element of the `spatial_neighbors` keyword of apply(!)
+    """
+
+    ni = sim.neighbors_infos[AT]
+    map(id -> ni.states[id], inrange(ni.kdtree, pos, distance))
+end
+
+function prepare_spatial_neighbors!(sim, sn)
+    # TODO: test reuse of existing Infos (and removing when changed)
+    
+    if sn !== nothing
+        for at in sn.agenttypes
+            if ! haskey(sim.neighbors_infos, at) ||
+                sim.neighbors_infos[at].snhash != hash(sn)
+
+                (_, po, st) = _get_ids_poss_states(sim, at, sn.pos_field,
+                                                   sn.filter, sn.state_func;
+                                                   ignore_ids = true)
+
+                if length(st) > 0                
+                    kdtree = _create_kdtree!(sim, po,
+                                             sn.periodic_lower, sn.periodic_upper,
+                                             sn.metric, sn.leafsize, sn.reorder)
+                    sim.neighbors_infos[at] =
+                        NeighborsInfo{typeof(first(st))}(kdtree, st, hash(sn), false)
+                else
+                    sim.neighbors_infos[at] = NeighborsInfo(sn)
+                end
+            end
+            simfield(sim, at).prepared_spatial_neighbors = true
+        end
+    end
+end
+
+function finish_spatial_neighbors!(sim, sn, write)
+    if sn !== nothing
+        for at in sn.agenttypes
+            simfield(sim, at).prepared_spatial_neighbors = false
+        end
+    end
+    for w in write
+        if haskey(sim.neighbors_infos, w)
+            delete!(sim.neighbors_infos, w)
+        end
+    end
+end        

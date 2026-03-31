@@ -108,17 +108,19 @@ end
 # create symbol for the different fields of an agent/edgetype
 
 # TODO: adjust edgefieldfactory to macros
-writefield(T) = Symbol(T).write
+# writefield(T) = Symbol(T).write
 
-readfield(T) = Symbol(T).read
+# readfield(T) = Symbol(T).read
 
 # nextidfield(T) = Symbol(T, "_nextid")
+
+simfield(sim, T::DataType) = getproperty(sim, sim.typeinfos.assymbol[T])
 
 macro nextid(T)
     field = Symbol(T)
     :( sim.$(field).nextid ) |> esc
 end 
-nextid(sim, T) = getproperty(sim, Symbol(T)).nextid
+nextid(sim, T) = simfield(sim, T).nextid
 
 macro agent(T)
     field = Symbol(T)
@@ -134,43 +136,43 @@ macro windows(T)
     field = Symbol(T)
     :( sim.$(field).mpiwindows ) |> esc
 end
-windows(sim, T) = getproperty(sim, Symbol(T)).mpiwindows
+windows(sim, T) = simfield(sim, T).mpiwindows
 
 macro readdied(T)
     field = Symbol(T)
     :( sim.$(field).read.died ) |> esc
 end
-readdied(sim, T) = getproperty(sim, Symbol(T)).read.died
+readdied(sim, T) = simfield(sim, T).read.died
 
 macro writedied(T)
     field = Symbol(T)
     :( sim.$(field).write.died ) |> esc
 end
-writedied(sim, T) = getproperty(sim, Symbol(T)).write.died
+writedied(sim, T) = simfield(sim, T).write.died
 
 macro readstate(T)
     field = Symbol(T)
     :( sim.$(field).read.state ) |> esc
 end
-readstate(sim, T) = getproperty(sim, Symbol(T)).read.state
+readstate(sim, T) = simfield(sim, T).read.state
 
 macro writestate(T)
     field = Symbol(T)
     :( sim.$(field).write.state ) |> esc
 end
-writestate(sim, T) = getproperty(sim, Symbol(T)).write.state
+writestate(sim, T) = simfield(sim, T).write.state
 
 macro readreuseable(T)
     field = Symbol(T)
     :( sim.$(field).read.reuseable ) |> esc
 end
-readreuseable(sim, T) = getproperty(sim, Symbol(T)).read.reuseable
+readreuseable(sim, T) = simfield(sim, T).read.reuseable
 
 macro writereuseable(T)
     field = Symbol(T)
     :( sim.$(field).write.reuseable ) |> esc
 end
-writereuseable(sim, T) = getproperty(sim, Symbol(T)).write.reuseable
+writereuseable(sim, T) = simfield(sim, T).write.reuseable
 
 macro agentwrite(T)
     field = Symbol(T)
@@ -186,32 +188,32 @@ macro edgewrite(T)
     field = Symbol(T)
     :( sim.$(field).write ) |> esc
 end
-edgewrite(sim, T) = getproperty(sim, Symbol(T)).write
+edgewrite(sim, T) = simfield(sim, T).write
 
 macro edgeread(T)
     field = Symbol(T)
     :( sim.$(field).read ) |> esc
 end
-edgeread(sim, T) = getproperty(sim, Symbol(T)).read
+edgeread(sim, T) = simfield(sim, T).read
 
 macro storage(T)
     field = Symbol(T)
     :( sim.$(field).storage ) |> esc
 end
-storage(sim, T) = getproperty(sim, Symbol(T)).storage
+storage(sim, T) = simfield(sim, T).storage
 
 macro agentsontarget(T)
     field = Symbol(T)
     :( sim.$(field).agentsontarget ) |> esc
 end
-agentsontarget(sim, T) = getproperty(sim, Symbol(T)).agentsontarget
+agentsontarget(sim, T) = simfield(sim, T).agentsontarget
 
 
 macro removeedges(T)
     field = Symbol(T)
     :( sim.$(field).removeedges ) |> esc
 end
-removeedges(sim, T) = getproperty(sim, Symbol(T)).removeedges
+removeedges(sim, T) = simfield(sim, T).removeedges
 
 
 # we use this tests are for the distributed version, in this case

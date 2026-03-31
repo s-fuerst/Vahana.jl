@@ -54,6 +54,8 @@ mutable struct AgentFields{T}
     last_transmit::Dict{DataType, Int64}
     # the last time that the agenttype was writable
     last_change::Int64
+    # this agenttype is in the with_spatial_neighbors argument of apply
+    prepared_spatial_neighbors::Bool
 end
 
 AgentFields(T::DataType) =
@@ -66,7 +68,8 @@ AgentFields(T::DataType) =
                 AgentNr(1), #nextid
                 MPIWindows(), 
                 Dict{DataType, Int64}(), #last_transmit
-                0) #last_change
+                0, #last_change
+                false) # prepared_spatial_neighbors 
 
 mutable struct EdgeFields{ET, EST}
     read::ET
@@ -153,7 +156,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(num_transitions::Int64),
                   :(logger::Log),
                   :(h5file::Union{HDF5.File, Nothing}),
-                  :(neighbors_info::NeighborsInfo),
+                  :(neighbors_infos::Dict{DataType, NeighborsInfo}),
                   :(external::Dict{Any, Any}),
                   edgefields...,
                   nodefields...)
@@ -262,11 +265,11 @@ See also [`create_model`](@ref), [`param`](@ref),
 and [`finish_init!`](@ref)
 """
 function create_simulation(model::Model,
-                    params::P = nothing,
-                    globals::G = nothing;
-                    name = model.name,
-                    filename = name, overwrite_file = true,
-                    logging = false, debug = false) where {P, G}
+                           params::P = nothing,
+                           globals::G = nothing;
+                           name = model.name,
+                           filename = name, overwrite_file = true,
+                           logging = false, debug = false) where {P, G}
 
     simsymbol = Symbol(model.name)
     
@@ -313,7 +316,10 @@ function create_simulation(model::Model,
         num_transitions = 0,
         logger = create_logger($name, $logging, $debug, $overwrite_file),
         h5file = nothing, # we need the sim instance to create the h5file
-        neighbors_info = NeighborsInfo(),
+        # we store the neighbor_infos per agenttype and reuse the
+        # the infos until the agenttype is writeable in an apply function
+        # in this case, we remove the agenttype from the dictonary
+        neighbors_infos = Dict{DataType, NeighborsInfo}(),
         # allows the client to attach arbitrary information, that will
         # be removed in finish_simulation.
         external = Dict{Any, Any}() 
@@ -423,8 +429,8 @@ See also [`register_agenttype!`](@ref), [`register_edgetype!`](@ref),
 [`apply!`](@ref) and [`finish_simulation!`](@ref)
 """
 function finish_init!(sim;
-               partition = Dict{AgentID, ProcessID}(),
-               return_idmapping = false, partition_algo = :Metis, distribute = true)
+                      partition = Dict{AgentID, ProcessID}(),
+                      return_idmapping = false, partition_algo = :Metis, distribute = true)
     @assert ! sim.initialized "You can not call finish_init! twice for the same simulation"
 
     _log_info(sim, "<Begin> finish_init!")
@@ -652,8 +658,8 @@ function set_param!(param::Symbol, value)
 end
 
 function maybeadd(coll,
-           id,
-           agent) 
+                  id,
+                  agent) 
     # the coll[id] writes into another container then
     # we use for the iteration
     @inbounds coll[id] = agent
@@ -661,8 +667,8 @@ function maybeadd(coll,
 end
 
 function maybeadd(_,
-           ::AgentNr,
-           ::Nothing)
+                  ::AgentNr,
+                  ::Nothing)
     nothing
 end
 
@@ -738,6 +744,18 @@ used for edgetypes without the :SingleType hint.
 
 See also [`apply`](@ref) and the [Applying Transition Function section
 in the tutorial](tutorial1.md#Applying-Transition-Functions)
+
+TODO: Add Documentation for
+spatial_neighbors dict:
+- agenttypes (from_types)
+- state_func (edge_constructor). Default `identity`
+- pos_field (from_pos_field). Default: `:pos`
+- filter (from_filter): Default: `nothing`
+- periodic_lower (nothing)
+- periodic_upper (nothing)
+- metric (Euclidean)
+- leafsize (25)
+- reorder (false)
 """
 function apply!(sim::Simulation,
          func::Function,
@@ -745,6 +763,7 @@ function apply!(sim::Simulation,
          read,
          write;
          add_existing = [],
+         spatial_neighbors = nothing,
          with_edge = nothing)
     @assert sim.initialized "You must call finish_init! before apply!"
 
@@ -767,6 +786,15 @@ function apply!(sim::Simulation,
     write = applicable(iterate, write) ? write : [ write ]
     add_existing = applicable(iterate, add_existing) ?
         add_existing : [ add_existing ]
+
+    sn = spatial_neighbors
+    if sn !== nothing
+        sn.agenttypes = applicable(iterate, sn.agenttypes) ?
+            sn.agenttypes : [ sn.agenttypes ]
+        for at in sn.agenttypes
+            @assert at in read "$sn is in `sn` but not in `read`"
+        end
+    end
 
     for c in call
         @assert ! (c in add_existing) "$c can not be element of `add_existing`"
@@ -791,6 +819,8 @@ function apply!(sim::Simulation,
     
     foreach(prepare_write!(sim, read, [call; add_existing]), write)
 
+    prepare_spatial_neighbors!(sim, sn)
+
     MPI.Barrier(MPI.COMM_WORLD)
 
     for C in call
@@ -804,7 +834,7 @@ function apply!(sim::Simulation,
         else
             rfunc = C in read ? transition_with_read_with_edge! :
                 transition_without_read_with_edge!
-                rfunc(wfunc, sim, func, C, with_edge)
+            rfunc(wfunc, sim, func, C, with_edge)
         end    
         _log_debug(sim, "<End> tf_call!")
     end
@@ -829,6 +859,8 @@ function apply!(sim::Simulation,
     foreach(finish_write!(sim), writeableAT)
 
     foreach(finish_write!(sim), writeableET)
+
+    finish_spatial_neighbors!(sim, sn, write)
 
     sim.intransition = false
     
