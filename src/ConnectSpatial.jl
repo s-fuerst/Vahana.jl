@@ -38,7 +38,7 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
     if edge_cons !== nothing
         edges = if immortal && edge_cons == identity
             states
-        else    
+        else
             e = Vector{Base.return_types(edge_cons)[1]}()
             sizehint!(e, length(states))
             e
@@ -143,6 +143,7 @@ end
 function _make_pos_func_val(::Type{T}, ::Val{fieldname}) where {T, fieldname}
     state::T -> getfield(state, fieldname)
 end
+
 
 # TODO update doc
 # TODO: add tests for edge_constructor with state and
@@ -418,6 +419,13 @@ function find_neighbors(sim, pos::SVector{N, T}, distance, ::Type{AT}) where {N,
     map(id -> ni.states[id], inrange(ni.kdtree, pos, distance))
 end
 
+# the state_func can be given with an anonymous function like: state -> state.count
+# but then it is not possible to inference the return type of this function.
+# But we know the type of state, and add this information here
+function _make_state_func_val(::Type{T}, state_func) where {T}
+    state::T -> state_func(state)
+end
+
 function prepare_spatial_neighbors!(sim, sn)
     # TODO: test reuse of existing Infos (and removing when changed)
     
@@ -426,8 +434,10 @@ function prepare_spatial_neighbors!(sim, sn)
             if ! haskey(sim.neighbors_infos, at) ||
                 sim.neighbors_infos[at].snhash != hash(sn)
 
+                state_func = _make_state_func_val(at, sn.state_func)
+                
                 (_, po, st) = _get_ids_poss_states(sim, at, sn.pos_field,
-                                                   sn.filter, sn.state_func;
+                                                   sn.filter, state_func;
                                                    ignore_ids = true)
 
                 if length(st) > 0                
