@@ -285,6 +285,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             end
         end
         if ! add_existing
+            # TODO: this looks confusing. I expect that this is working
+            # as we read from the shared memory, but check if this can
+            # be removed
             @agentread($T) = AgentReadWrite($T)
             @agentwrite($T) = AgentReadWrite($T)
             @nextid($T) = 1
