@@ -4,7 +4,6 @@ export SpatialNeighbors
 export find_neighbors, find_neighbors_iter
 
 using StaticArrays
-import Combinatorics: combinations
 import NearestNeighbors: PeriodicTree, KDTree, knn, inrange, Euclidean
 
 struct NeighborsInfo{T}
@@ -171,7 +170,7 @@ function _get_ids_poss_states(sim, types, pos_field, filter, edge_constructor;
                                              edge_constructor, true)
             append!(ids, i)
             append!(poss, p)
-            if edge_cons !== nothing
+            if edge_constructor !== nothing
                 append!(edges, e)
             end
         end
@@ -288,6 +287,11 @@ function connect_spatial_neighbors!(sim,
     end
 
     
+    if sim.initialized
+        prepare_write!(sim, [], add_existing, edge_type)
+    end
+    sim.intransition = true
+
     if length(from_ids) > 0
         kdtree = _create_kdtree!(sim,
                                  from_poss,
@@ -308,10 +312,6 @@ function connect_spatial_neighbors!(sim,
             edge_constructor
         end
 
-        if sim.initialized
-            prepare_write!(sim, [], add_existing, edge_type)
-        end
-        sim.intransition = true
 
         # collect the ids and pos vectors
         (to_ids, to_poss) = _get_ids_poss_states(sim,
@@ -327,12 +327,11 @@ function connect_spatial_neighbors!(sim,
                 search_func(kdtree, collect(pos), from_ids, from_edges, to_id)
             end
         end
-        
-        sim.intransition = false
-        # Finish writing edges if simulation is not initialized
-        if sim.initialized
-            finish_write!(sim, edge_type)
-        end
+    end
+    sim.intransition = false
+    # Finish writing edges if simulation is not initialized
+    if sim.initialized
+        finish_write!(sim, edge_type)
     end
 
     _log_info(sim, "<End> connect_spatial_neighbors!")
@@ -358,7 +357,7 @@ end
 
 function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64}, 
                 periodic_boundaries::NTuple{2, SVector{N, Float64}}) where N
-    vector_from_to(from, to, pb[1], pb[2])
+    periodic_diff(to, from, pb[1], pb[2])
 end
 
 function periodic_clamp(pos::SVector{N, T},
@@ -414,9 +413,13 @@ function find_neighbors(sim, pos::SVector{N, T}, distance, ::Type{AT}) where {N,
     @mayassert simfield(sim, AT).prepared_spatial_neighbors """
     $AT is not element of the `spatial_neighbors` keyword of apply(!)
     """
-
     ni = sim.neighbors_infos[AT]
-    map(id -> ni.states[id], inrange(ni.kdtree, pos, distance))
+
+    if ni.empty
+        similar(ni.states, 0)
+    else
+        map(id -> ni.states[id], inrange(ni.kdtree, pos, distance))
+    end
 end
 
 # the state_func can be given with an anonymous function like: state -> state.count
