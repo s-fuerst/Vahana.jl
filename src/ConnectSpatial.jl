@@ -217,8 +217,7 @@ function _create_kdtree!(sim,
     kdtree
 end
 
-# we modify agenttypes in apply!
-Base.@kwdef mutable struct SpatialNeighbors
+Base.@kwdef struct SpatialNeighbors
     agenttypes::Union{Vector{DataType}, DataType}
     state_func = identity
     pos_field = :pos
@@ -229,6 +228,9 @@ Base.@kwdef mutable struct SpatialNeighbors
     leafsize = 25
     reorder = false
 end
+
+_spatial_agenttypes(sn::SpatialNeighbors) =
+    sn.agenttypes isa DataType ? (sn.agenttypes,) : sn.agenttypes
 
 SpatialNeighbors(agenttypes) = SpatialNeighbors(agenttypes = agenttypes)    
 SpatialNeighbors(agenttypes, periodic_upper) =
@@ -433,7 +435,7 @@ function prepare_spatial_neighbors!(sim, sn)
     # TODO: test reuse of existing Infos (and removing when changed)
     
     if sn !== nothing
-        for at in sn.agenttypes
+        for at in _spatial_agenttypes(sn)
             if ! haskey(sim.neighbors_infos, at) ||
                 sim.neighbors_infos[at].snhash != hash(sn)
 
@@ -460,7 +462,7 @@ end
 
 function finish_spatial_neighbors!(sim, sn, write)
     if sn !== nothing
-        for at in sn.agenttypes
+        for at in _spatial_agenttypes(sn)
             simfield(sim, at).prepared_spatial_neighbors = false
         end
     end

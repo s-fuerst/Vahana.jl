@@ -789,9 +789,7 @@ function apply!(sim::Simulation,
 
     sn = spatial_neighbors
     if sn !== nothing
-        sn.agenttypes = applicable(iterate, sn.agenttypes) ?
-            sn.agenttypes : [ sn.agenttypes ]
-        for at in sn.agenttypes
+        for at in _spatial_agenttypes(sn)
             @assert at in read "$sn is in `sn` but not in `read`"
         end
     end
