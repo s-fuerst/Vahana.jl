@@ -160,6 +160,39 @@ function runedgestest()
             end
         end
 
+        @testset "neighborids_iter" begin
+            disable_transition_checks(sim, true)
+            for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
+                e = neighborids_iter(sim, a3id, t) |> collect
+                @test e[1] == a2id
+                @test e[2] == a1id
+                # the empty case: no edges with the agent as target
+                @test neighborids_iter(sim, a2id, t) === nothing
+            end
+            disable_transition_checks(sim, false)
+            for t in [EdgeE, EdgeSE, EdgeI, EdgeTI, EdgeTsI, EdgeSI,
+                   EdgeSTI, EdgeSTsI, EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
+                @test_throws AssertionError neighborids_iter(sim, a1id, t)
+            end
+        end
+
+        @testset "neighborstates_iter" begin
+            disable_transition_checks(sim, true)
+            for t in [EdgeD, EdgeT, EdgeTs, EdgeS, EdgeST, EdgeSTs]
+                states = neighborstates_iter(sim, a3id, t, Agent) |> collect
+                @test states[1] == Agent(2)
+                @test states[2] == Agent(1)
+                # the empty case: no edges with the agent as target
+                @test neighborstates_iter(sim, a2id, t, Agent) === nothing
+            end
+            disable_transition_checks(sim, false)
+            for t in [EdgeE, EdgeSE, EdgeI, EdgeTI, EdgeTsI, EdgeSI,
+                   EdgeSTI, EdgeSTsI, EdgeEI, EdgeSEI, EdgeSETI, EdgeSETsI]
+                @test_throws AssertionError neighborstates_iter(sim, a1id, t, Agent)
+            end
+        end
+
+
         @testset "edgestates" begin
             disable_transition_checks(sim, true)
             for t in [EdgeD, EdgeT, EdgeTs, EdgeI, EdgeTI, EdgeTsI]

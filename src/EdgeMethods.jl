@@ -792,7 +792,8 @@ if singleedge || ignorefrom
 else
     @eval function neighborstates_iter(sim::$simsymbol, id::AgentID,
                                 edgetype::Type{$T}, agenttype::Type)
-        (agentstate(sim, nid, agenttype) for nid in neighborids_iter(sim, id, edgetype))
+        nids = neighborids_iter(sim, id, edgetype)
+        isnothing(nids) ? nothing : (agentstate(sim, nid, agenttype) for nid in nids)
     end
 end
 

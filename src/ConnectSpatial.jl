@@ -288,6 +288,14 @@ function connect_spatial_neighbors!(sim,
         end
     end
 
+    # Prepare writing edges if simulation is not initialized
+    edge_type = if typeof(edge_constructor) != DataType
+        # edge_constructor is a function, get the type from the first edge
+        typeof(from_edges[1])
+    else
+        # edge_constructor is a DataType, use it directly
+        edge_constructor
+    end
     
     if sim.initialized
         prepare_write!(sim, [], add_existing, edge_type)
@@ -305,14 +313,6 @@ function connect_spatial_neighbors!(sim,
 
 
         
-        # Prepare writing edges if simulation is not initialized
-        edge_type = if typeof(edge_constructor) != DataType
-            # edge_constructor is a function, get the type from the first edge
-            typeof(from_edges[1])
-        else
-            # edge_constructor is a DataType, use it directly
-            edge_constructor
-        end
 
 
         # collect the ids and pos vectors
@@ -359,7 +359,7 @@ end
 
 function periodic_diff(to::SVector{N, Float64}, from::SVector{N, Float64}, 
                 periodic_boundaries::NTuple{2, SVector{N, Float64}}) where N
-    periodic_diff(to, from, pb[1], pb[2])
+    periodic_diff(to, from, periodic_boundaries[1], periodic_boundaries[2])
 end
 
 function periodic_clamp(pos::SVector{N, T},
