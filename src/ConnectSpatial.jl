@@ -226,7 +226,7 @@ Base.@kwdef struct SpatialNeighbors
     periodic_upper::Union{Vector, Nothing} = nothing
     metric::Any = Euclidean()
     leafsize = 25
-    reorder = false
+    reorder = true
 end
 
 _spatial_agenttypes(sn::SpatialNeighbors) =
