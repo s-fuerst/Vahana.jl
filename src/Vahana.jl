@@ -153,6 +153,10 @@ set_log_path = (path::String) -> config.log_path = path
 
 abstract type Simulation end
 
+# must be included before Simulation.jl (the generated Simulation struct
+# carries an `instrumentation::Union{Nothing, Instrumentation}` field)
+include("Instrumentation.jl")
+
 include("Helpers.jl")
 
 # MPIInit must be included before Agent/Edge, and Agent/Edge before MPI

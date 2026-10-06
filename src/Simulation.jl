@@ -158,6 +158,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(h5file::Union{HDF5.File, Nothing}),
                   :(neighbors_infos::Dict{DataType, NeighborsInfo}),
                   :(external::Dict{Any, Any}),
+                  :(instrumentation::Instrumentation),
                   edgefields...,
                   nodefields...)
     
@@ -322,7 +323,8 @@ function create_simulation(model::Model,
         neighbors_infos = Dict{DataType, NeighborsInfo}(),
         # allows the client to attach arbitrary information, that will
         # be removed in finish_simulation.
-        external = Dict{Any, Any}() 
+        external = Dict{Any, Any}(),
+        instrumentation = Instrumentation()
     )
 
     if !isdefined(Vahana, :init_storage!) || !isdefined(Vahana, :init_field!)
