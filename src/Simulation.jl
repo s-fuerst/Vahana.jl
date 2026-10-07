@@ -778,11 +778,17 @@ function apply!(sim::Simulation,
         @info "<Begin> apply!" func transition=sim.num_transitions+1
     end
     
+    # instrumentation: set caller/context for this record and open the
+    # top-level event (record boundary). 
+    _inst_enter!(sim, :apply, func)
+    _inst_begin(sim, :apply_total)
+
     # must be set to true before prepare_read! (as this calls add_edge!)
     sim.intransition = true
 
-    # Do allow also just use a single type as argument, we check this
-    # here and convert the single type to a vector if necessary
+    # We allow to use a single type as argument instead of a vector,
+    # we check this here and convert the single type to a vector if
+    # necessary
     call = applicable(iterate, call) ? call : [ call ]
     read = applicable(iterate, read) ? read : [ read ]
     write = applicable(iterate, write) ? write : [ write ]
@@ -804,9 +810,17 @@ function apply!(sim::Simulation,
     end
 
     readableET = filter(w -> w in sim.typeinfos.edges_types, read)
-    foreach(T -> prepare_read!(sim, read, T), readableET)
+    foreach(readableET) do T
+        _inst_phase(sim, :prepare_read, T) do
+            prepare_read!(sim, read, T)
+        end
+    end
     readableAT = filter(w -> w in sim.typeinfos.nodes_types, read)
-    foreach(T -> prepare_read!(sim, read, T), readableAT)
+    foreach(readableAT) do T
+        _inst_phase(sim, :prepare_read, T) do
+            prepare_read!(sim, read, T)
+        end
+    end
 
     writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
     writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
@@ -817,52 +831,99 @@ function apply!(sim::Simulation,
         end
     end
     
-    foreach(prepare_write!(sim, read, [call; add_existing]), write)
+    # the 3-argument prepare_write! is a dispatcher that derives the
+    # per-type Bool from the vector (t in add_existing); we inline that
+    # here, as the do-block needs an explicit T. The vector is built once,
+    # as in the original curried call.
+    addexisting = [call; add_existing]
+    foreach(write) do T
+        _inst_phase(sim, :prepare_write, T) do
+            prepare_write!(sim, read, T in addexisting, T)
+        end
+    end
 
     prepare_spatial_neighbors!(sim, sn)
 
-    MPI.Barrier(MPI.COMM_WORLD)
+    _inst_phase(sim, :barrier_pre; kind = :barrier) do
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
 
     for C in call
         with_logger(sim) do
             @debug "<Begin> tf_call!" agenttype=C transition=sim.num_transitions+1
         end
         wfunc = C in write ? transition_with_write! : transition_without_write!
-        if with_edge === nothing
-            rfunc = C in read ? transition_with_read! : transition_without_read!
-            rfunc(wfunc, sim, func, C)
-        else
-            rfunc = C in read ? transition_with_read_with_edge! :
-                transition_without_read_with_edge!
-            rfunc(wfunc, sim, func, C, with_edge)
-        end    
+        # items = buffer slots of this type (O(1)); NOT the number of alive
+        # agents (that would be an O(n) scan inside the measured phase).
+        # Evaluated once before the transition; the slot count does not
+        # change inside the loop.
+        _inst_phase(sim, :transition, C; items = length(writestate(sim, C))) do
+            if with_edge === nothing
+                rfunc = C in read ? transition_with_read! : transition_without_read!
+                rfunc(wfunc, sim, func, C)
+            else
+                rfunc = C in read ? transition_with_read_with_edge! :
+                    transition_without_read_with_edge!
+                rfunc(wfunc, sim, func, C, with_edge)
+            end
+        end
         _log_debug(sim, "<End> tf_call!")
     end
     
-    MPI.Barrier(MPI.COMM_WORLD)
+    _inst_phase(sim, :barrier_post; kind = :barrier) do
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
 
     # we first remove all deleted edges, so that we can readd
     # new edges to an agent in the SingleEdge case.
     # This include the edges of died agents.
-    foreach(ET -> transmit_remove_edges!(sim, ET), writeableET)
+    foreach(writeableET) do ET
+        _inst_phase(sim, :edges_remove, ET) do
+            transmit_remove_edges!(sim, ET)
+        end
+    end
     
     # we must first call transmit_edges, so that they are exists
     # on the correct rank instead in @storage, where they are
     # not deleted in the case that an agent died
-    foreach(ET -> transmit_edges!(sim, ET), writeableET)
+    foreach(writeableET) do ET
+        _inst_phase(sim, :edges_add, ET) do
+            transmit_edges!(sim, ET)
+        end
+    end
     
-    foreach(T -> finish_read!(sim, T), read)
+    foreach(read) do T
+        _inst_phase(sim, :finish_read, T) do
+            finish_read!(sim, T)
+        end
+    end
 
     # then we can call finish_write! for the agents, as this will
     # remove the edges where are died agents are involved (and modifies
     # EdgeType_write).
-    foreach(finish_write!(sim), writeableAT)
+    foreach(writeableAT) do T
+        _inst_phase(sim, :finish_write, T) do
+            finish_write!(sim, T)
+        end
+    end
 
-    foreach(finish_write!(sim), writeableET)
+    foreach(writeableET) do T
+        _inst_phase(sim, :finish_write, T) do
+            finish_write!(sim, T)
+        end
+    end
 
-    finish_spatial_neighbors!(sim, sn, write)
+    _inst_phase(sim, :finish_spatial) do
+        finish_spatial_neighbors!(sim, sn, write)
+    end
 
     sim.intransition = false
+
+    # close the record BEFORE incrementing num_transitions (invariant, see
+    # top of apply!): the :apply_total event and all children must carry the
+    # 0-based transition number of this apply!
+    _inst_end(sim, :apply_total)
+    _inst_reset!(sim)
     
     # must be incremented after the transition, so that read only
     # functions like mapreduce tries to transfer the necessary states

@@ -18,13 +18,74 @@ end
 # post-processing (n = number of agents):
 #   mean = sum_ns / n
 #   std  = sqrt(sum_sq_ns / n - (sum_ns / n)^2)
-struct AgentTimeStats
+mutable struct AgentTimeStats
     min_ns::Int64
     max_ns::Int64
     sum_ns::Int64
-    sum_sq_ns::Int128    
-    AgentTimeStats(min_ns = typemin(Int64), max_ns = 0,
-                   sum_ns = 0, sum_sq_ns = 0) = new(min_ns, max_ns, sum_ns, sum_sq_ns)
+    sum_sq_ns::Int128
+
+    # typemax marks an accumulator to which no agent time has been added yet.
+    AgentTimeStats() = new(typemax(Int64), typemin(Int64), 0, 0)
+    AgentTimeStats(min_ns, max_ns, sum_ns, sum_sq_ns) =
+        new(min_ns, max_ns, sum_ns, sum_sq_ns)
+end
+
+@inline function _inst_add_agent_time!(stats::AgentTimeStats, dt::Integer)
+    dt_ns = Int64(dt)
+    if dt_ns < stats.min_ns
+        stats.min_ns = dt_ns
+    end
+    if dt_ns > stats.max_ns
+        stats.max_ns = dt_ns
+    end
+    stats.sum_ns += dt_ns
+    stats.sum_sq_ns += Int128(dt_ns) * Int128(dt_ns)
+    stats
+end
+
+@inline function _inst_agentstats_or_nothing(stats::AgentTimeStats)
+    if stats.min_ns == typemax(Int64)
+        nothing
+    else
+        stats
+    end
+end
+
+# Diagnostic-only transition statistics. The accumulator doubles as the
+# on/off token (`nothing` = diagnostics off), so the transition loops carry
+# neither a `diagnostic` flag nor the begin/end bookkeeping explicitly.
+function _inst_begin_agent_stats(sim, type::DataType)
+    if instrumentation_enabled() && sim.instrumentation.diagnostic
+        _inst_begin(sim, :transition_stats, type)
+        AgentTimeStats()
+    else
+        nothing
+    end
+end
+
+function _inst_end_agent_stats(sim, type::DataType,
+                               stats::Union{Nothing, AgentTimeStats})
+    if stats !== nothing
+        _inst_end(sim, :transition_stats, type;
+                  agentstats = _inst_agentstats_or_nothing(stats))
+    end
+    nothing
+end
+
+# Times a transition call. Only the tfunc call is measured; wfunc (state
+# write) stays outside (O(1), deterministic). `stats === nothing` is
+# loop-invariant, so the union split branch is cheap, and all four
+# transition variants pass exactly three arguments to tfunc.
+@inline function _inst_transition_call(stats::Union{Nothing, AgentTimeStats},
+                                       tfunc, a, b, c)
+    if stats === nothing
+        tfunc(a, b, c)
+    else
+        t0 = time_ns()
+        result = tfunc(a, b, c)
+        _inst_add_agent_time!(stats, time_ns() - t0)
+        result
+    end
 end
 
 # A measured interval. parent durations include child durations.
@@ -141,6 +202,28 @@ end
     nothing
 end
 
+# Wraps a phase in one `label` event (replaces the manual
+# `_inst_begin`/…/`_inst_end` pairs). `label`/`type` are given exactly once,
+# so begin and end cannot drift apart. Body as do-block:
+#
+#     _inst_phase(sim, :barrier_pre; kind = :barrier) do
+#         MPI.Barrier(MPI.COMM_WORLD)
+#     end
+#
+# NOTE: `continue`, `break`, `return` or a throw inside `f()` skips the
+# `_inst_end` (unbalanced stack) — the wrapped call sites in `apply!` are
+# plain statements. `items` is evaluated at the call site (before `f()`); for
+# the slot counts used in `apply!` the length does not change inside `f()`.
+@inline function _inst_phase(f::F, sim, label::Symbol,
+                             type::DataType = Nothing;
+                             kind::Symbol = :phase,
+                             items::Integer = 0) where F
+    _inst_begin(sim, label, type)
+    result = f()
+    _inst_end(sim, label, type; kind = kind, items = items)
+    result
+end
+
 # Caller labeling: named functions -> Symbol(string(func)).
 # Closures (compiler names, starting with "#": "#674#675{...}" <= 1.11,
 # "#2" >= 1.12) are unstable per compile session -> use the definition
@@ -151,8 +234,8 @@ end
 #                  -> :anon_<file>
 # Fallback :anonymous when no source can be determined (e.g.
 # "unknown file name", GeneratedFunctionStubs).
-function _inst_caller_label(inst, func)
-    get!(inst.func_labels, func) do
+function _inst_caller_label(sim, func)
+    get!(sim.instrumentation.func_labels, func) do
         name = string(func)
         if !startswith(name, '#')
             return Symbol(name)
@@ -180,24 +263,26 @@ end
 # func = :none (default) -> caller stays untouched, only the context
 # switches (e.g. mapreduce); Vahana transitions are functions, never
 # symbols, so the sentinel is cleanly separable by value.
-@inline function _inst_enter!(inst, context, func = :none)
+@inline function _inst_enter!(sim, context, func = :none)
     if instrumentation_enabled()
+        inst = sim.instrumentation
         if func !== :none
-            inst.current_caller = _inst_caller_label(inst, func)
+            inst.current_caller = _inst_caller_label(sim, func)
         end
         inst.current_context = context
     end
-    inst
+    sim
 end
 
 # Reset after the top-level block (caller loses its validity,
 # context -> :none).
-@inline function _inst_reset!(inst)
+@inline function _inst_reset!(sim)
     if instrumentation_enabled()
+        inst = sim.instrumentation
         inst.current_caller = nothing
         inst.current_context = :none
     end
-    inst
+    sim
 end
 
 # Diagnostic mode: barrier inserted before collectives with payload.

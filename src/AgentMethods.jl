@@ -185,14 +185,16 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             T = $T
             typeof(newstate) != $T
         end """
-        The transition function returned an agent of type $T,  
+        The transition function returned an agent of type $T,
         but $T is not in the `write` vector.
         """
     end
 
     @eval function transition_with_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
-        # an own counter (with the correct type) is faster then enumerate 
+        # an own counter (with the correct type) is faster then enumerate
         idx = AgentNr(0)
+        # diagnostic-only per-agent timing (distorts the timings!)
+        stats = _inst_begin_agent_stats(sim, $T)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
             # jump over died agents
@@ -201,9 +203,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
-            newstate = tfunc(state, agent_id($typeid, idx), sim)
+            newstate = _inst_transition_call(stats, tfunc, state,
+                                             agent_id($typeid, idx), sim)
             wfunc(sim, idx, newstate, $T)
-        end 
+        end
+        _inst_end_agent_stats(sim, $T, stats)
     end
 
     @eval function transition_with_read_with_edge!(wfunc,
@@ -213,25 +217,30 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                                             ET::DataType)
         @mayassert !has_hint(sim, ET, :SingleType) """
         Only edge types without the :SingeType hint can be added to
-        to the `with_edge` keyword of an apply! call, but $ET 
-        has the :SingleType hint.    
+        to the `with_edge` keyword of an apply! call, but $ET
+        has the :SingleType hint.
             """
         tnr = type_nr(sim, $T)
+        # diagnostic-only per-agent timing (distorts the timings!)
+        stats = _inst_begin_agent_stats(sim, $T)
         for (id, _) in edgeread(sim, ET)
             if type_nr(id) == tnr
                 idx = agent_nr(id)
                 state = @readstate($T)[idx]
                 @mayassert ! @readdied($T)[idx]
-                newstate = tfunc(state, id, sim)
+                newstate = _inst_transition_call(stats, tfunc, state, id, sim)
                 wfunc(sim, idx, newstate, $T)
             end
         end
+        _inst_end_agent_stats(sim, $T, stats)
     end
 
 
     @eval function transition_without_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
-        # an own counter (with the correct type) is faster then enumerate 
+        # an own counter (with the correct type) is faster then enumerate
         idx = AgentNr(0)
+        # diagnostic-only per-agent timing (distorts the timings!)
+        stats = _inst_begin_agent_stats(sim, $T)
         for _ in 1:length(@readstate($T))
             idx += AgentNr(1)
             if $mortal
@@ -239,9 +248,11 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
-            r = tfunc(Val($T), agent_id($typeid, idx), sim)
+            r = _inst_transition_call(stats, tfunc, Val($T),
+                                      agent_id($typeid, idx), sim)
             wfunc(sim, idx, r, $T)
-        end 
+        end
+        _inst_end_agent_stats(sim, $T, stats)
     end
 
     @eval function transition_without_read_with_edge!(wfunc,
@@ -252,24 +263,27 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         @mayassert !has_hint(sim, ET, :SingleType) """
         Only edge types without the :SingeType hint can be added to
         to the `with_edge` keyword of an apply! call, but $ET
-        has the :SingleType hint.    
+        has the :SingleType hint.
         """
         tnr = type_nr(sim, $T)
+        # diagnostic-only per-agent timing (distorts the timings!)
+        stats = _inst_begin_agent_stats(sim, $T)
         for (id, _) in edgeread(sim, ET)
             if type_nr(id) == tnr
                 idx = agent_nr(id)
                 if $mortal
                     @mayassert ! @readdied($T)[idx]
                 end
-                newstate = tfunc(Val($T), id, sim)
+                newstate = _inst_transition_call(stats, tfunc, Val($T), id, sim)
                 wfunc(sim, idx, newstate, $T)
             end
         end
+        _inst_end_agent_stats(sim, $T, stats)
     end
 
 
     @eval function prepare_write!(sim::$simsymbol, _, add_existing::Bool, ::Type{$T})
-        if $immortal 
+        if $immortal
             # distributing the initial graph or reading from file will
             # also kill immortal agents, so we can assert this only
             # after the sim is initialized.
