@@ -72,20 +72,13 @@ function _inst_end_agent_stats(sim, type::DataType,
     nothing
 end
 
-# Times a transition call. Only the tfunc call is measured; wfunc (state
-# write) stays outside (O(1), deterministic). `stats === nothing` is
-# loop-invariant, so the union split branch is cheap, and all four
-# transition variants pass exactly three arguments to tfunc.
-@inline function _inst_transition_call(stats::Union{Nothing, AgentTimeStats},
-                                       tfunc, a, b, c)
-    if stats === nothing
-        tfunc(a, b, c)
-    else
-        t0 = time_ns()
-        result = tfunc(a, b, c)
-        _inst_add_agent_time!(stats, time_ns() - t0)
-        result
-    end
+# Times a transition call (diagnostic mode only). Only the tfunc call is
+# measured; wfunc (state write) stays outside (O(1), deterministic).
+function _inst_timed_transition_call(stats::AgentTimeStats, tfunc, a, b, c)
+    t0 = time_ns()
+    result = tfunc(a, b, c)
+    _inst_add_agent_time!(stats, time_ns() - t0)
+    result
 end
 
 # A measured interval. parent durations include child durations.
@@ -206,7 +199,7 @@ end
 # `_inst_begin`/…/`_inst_end` pairs). `label`/`type` are given exactly once,
 # so begin and end cannot drift apart. Body as do-block:
 #
-#     _inst_phase(sim, :barrier_pre; kind = :barrier) do
+#     _inst_phase(sim, :barrier_pre_apply; kind = :barrier) do
 #         MPI.Barrier(MPI.COMM_WORLD)
 #     end
 #

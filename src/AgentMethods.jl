@@ -203,8 +203,10 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
-            newstate = _inst_transition_call(stats, tfunc, state,
-                                             agent_id($typeid, idx), sim)
+            newstate = stats === nothing ?
+                        tfunc(state, agent_id($typeid, idx), sim) :
+                        _inst_timed_transition_call(stats, tfunc, state,
+                                                    agent_id($typeid, idx), sim)
             wfunc(sim, idx, newstate, $T)
         end
         _inst_end_agent_stats(sim, $T, stats)
@@ -228,7 +230,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 idx = agent_nr(id)
                 state = @readstate($T)[idx]
                 @mayassert ! @readdied($T)[idx]
-                newstate = _inst_transition_call(stats, tfunc, state, id, sim)
+                newstate = stats === nothing ? tfunc(state, id, sim) :
+                        _inst_timed_transition_call(stats, tfunc, state, id, sim)
                 wfunc(sim, idx, newstate, $T)
             end
         end
@@ -248,8 +251,10 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     continue
                 end
             end
-            r = _inst_transition_call(stats, tfunc, Val($T),
-                                      agent_id($typeid, idx), sim)
+            r = stats === nothing ?
+                  tfunc(Val($T), agent_id($typeid, idx), sim) :
+                  _inst_timed_transition_call(stats, tfunc, Val($T),
+                                              agent_id($typeid, idx), sim)
             wfunc(sim, idx, r, $T)
         end
         _inst_end_agent_stats(sim, $T, stats)
@@ -274,7 +279,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 if $mortal
                     @mayassert ! @readdied($T)[idx]
                 end
-                newstate = _inst_transition_call(stats, tfunc, Val($T), id, sim)
+                newstate = stats === nothing ? tfunc(Val($T), id, sim) :
+                        _inst_timed_transition_call(stats, tfunc, Val($T), id, sim)
                 wfunc(sim, idx, newstate, $T)
             end
         end
