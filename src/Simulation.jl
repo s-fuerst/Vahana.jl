@@ -780,8 +780,8 @@ function apply!(sim::Simulation,
     
     # instrumentation: set caller/context for this record and open the
     # top-level event (record boundary). 
-    _inst_enter!(sim, :apply, func)
-    _inst_begin(sim, :apply_total)
+    _inst_set_context!(sim, :apply, func)
+    _inst_begin!(sim, :apply_total)
 
     # must be set to true before prepare_read! (as this calls add_edge!)
     sim.intransition = true
@@ -922,8 +922,8 @@ function apply!(sim::Simulation,
     # close the record BEFORE incrementing num_transitions (invariant, see
     # top of apply!): the :apply_total event and all children must carry the
     # 0-based transition number of this apply!
-    _inst_end(sim, :apply_total)
-    _inst_reset!(sim)
+    _inst_end!(sim, :apply_total)
+    _inst_set_context!(sim, :none)
     
     # must be incremented after the transition, so that read only
     # functions like mapreduce tries to transfer the necessary states

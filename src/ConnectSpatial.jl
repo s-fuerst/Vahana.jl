@@ -121,12 +121,15 @@ function _agents_ids_states_and_edges(sim, ::Type{T}, pos_func, filter_pred,
     end
 
     if must_join && mpi.active
+        # purpose labels make every spatial join distinguishable in the
+        # instrumentation event stream (ids/poss/edges have identical
+        # signatures)
         if ! ignore_ids
-            ids = join(ids)
+            ids = join(ids; sim = sim, label = :join_spatial_ids, type = T)
         end
-        poss = join(poss)
+        poss = join(poss; sim = sim, label = :join_spatial_poss, type = T)
         if edge_cons !== nothing
-            edges = join(edges)
+            edges = join(edges; sim = sim, label = :join_spatial_edges, type = T)
         end
     end
 
@@ -441,18 +444,28 @@ function prepare_spatial_neighbors!(sim, sn)
 
                 state_func = _make_state_func_val(at, sn.state_func)
                 
-                (_, po, st) = _get_ids_poss_states(sim, at, sn.pos_field,
-                                                   sn.filter, state_func;
-                                                   ignore_ids = true)
+                (_, po, st) = _inst_phase(sim, :spatial_collect, at) do
+                    _get_ids_poss_states(sim, at, sn.pos_field,
+                                         sn.filter, state_func;
+                                         ignore_ids = true)
+                end
 
                 if length(st) > 0                
-                    kdtree = _create_kdtree!(sim, po,
-                                             sn.periodic_lower, sn.periodic_upper,
-                                             sn.metric, sn.leafsize, sn.reorder)
+                    kdtree = _inst_phase(sim, :spatial_kdtree, at) do
+                        _create_kdtree!(sim, po,
+                                        sn.periodic_lower, sn.periodic_upper,
+                                        sn.metric, sn.leafsize, sn.reorder)
+                    end
                     sim.neighbors_infos[at] =
                         NeighborsInfo{typeof(first(st))}(kdtree, st, hash(sn), false)
                 else
                     sim.neighbors_infos[at] = NeighborsInfo(sn)
+                end
+            else
+                # cache hit: only the snhash check, duration ≈ 0 (the
+                # cache hit rate is directly countable in the analysis)
+                _inst_phase(sim, :spatial_cached, at) do
+                    nothing
                 end
             end
             simfield(sim, at).prepared_spatial_neighbors = true

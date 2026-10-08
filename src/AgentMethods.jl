@@ -332,7 +332,12 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
         # copy_mem needs collective calls, so if one rank want to
         # copy_mem, all must participate
-        must_copy_mem = MPI.Allreduce(must_copy_mem, |, MPI.COMM_WORLD)
+        must_copy_mem = _inst_phase(sim, :allreduce_mustcopy, $T;
+                                   kind = :allreduce,
+                                   si = 1, ri = 1,
+                                   sb = sizeof(Bool), rb = sizeof(Bool)) do
+            MPI.Allreduce(must_copy_mem, |, MPI.COMM_WORLD)
+        end
         
         if $mortal
             network_changed = fill(false, length(sim.typeinfos.edges_types))
@@ -358,7 +363,8 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             # So we first collect the ids of all died agents and then
             # call remove_edges! for all edges stored in agentsontarget for
             # the collected ids.
-            alldied = $nompi ? aids : join(aids)
+            alldied = $nompi ? aids :
+                join(aids; sim = sim, label = :join_died, type = $T)
             if ! isempty(alldied)
                 for ET in edges_types
                     idx = findfirst(x -> x == ET, edges_types)
@@ -367,7 +373,14 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
             end
 
-            MPI.Allreduce!(network_changed, |, mpi.comm)
+            _inst_phase(sim, :allreduce_networkchanged, $T;
+                        kind = :allreduce,
+                        si = length(network_changed),
+                        ri = length(network_changed),
+                        sb = length(network_changed) * sizeof(Bool),
+                        rb = length(network_changed) * sizeof(Bool)) do
+                MPI.Allreduce!(network_changed, |, mpi.comm)
+            end
             for ET in edges_types
                 idx = findfirst(x -> x == ET, edges_types)
                 if network_changed[idx]
@@ -382,23 +395,29 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
 
         if ! $stateless && must_copy_mem
             if $independent && sim.initialized
-                memcpy!(@writestate($T), @readstate($T),
-                        length(@readstate($T)) * sizeof($T))
+                _inst_phase(sim, :memcpy_state, $T) do
+                    memcpy!(@writestate($T), @readstate($T),
+                            length(@readstate($T)) * sizeof($T))
+                end
             end
             
-            if ! isnothing(@windows($T).shmstate)
-                MPI.free(@windows($T).shmstate)
+            # Win_allocate_shared + memcpy + Win_fence bundled in one
+            # `:win_shmstate` event (kind `:win_fence`)
+            sarr = _inst_phase(sim, :win_shmstate, $T; kind = :win_fence) do
+                if ! isnothing(@windows($T).shmstate)
+                    MPI.free(@windows($T).shmstate)
+                end
+                (@windows($T).shmstate, sarr) = 
+                    MPI.Win_allocate_shared(Array{$T},
+                                            length(@writestate($T)),
+                                            mpi.shmcomm)
+
+                memcpy!(sarr, @writestate($T),
+                        length(@writestate($T)) * sizeof($T))
+                
+                MPI.Win_fence(0, @windows($T).shmstate)
+                sarr
             end
-            (@windows($T).shmstate, sarr) = 
-                MPI.Win_allocate_shared(Array{$T},
-                                        length(@writestate($T)),
-                                        mpi.shmcomm)
-
-            memcpy!(sarr, @writestate($T),
-                    length(@writestate($T)) * sizeof($T))
-
-            
-            MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
 
             # maybe the state has change, so we must clear the cache 
@@ -419,19 +438,21 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         # So we have no seperate handling for the indepent case for
         # the died vector.
         if $mortal 
-            if ! isnothing(@windows($T).shmdied)
-                MPI.free(@windows($T).shmdied)
+            sarr = _inst_phase(sim, :win_shmdied, $T; kind = :win_fence) do
+                if ! isnothing(@windows($T).shmdied)
+                    MPI.free(@windows($T).shmdied)
+                end
+                (@windows($T).shmdied, sarr) = 
+                    MPI.Win_allocate_shared(Array{Bool},
+                                            length(@writedied($T)),
+                                            mpi.shmcomm)
+            
+                memcpy!(sarr, @writedied($T),
+                        length(@writedied($T)) * sizeof(Bool))
+                
+                MPI.Win_fence(0, @windows($T).shmdied)
+                sarr
             end
-            (@windows($T).shmdied, sarr) = 
-                MPI.Win_allocate_shared(Array{Bool},
-                                        length(@writedied($T)),
-                                        mpi.shmcomm)
-            
-            memcpy!(sarr, @writedied($T),
-                    length(@writedied($T)) * sizeof(Bool))
-
-            
-            MPI.Win_fence(0, @windows($T).shmdied)
             @readdied($T) = sarr
         end
         
@@ -561,17 +582,30 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         You can not call mapreduce inside of a transition function."""
         emptyval = val4empty(op; kwargs...)
 
+        # Lazy-Record: mapreduce is called outside of apply!, so it opens
+        # its own top-level record (context :mapreduce, caller untouched
+        # via func = :none) and resets the context afterwards. The
+        # transition_nr invariant holds: no num_transitions increment
+        # inside the instrumented interval.
+        _inst_set_context!(sim, :mapreduce)
+        _inst_begin!(sim, :mapreduce, $T)
         if $immortal
-            reduced = emptyval
-            for i in 1:(@agent($T).nextid - 1)
-                reduced = op(f(@readstate($T)[i]), reduced)
+            reduced = _inst_phase(sim, :mapreduce_local, $T) do
+                r = emptyval
+                for i in 1:(@agent($T).nextid - 1)
+                    r = op(f(@readstate($T)[i]), r)
+                end
+                r
             end
         else 
-            reduced = emptyval
-            for i in 1:(@agent($T).nextid - 1)
-                if ! @readdied($T)[i]
-                    reduced = op(f(@readstate($T)[i]), reduced)
+            reduced = _inst_phase(sim, :mapreduce_local, $T) do
+                r = emptyval
+                for i in 1:(@agent($T).nextid - 1)
+                    if ! @readdied($T)[i]
+                        r = op(f(@readstate($T)[i]), r)
+                    end
                 end
+                r
             end
         end   
 
@@ -579,8 +613,16 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             reduced
         else
             mpiop = get(kwargs, :mpiop, op)
-            MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+            _inst_phase(sim, :mapreduce_allreduce, $T;
+                        kind = :allreduce,
+                        si = 1, ri = 1,
+                        sb = sizeof(reduced), rb = sizeof(reduced)) do
+                MPI.Allreduce(reduced, mpiop, MPI.COMM_WORLD)
+            end
         end
+
+        _inst_end!(sim, :mapreduce, $T)
+        _inst_set_context!(sim, :none)
 
         _log_info(sim, "<End> mapreduce agents")
         

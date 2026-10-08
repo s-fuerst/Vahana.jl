@@ -204,14 +204,27 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                 # transmit the number of AgentIDs the current PE want to
                 # send to the other PEs
                 sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
-                recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+                recvNumElems = _inst_phase(
+                    sim, :agent_alltoall_ids, T; kind = :alltoall,
+                    si = length(sendNumElems), ri = length(sendNumElems),
+                    sb = length(sendNumElems) * sizeof(Int64),
+                    rb = length(sendNumElems) * sizeof(Int64)) do
+                    MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+                end
                 # with this information we can prepare the receive buffer
                 recvbuf = MPI.VBuffer(Vector{AgentID}(undef, sum(recvNumElems)),
                                       recvNumElems)
 
                 # transmit the AgentIDs itself
-                _log_time(sim, "transmit_agents Alltoallv! AgentIDs", true) do
-                    MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                _inst_diag_barrier(sim, :ready_wait_agent_alltoallv_ids)
+                _inst_phase(sim, :agent_alltoallv_ids, T; kind = :alltoallv,
+                            si = sum(sendNumElems), ri = sum(recvNumElems),
+                            sb = sum(sendNumElems) * sizeof(AgentID),
+                            rb = sum(recvNumElems) * sizeof(AgentID)) do
+                    _log_time(sim, "transmit_agents Alltoallv! AgentIDs",
+                              true) do
+                        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                    end
                 end
 
                 ## now we gather the agentstate
@@ -244,8 +257,15 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                     Vector{Tuple{AgentID, $T}}(undef, sum(sendNumElems))
                 end
                 recvbuf = VBuffer(recv, sendNumElems)
-                _log_time(sim, "transmit_agents Alltoallv! state", true) do
-                    MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+
+                _inst_diag_barrier(sim, :ready_wait_agent_alltoallv_state)
+                _inst_phase(sim, :agent_alltoallv_state, T; kind = :alltoallv,
+                            si = length(send), ri = length(recv),
+                            sb = length(send) * sizeof(eltype(send)),
+                            rb = length(recv) * sizeof(eltype(recv))) do
+                    _log_time(sim, "transmit_agents Alltoallv! state", true) do
+                        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+                    end
                 end
 
                 ## And now fill the foreign dictonaries
@@ -374,13 +394,25 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         # transmit the number of edges the current PE want to send to the
         # other PEs
         sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
-        recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+        recvNumElems = _inst_phase(
+            sim, :edge_add_alltoall, $T; kind = :alltoall,
+            si = length(sendNumElems), ri = length(sendNumElems),
+            sb = length(sendNumElems) * sizeof(Int64),
+            rb = length(sendNumElems) * sizeof(Int64)) do
+            MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+        end
         # with this information we can prepare the receive buffer
         recvbuf = MPI.VBuffer($ST(undef, sum(recvNumElems)),
                               recvNumElems)
 
         # transmit the edges itself
-        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+        _inst_diag_barrier(sim, :ready_wait_edge_add_alltoallv)
+        _inst_phase(sim, :edge_add_alltoallv, $T; kind = :alltoallv,
+                    si = length(sendbuf.data), ri = length(recvbuf.data),
+                    sb = length(sendbuf.data) * sizeof(eltype(sendbuf.data)),
+                    rb = length(recvbuf.data) * sizeof(eltype(recvbuf.data))) do
+            MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+        end
 
         # In the case that the edgetype count only the number of edges, write
         # this number directly into the edges container of the receiving PE
@@ -452,13 +484,25 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
         # transmit the number of edges the current PE want to send to the
         # other PEs
         sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
-        recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+        recvNumElems = _inst_phase(
+            sim, :edge_remove_alltoall, $T; kind = :alltoall,
+            si = length(sendNumElems), ri = length(sendNumElems),
+            sb = length(sendNumElems) * sizeof(Int64),
+            rb = length(sendNumElems) * sizeof(Int64)) do
+            MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+        end
         # with this information we can prepare the receive buffer
         recvbuf = MPI.VBuffer(fill((0,0), sum(recvNumElems)),
                               recvNumElems)
 
         # transmit the information about the removed edge itself
-        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+        _inst_diag_barrier(sim, :ready_wait_edge_remove_alltoallv)
+        _inst_phase(sim, :edge_remove_alltoallv, $T; kind = :alltoallv,
+                    si = length(sendbuf.data), ri = length(recvbuf.data),
+                    sb = length(sendbuf.data) * sizeof(eltype(sendbuf.data)),
+                    rb = length(recvbuf.data) * sizeof(eltype(recvbuf.data))) do
+            MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+        end
 
         for (source, target) in recvbuf.data
             target = AgentID(target)
@@ -489,7 +533,13 @@ end
 # rank 2: vec = [4]
 #
 # join(vec) returns [1, 2, 4] on all ranks
-function join(vec::Vector{T}) where T
+#
+# Instrumentation: with the `sim` kwarg the two Alltoallv calls are
+# recorded as `:join_sizes`/`:join_values` (type = `type` kwarg); with
+# additionally a `label` the whole join is wrapped in a purpose event
+# (e.g. `join(aids; sim = sim, label = :join_died, type = T)`). Without
+# the `sim` kwarg the call is uninstrumented (user-level usage).
+function join(vec::Vector{T}; sim = nothing, label = nothing, type = Nothing) where T
     # transfer the vector sizes
     sizes = Vector{Int32}(undef, mpi.size)
     sizes[mpi.rank + 1] = length(vec)
@@ -498,7 +548,19 @@ function join(vec::Vector{T}) where T
                        fill(Int32(mpi.rank), mpi.size))
     recv = MPI.VBuffer(sizes, fill(Int32(1), mpi.size))
 
-    MPI.Alltoallv!(send, recv, mpi.comm)
+    # purpose event (only if the caller opts in with a label); wraps
+    # both mechanism events below
+    if sim !== nothing && label !== nothing
+        _inst_begin!(sim, label, type)
+    end
+
+    _inst_diag_barrier(sim, :ready_wait_join_sizes)
+    _inst_phase(sim, :join_sizes, type; kind = :alltoallv,
+                si = length(sizes), ri = length(sizes),
+                sb = length(sizes) * sizeof(Int32),
+                rb = length(sizes) * sizeof(Int32)) do
+        MPI.Alltoallv!(send, recv, mpi.comm)
+    end
     sizes = recv.data
 
     # transfer the vector itself
@@ -511,7 +573,17 @@ function join(vec::Vector{T}) where T
                        fill(Int32(displace[mpi.rank + 1]), mpi.size))
     recv = MPI.VBuffer(values, sizes)
 
-    MPI.Alltoallv!(send, recv, mpi.comm)
+    _inst_diag_barrier(sim, :ready_wait_join_values)
+    _inst_phase(sim, :join_values, type; kind = :alltoallv,
+                si = length(vec), ri = sum(sizes),
+                sb = length(vec) * sizeof(T),
+                rb = sum(sizes) * sizeof(T)) do
+        MPI.Alltoallv!(send, recv, mpi.comm)
+    end
+
+    if sim !== nothing && label !== nothing
+        _inst_end!(sim, label, type)
+    end
 
     recv.data
 end

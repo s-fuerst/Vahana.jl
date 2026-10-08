@@ -56,7 +56,7 @@ end
 # neither a `diagnostic` flag nor the begin/end bookkeeping explicitly.
 function _inst_begin_agent_stats(sim, type::DataType)
     if instrumentation_enabled() && sim.instrumentation.diagnostic
-        _inst_begin(sim, :transition_stats, type)
+        _inst_begin!(sim, :transition_stats, type)
         AgentTimeStats()
     else
         nothing
@@ -66,7 +66,7 @@ end
 function _inst_end_agent_stats(sim, type::DataType,
                                stats::Union{Nothing, AgentTimeStats})
     if stats !== nothing
-        _inst_end(sim, :transition_stats, type;
+        _inst_end!(sim, :transition_stats, type;
                   agentstats = _inst_agentstats_or_nothing(stats))
     end
     nothing
@@ -117,7 +117,7 @@ mutable struct Instrumentation
     # per-agent timing (distorts the timings!)
     diagnostic::Bool                 
     events::Vector{InstEvent}
-    # copied into the events at _inst_end; after apply! -> nothing
+    # copied into the events at _inst_end!; after apply! -> nothing
     current_caller::Union{Nothing, Symbol}   
     # record context (default :none)
     current_context::Symbol
@@ -155,14 +155,14 @@ end
 # Stack: begin = push(label, type, time_ns), end = pop -> duration.
 # LIFO covers nested phases. label/type come from the stack entry; the
 # parameters at end are used for consistency checks only.
-@inline function _inst_begin(sim, label, type::DataType = Nothing)
+@inline function _inst_begin!(sim, label, type::DataType = Nothing)
     if instrumentation_enabled()
         push!(sim.instrumentation.stack, (label, type, time_ns()))
     end
     nothing
 end
 
-@inline function _inst_end(sim, label, type::DataType = Nothing;
+@inline function _inst_end!(sim, label, type::DataType = Nothing;
                   kind::Symbol = :phase,
                   si::Integer = 0, ri::Integer = 0,
                   sb::Integer = 0, rb::Integer = 0,
@@ -196,7 +196,7 @@ end
 end
 
 # Wraps a phase in one `label` event (replaces the manual
-# `_inst_begin`/…/`_inst_end` pairs). `label`/`type` are given exactly once,
+# `_inst_begin!`/…/`_inst_end!` pairs). `label`/`type` are given exactly once,
 # so begin and end cannot drift apart. Body as do-block:
 #
 #     _inst_phase(sim, :barrier_pre_apply; kind = :barrier) do
@@ -204,17 +204,32 @@ end
 #     end
 #
 # NOTE: `continue`, `break`, `return` or a throw inside `f()` skips the
-# `_inst_end` (unbalanced stack) — the wrapped call sites in `apply!` are
+# `_inst_end!` (unbalanced stack) — the wrapped call sites in `apply!` are
 # plain statements. `items` is evaluated at the call site (before `f()`); for
 # the slot counts used in `apply!` the length does not change inside `f()`.
 @inline function _inst_phase(f::F, sim, label::Symbol,
                              type::DataType = Nothing;
                              kind::Symbol = :phase,
-                             items::Integer = 0) where F
-    _inst_begin(sim, label, type)
+                             items::Integer = 0,
+                             si::Integer = 0, ri::Integer = 0,
+                             sb::Integer = 0, rb::Integer = 0) where F
+    _inst_begin!(sim, label, type)
     result = f()
-    _inst_end(sim, label, type; kind = kind, items = items)
+    _inst_end!(sim, label, type; kind = kind, items = items,
+              si = si, ri = ri, sb = sb, rb = rb)
     result
+end
+
+# Uninstrumented pass-through for call sites that may run without a
+# simulation (e.g. the user-level `join` without the `sim` kwarg).
+# Dispatches only when sim is literally `nothing`.
+@inline function _inst_phase(f::F, ::Nothing, label::Symbol,
+                             type::DataType = Nothing;
+                             kind::Symbol = :phase,
+                             items::Integer = 0,
+                             si::Integer = 0, ri::Integer = 0,
+                             sb::Integer = 0, rb::Integer = 0) where F
+    f()
 end
 
 # Caller labeling: named functions -> Symbol(string(func)).
@@ -252,28 +267,15 @@ function _inst_caller_label(sim, func)
     end
 end
 
-# Record state: set/reset current_caller/current_context in one place.
-# func = :none (default) -> caller stays untouched, only the context
-# switches (e.g. mapreduce); Vahana transitions are functions, never
-# symbols, so the sentinel is cleanly separable by value.
-@inline function _inst_enter!(sim, context, func = :none)
+# Record state: set current_caller/current_context in one place. The
+# `func = :none` sentinel doubles as the reset (e.g. `_inst_set_context!(sim,
+# :none)` after a top-level block)
+@inline function _inst_set_context!(sim, context, func = :none)
     if instrumentation_enabled()
         inst = sim.instrumentation
-        if func !== :none
-            inst.current_caller = _inst_caller_label(sim, func)
-        end
+        inst.current_caller = func === :none ? nothing :
+            _inst_caller_label(sim, func)
         inst.current_context = context
-    end
-    sim
-end
-
-# Reset after the top-level block (caller loses its validity,
-# context -> :none).
-@inline function _inst_reset!(sim)
-    if instrumentation_enabled()
-        inst = sim.instrumentation
-        inst.current_caller = nothing
-        inst.current_context = :none
     end
     sim
 end
@@ -285,10 +287,15 @@ end
 @inline function _inst_diag_barrier(sim, label)
     if instrumentation_enabled()
         if sim.instrumentation.diagnostic 
-            _inst_begin(sim, label)
+            _inst_begin!(sim, label)
             MPI.Barrier(MPI.COMM_WORLD)
-            _inst_end(sim, label; kind = :barrier)
+            _inst_end!(sim, label; kind = :barrier)
         end
     end
+    nothing
+end
+
+# Uninstrumented pass-through, cf. `_inst_phase`.
+@inline function _inst_diag_barrier(::Nothing, label)
     nothing
 end
