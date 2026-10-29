@@ -193,7 +193,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     @eval function transition_with_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate
         idx = AgentNr(0)
-        # diagnostic-only per-agent timing (distorts the timings!)
+        # Diagnostic-only per-agent timing (distorts the timings!).
         stats = _inst_begin_agent_stats(sim, $T)
         for state::$T in @readstate($T)
             idx += AgentNr(1)
@@ -204,9 +204,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
             end
             newstate = stats === nothing ?
-                        tfunc(state, agent_id($typeid, idx), sim) :
-                        _inst_timed_transition_call(stats, tfunc, state,
-                                                    agent_id($typeid, idx), sim)
+                tfunc(state, agent_id($typeid, idx), sim) :
+                _inst_timed_transition_call(stats, tfunc,
+                                            state, agent_id($typeid, idx), sim)
             wfunc(sim, idx, newstate, $T)
         end
         _inst_end_agent_stats(sim, $T, stats)
@@ -223,7 +223,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         has the :SingleType hint.
             """
         tnr = type_nr(sim, $T)
-        # diagnostic-only per-agent timing (distorts the timings!)
         stats = _inst_begin_agent_stats(sim, $T)
         for (id, _) in edgeread(sim, ET)
             if type_nr(id) == tnr
@@ -231,7 +230,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 state = @readstate($T)[idx]
                 @mayassert ! @readdied($T)[idx]
                 newstate = stats === nothing ? tfunc(state, id, sim) :
-                        _inst_timed_transition_call(stats, tfunc, state, id, sim)
+                    _inst_timed_transition_call(stats, tfunc, state, id, sim)
                 wfunc(sim, idx, newstate, $T)
             end
         end
@@ -242,7 +241,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
     @eval function transition_without_read!(wfunc, sim::$simsymbol, tfunc, ::Type{$T})
         # an own counter (with the correct type) is faster then enumerate
         idx = AgentNr(0)
-        # diagnostic-only per-agent timing (distorts the timings!)
         stats = _inst_begin_agent_stats(sim, $T)
         for _ in 1:length(@readstate($T))
             idx += AgentNr(1)
@@ -252,9 +250,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                 end
             end
             r = stats === nothing ?
-                  tfunc(Val($T), agent_id($typeid, idx), sim) :
-                  _inst_timed_transition_call(stats, tfunc, Val($T),
-                                              agent_id($typeid, idx), sim)
+                tfunc(Val($T), agent_id($typeid, idx), sim) :
+                _inst_timed_transition_call(stats, tfunc, Val($T),
+                                            agent_id($typeid, idx), sim)
             wfunc(sim, idx, r, $T)
         end
         _inst_end_agent_stats(sim, $T, stats)
@@ -271,7 +269,6 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         has the :SingleType hint.
         """
         tnr = type_nr(sim, $T)
-        # diagnostic-only per-agent timing (distorts the timings!)
         stats = _inst_begin_agent_stats(sim, $T)
         for (id, _) in edgeread(sim, ET)
             if type_nr(id) == tnr
@@ -280,7 +277,7 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
                     @mayassert ! @readdied($T)[idx]
                 end
                 newstate = stats === nothing ? tfunc(Val($T), id, sim) :
-                        _inst_timed_transition_call(stats, tfunc, Val($T), id, sim)
+                    _inst_timed_transition_call(stats, tfunc, Val($T), id, sim)
                 wfunc(sim, idx, newstate, $T)
             end
         end

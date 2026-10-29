@@ -778,8 +778,7 @@ function apply!(sim::Simulation,
         @info "<Begin> apply!" func transition=sim.num_transitions+1
     end
     
-    # instrumentation: set caller/context for this record and open the
-    # top-level event (record boundary). 
+    # instrumentation: set caller/context and open the top-level event
     _inst_set_context!(sim, :apply, func)
     _inst_begin!(sim, :apply_total)
 
@@ -808,6 +807,12 @@ function apply!(sim::Simulation,
     for ae in add_existing
         @assert ae in write "$ae is in `add_existing` but not in `write`"
     end
+
+    # Snapshot the rank-local live population once, before any transition
+    # runs. This is O(1) per agent type via the stable read-state reuse list.
+    # Do not allocate or inspect agent buffers when instrumentation is off.
+    inst_items = instrumentation_enabled() ?
+        Int64[_inst_live_agent_count(sim, T) for T in call] : nothing
 
     readableET = filter(w -> w in sim.typeinfos.edges_types, read)
     foreach(readableET) do T
@@ -848,16 +853,17 @@ function apply!(sim::Simulation,
         MPI.Barrier(MPI.COMM_WORLD)
     end
 
-    for C in call
+    for (call_idx, C) in enumerate(call)
         with_logger(sim) do
             @debug "<Begin> tf_call!" agenttype=C transition=sim.num_transitions+1
         end
         wfunc = C in write ? transition_with_write! : transition_without_write!
-        # items = buffer slots of this type (O(1)); NOT the number of alive
-        # agents (that would be an O(n) scan inside the measured phase).
-        # Evaluated once before the transition; the slot count does not
-        # change inside the loop.
-        _inst_phase(sim, :transition, C; items = length(writestate(sim, C))) do
+        # `items` is the local number of live agents of C at apply! entry,
+        # not the allocated state-vector length. The snapshot is taken before
+        # any type transition can add, kill, or reuse agent slots. If `with_edge`
+        # is set, this is the local population, not the edge-selected subset.
+        items = inst_items === nothing ? 0 : inst_items[call_idx]
+        _inst_phase(sim, :transition, C; items = items) do
             if with_edge === nothing
                 rfunc = C in read ? transition_with_read! : transition_without_read!
                 rfunc(wfunc, sim, func, C)
@@ -919,7 +925,7 @@ function apply!(sim::Simulation,
 
     sim.intransition = false
 
-    # close the record BEFORE incrementing num_transitions (invariant, see
+    # close the apply event BEFORE incrementing num_transitions (invariant, see
     # top of apply!): the :apply_total event and all children must carry the
     # 0-based transition number of this apply!
     _inst_end!(sim, :apply_total)

@@ -1,0 +1,11 @@
+[project]
+name = "vahana-instrumentation-dashboard"
+version = "0.1.0"
+description = "Local Dash UI for direct Vahana instrumentation HDF5 analysis"
+requires-python = ">=3.11"
+dependencies = [
+    "dash>=2.18",
+    "h5py>=3.11",
+    "numpy>=2.0",
+    "pandas>=2.2",
+]

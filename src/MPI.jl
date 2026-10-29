@@ -9,13 +9,18 @@ using Logging
 # mapping can be used, e.g. for testing, or in the case that the
 # modeller can create a better partitioning him/herself then Metis.
 function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
+    _inst_set_context!(sim, :init)
+    _inst_begin!(sim, :distribute)
+
     node_types = sim.typeinfos.nodes_types
     edge_types = sim.typeinfos.edges_types
     # We reconstruct the whole graph, so we call prepare_write for
     # all agent and edgetypes
     foreach(prepare_write!(sim, [], []), [ node_types; edge_types ])
 
-    MPI.Barrier(MPI.COMM_WORLD)
+    _inst_phase(sim, :barrier_pre_distribute; kind = :barrier) do
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
     disable_transition_checks(sim, true)
     
     # we also reset the nextid count to 1 for every nodetype
@@ -39,8 +44,10 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # mapped to this PE. We collect now this information. As we can not send
     # the Dict directly, we join the keys and values indepently and create
     # a new dict afterwards
-    allkeys = join(keys(idmapping) |> collect)
-    allvalues = join(values(idmapping) |> collect)
+    allkeys = join(keys(idmapping) |> collect; sim = sim,
+                   label = :join_idmapping_keys)
+    allvalues = join(values(idmapping) |> collect; sim = sim,
+                     label = :join_idmapping_values)
     idmapping = Dict(allkeys .=> allvalues)
 
     # Till now we have distribute only the agents, and we have the mapping
@@ -53,38 +60,44 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     # we want to allow that add_raster is only called on the root rank
     # but in this case the sim.rasters Dict missings the keys on the
     # other ranks. So we first send the key names
-    if mpi.rank == 0
-        rasternames = String.(keys(sim.rasters))
-        n = length(rasternames)
-        MPI.Bcast!(Ref(n), MPI.COMM_WORLD)
-        for s in rasternames
-            len = length(s)
-            MPI.Bcast!(Ref(len), MPI.COMM_WORLD)
-            MPI.Bcast!(Vector{UInt8}(s), MPI.COMM_WORLD)
+    _inst_phase(sim, :raster_bcast) do
+        if mpi.rank == 0
+            rasternames = String.(keys(sim.rasters))
+            n = length(rasternames)
+            MPI.Bcast!(Ref(n), MPI.COMM_WORLD)
+            for s in rasternames
+                len = length(s)
+                MPI.Bcast!(Ref(len), MPI.COMM_WORLD)
+                MPI.Bcast!(Vector{UInt8}(s), MPI.COMM_WORLD)
+            end
+        else
+            n = Ref{Int}()
+            MPI.Bcast!(n, MPI.COMM_WORLD)
+        
+            for _ in 1:n[]
+                len = Ref{Int}()
+                MPI.Bcast!(len, MPI.COMM_WORLD)
+                buffer = Vector{UInt8}(undef, len[])
+                MPI.Bcast!(buffer, MPI.COMM_WORLD)
+                push!(sim.rasters, Symbol(String(buffer)) => AgentID[])
+            end
         end
-    else
-        n = Ref{Int}()
-        MPI.Bcast!(n, MPI.COMM_WORLD)
-    
-        for _ in 1:n[]
-            len = Ref{Int}()
-            MPI.Bcast!(len, MPI.COMM_WORLD)
-            buffer = Vector{UInt8}(undef, len[])
-            MPI.Bcast!(buffer, MPI.COMM_WORLD)
-            push!(sim.rasters, Symbol(String(buffer)) => AgentID[])
-        end
-    end
 
-    # we must also update and broadcast the ids for each raster. As we
-    # don't need the edges for that, we must not synchronize the PEs
-    # before.
-    foreach(grid -> broadcastids(sim, grid, idmapping),  keys(sim.rasters))
+        # we must also update and broadcast the ids for each raster. As we
+        # don't need the edges for that, we must not synchronize the PEs
+        # before.
+        foreach(grid -> broadcastids(sim, grid, idmapping), keys(sim.rasters))
+    end
 
     # finish everything and return the idmapping
     disable_transition_checks(sim, false)
-    MPI.Barrier(MPI.COMM_WORLD)
+    _inst_phase(sim, :barrier_post_distribute; kind = :barrier) do
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
     foreach(T -> finish_distribute!(sim, T), node_types)
-    
+
+    _inst_end!(sim, :distribute)
+    _inst_set_context!(sim, :none)
     idmapping
 end
 
@@ -113,6 +126,7 @@ end
 
 # Distribute agents of agenttype T to the different PEs. 
 function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
+    _inst_begin!(sim, :sendagents, T)
     with_logger(sim) do
         @debug "<Begin> sendagents!" agenttype=T
     end
@@ -134,16 +148,29 @@ function sendagents!(sim, perPE::Vector{Vector{AgentID}}, T::DataType)
     # first we transmit the number of agents a PE want to send to the
     # other PEs
     sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
-    recvNumElems = MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+    recvNumElems = _inst_phase(
+        sim, :agent_init_alltoall, T; kind = :alltoall,
+        si = length(sendNumElems), ri = length(sendNumElems),
+        sb = length(sendNumElems) * sizeof(Int64),
+        rb = length(sendNumElems) * sizeof(Int64)) do
+        MPI.Alltoall(UBuffer(sendNumElems, 1), mpi.comm)
+    end
     # with this information we can prepare the receive buffer
     recvbuf = MPI.VBuffer(ST(undef, sum(recvNumElems)), recvNumElems)
     # and then transfer the {AgentID,T (AgentState)} tuples.
-    MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+    _inst_diag_barrier(sim, :ready_wait_agent_init_alltoallv)
+    _inst_phase(sim, :agent_init_alltoallv, T; kind = :alltoallv,
+                si = length(sendbuf.data), ri = length(recvbuf.data),
+                sb = length(sendbuf.data) * sizeof(eltype(sendbuf.data)),
+                rb = length(recvbuf.data) * sizeof(eltype(recvbuf.data))) do
+        MPI.Alltoallv!(sendbuf, recvbuf, mpi.comm)
+    end
     # we need oldid as key and newid as value
     idmapping = Dict{AgentID, AgentID}() 
     foreach(recvbuf.data) do (id, agent)
         idmapping[id] = add_agent!(sim, agent)
     end
+    _inst_end!(sim, :sendagents, T)
     _log_debug(sim, "<End> sendagents!")
     idmapping
 end
@@ -311,6 +338,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
     # | Int64              | x       | x      | num_edges     | num_edges      |
     @eval function sendedges!(sim::$simsymbol, sendmap::Dict{AgentID, ProcessID},
                        idmapping, ::Type{$T})
+        _inst_begin!(sim, :sendedges, $T)
         with_logger(sim) do
             @debug "<Begin> sendedges!" edgetype=$T
         end
@@ -363,6 +391,7 @@ function construct_mpi_edge_methods(T::DataType, typeinfos, simsymbol, CE)
 
         edges_alltoall!(sim, perPE, $T, updateid)
 
+        _inst_end!(sim, :sendedges, $T)
         with_logger(sim) do
             @debug "<End> sendedges!" 
         end

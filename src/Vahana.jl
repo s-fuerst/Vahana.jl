@@ -4,6 +4,14 @@ using MPI, Metis, Requires
 
 export enable_asserts, suppress_warnings, detect_stateless
 export set_hdf5_path, set_log_path
+export instrumentation_dashboard, instrumentation_dashboard_app
+
+function instrumentation_dashboard(args...; kwargs...)
+    throw(ArgumentError("Load Bonito and WGLMakie to use instrumentation_dashboard."))
+end
+function instrumentation_dashboard_app(args...; kwargs...)
+    throw(ArgumentError("Load Bonito and WGLMakie to use instrumentation_dashboard_app."))
+end
 
 function __init__()
     @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
@@ -153,9 +161,6 @@ set_log_path = (path::String) -> config.log_path = path
 
 abstract type Simulation end
 
-# must be included before Simulation.jl (the generated Simulation struct
-# carries an `instrumentation::Union{Nothing, Instrumentation}` field)
-include("Instrumentation.jl")
 
 include("Helpers.jl")
 
@@ -170,6 +175,9 @@ include("MPI.jl")
 include("ModelTypes.jl")
 
 include("HDF5.jl")
+# must be included before Simulation.jl (the generated Simulation struct
+# carries an `instrumentation::Union{Nothing, Instrumentation}` field)
+include("Instrumentation.jl")
 
 include("EdgeMethods.jl")
 include("AgentMethods.jl")
