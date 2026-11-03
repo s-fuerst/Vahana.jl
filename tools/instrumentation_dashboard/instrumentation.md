@@ -42,11 +42,10 @@ The current file format stores enum fields as integer IDs without persisting the
 
 ## Measurement caveats
 
-Per-agent timings are diagnostic measurements and add overhead. Enable diagnostics consistently on all MPI ranks before the measured operations, and use those timings for diagnosis rather than benchmarking:
+Per-agent timings are diagnostic measurements and add overhead. Enable them consistently on all MPI ranks before the measured operations, and use those timings for diagnosis rather than benchmarking:
 
 ```julia
-enable_instrumentation!(true)
-enable_diagnostics!(sim, true)
+enable_instrumentation(true, true)
 ```
 
 The transition `items` value is the rank-local number of live agents of that type at entry to `apply!`, not the number of allocated storage slots. Counts are recorded for types that have a transition event in that `apply!` call.

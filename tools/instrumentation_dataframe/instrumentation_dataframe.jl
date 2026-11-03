@@ -25,7 +25,7 @@ suppress_warnings(true)
 
 # VString{32} fields: fixed-width byte strings, NUL-padded; empty = "not
 # set". (Converted manually: the `String(VString{N})` constructor only
-# exists in processes where `enable_instrumentation!` created it.)
+# exists in processes where `enable_instrumentation` created it.)
 function vstring_val(s)
     b = collect(s)
     i = findfirst(iszero, b)
@@ -50,7 +50,6 @@ function inst_events_df(events::Vector{InstEvent})
         caller         = [vstring_val(e.caller) for e in events],
         type           = [vstring_val(e.type) for e in events],
         transition_nr  = [e.transition_nr for e in events],
-        diag           = [e.diag for e in events],
         start_ns       = [e.start_ns for e in events],
         dur_ns         = [e.dur_ns for e in events],
         items          = [e.items for e in events],
@@ -125,14 +124,14 @@ if !file_exists
     add_agents!(sim, [A1(i) for i in 1:50])
     finish_init!(sim)                      # init phase events (distribute!)
 
-    enable_instrumentation!(true)
+    enable_instrumentation(true)
     apply!(sim, (s, id, sim) -> A1(s.x + 1), A1, [A1], [A1, E1])
     apply!(sim, (s, id, sim) -> A1(s.x * 2), A1, [A1], [A1, E1])
-    enable_instrumentation!(false)
+    enable_instrumentation(false)
 
     println("rank ", Vahana.mpi.rank,
             " recorded ", length(sim.instrumentation.events), " events")
-    write_instrumentation!(sim)
+    write_instrumentation(sim)
     close_h5file!(sim)
 end
 

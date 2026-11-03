@@ -1,6 +1,6 @@
 export Instrumentation, InstEvent
-export enable_instrumentation!, enable_diagnostics!
-export write_instrumentation!, load_instrumentation
+export enable_instrumentation
+export write_instrumentation, load_instrumentation
 
 @enum EventContext begin
     EC_none
@@ -45,6 +45,7 @@ end
     EL_apply_total
     EL_prepare_read
     EL_prepare_write
+    EL_prepare_spatial
     EL_barrier_pre_apply
     EL_transition
     EL_barrier_post_apply
@@ -131,6 +132,7 @@ const _EVENT_LABEL_BY_SYMBOL = Dict{Symbol, EventLabel}(
     :apply_total                        => EL_apply_total,
     :prepare_read                       => EL_prepare_read,
     :prepare_write                      => EL_prepare_write,
+    :prepare_spatial                    => EL_prepare_spatial,
     :barrier_pre_apply                  => EL_barrier_pre_apply,
     :transition                         => EL_transition,
     :barrier_post_apply                 => EL_barrier_post_apply,
@@ -191,7 +193,7 @@ end
 
 # The fixed-width string fields (caller, type) use the `VString{N}`
 # conversion from HDF5.jl: `create_string_converter` (called by
-# `enable_instrumentation!`) generates the `SVector{N, UInt8}(str)`
+# `enable_instrumentation`) generates the `SVector{N, UInt8}(str)`
 # constructor that pads with zeros (and truncates strings that are too
 # long). The conversion is only used at event construction time in
 # `_inst_end!`, which runs only when instrumentation is enabled.
@@ -217,7 +219,6 @@ struct InstEvent
     # Event-local item count. For :transition this is live agents at apply! entry;
     # for :transition_stats it is the number of timed agent callbacks.
     items::Int64
-    diag::Bool
     start_ns::Int64
     dur_ns::Int64
     # send/recv volume; 0 for local event
@@ -231,6 +232,9 @@ struct InstEvent
     agent_sum_ns::Int64
     agent_sum_sq_hi::Int64
     agent_sum_sq_lo::Int64
+    # GC stop-the-world pause time (ns) that occurred on this rank while the
+    # event was open; 0 when no collection ran during the event.
+    gc_pause_ns::Int64
 end
 
 
@@ -268,9 +272,6 @@ end
 # end
 
 mutable struct Instrumentation
-    # true: additional barriers before collectives
-    # (distorts the timings!)
-    diagnostic::Bool                 
     events::Vector{InstEvent}
     # copied into the events at _inst_end!; after apply! -> nothing
     current_caller::Union{Nothing, Symbol}   
@@ -278,21 +279,22 @@ mutable struct Instrumentation
     current_context::Symbol
     # func -> name cache
      func_labels::Dict{Any, Symbol}
-    # (label, type, t0); LIFO nesting
-    stack::Vector{Tuple{Symbol, DataType, Int64}} 
+    # (label, type, t0, gc_num_at_start); LIFO nesting
+    stack::Vector{Tuple{Symbol, DataType, Int64, Base.GC_Num}}
 
     function Instrumentation()
-        new(false, InstEvent[], nothing, :none, 
-            Dict{Any, Symbol}(), Tuple{Symbol, DataType, Int64}[])
+        new(InstEvent[], nothing, :none,
+            Dict{Any, Symbol}(), Tuple{Symbol, DataType, Int64, Base.GC_Num}[])
     end
 end
 
 # making this a function results in code being invalidated and recompiled when
 # this gets changed
 instrumentation_enabled() = false
+diagnostics_enabled() = false
 
 """
-    enable_instrumentation!(enable::Bool)
+    enable_instrumentation(enable::Bool, diagnostic::Bool = false)
 
 Module-level switch (analogous to [`enable_asserts`](@ref)) that turns all
 instrumentation hooks into no-ops, without touching individual simulations.
@@ -302,8 +304,17 @@ Like `enable_asserts`, changes take effect only after a world-age barrier
 When `enable` is set to true, this function also calls [`create_enum_converter`](@ref)
 and [`create_string_converter`](@ref), as this functionality is utilized to
 store the instrumentation to the HDF5 file.
+
+The `diagnostic` argument additionally enables diagnostic instrumentation:
+per-agent transition timings recorded as `:transition_stats` events and
+extra barriers before selected MPI collectives to expose rank imbalance and
+waiting time. These measurements add overhead and perturb timings; use them
+for diagnosis, not performance benchmarks. Diagnostics are only recorded
+when instrumentation is enabled as well. In MPI runs, call this function on
+every rank with the same arguments before the measured operation.
 """
-function enable_instrumentation!(enable::Bool)
+function enable_instrumentation(enable::Bool, diagnostic::Bool = false)
+    @assert enable || !diagnostic "diagnostics require instrumentation to be enabled"
     if enable
         create_enum_converter()
         create_string_converter(false)
@@ -311,37 +322,17 @@ function enable_instrumentation!(enable::Bool)
     else
         @eval instrumentation_enabled() = false
     end
+    @eval diagnostics_enabled() = $(enable && diagnostic)
+    nothing
 end
 
-"""
-    enable_diagnostics!(sim::Simulation, enable::Bool)
-
-Enable or disable diagnostic instrumentation for one simulation.
-
-When enabled, Vahana records per-agent transition timings in
-`:transition_stats` events and inserts additional barriers before selected
-MPI collectives to expose rank imbalance and waiting time. These measurements
-add overhead and perturb timings; use them for diagnosis, not performance
-benchmarks.
-
-This setting is independent of [`enable_instrumentation!`](@ref): diagnostics
-are only recorded when instrumentation is also enabled. In MPI runs, call
-this function on every rank with the same `enable` value before the measured
-operation, since ranks with different settings may take different collective
-paths.
-
-Returns the value of `enable`.
-"""
-function enable_diagnostics!(sim::Simulation, enable::Bool)
-    sim.instrumentation.diagnostic = enable
-end
-
-# Stack: begin = push(label, type, time_ns), end = pop -> duration.
-# LIFO covers nested phases. label/type come from the stack entry; the
-# parameters at end are used for consistency checks only.
+# Stack: begin = push(label, type, time_ns, gc_num), end = pop -> duration
+# and GC pause time. LIFO covers nested phases. label/type come from the stack
+# entry; the parameters at end are used for consistency checks only.
 @inline function _inst_begin!(sim, label, type::DataType = Nothing)
     if instrumentation_enabled()
-        push!(sim.instrumentation.stack, (label, type, time_ns()))
+        push!(sim.instrumentation.stack,
+              (label, type, time_ns(), Base.gc_num()))
     end
     nothing
 end
@@ -354,7 +345,7 @@ end
                   agentstats::Union{Nothing, AgentTimeStats} = nothing)
     if instrumentation_enabled()
         inst = sim.instrumentation
-        (l, t, t0) = pop!(inst.stack)
+        (l, t, t0, gc0) = pop!(inst.stack)
         if l !== label
             error("event stack unbalanced: expected label $l, got $label")
         end
@@ -362,6 +353,8 @@ end
             error("event stack unbalanced: expected type $t, got $type")
         end
         now = time_ns()
+        # GC time spent on this rank while the event was open
+        gc_pause_ns = Base.GC_Diff(Base.gc_num(), gc0).total_time
         # convert the Symbol API to the fixed-width event representation
         label_id = get(_EVENT_LABEL_BY_SYMBOL, label, nothing)
         label_id === nothing &&
@@ -398,12 +391,12 @@ end
                                      step,
                                      sim.num_transitions,
                                      items,
-                                     startswith(string(label), "ready_wait_"),
                                      t0,
                                      now - t0,
                                      si, ri, sb, rb,
                                      agent_min_ns, agent_max_ns, agent_sum_ns,
-                                     agent_sum_sq_hi, agent_sum_sq_lo))
+                                     agent_sum_sq_hi, agent_sum_sq_lo,
+                                     gc_pause_ns))
     end
     nothing
 end
@@ -425,7 +418,7 @@ end
 # Diagnostic-only per-agent timing. The event is still emitted for a type
 # with no local agents (items == 0, timing fields == 0).
 @inline function _inst_begin_agent_stats(sim, type::DataType)
-    if instrumentation_enabled() && sim.instrumentation.diagnostic
+    if instrumentation_enabled() && diagnostics_enabled()
         _inst_begin!(sim, :transition_stats, type)
         AgentTimeStats()
     else
@@ -542,7 +535,7 @@ end
 # diagnosis only, not for benchmarking.
 @inline function _inst_diag_barrier(sim, label)
     if instrumentation_enabled()
-        if sim.instrumentation.diagnostic 
+        if diagnostics_enabled() 
             _inst_begin!(sim, label)
             MPI.Barrier(MPI.COMM_WORLD)
             _inst_end!(sim, label; kind = :barrier)
@@ -590,12 +583,23 @@ function _inst_int128_reassemble(hi::Int64, lo::Int64)
     Int128(hi) * _INST_TWO64 + unsigned_lo
 end
 
+# Version of the /instrumentation metadata schema (enum-name attributes and
+# format_version). Bump when the /instrumentation layout or the
+# enum-to-integer mapping changes.
+const INST_FORMAT_VERSION = 4
+
+"""Enum member names without their declaration prefix (`EL_`, `EC_`, `EK_`),
+in declaration order"""
+function _inst_enum_names(E::Type{<:Enum}, prefix::String)
+    [replace(string(member), prefix => "") for member in instances(E)]
+end
+
 # ---------------------------------------------------------------------------
-# write_instrumentation!
+# write_instrumentation
 # ---------------------------------------------------------------------------
 
 """
-    write_instrumentation!(sim)
+    write_instrumentation(sim)
 
 Saves the current instrumentation event stream to the attached HDF5 file
 (`sim.h5file`), under the group `/instrumentation/`.
@@ -612,13 +616,19 @@ fixed-width byte strings (`VString{32}`). `rank` holds the MPI rank that
 recorded the event. `agent_sum_sq` (Int128) is split into
 `agent_sum_sq_hi`/`agent_sum_sq_lo` (each Int64).
 
+The `/instrumentation/` group additionally stores metadata attributes:
+`n_events_per_rank`, `displace`, `mpi_size`, `format_version`, and the
+enum-name tables `event_labels`, `contexts`, and `kinds` (0-indexed string
+arrays). External readers should use these tables instead of a hardcoded
+enum list; `format_version` identifies the metadata schema.
+
 The event stream is **not** cleared after saving. A second call to
-`write_instrumentation!` on the same file will error because the
+`write_instrumentation` on the same file will error because the
 `/instrumentation/` group already exists.
 
 See also [`load_instrumentation`](@ref).
 """
-function write_instrumentation!(sim::Simulation)
+function write_instrumentation(sim::Simulation)
     if sim.h5file === nothing
         create_h5file!(sim)
     end
@@ -654,6 +664,14 @@ function write_instrumentation!(sim::Simulation)
     attrs(gid)["n_events_per_rank"] = vec_num
     attrs(gid)["displace"] = vec_displace
     attrs(gid)["mpi_size"] = mpi.size
+    # Enum-name metadata so external readers (e.g. the Python marimo
+    # notebook) do not need a hardcoded enum table kept in sync with these
+    # enums. The string arrays are 0-indexed to match the integer
+    # representation of the enum fields in the events dataset.
+    attrs(gid)["format_version"] = INST_FORMAT_VERSION
+    attrs(gid)["event_labels"] = _inst_enum_names(EventLabel, "EL_")
+    attrs(gid)["contexts"] = _inst_enum_names(EventContext, "EC_")
+    attrs(gid)["kinds"] = _inst_enum_names(EventKind, "EK_")
 
     # --- write one partitioned HDF5 compound dataset ---
     _inst_write_events(gid, "events", sum_n, events, start_idx, last_idx)
@@ -701,7 +719,6 @@ function _inst_event_from_nt(r)
               Int64(r.step),
               r.transition_nr,
               r.items,
-              r.diag,
               r.start_ns,
               r.dur_ns,
               r.send_items,
@@ -712,14 +729,15 @@ function _inst_event_from_nt(r)
               r.agent_max_ns,
               r.agent_sum_ns,
               r.agent_sum_sq_hi,
-              r.agent_sum_sq_lo)
+              r.agent_sum_sq_lo,
+              r.gc_pause_ns)
 end
 
 """
     load_instrumentation(filename)
 
 Loads the instrumentation event stream from an HDF5 file (as written by
-[`write_instrumentation!`](@ref)) and returns a `Vector{InstEvent}`
+[`write_instrumentation`](@ref)) and returns a `Vector{InstEvent}`
 sorted by start time, using the same order as the save
 (`(start_ns, -dur_ns)`). Each event carries the `rank` of the process
 that recorded it.

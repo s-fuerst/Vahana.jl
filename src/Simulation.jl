@@ -847,7 +847,9 @@ function apply!(sim::Simulation,
         end
     end
 
-    prepare_spatial_neighbors!(sim, sn)
+    _inst_phase(sim, :prepare_spatial; kind = :barrier) do
+        prepare_spatial_neighbors!(sim, sn)
+    end
 
     _inst_phase(sim, :barrier_pre_apply; kind = :barrier) do
         MPI.Barrier(MPI.COMM_WORLD)

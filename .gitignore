@@ -9,3 +9,4 @@
 *.log
 /docs/LocalPreferences.toml
 /coverage/
+skills-lock.json

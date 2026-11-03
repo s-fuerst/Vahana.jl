@@ -43,7 +43,7 @@ end
     @test isempty(sim.instrumentation.events)
 
     # 2) collective toggle on: every rank records its own events
-    enable_instrumentation!(true)
+    enable_instrumentation(true)
     apply!(sim, (s, id, sim) -> A1(s.x + 1), A1, [A1, E1], [A1, E1])
     apply!(sim, (s, id, sim) -> A1(s.x + 1), A1, [A1, E1], [A1, E1])
 
@@ -246,13 +246,13 @@ end
                     filter(x -> x.label == Vahana.EL_edge_add_alltoallv, recc))
     @test MPI.Allreduce(vol, +, MPI.COMM_WORLD) > 0
 
-    # 6) diagnostic mode: per-agent timing statistics per agent type
-    @test enable_diagnostics!(sim2, true)
-    @test sim2.instrumentation.diagnostic
-    @test !sim.instrumentation.diagnostic # setting is per simulation
+    # 6) diagnostic mode: per-agent timing statistics per agent type.
+    # The switch is global with world-age semantics: the re-@eval'd
+    # enabled-functions are only picked up by code compiled after this
+    # top-level statement, which is the case for the apply! call below.
+    enable_instrumentation(true, true)
     apply!(sim2, multi_trans, [A1, A2], [A1, A2], [A1, A2, E1])
-    @test !enable_diagnostics!(sim2, false)
-    @test !sim2.instrumentation.diagnostic
+    enable_instrumentation(true, false)
     rec3 = filter(e -> e.transition_nr == maximum(e2.transition_nr
                                                   for e2 in
                                                   sim2.instrumentation.events),
@@ -409,7 +409,7 @@ end
     @test sim4.instrumentation.current_context == :none
 
     # 10) collective toggle off: no new events on any rank
-    enable_instrumentation!(false)
+    enable_instrumentation(false)
     n_before = length(sim.instrumentation.events)
     apply!(sim, (s, id, sim) -> A1(s.x + 1), A1, [A1, E1], [A1, E1])
     @test length(sim.instrumentation.events) == n_before
@@ -429,7 +429,7 @@ end
         register_edgetype!(E1; hints=[:Stateless]) |>
         create_model("Instr Init")
 
-    enable_instrumentation!(true)
+    enable_instrumentation(true)
 
     # finish_init! with distribute calls distribute! internally
     sim_init = create_simulation(model2; filename="InstrumentationRecordMPI")
@@ -439,7 +439,7 @@ end
         add_edge!(sim_init, a1_ids[i], a1_ids[mod1(i+1, length(a1_ids))], E1())
     end
     finish_init!(sim_init)
-    enable_instrumentation!(false)
+    enable_instrumentation(false)
 
     ev = sim_init.instrumentation.events
     @test !isempty(ev)
@@ -511,7 +511,7 @@ end
 
     # Parallel HDF5 compound-event save/load roundtrip.
     expected_events = MPI.Allreduce(length(ev), +, mpi.comm)
-    write_instrumentation!(sim_init)
+    write_instrumentation(sim_init)
     close_h5file!(sim_init)
     loaded = load_instrumentation("InstrumentationRecordMPI")
     @test eltype(loaded) == InstEvent
@@ -559,7 +559,7 @@ end
         register_edgetype!(E1) |>
         create_model("Instr Step")
 
-    enable_instrumentation!(true)
+    enable_instrumentation(true)
 
     # globals WITH a `step` field: every event carries the value at the
     # time the event is recorded
@@ -599,7 +599,7 @@ end
     @test all(e -> e.step == -1, ev_ns)
 
     # save/load roundtrip preserves the per-record step values
-    write_instrumentation!(sim_s)
+    write_instrumentation(sim_s)
     close_h5file!(sim_s)
     # the loader returns all ranks' events combined
     n_loaded = MPI.Allreduce(length(sim_s.instrumentation.events), +, mpi.comm)
@@ -608,7 +608,7 @@ end
     @test Set(Int(e.step) for e in loaded) == Set((0, 42))
     @test any(e -> e.step == 42 && e.label == Vahana.EL_apply_total, loaded)
 
-    enable_instrumentation!(false)
+    enable_instrumentation(false)
 
     if mpi.rank == 0
         for rank in 0:(mpi.size - 1)

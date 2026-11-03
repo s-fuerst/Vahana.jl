@@ -47,7 +47,7 @@ Im geprüften Beispiel `h5/InstrumentationExample.h5`, Transition 1, decken die 
 
 - `:transition.items` ist die rank-lokale Zahl lebender Agenten dieses Typs beim Eintritt in `apply!`; Typen ohne Transition-Ereignis werden in diesem Snapshot nicht aufgeführt.
 - Zeitstempel verschiedener MPI-Prozesse sind nicht als gemeinsame Uhr zu interpretieren. Die Timeline bezieht Zeiten auf den lokalen `apply_total`-Start pro Rank; Dauervergleiche bleiben sinnvoll.
-- Agenten-Callback-Timings gibt es nur mit `enable_diagnostics!(sim, true)`. Diese Messungen und Diagnosebarrieren fügen Overhead hinzu und eignen sich zur Diagnose, nicht als unverfälschte Benchmarkwerte.
+- Agenten-Callback-Timings gibt es nur mit `enable_instrumentation(true, true)`. Diese Messungen und Diagnosebarrieren fügen Overhead hinzu und eignen sich zur Diagnose, nicht als unverfälschte Benchmarkwerte.
 - `apply_total` umfasst Kindintervalle. Für Prozentwerte der Coverage werden Teilintervalle vereinigt statt verschachtelte Dauern einfach aufzusummieren.
 
 ## Prüfumfang und offene Arbeit
