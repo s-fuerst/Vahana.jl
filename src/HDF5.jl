@@ -231,6 +231,14 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
         for k in fieldnames(typeof(sim.params))
             field = getfield(sim.params, k)
             if typeof(field) <: Array
+                # HDF5.jl cannot build a datatype for Symbol; store as string
+                if eltype(field) === Symbol
+                    field = map(string, field)
+                end
+                if eltype(field) === String && parallel_write()
+                    error("Writing an array of String in parallel HDF5 mode is " *
+                          "not supported (libhdf5 has no parallel VL string IO).")
+                end
                 if length(field) > 0
                     pid[string(k)] = field
                     attrs(pid[string(k)])["array"] = true
@@ -238,8 +246,20 @@ function create_h5file!(sim::Simulation, filename = sim.filename; overwrite = si
                     attrs(eid)[string(k)] = true
                 end
             else
-                pid[string(k)] = [ field ]
-                attrs(pid[string(k)])["array"] = false
+                if field isa Symbol
+                    field = string(field)
+                end
+                if field isa String
+                    # Parallel HDF5 cannot write variable-length string
+                    # datasets, so store the string as a byte array with a
+                    # "string" marker attribute (see _read_param_value).
+                    pid[string(k)] = [UInt8(c) for c in field]
+                    attrs(pid[string(k)])["array"] = false
+                    attrs(pid[string(k)])["string"] = true
+                else
+                    pid[string(k)] = [ field ]
+                    attrs(pid[string(k)])["array"] = false
+                end
             end
         end
     end
@@ -902,6 +922,20 @@ function _read_agents_merge!(sim::Simulation, tid, T::DataType, fidx, parallel)
     idmapping
 end
 
+# read a single params/globals dataset; strings are stored as byte arrays
+# with a "string" marker attribute, because parallel HDF5 cannot write
+# variable-length string datasets
+function _read_param_value(ds)
+    a = attrs(ds)
+    if haskey(a, "string")
+        String(ds[])
+    elseif a["array"]
+        ds[]
+    else
+        ds[1]
+    end
+end
+
 function _read_globals_or_params(hid, empty_array_str)
     eid = hid[empty_array_str]
     all_keys = map(string,
@@ -911,10 +945,8 @@ function _read_globals_or_params(hid, empty_array_str)
     Dict(map(all_keys) do k
              k => if haskey(HDF5.attributes(eid), k)
                  nothing
-             elseif attrs(hid[k])["array"] 
-                 hid[k][]
              else
-                 hid[k][1]
+                 _read_param_value(hid[k])
              end
          end)
 end
@@ -928,10 +960,8 @@ function _read_globals_or_params(hid, T, empty_array_str)
     unsorted = Dict(map(all_keys) do k
                         k => if haskey(HDF5.attributes(eid), k)
                             Vector{fieldtype(T, Symbol(k))}()
-                        elseif attrs(hid[k])["array"] 
-                            hid[k][]
                         else
-                            hid[k][1]
+                            _read_param_value(hid[k])
                         end
                     end)
     
