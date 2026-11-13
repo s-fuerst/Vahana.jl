@@ -415,6 +415,16 @@ end
     @test length(sim.instrumentation.events) == n_before
     @test isempty(sim.instrumentation.stack)
 
+    # MPI.Win_free is collective on the window communicator. Release every
+    # simulation explicitly and in the same order on all ranks; otherwise an
+    # asynchronous GC finalizer can enter MPI while peers are in another call.
+    for simulation in (sim, sim2, simc, sim3, sim4)
+        finish_simulation!(simulation)
+    end
+    # Exercise finalizers before the next test starts issuing MPI collectives.
+    GC.gc()
+    MPI.Barrier(mpi.comm)
+
     sleep(mpi.rank * 0.05)
 end
 
@@ -439,15 +449,40 @@ end
         add_edge!(sim_init, a1_ids[i], a1_ids[mod1(i+1, length(a1_ids))], E1())
     end
     finish_init!(sim_init)
+
+    # Initialization without distribution is also wholly in the init context.
+    sim_local_init = create_simulation(model2)
+    add_agent!(sim_local_init, A1(1))
+    finish_init!(sim_local_init; distribute=false)
+    local_init_events = sim_local_init.instrumentation.events
+    @test !isempty(local_init_events)
+    @test all(e -> e.context == Vahana.EC_init, local_init_events)
+    @test all(e -> e.label != Vahana.EL_distribute, local_init_events)
+    @test sim_local_init.instrumentation.current_context == :none
+    @test sim_local_init.instrumentation.current_caller === nothing
+    @test isempty(sim_local_init.instrumentation.stack)
+    finish_simulation!(sim_local_init)
+
+    # The invalid partition has the same type on all ranks, so every rank
+    # fails at the same non-collective dispatch after the initial collectives.
+    if mpi.size > 1
+        sim_bad_init = create_simulation(model2)
+        add_agent!(sim_bad_init, A1(1))
+        @test_throws MethodError finish_init!(sim_bad_init; partition=1)
+        @test sim_bad_init.instrumentation.current_context == :none
+        @test sim_bad_init.instrumentation.current_caller === nothing
+        @test isempty(sim_bad_init.instrumentation.stack)
+        finish_simulation!(sim_bad_init)
+    end
     enable_instrumentation(false)
 
     ev = sim_init.instrumentation.events
     @test !isempty(ev)
 
-    # Filter to init-context events only (finish_init! also calls finish_write!
-    # which emits :join_died / :allreduce_* events with context=:none)
+    # All instrumented finish_init! work, including finish_write! before and
+    # after distribute!, belongs to the init context.
     init_ev = filter(e -> e.context == Vahana.EC_init, ev)
-    @test !isempty(init_ev)
+    @test length(init_ev) == length(ev)
 
     # top-level :distribute event
     dist = filter(e -> e.label == Vahana.EL_distribute, ev)
@@ -455,6 +490,14 @@ end
     @test dist[1].context == Vahana.EC_init
     @test isempty(String(dist[1].caller))
     @test etype(dist[1]) == nameof(Nothing)
+    top = only(dist)
+    inside_distribute(e) = e.start_ns >= top.start_ns &&
+        e.start_ns + e.dur_ns <= top.start_ns + top.dur_ns + 1
+    dist_ev = filter(inside_distribute, init_ev)
+    @test any(e -> e.label == Vahana.EL_allreduce_mustcopy &&
+                   e.start_ns + e.dur_ns <= top.start_ns, init_ev)
+    @test any(e -> e.label == Vahana.EL_allreduce_mustcopy &&
+                   e.start_ns >= top.start_ns + top.dur_ns, init_ev)
 
     # per-type :sendagents events (one per node type)
     sa = filter(e -> e.label == Vahana.EL_sendagents, init_ev)
@@ -487,8 +530,8 @@ end
     @test length(jk) == 1
     @test length(jv) == 1
     # mechanism events from the idmapping joins (context :init)
-    @test length(filter(e -> e.label == Vahana.EL_join_sizes && e.context == Vahana.EC_init, ev)) == 2
-    @test length(filter(e -> e.label == Vahana.EL_join_values && e.context == Vahana.EC_init, ev)) == 2
+    @test length(filter(e -> e.label == Vahana.EL_join_sizes, dist_ev)) == 2
+    @test length(filter(e -> e.label == Vahana.EL_join_values, dist_ev)) == 2
 
     # barrier events
     @test length(filter(e -> e.label == Vahana.EL_barrier_pre_distribute, init_ev)) == 1
@@ -497,14 +540,13 @@ end
     # raster_bcast
     @test length(filter(e -> e.label == Vahana.EL_raster_bcast, init_ev)) == 1
 
-    # nesting: all init-context events inside :distribute
-    top = only(dist)
-    for e in init_ev
-        @test e.start_ns >= top.start_ns &&
-              e.start_ns + e.dur_ns <= top.start_ns + top.dur_ns + 1
+    # Distribution-specific events remain nested inside :distribute; init also
+    # includes work before and after that interval.
+    for e in [sa; aia; aiaa; se; eaa; eaav; jk; jv]
+        @test inside_distribute(e)
     end
 
-    # context reset after distribute!
+    # context reset after finish_init!
     @test sim_init.instrumentation.current_context == :none
     @test sim_init.instrumentation.current_caller === nothing
     @test isempty(sim_init.instrumentation.stack)
@@ -519,6 +561,7 @@ end
     # every rank's events must carry that rank
     @test Set(Int(e.rank) for e in loaded) == Set(0:(mpi.size - 1))
     @test any(e -> e.label == Vahana.EL_distribute, loaded)
+    @test all(e -> e.context == Vahana.EC_init, loaded)
     @test any(e -> isempty(String(e.caller)), loaded)
     @test any(e -> etype(e) == nameof(Nothing), loaded)
     # no `step` global -> the -1 sentinel survives the roundtrip
@@ -528,6 +571,9 @@ end
               (loaded[i].start_ns, -loaded[i].dur_ns) <=
               (loaded[i + 1].start_ns, -loaded[i + 1].dur_ns),
               1:length(loaded) - 1)
+    finish_simulation!(sim_init)
+    GC.gc()
+    MPI.Barrier(mpi.comm)
     if mpi.rank == 0
         for rank in 0:(mpi.size - 1)
             rm("h5/InstrumentationRecordMPI_$(rank).h5"; force=true)
@@ -609,6 +655,10 @@ end
     @test any(e -> e.step == 42 && e.label == Vahana.EL_apply_total, loaded)
 
     enable_instrumentation(false)
+    finish_simulation!(sim_s)
+    finish_simulation!(sim_ns)
+    GC.gc()
+    MPI.Barrier(mpi.comm)
 
     if mpi.rank == 0
         for rank in 0:(mpi.size - 1)

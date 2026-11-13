@@ -9,7 +9,6 @@ using Logging
 # mapping can be used, e.g. for testing, or in the case that the
 # modeller can create a better partitioning him/herself then Metis.
 function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
-    _inst_set_context!(sim, :init)
     _inst_begin!(sim, :distribute)
 
     node_types = sim.typeinfos.nodes_types
@@ -97,7 +96,6 @@ function distribute!(sim, sendmap::Dict{AgentID, ProcessID})
     foreach(T -> finish_distribute!(sim, T), node_types)
 
     _inst_end!(sim, :distribute)
-    _inst_set_context!(sim, :none)
     idmapping
 end
 

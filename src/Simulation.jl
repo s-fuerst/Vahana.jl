@@ -437,6 +437,15 @@ function finish_init!(sim;
 
     _log_info(sim, "<Begin> finish_init!")
 
+    _inst_set_context!(sim, :init)
+    try
+        _finish_init!(sim; partition, return_idmapping, partition_algo, distribute)
+    finally
+        _inst_set_context!(sim, :none)
+    end
+end
+
+function _finish_init!(sim; partition, return_idmapping, partition_algo, distribute)
     sorted_pairs = sort(collect(sim.typeinfos.nodes_type2id), by = x -> x[2])
     foreach(finish_write!(sim), map(x -> x[1], sorted_pairs))
     foreach(finish_write!(sim), sim.typeinfos.edges_types)

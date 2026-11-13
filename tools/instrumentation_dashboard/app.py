@@ -379,9 +379,11 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="Enable Dash development mode and hot reload")
     args = parser.parse_args()
 
-    events = load_instrumentation_hdf5(args.filename)
-    app = create_app(events, args.filename)
-    print(f"Loaded {len(events):,} instrumentation events from {len(events.attrs['source_files'])} HDF5 file(s).")
+    from dashboard import create_dashboard
+
+    requested = Path(args.filename).expanduser().resolve()
+    app = create_dashboard(requested if requested.is_dir() else requested.parent,
+                           None if requested.is_dir() else requested)
     print(f"Open http://{args.host}:{args.port}")
     app.run(host=args.host, port=args.port, debug=args.debug)
 

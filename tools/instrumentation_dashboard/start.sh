@@ -13,7 +13,7 @@ usage() {
 Start the Vahana HDF5 instrumentation dashboard using uv.
 
 Usage:
-  tools/instrumentation_dashboard/start.sh [HDF5_FILE_OR_BASE] [--no-debug] [DASH_OPTIONS...]
+  tools/instrumentation_dashboard/start.sh [HDF5_FILE_OR_BASE_OR_DIRECTORY] [--no-debug] [DASH_OPTIONS...]
 
 Examples:
   tools/instrumentation_dashboard/start.sh
@@ -67,7 +67,7 @@ BASE_FILE="$DATA_FILE"
 if [[ "$BASE_FILE" == *.h5 ]]; then
   BASE_FILE="${BASE_FILE%.h5}"
 fi
-if [[ ! -f "$DATA_FILE" && ! -f "${DATA_FILE}.h5" && ! -f "${BASE_FILE}_0.h5" ]]; then
+if [[ ! -d "$DATA_FILE" && ! -f "$DATA_FILE" && ! -f "${DATA_FILE}.h5" && ! -f "${BASE_FILE}_0.h5" ]]; then
   echo "Error: no HDF5 file found for '$DATA_FILE'." >&2
   echo "Expected the file, '${DATA_FILE}.h5', or per-rank files like '${BASE_FILE}_0.h5'." >&2
   exit 2

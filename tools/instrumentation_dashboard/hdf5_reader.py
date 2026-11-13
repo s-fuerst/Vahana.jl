@@ -85,7 +85,7 @@ KIND_BY_ID = {
 
 _REQUIRED_FIELDS = {
     "label", "caller", "type", "context", "kind", "transition_nr", "items",
-    "diag", "start_ns", "dur_ns", "send_items", "recv_items", "send_bytes",
+    "start_ns", "dur_ns", "send_items", "recv_items", "send_bytes",
     "recv_bytes", "agent_min_ns", "agent_max_ns", "agent_sum_ns",
     "agent_sum_sq_hi", "agent_sum_sq_lo",
 }
@@ -182,21 +182,29 @@ def load_instrumentation_hdf5(filename: str | Path) -> pd.DataFrame:
                 "n_events": int(len(dataset)),
             })
             has_rank = "rank" in fields
+            def enum_mapping(attribute, fallback):
+                if attribute not in group.attrs:
+                    return fallback
+                values = np.asarray(group.attrs[attribute]).reshape(-1)
+                return {i: v.decode("utf-8") if isinstance(v, bytes) else str(v) for i, v in enumerate(values)}
+            labels = enum_mapping("event_labels", EVENT_LABEL_BY_ID)
+            contexts = enum_mapping("contexts", CONTEXT_BY_ID)
+            kinds = enum_mapping("kinds", KIND_BY_ID)
             for index, raw in enumerate(dataset):
                 rank = int(raw["rank"]) if has_rank else _legacy_rank(index, group.attrs, rank_from_filename)
                 hi = int(raw["agent_sum_sq_hi"])
                 lo = int(raw["agent_sum_sq_lo"])
                 rows.append({
-                    "label": _enum_name(raw["label"], EVENT_LABEL_BY_ID, "label"),
+                    "label": _enum_name(raw["label"], labels, "label"),
                     "label_id": int(raw["label"]),
                     "caller": _decode_fixed_string(raw["caller"]),
                     "type": _decode_fixed_string(raw["type"]),
-                    "context": _enum_name(raw["context"], CONTEXT_BY_ID, "context"),
-                    "kind": _enum_name(raw["kind"], KIND_BY_ID, "kind"),
+                    "context": _enum_name(raw["context"], contexts, "context"),
+                    "kind": _enum_name(raw["kind"], kinds, "kind"),
                     "rank": rank,
                     "transition_nr": int(raw["transition_nr"]),
                     "items": int(raw["items"]),
-                    "diag": bool(raw["diag"]),
+                    "diag": bool(raw["diag"]) if "diag" in fields else _enum_name(raw["label"], labels, "label").startswith("ready_wait_"),
                     "start_ns": int(raw["start_ns"]),
                     "dur_ns": int(raw["dur_ns"]),
                     "send_items": int(raw["send_items"]),

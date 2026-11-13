@@ -10,3 +10,5 @@
 /docs/LocalPreferences.toml
 /coverage/
 skills-lock.json
+/tools/instrumentation_dashboard/__pycache__/
+/tools/instrumentation_marimo/__marimo__/
