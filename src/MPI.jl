@@ -230,7 +230,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                 # send to the other PEs
                 sendNumElems = [ length(perPE[i]) for i in 1:mpi.size ]
                 recvNumElems = _inst_phase(
-                    sim, :agent_alltoall_ids, T; kind = :alltoall,
+                    sim, :agent_alltoall_ids, $T; kind = :alltoall,
                     si = length(sendNumElems), ri = length(sendNumElems),
                     sb = length(sendNumElems) * sizeof(Int64),
                     rb = length(sendNumElems) * sizeof(Int64)) do
@@ -242,7 +242,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
 
                 # transmit the AgentIDs itself
                 _inst_diag_barrier(sim, :ready_wait_agent_alltoallv_ids)
-                _inst_phase(sim, :agent_alltoallv_ids, T; kind = :alltoallv,
+                _inst_phase(sim, :agent_alltoallv_ids, $T; kind = :alltoallv,
                             si = sum(sendNumElems), ri = sum(recvNumElems),
                             sb = sum(sendNumElems) * sizeof(AgentID),
                             rb = sum(recvNumElems) * sizeof(AgentID)) do
@@ -284,7 +284,7 @@ function construct_mpi_agent_methods(T::DataType, attr, simsymbol, mortal)
                 recvbuf = VBuffer(recv, sendNumElems)
 
                 _inst_diag_barrier(sim, :ready_wait_agent_alltoallv_state)
-                _inst_phase(sim, :agent_alltoallv_state, T; kind = :alltoallv,
+                _inst_phase(sim, :agent_alltoallv_state, $T; kind = :alltoallv,
                             si = length(send), ri = length(recv),
                             sb = length(send) * sizeof(eltype(send)),
                             rb = length(recv) * sizeof(eltype(recv))) do
