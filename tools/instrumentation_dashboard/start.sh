@@ -21,7 +21,9 @@ Examples:
   tools/instrumentation_dashboard/start.sh results/run --port 8060
   tools/instrumentation_dashboard/start.sh results/run --no-debug
 
-If no file is supplied, the repository sample h5/InstrumentationExample.h5 is used.
+If no file is supplied, the repository sample h5/InstrumentationExample.h5 is used
+when present; otherwise the dashboard opens in the h5 directory (or repository root)
+so you can browse to a run.
 Hot reload is on by default; --no-debug disables Dash development mode.
 EOF
 }
@@ -31,8 +33,10 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+CUSTOM_DATA_FILE=0
 if [[ $# -gt 0 && "$1" != -* ]]; then
   DATA_FILE="$1"
+  CUSTOM_DATA_FILE=1
   shift
 fi
 
@@ -68,9 +72,19 @@ if [[ "$BASE_FILE" == *.h5 ]]; then
   BASE_FILE="${BASE_FILE%.h5}"
 fi
 if [[ ! -d "$DATA_FILE" && ! -f "$DATA_FILE" && ! -f "${DATA_FILE}.h5" && ! -f "${BASE_FILE}_0.h5" ]]; then
-  echo "Error: no HDF5 file found for '$DATA_FILE'." >&2
-  echo "Expected the file, '${DATA_FILE}.h5', or per-rank files like '${BASE_FILE}_0.h5'." >&2
-  exit 2
+  if ((!CUSTOM_DATA_FILE)); then
+    # The bundled sample is optional; start in a useful directory so the user
+    # can browse to a run instead of failing before the dashboard opens.
+    if [[ -d "$REPO_ROOT/h5" ]]; then
+      DATA_FILE="$REPO_ROOT/h5"
+    else
+      DATA_FILE="$REPO_ROOT"
+    fi
+  else
+    echo "Error: no HDF5 file found for '$DATA_FILE'." >&2
+    echo "Expected the file, '${DATA_FILE}.h5', or per-rank files like '${BASE_FILE}_0.h5'." >&2
+    exit 2
+  fi
 fi
 
 if ((DEBUG)); then
