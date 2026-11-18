@@ -454,16 +454,14 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
         end
         
         if ! $stateless && must_copy_mem
-            @agent($T).shmstate = 
-                [ MPI.Win_shared_query(Array{$T},
-                                       @windows($T).shmstate;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+            @agent($T).shmstate =
+                [ shared_array($T, @windows($T).shmstate, i - 1)
+                  for i in 1:mpi.shmsize ]
         end
         if $mortal
-            @agent($T).shmdied = 
-                [ MPI.Win_shared_query(Array{Bool},
-                                       @windows($T).shmdied;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+            @agent($T).shmdied =
+                [ shared_array(Bool, @windows($T).shmdied, i - 1)
+                  for i in 1:mpi.shmsize ]
         end
         # for the reusable vector, we merge the new reuseable indices
         # (from agent died in this transition) with the unused indicies that
@@ -493,10 +491,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             MPI.Win_fence(0, @windows($T).shmstate)
             @readstate($T) = sarr
 
-            @agent($T).shmstate = 
-                [ MPI.Win_shared_query(Array{$T},
-                                       @windows($T).shmstate;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+            @agent($T).shmstate =
+                [ shared_array($T, @windows($T).shmstate, i - 1)
+                  for i in 1:mpi.shmsize ]
         end
         if $mortal
             (@windows($T).shmdied, sarr) = 
@@ -510,10 +507,9 @@ function construct_agent_methods(T::DataType, typeinfos, simsymbol)
             MPI.Win_fence(0, @windows($T).shmdied)
             @readdied($T) = sarr
 
-            @agent($T).shmdied = 
-                [ MPI.Win_shared_query(Array{Bool},
-                                       @windows($T).shmdied;
-                                       rank = i - 1) for i in 1:mpi.shmsize ]
+            @agent($T).shmdied =
+                [ shared_array(Bool, @windows($T).shmdied, i - 1)
+                  for i in 1:mpi.shmsize ]
         end
     end
 

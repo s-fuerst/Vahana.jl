@@ -2,6 +2,15 @@ using MPI
 
 using Logging
 
+# Query windows allocated for T without MPI.jl's displacement-size check:
+# MPICH 5 may return a zero displacement unit for an empty remote segment.
+# Nonempty arrays refer to window memory and must not outlive the window.
+function shared_array(::Type{T}, win, rank) where T
+    nbytes, _, ptr = MPI.Win_shared_query(Ptr{T}, win; rank)
+    nbytes == 0 && return Vector{T}()
+    unsafe_wrap(Array, ptr, div(nbytes, sizeof(T)))
+end
+
 # Distributing the whole graph to the different processes.
 # 
 # This function is called from finish_init!, per default the sendmap
