@@ -27,4 +27,21 @@ Julia, designed for large-scale simulations of complex social networks
   analyses, and design considerations are not approval for changes. Ask
   explicitly before editing anything in a discussion round.
 - Do not overwrite files the user is editing in parallel.
+- Show all proposed code, including revisions, in the conversation and discuss
+  it before writing it to files. Obtain explicit approval for the shown code;
+  agreement on design decisions alone is not permission to write code.
+
+## Code style
+
+- Use explicit `if` / `elseif` / `else` blocks for control flow. Do not use
+  short-circuiting `&&` or `||` as substitutes for conditionals (for example,
+  `condition || throw(...)` or `condition && return ...`). Boolean expressions
+  in conditions are fine.
+- Use Julia's implicit return of the final expression for all result types.
+  Do not write an explicit `return` on the final line of a function; this also
+  applies to `nothing` and constructor expressions such as `new(...)`.
+- Avoid early returns. On normal execution, a function should reach its final
+  expression. Only use early returns in exceptional cases with a compelling,
+  explicitly discussed justification. Throwing an exception for invalid input
+  is not a normal return path.
 
