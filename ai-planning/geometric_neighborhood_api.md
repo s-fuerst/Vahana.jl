@@ -2,7 +2,7 @@
 
 Grundlage ist `~/mdu2/texte/plan_geometric_neighborhood/geometric_neighborhood.tex` sowie die bestehende Implementierung in `src/ConnectSpatial.jl`, `src/ModelTypes.jl` und `src/Simulation.jl`.
 
-**Status:** Dieser Text fasst die diskutierten Entscheidungen zusammen. Codebeispiele beschreiben die geplante API, keine bereits implementierten Funktionen. Kleinere interne Details und die spätere Komfortfunktion werden bei der Implementierung konkretisiert. Es wurden keine Implementierungsänderungen vorgenommen.
+**Status:** Dieser Text fasst die diskutierten Entscheidungen zusammen. Die Raumtypen und ein Teil der Geometriehilfen sind in `src/GeometricSpace.jl` implementiert und werden unabhängig getestet; die Einbindung in Vahana und weitere Funktionen stehen noch aus. Beispiele zur Nachbarschaftssuche beschreiben weiterhin die geplante API. Kleinere interne Details und die spätere Komfortfunktion werden bei der Implementierung konkretisiert.
 
 ## 1. Grundidee und Umfang
 
@@ -36,7 +36,7 @@ abstract type GeometricSpace end
 # ContinuousSpace{...} <: GeometricSpace
 ```
 
-Beide Konstruktoren erhalten ein Paar `(lower, upper)` pro Dimension. Der Raum beschreibt ausschließlich die Geometrie: Grenzen, Periodizität, Metrik und gegebenenfalls einen expliziten Koordinatentyp. Die Positionsfunktion gehört zur `GeometricNeighborhood`, nicht zum Raum:
+Beide Konstruktoren erhalten ein Paar `(lower, upper)` pro Dimension. Der Raum beschreibt ausschließlich die Geometrie: Grenzen, Periodizität und Metrik. Er enthält weder einen Positionskoordinatentyp noch eine Positionsfunktion; letztere gehört zur `GeometricNeighborhood`:
 
 ```julia
 grid = GridSpace(
@@ -129,7 +129,7 @@ Hier steht `Person` für einen Agententyp mit beiden Positionsfeldern. Die Posit
 
 **Der Standard-Koordinatentyp einer registrierten Nachbarschaft wird aus dem Rückgabetyp ihrer `posfunc` abgeleitet, nicht aus den Grenzwerten des Raums.** Für die oben gezeigte Funktion `physical_position` mit `Predator` und `Prey` ist die interne Darstellung daher `SVector{2,Float32}`, obwohl die Grenzen von `physical` als Ganzzahlen angegeben sind.
 
-Bei `register_geom_neighborhood!` sind die beteiligten `query_types` und `neighbor_types` bekannt. Für alle diese Typen wird die `posfunc` der Nachbarschaft geprüft und deren interner Koordinatentyp festgelegt. Die Registrierung darf dazu keine Beispielagenten benötigen; leere Populationen müssen funktionieren. Der abgeleitete Typ gehört zu den validierten Metadaten der Registrierung; das gemeinsam referenzierte Raumobjekt wird dabei nicht verändert. Ohne explizite Typvorgabe können verschiedene Nachbarschaften desselben Raums unterschiedliche zulässige Koordinatentypen verwenden.
+Bei `register_geom_neighborhood!` sind die beteiligten `query_types` und `neighbor_types` bekannt. Für alle diese Typen wird die `posfunc` der Nachbarschaft geprüft und deren interner Koordinatentyp festgelegt. Die Registrierung darf dazu keine Beispielagenten benötigen; leere Populationen müssen funktionieren. Der abgeleitete Typ gehört zu den validierten Metadaten der Registrierung; das gemeinsam referenzierte Raumobjekt wird dabei nicht verändert. Verschiedene Nachbarschaften desselben Raums können unterschiedliche zulässige Koordinatentypen verwenden.
 
 Zulässige Koordinatenkategorien sind:
 
@@ -138,22 +138,15 @@ Zulässige Koordinatenkategorien sind:
 
 Komplexe Zahlen sowie Typen mit dynamischem Speicher wie `BigInt` und `BigFloat` sind nicht vorgesehen. Schmale Koordinatentypen sollen erhalten bleiben, um insbesondere replizierte Positionsarrays kompakt zu halten.
 
-Eine explizite Wahl soll ebenfalls möglich sein, beispielsweise:
+Eine explizite Vorgabe des Positionskoordinatentyps am Raum ist nicht vorgesehen. Intern hat jede registrierte Nachbarschaft einen gemeinsamen Koordinatentyp `T` und Positionen vom Typ `SVector{N,T}`. Positionsmethoden dürfen etwa Tupel oder `SVector`s liefern; ihre Ergebnisse werden auf diese Darstellung normalisiert. Verschiedene skalare Rückgabetypen beteiligter Methoden benötigen eine einheitliche, zulässige Typauflösung; deren genaue Promotionsregel ist bei der Implementierung festzulegen. Nicht eindeutig ableitbare oder inkompatible Positionstypen führen bei der Registrierung zu einer verständlichen Fehlermeldung statt zu `Any` in den Suchdaten.
 
-```julia
-GridSpace{Int32}([(0, 1000)])
-ContinuousSpace{Float32}([(0, 1000)])
-```
-
-Intern hat jede registrierte Nachbarschaft einen gemeinsamen Koordinatentyp `T` und Positionen vom Typ `SVector{N,T}`. Ein am Raum explizit vorgegebener Typ gilt für alle Nachbarschaften, die diesen Raum verwenden. Positionsmethoden dürfen etwa Tupel oder `SVector`s liefern; ihre Ergebnisse werden auf diese Darstellung normalisiert. Verschiedene skalare Rückgabetypen beteiligter Methoden benötigen eine einheitliche, zulässige Typauflösung; deren genaue Promotionsregel ist bei der Implementierung festzulegen. Nicht eindeutig ableitbare oder inkompatible Positionstypen führen bei der Registrierung zu einer verständlichen Fehlermeldung statt zu `Any` in den Suchdaten.
-
-Grenzen müssen im gewählten Typ zulässig darstellbar sein. Rasterkoordinaten dürfen nicht stillschweigend gerundet werden. Tatsächliche Werte und die Länge eines dynamischen Ergebnisvektors können gegebenenfalls erst bei der Vorbereitung geprüft werden.
+Rasterkoordinaten dürfen nicht stillschweigend gerundet werden. Tatsächliche Werte und die Länge eines dynamischen Ergebnisvektors können gegebenenfalls erst bei der Vorbereitung geprüft werden.
 
 **Speicher- und Rechentyp sind zu unterscheiden:** Periodenlängen, Differenzen, quadrierte Abstände und Zellindizes dürfen nicht durch zu schmale Zwischenrechnungen überlaufen. Breitere Rechentypen dürfen verwendet werden, ohne die gespeicherten Positionen pauschal zu verbreitern.
 
 ### Metrik
 
-Die Metrik gehört zum Raum und wird konkret typisiert gespeichert. Standard ist `Euclidean()`; weitere unterstützte Metriken sollen unter anderem Manhattan-/Cityblock- und Chebyshev-Distanzen sowie geeignete gewichtete Varianten umfassen.
+Die Metrik gehört zum Raum und wird konkret typisiert gespeichert. Standard ist `Euclidean()`; außerdem werden `Cityblock()` (Manhattan) und `Chebyshev()` unterstützt. Gewichtete Metriken gehören nicht zur ersten Implementierung.
 
 Unterstützt werden nur Metriken, für die **komponentenweises Minimum-Image-Wrapping korrekt ist**: Auf jeder periodischen Achse wird die Differenz auf einen kürzesten periodischen Weg reduziert. Metriken mit Achsenkopplungen, bei denen dies nicht den kürzesten Gesamtabstand liefert, werden ausgeschlossen.
 
@@ -413,43 +406,29 @@ Die Hilfsfunktionen arbeiten mit dem Raumobjekt und Positionen, nicht mit vollst
 
 Raumtyp (`GridSpace` oder `ContinuousSpace`) und skalarer Koordinatentyp (`Int32`, `Float32` usw.) sind zu unterscheiden. Ohne explizite Koordinatentypvorgabe am Raum bestimmen die übergebenen Positionen die Typen der Hilfsfunktionen; eine Nachbarschaft oder deren `posfunc` wird dafür nicht benötigt.
 
-- `geom_clamp(space, pos)` liefert einen `SVector` mit dem Koordinatentyp von `pos`.
+- `geom_wrap(space, pos, clamp_nonperiodic=false)` liefert einen `SVector` mit dem Koordinatentyp von `pos`.
 - `geom_move(space, pos, move_vector)` liefert einen `SVector` mit dem Koordinatentyp der Ausgangsposition `pos`. Der Typ von `move_vector` darf die Zwischenrechnung verbreitern, ändert aber nicht den Ziel-Koordinatentyp. Beim `GridSpace` gilt die unten beschriebene Rundung.
-- Ein expliziter Koordinatentyp am Raum, etwa `ContinuousSpace{Float32}`, hat bei den zurückgegebenen Positionen von `geom_clamp` und `geom_move` Vorrang vor dem Typ von `pos`.
-- `geom_displacement(space, from, to)` verwendet einen gemeinsamen Rechentyp beider Positionen, der nötigenfalls für überlaufsichere Differenzen verbreitert wird. Auch eine explizite Raumtypvorgabe darf keine zu schmale Differenzdarstellung erzwingen.
-- `geom_distance(space, a, b)` baut auf dieser sicheren Differenzrechnung auf; der skalare Ergebnistyp hängt zusätzlich von der Metrik ab.
-- Für die zurückgegebene Position von `geom_wrap` gelten dieselben Typregeln wie bei `geom_clamp`. `geom_isvalidposition` liefert einen `Bool` und prüft die übergebene Position anhand der Raumvorgaben.
+- `geom_displacement(space, from, to)` verwendet einen gemeinsamen Rechentyp beider Positionen, der nötigenfalls für überlaufsichere Differenzen verbreitert wird.
+- `geom_distance(space, a, b)` baut auf sicherer Differenzrechnung auf. Für `Euclidean` sowie für alle Metriken im `ContinuousSpace` liefert die Funktion `Float64`. Im `GridSpace` liefern `Cityblock` und `Chebyshev` den Integer-Rechentyp von `geom_displacement`; eine zusätzliche Verbreiterung erfolgt nicht.
+- `geom_isvalidposition` liefert für wohlgeformte Positionen einen `Bool`; Dimension und Koordinatenkategorie sind Vorbedingungen und werden mit `@mayassert` geprüft.
 
-Alle Eingaben müssen zur Koordinatenkategorie des Raums passen; diese Typregeln erlauben insbesondere kein stillschweigendes Runden von Rasterpositionen außerhalb der ausdrücklich vorgesehenen Rundung in `geom_move`. Grenzen und Ergebnisse müssen im Ziel-Koordinatentyp zulässig darstellbar sein. Zwischenrechnungen dürfen unabhängig davon breiter erfolgen. Die Regeln sind unabhängig von zuvor registrierten Nachbarschaften und verändern das Raumobjekt nicht.
+Alle Eingaben müssen zur Koordinatenkategorie des Raums passen; diese Typregeln erlauben insbesondere kein stillschweigendes Runden von Rasterpositionen außerhalb der ausdrücklich vorgesehenen Rundung in `geom_move`. Ergebnisse müssen im Ziel-Koordinatentyp zulässig darstellbar sein; Raumgrenzen müssen es nicht. Zwischenrechnungen dürfen unabhängig davon breiter erfolgen. Die Regeln sind unabhängig von zuvor registrierten Nachbarschaften und verändern das Raumobjekt nicht.
 
-### `geom_clamp`: eine gültige Position herstellen
+### `geom_wrap`: periodisch normalisieren und optional begrenzen
 
 ```julia
-new_pos = geom_clamp(space, pos)
+new_pos = geom_wrap(space, pos, clamp_nonperiodic=false)
 ```
 
-Die Behandlung erfolgt pro Achse:
-
-- **periodisch:** in den kanonischen Bereich wrappen, auch bei Verschiebungen um mehrere Perioden;
-- **nichtperiodisch:** auf die untere beziehungsweise obere Grenze begrenzen.
-
-Beispiel:
+Periodische Achsen werden auch über mehrere Perioden hinweg in den kanonischen Bereich gewrappt. Nichtperiodische Überschreitungen werden standardmäßig zurückgewiesen; mit `clamp_nonperiodic=true` werden sie koordinatenweise auf die Grenzen begrenzt. Eine separate Funktion `geom_clamp` ist nicht vorgesehen.
 
 ```julia
-space = ContinuousSpace(
-    [(0, 10), (0, 5)];
-    periodic = (true, false),
-)
-
-geom_clamp(space, SVector(12.0, 7.0))
+space = ContinuousSpace([(0, 10), (0, 5)]; periodic = (true, false))
+geom_wrap(space, SVector(12.0, 7.0), true)
 # SVector(2.0, 5.0)
 ```
 
-Das Ergebnis ist eine statische Position als `SVector`; bei expliziter Koordinatentypvorgabe am Raum wird dieser Typ verwendet, andernfalls der Koordinatentyp von `pos`. Ungültige Eingaben wie falsche Dimensionen oder `NaN` werden nicht durch Clamping repariert.
-
-Die ausdrückliche Korrektur im Modellcode widerspricht nicht dem Suchvertrag: Die Nachbarschaftssuche selbst korrigiert ungültige nichtperiodische Positionen weiterhin nicht stillschweigend, sondern weist sie zurück.
-
-Der bisherige Name `periodic_clamp` vermischt Wrapping und Begrenzung. `geom_clamp` bildet beide Operationen entsprechend der jeweiligen Achse ab.
+Ungültige Eingaben wie falsche Dimensionen oder `NaN` werden nicht durch Begrenzung repariert. Die ausdrückliche Korrektur im Modellcode ändert den Suchvertrag nicht: Die Nachbarschaftssuche weist ungültige nichtperiodische Positionen zurück.
 
 ### `geom_move`: Bewegung bis zum ersten Randkontakt
 
@@ -476,9 +455,9 @@ geom_move(space, SVector(7.0, 9.0), SVector(1.0, 2.0))
 - Periodische Achsen begrenzen die Bewegung nicht; die resultierenden Koordinaten werden dort gewrappt.
 - Bei gemischter Periodizität verkürzt ein nichtperiodischer Randkontakt den gesamten Bewegungsvektor, einschließlich seiner periodischen Komponenten.
 - Eine gültige Ausgangsposition wird vorausgesetzt. Die Zwischenrechnung muss hinreichend breit erfolgen; insbesondere darf ein gebrochener Schnittpunkt nicht vorzeitig durch ganzzahlige Arithmetik verloren gehen.
-- Rückgabe ist ausschließlich die neue Position als `SVector`, nicht ein neuer Agentenzustand. Bei expliziter Koordinatentypvorgabe am Raum gilt dieser Typ; andernfalls der Koordinatentyp der Ausgangsposition `pos`.
+- Rückgabe ist ausschließlich die neue Position als `SVector` mit dem Koordinatentyp der Ausgangsposition `pos`, nicht ein neuer Agentenzustand.
 
-**Beim `GridSpace` wird die berechnete Zielposition nötigenfalls gerundet.** Wenn tatsächlich eine Rundung erforderlich ist, wird über `@warn` einmalig gewarnt, nicht bei jeder gerundeten Bewegung. Die genaue Rundungskonvention und die Begrenzung der Warnungen unter MPI werden bei der Implementierung konkretisiert; dafür dürfen keine zusätzlichen kollektiven Aufrufe in die Hilfsfunktion eingeführt werden. Das Ergebnis muss auch nach Rundung und periodischer Normalisierung eine gültige Rasterposition sein.
+**Beim `GridSpace` wird die berechnete Zielposition nötigenfalls mit `RoundNearest` gerundet**, bei Gleichstand zur geraden Ganzzahl. Nur bei tatsächlicher Rundung wird mit `@warn` und `maxlog=1` gewarnt; die Begrenzung gilt unter MPI pro Prozess/Logger, ohne zusätzliche Kollektive. Das Ergebnis muss auch nach Rundung und periodischer Normalisierung eine gültige Rasterposition sein.
 
 Den Agentenzustand aktualisiert der Modellcode selbst, beispielsweise mit Accessors:
 
@@ -506,25 +485,21 @@ geom_displacement(line, SVector(1.0), SVector(9.0))
 # SVector(-2.0)
 ```
 
-Bei genau einer halben Periodenlänge gibt es zwei gleich kurze Richtungen. Vorgeschlagen ist, im Gleichstand die Richtung der ursprünglichen Differenz beizubehalten, damit das Vertauschen der Endpunkte das Vorzeichen umkehrt. Diese Konvention ist in Tests ausdrücklich abzudecken.
+Bei genau einer halben Periodenlänge gibt es zwei gleich kurze Richtungen. Im Gleichstand bleibt das Vorzeichen der ursprünglichen Differenz erhalten, damit das Vertauschen der Endpunkte das Vorzeichen umkehrt. Diese Konvention ist in Tests ausdrücklich abzudecken.
 
 Der Differenzvektor darf einen breiteren Rechentyp als die gespeicherten Positionen besitzen: Zwei gültige schmale Ganzzahlkoordinaten können eine Differenz ergeben, die nicht in ihren Speichertyp passt.
 
 `geom_distance` liefert den Abstand gemäß Raummetrik einschließlich periodischer Behandlung. Suchbackend und Modellcode sollen dieselbe Distanzsemantik verwenden.
 
-### `geom_wrap`: ausschließlich periodisch normalisieren
+Für die euklidische Distanz werden die Differenzkomponenten vor dem Quadrieren nach `Float64` konvertiert und die Quadratwurzel ihrer Quadratsumme berechnet. Extrem große oder kleine Gleitkommawerte können dabei zu Über- beziehungsweise Unterlauf führen; eine skalierte, robuste Normberechnung ist nicht vorgesehen.
 
-```julia
-new_pos = geom_wrap(space, pos)
-```
+Die ganzzahlige Manhattan-Distanz wird ohne zusätzliche Typverbreiterung summiert. Vor jeder Addition prüft `@mayassert`, ob die Summe im Ergebnistyp darstellbar bleibt. Bei aktivierten Assertions führt ein Überlauf zu `AssertionError`; bei deaktivierten Assertions darf die Summe den Ergebnistyp nicht überschreiten.
 
-`geom_wrap` ist ein verbindlicher Bestandteil der öffentlichen API und gehört zur ersten Implementierung der Geometriehelfer. Die Funktion normalisiert nur periodische Achsen; Überschreitungen nichtperiodischer Grenzen werden zurückgewiesen, nicht begrenzt. Damit unterscheidet sie sich ausdrücklich von `geom_clamp`.
+### `geom_isvalidposition`: Position prüfen
 
-Die Rückgabe ist ein `SVector` mit denselben Typregeln wie bei `geom_clamp`: Eine explizite Koordinatentypvorgabe am Raum hat Vorrang, andernfalls gilt der Koordinatentyp von `pos`. Falsche Dimensionen, unzulässige Werte und nicht darstellbare Ergebnisse werden zurückgewiesen. Die Funktion benötigt weder eine Nachbarschaft noch einen vorbereiteten Index und führt keine MPI-Kommunikation aus.
+`geom_isvalidposition(space, pos)` ist Teil der öffentlichen API. Für eine Position mit korrekter Dimension und unterstützter Koordinatenkategorie liefert die Funktion `true`, wenn alle Werte endlich und im gültigen Bereich sind, sonst `false`. Periodische Achsen müssen im kanonischen Bereich liegen; nichtperiodische kontinuierliche Achsen schließen beide Grenzen ein.
 
-### Weitere mögliche Ergänzung
-
-Noch zu konkretisieren ist die Aufnahme und Benennung von `geom_isvalidposition(space, pos)`: prüfen, ob eine Position ohne Korrektur gültig und im kanonischen Bereich liegt, einschließlich Dimension und zulässiger Werte.
+Korrekte Dimension und Koordinatenkategorie sind Vorbedingungen, die mit `@mayassert` geprüft werden. Bei aktivierten Assertions führt eine Verletzung zu `AssertionError`; bei deaktivierten Assertions dürfen diese Vorbedingungen nicht verletzt werden.
 
 Zellzuordnung bleibt eine Backendoperation und ist zunächst kein öffentlicher Geometriehelfer. Eine allgemeine öffentliche Funktion für quadrierte Abstände ist nicht notwendig; entsprechende Optimierungen können metrikspezifisch intern erfolgen.
 

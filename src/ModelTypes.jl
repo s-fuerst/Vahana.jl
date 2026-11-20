@@ -1,5 +1,6 @@
 export ModelTypes
 export register_agenttype!, register_edgetype!, register_param!, register_global!
+export register_geom_neighborhood!
 
 
 Base.@kwdef struct Param{T}
@@ -38,6 +39,7 @@ Base.@kwdef struct ModelTypes
     nodes_id2type::Vector{DataType} = Vector{DataType}(undef, MAX_TYPES)
     params::Vector{Param} = Vector{Param}()
     globals::Vector{Global} = Vector{Global}()
+    geom_neighborhoods::Vector{GeometricRegistration} = GeometricRegistration[]
     assymbol::Dict{DataType, Symbol} = Dict{DataType, Symbol}()
 end
 
@@ -289,5 +291,86 @@ end
 
 register_global!(name, init_value::T) where T =
     types -> register_global!(types, name, init_value) 
+
+function register_geom_neighborhood!(
+    types::ModelTypes,
+    name::Symbol,
+    definition::T;
+    backend::ReplicatedKDTree=ReplicatedKDTree(),
+) where {T<:GeometricNeighborhood}
+    @assert !(name in (registration.name for registration in types.geom_neighborhoods)) (
+        "Geometric neighborhood $name is already registered"
+    )
+
+    inferred_type(f, agent_type) =
+        Core.Compiler.return_type(f, Tuple{agent_type})
+
+    agent_types = unique(vcat(
+        definition.query_types,
+        definition.neighbor_types,
+    ))
+
+    coordinate_types = DataType[]
+    supported_coordinates = definition.space isa GridSpace ?
+        SupportedGridCoordinate : SupportedContinuousCoordinate
+
+    for agent_type in agent_types
+        @assert agent_type in types.nodes_types (
+            "Agent type $agent_type is not registered"
+        )
+
+        position_type = inferred_type(definition.posfunc, agent_type)
+
+        @assert isconcretetype(position_type) (
+            "Cannot infer position type for $agent_type in neighborhood $name"
+        )
+
+        coordinate_type = position_type <: Tuple ?
+            promote_type(fieldtypes(position_type)...) : eltype(position_type)
+
+        @assert coordinate_type <: supported_coordinates (
+            "Unsupported coordinate type $coordinate_type in neighborhood $name"
+        )
+
+        push!(coordinate_types, coordinate_type)
+    end
+
+    coordinate_type = promote_type(coordinate_types...)
+
+    @assert isconcretetype(coordinate_type) (
+        "Cannot determine coordinate type for neighborhood $name"
+    )
+
+    project_type = definition.project_type
+
+    if project_type === nothing
+        project_types = unique([
+            inferred_type(definition.project, agent_type)
+            for agent_type in definition.neighbor_types
+        ])
+
+        @assert length(project_types) == 1 && isconcretetype(only(project_types)) (
+            "Cannot infer a common concrete projection type for neighborhood $name; " *
+            "specify project_type"
+        )
+
+        project_type = only(project_types)
+    end
+
+    push!(types.geom_neighborhoods, GeometricRegistration(
+        name,
+        definition,
+        backend,
+        coordinate_type,
+        project_type,
+    ))
+
+    types
+end
+
+register_geom_neighborhood!(
+    name::Symbol, definition::T; kwargs...
+) where {T<:GeometricNeighborhood} =
+    types -> register_geom_neighborhood!(types, name, definition; kwargs...)
 
 

@@ -33,10 +33,12 @@ Julia, designed for large-scale simulations of complex social networks
 
 ## Code style
 
-- Use explicit `if` / `elseif` / `else` blocks for control flow. Do not use
-  short-circuiting `&&` or `||` as substitutes for conditionals (for example,
-  `condition || throw(...)` or `condition && return ...`). Boolean expressions
-  in conditions are fine.
+- Ternary expressions (`condition ? a : b`) are allowed.
+- Do not use short-circuiting `&&` or `||` for control flow that logically
+  represents an `if` statement and is more clearly read as one (for example,
+  `condition || throw(...)` or `condition && return ...`). Use explicit
+  `if` / `elseif` / `else` blocks for those cases. Boolean expressions using
+  `&&` and `||` within conditions are allowed.
 - Use Julia's implicit return of the final expression for all result types.
   Do not write an explicit `return` on the final line of a function; this also
   applies to `nothing` and constructor expressions such as `new(...)`.

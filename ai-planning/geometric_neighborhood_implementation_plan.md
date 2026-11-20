@@ -114,26 +114,21 @@ Arbeitspaket A benötigt weder Agententypen noch Positionsfunktionen oder eine N
 
 ### A3. Metrikvertrag
 
-Zwei interne Operationen festlegen:
+Exakte Distanz nach periodischer Differenzbildung für euklidische, Cityblock-/Manhattan- und Chebyshev-Distanzen implementieren. Gewichtete Metriken sind nicht Bestandteil von Arbeitspaket A. Nur Metriken zulassen, bei denen komponentenweises Minimum Image korrekt ist.
 
-1. Exakte Distanz nach periodischer Differenzbildung.
-2. Konservative achsenweise Suchausdehnung für einen Radius.
-
-Für euklidische, Cityblock-/Manhattan- und Chebyshev-Distanzen implementieren. Gewichtete Metriken sind nicht Bestandteil von Arbeitspaket A. Nur Metriken zulassen, bei denen komponentenweises Minimum Image korrekt ist.
-
-Unbekannte oder nicht unterstützte Kombinationen früh mit verständlicher Meldung zurückweisen. Nicht stillschweigend euklidische Suchausdehnungen für andere Metriken verwenden.
+Unbekannte oder nicht unterstützte Kombinationen früh mit verständlicher Meldung zurückweisen. Die konservative achsenweise Suchausdehnung für einen Radius wird erst für die Cell List in Arbeitspaket E2 implementiert und gehört nicht zur Abnahme von A.
 
 ### A4. Öffentliche Hilfsfunktionen
 
 - `geom_move(space, pos, move_vector)`: gemeinsamer Streckenparameter bis zum ersten begrenzenden nichtperiodischen Randkontakt; kein Weiterrutschen und keine Reflexion.
 - `geom_displacement(space, from, to)`: gerichtete Differenz einschließlich Minimum Image; gegebenenfalls breiterer Ergebnistyp. Bei genau einer halben Periodenlänge das Vorzeichen der ursprünglichen Differenz beibehalten; Vertauschen der Endpunkte kehrt das Vorzeichen um.
-- `geom_distance(space, a, b)`: dieselbe Metrik- und Periodizitätssemantik wie im Backend; Rückgabetyp immer `Float64`. Vor potenziell überlaufenden Metrikoperationen geeignet verbreitern, nicht erst das fertige Ergebnis konvertieren.
+- `geom_distance(space, a, b)`: dieselbe Metrik- und Periodizitätssemantik wie im Backend. Für `Euclidean` und für alle Metriken im `ContinuousSpace` ist der Rückgabetyp `Float64`; `Cityblock` und `Chebyshev` liefern im `GridSpace` den Integer-Rechentyp von `geom_displacement`, ohne zusätzliche Verbreiterung. Bei `Euclidean` vor dem Quadrieren nach `Float64` konvertieren und die Quadratwurzel der Quadratsumme verwenden; Über-/Unterlauf extremer Gleitkommawerte wird nicht durch eine robuste Normberechnung vermieden. Die Integer-Manhattan-Summe in einer Schleife berechnen und ihre Darstellbarkeit vor jeder Addition ausschließlich mit `@mayassert` prüfen. Bei deaktivierten Assertions darf die Summe den Ergebnistyp nicht überschreiten.
 - `geom_wrap(space, pos, clamp_nonperiodic::Bool=false)` als verbindliche öffentliche API anbieten. Periodische Achsen immer normalisieren. Bei `clamp_nonperiodic=false` nichtperiodische Überschreitungen zurückweisen; bei `true` nichtperiodische Koordinaten auf die Grenzen begrenzen. Keine separate Funktion `geom_clamp` anbieten. Wrapping über mehrere Perioden, gemischte Periodizität, ungültige Eingaben sowie beide Verhaltensweisen bei nichtperiodischen Überschreitungen testen.
-- `geom_isvalidposition(space, pos)` als verbindliche öffentliche API anbieten; liefert einen `Bool` und prüft Dimension, Koordinatenkategorie, endliche Werte und gültigen Positionsbereich.
+- `geom_isvalidposition(space, pos)` als verbindliche öffentliche API anbieten: Korrekte Dimension und unterstützte Koordinatenkategorie sind Vorbedingungen und werden mit `@mayassert` geprüft (`AssertionError` bei aktivierten Assertions). Für solche wohlgeformten Positionen liefert die Funktion einen `Bool`: `false` bei nicht endlichen Werten oder außerhalb des gültigen Positionsbereichs, andernfalls `true`.
 
-**Verbindliche Typregeln:** `geom_wrap` und `geom_move` liefern einen `SVector` mit dem Koordinatentyp von `pos`. Der Typ des Bewegungsvektors darf die Zwischenrechnung verbreitern, nicht den Ziel-Koordinatentyp ändern. `geom_displacement` verwendet einen gemeinsamen, nötigenfalls für überlaufsichere Differenzen verbreiterten Rechentyp beider Positionen. `geom_distance` liefert immer `Float64`; `geom_isvalidposition` liefert einen `Bool`. Am Raum gibt es keine explizite Positionskoordinatentypvorgabe. Diese Regeln benötigen keine `posfunc`, hängen nicht von registrierten Nachbarschaften ab und verändern das Raumobjekt nicht. Zulässige Koordinatenkategorien und Darstellbarkeit weiterhin prüfen; die ausdrücklich vorgesehene Rasterrundung in `geom_move` bleibt erhalten.
+**Verbindliche Typregeln:** `geom_wrap` und `geom_move` liefern einen `SVector` mit dem Koordinatentyp von `pos`. Der Typ des Bewegungsvektors darf die Zwischenrechnung verbreitern, nicht den Ziel-Koordinatentyp ändern. `geom_displacement` verwendet einen gemeinsamen, nötigenfalls für überlaufsichere Differenzen verbreiterten Rechentyp beider Positionen. `geom_distance` liefert für `Euclidean` und im `ContinuousSpace` immer `Float64`, für `Cityblock` und `Chebyshev` im `GridSpace` den Integer-Rechentyp von `geom_displacement`; `geom_isvalidposition` liefert für wohlgeformte Positionen einen `Bool` und prüft Dimension und Koordinatenkategorie mit `@mayassert`. Am Raum gibt es keine explizite Positionskoordinatentypvorgabe. Diese Regeln benötigen keine `posfunc`, hängen nicht von registrierten Nachbarschaften ab und verändern das Raumobjekt nicht. Zulässige Koordinatenkategorien und Darstellbarkeit weiterhin prüfen; die ausdrücklich vorgesehene Rasterrundung in `geom_move` bleibt erhalten.
 
-Die Tests müssen insbesondere unterschiedliche Typen von Ausgangsposition und Bewegungsvektor, die Unabhängigkeit des Positionskoordinatentyps vom Grenztyp, sichere Differenzen schmaler Koordinaten, den festen Rückgabetyp `Float64` von `geom_distance`, die öffentliche Positionsvalidierung sowie die Unabhängigkeit von Nachbarschaftsregistrierungen abdecken.
+Die Tests müssen insbesondere unterschiedliche Typen von Ausgangsposition und Bewegungsvektor, die Unabhängigkeit des Positionskoordinatentyps vom Grenztyp, sichere Differenzen schmaler Koordinaten, die raum- und metrikabhängigen Rückgabetypen von `geom_distance` einschließlich der `@mayassert`-Überlaufprüfung für die Integer-Manhattan-Summe, die öffentliche Positionsvalidierung sowie die Unabhängigkeit von Nachbarschaftsregistrierungen abdecken.
 
 Bei `geom_move` im GridSpace erst den geometrischen Schnittpunkt berechnen, dann runden, normalisieren und die gültige Rasterposition sicherstellen. Mit Julias `RoundNearest` runden, bei Gleichstand zur geraden Ganzzahl; diese Konvention explizit testen. Die Warnung nur bei tatsächlicher Rundung mit `maxlog=1` ausgeben, ohne Kollektive im Bewegungsaufruf. Diese Begrenzung gilt unter MPI pro Prozess/Logger, nicht global.
 
@@ -145,9 +140,9 @@ Bei `geom_move` im GridSpace erst den geometrischen Schnittpunkt berechnen, dann
 
 - `GeometricNeighborhood` parametrisch für Raum, `posfunc`, Agententypangaben, Filter, Projektion und Radius implementieren. Die reine Positionsfunktion auf dem lesbaren Snapshot muss alle beteiligten Query- und Neighbor-Typen unterstützen.
 - `weight`, `project_type` und Defaults entsprechend dem API-Entwurf unterstützen.
-- Backendkonfiguration in einem Registrierungsdeskriptor neben der fachlichen Definition speichern.
-- In `ModelTypes` Vektoren für Räume und benannte Nachbarschaften ergänzen, analog zu `params` und `globals`.
-- Raumreferenzen intern eindeutig zuordnen. Eine zusätzliche öffentliche Raumregistrierung ist kein beschlossenes Muss; zunächst kann die Nachbarschaftsregistrierung ihren Raum in die Modellmetadaten aufnehmen.
+- `GeometricRegistration` als Registrierungsdeskriptor mit `name`, `definition`, `backend`, `coordinate_type` und `project_type` vorsehen. Backendkonfiguration und validierte Koordinaten-/Projektionstypen neben der fachlichen Definition speichern.
+- In `ModelTypes` einen Vektor `geom_neighborhoods::Vector{GeometricRegistration}` für benannte Nachbarschaften ergänzen, analog zu `params` und `globals`.
+- Räume werden nicht separat registriert oder in einer eigenen Modellliste verwaltet. Der Raum ist direkt über `definition.space` erreichbar; ein `space_index` entfällt.
 - Derselbe Raum darf von mehreren Nachbarschaften mit unterschiedlichen `posfunc`s referenziert werden, beispielsweise Wohnungs- und Arbeitsplatzposition derselben Person. Positionszuordnung und abgeleiteter Koordinatentyp bleiben nachbarschaftsspezifisch; unterschiedliche zulässige Koordinatentypen sind möglich.
 
 ### B2. Registrierungsfunktionen
@@ -303,6 +298,7 @@ Zunächst auf einem Rank des Nodes aufbauen und dann als unveränderlichen Index
 - Konfigurierbare positive Zellgröße beziehungsweise deterministischen Default festlegen.
 - Periodische Achsen konsistent in ihre Periode kacheln; effektive Zellbreiten bei nicht exakt teilbarer Ausdehnung verwenden.
 - Obere nichtperiodische Randfläche der letzten Zelle zuordnen.
+- Eine interne Metrikoperation für die konservative achsenweise Suchausdehnung zu einem Radius implementieren. Für Euclidean, Cityblock und Chebyshev genügt jeweils der Radius pro Achse. Die Ausdehnung darf zusätzliche Kandidaten einschließen, aber keine tatsächlichen Treffer ausschließen; nicht stillschweigend euklidische Suchausdehnungen für andere Metriken verwenden.
 - Kandidaten anhand der metrikspezifischen Suchausdehnung bestimmen.
 - Periodische Zellnummern normalisieren und jede Kandidatenzelle höchstens einmal besuchen, auch wenn der Radius die Periode überdeckt.
 - Exakte Distanz prüfen; Selbst-ID ausschließen.

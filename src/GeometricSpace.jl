@@ -1,6 +1,6 @@
 export Euclidean, Cityblock, Chebyshev
 export GeometricSpace, GridSpace, ContinuousSpace
-export geom_isvalidposition, geom_wrap, geom_move, geom_displacement
+export geom_isvalidposition, geom_wrap, geom_move, geom_displacement, geom_distance
 
 using StaticArrays: SVector
 
@@ -176,9 +176,9 @@ function geom_wrap(space::GridSpace{N,B}, pos, clamp_nonperiodic::Bool=false) wh
                 offset += period
             end
 
-            B(lo + offset)
+            T(lo + offset)
         elseif clamp_nonperiodic
-            B(clamp(coordinate, lo, hi))
+            T(clamp(coordinate, lo, hi))
         else
             if !(lo <= coordinate <= hi)
                 throw(ArgumentError(
@@ -186,11 +186,11 @@ function geom_wrap(space::GridSpace{N,B}, pos, clamp_nonperiodic::Bool=false) wh
                 ))
             end
 
-            B(coordinate)
+            T(coordinate)
         end
     end
 
-    SVector{N,B}(coordinates)
+    SVector{N,T}(coordinates)
 end
 
 function geom_wrap(space::ContinuousSpace{N}, pos, clamp_nonperiodic::Bool=false) where {N}
@@ -243,9 +243,10 @@ function geom_wrap(space::ContinuousSpace{N}, pos, clamp_nonperiodic::Bool=false
 end
 
 function geom_move(space::GridSpace{N,B}, pos, move_vector) where {N,B}
+    T = eltype(pos)
     R = widen(B)
 
-    @mayassert eltype(pos) == B
+    @mayassert T <: SupportedGridCoordinate
     @mayassert geom_isvalidposition(space, pos)
     @mayassert length(move_vector) == N
 
@@ -282,7 +283,7 @@ function geom_move(space::GridSpace{N,B}, pos, move_vector) where {N,B}
         R(rounded)
     end)
 
-    geom_wrap(space, target, true)
+    SVector{N,T}(geom_wrap(space, target, true))
 end
 
 function geom_move(space::ContinuousSpace{N}, pos, move_vector) where {N}
@@ -383,6 +384,38 @@ function geom_displacement(space::ContinuousSpace{N}, from, to) where {N}
     end
 
     SVector{N,Float64}(coordinates)
+end
+
+function geom_distance(space::GeometricSpace, a, b)
+    _geom_distance(space.metric, geom_displacement(space, a, b))
+end
+
+function _geom_distance(::Euclidean, delta)
+    sqrt(sum(abs2, Float64.(delta)))
+end
+
+function _geom_distance(::Cityblock, delta)
+    sum(abs, delta)
+end
+
+function _geom_distance(::Cityblock, delta::SVector{N,T}) where {N,T<:Integer}
+    distance = zero(T)
+
+    for component in delta
+        magnitude = abs(component)
+
+        @mayassert distance <= typemax(T) - magnitude (
+            "Manhattan distance exceeds the integer result type $T."
+        )
+
+        distance += magnitude
+    end
+
+    distance
+end
+
+function _geom_distance(::Chebyshev, delta)
+    maximum(abs, delta)
 end
 
 function geom_isvalidposition(space::GridSpace{N}, pos) where {N}

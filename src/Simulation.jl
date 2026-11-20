@@ -156,7 +156,6 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(num_transitions::Int64),
                   :(logger::Log),
                   :(h5file::Union{HDF5.File, Nothing}),
-                  :(neighbors_infos::Dict{DataType, NeighborsInfo}),
                   :(external::Dict{Any, Any}),
                   :(instrumentation::Instrumentation),
                   edgefields...,
@@ -317,10 +316,6 @@ function create_simulation(model::Model,
         num_transitions = 0,
         logger = create_logger($name, $logging, $debug, $overwrite_file),
         h5file = nothing, # we need the sim instance to create the h5file
-        # we store the neighbor_infos per agenttype and reuse the
-        # the infos until the agenttype is writeable in an apply function
-        # in this case, we remove the agenttype from the dictonary
-        neighbors_infos = Dict{DataType, NeighborsInfo}(),
         # allows the client to attach arbitrary information, that will
         # be removed in finish_simulation.
         external = Dict{Any, Any}(),
@@ -803,12 +798,12 @@ function apply!(sim::Simulation,
     add_existing = applicable(iterate, add_existing) ?
         add_existing : [ add_existing ]
 
-    sn = spatial_neighbors
-    if sn !== nothing
-        for at in _spatial_agenttypes(sn)
-            @assert at in read "$sn is in `sn` but not in `read`"
-        end
-    end
+    # sn = spatial_neighbors
+    # if sn !== nothing
+    #     for at in _spatial_agenttypes(sn)
+    #         @assert at in read "$sn is in `sn` but not in `read`"
+    #     end
+    # end
 
     for c in call
         @assert ! (c in add_existing) "$c can not be element of `add_existing`"
@@ -856,9 +851,9 @@ function apply!(sim::Simulation,
         end
     end
 
-    _inst_phase(sim, :prepare_spatial; kind = :barrier) do
-        prepare_spatial_neighbors!(sim, sn)
-    end
+    # _inst_phase(sim, :prepare_spatial; kind = :barrier) do
+    #     prepare_spatial_neighbors!(sim, sn)
+    # end
 
     _inst_phase(sim, :barrier_pre_apply; kind = :barrier) do
         MPI.Barrier(MPI.COMM_WORLD)
@@ -930,9 +925,9 @@ function apply!(sim::Simulation,
         end
     end
 
-    _inst_phase(sim, :finish_spatial) do
-        finish_spatial_neighbors!(sim, sn, write)
-    end
+    # _inst_phase(sim, :finish_spatial) do
+    #     finish_spatial_neighbors!(sim, sn, write)
+    # end
 
     sim.intransition = false
 

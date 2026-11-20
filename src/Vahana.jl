@@ -172,6 +172,9 @@ include("Edge.jl")
 
 include("MPI.jl")
 
+include("GeometricSpace.jl")
+include("GeometricNeighborhood.jl")
+
 include("ModelTypes.jl")
 
 include("HDF5.jl")
@@ -195,7 +198,6 @@ include("GraphsSupport.jl")
 
 include("Logging.jl")
 
-include("ConnectSpatial.jl")
 
 end
 

@@ -236,7 +236,7 @@ end
         @test_throws AssertionError geom_wrap(space, (1,))
         @test geom_wrap(
             space, (Int8(1), Int8(2))
-        ) === SVector{2,Int64}(1, 2)
+        ) === SVector{2,Int8}(1, 2)
 
         @test_throws AssertionError geom_wrap(space, (1.0, 2.0))
     end
@@ -245,7 +245,7 @@ end
 
     @test geom_wrap(
         narrow_space, (Int128(200),)
-    ) === SVector{1,Int8}(99)
+    ) === SVector{1,Int128}(99)
 end
 
 @testset "Continuous wrapping" begin
@@ -481,9 +481,9 @@ end
             checked_grid, (5, 5), (1,)
         )
 
-        @test_throws AssertionError geom_move(
+        @test geom_move(
             checked_grid, (Int8(5), Int8(5)), (1, 1)
-        )
+        ) === SVector{2,Int8}(6, 6)
     end
 end
 
@@ -676,6 +676,71 @@ end
             checked_space, (1.0,), (2,)
         )
     end
+end
+
+@testset "Geometric distance" begin
+    for (Metric, expected) in (
+        (Euclidean, 5),
+        (Cityblock, 7),
+        (Chebyshev, 4),
+    )
+        @testset "$Metric" begin
+            grid = GridSpace([(0, 9), (0, 9)]; metric=Metric())
+            distance = geom_distance(
+                grid, SVector{2,Int8}(1, 1), SVector{2,Int8}(4, 5)
+            )
+
+            @test distance == expected
+            if Metric == Euclidean
+                @test distance isa Float64
+            else
+                @test distance isa Int128
+            end
+
+            continuous = ContinuousSpace(
+                [(0, 10), (0, 10)]; metric=Metric()
+            )
+            @test geom_distance(
+                continuous, SVector{2,Float32}(1, 1),
+                SVector{2,Float32}(4, 5)
+            ) === Float64(expected)
+
+            for (Space, upper, a, b) in (
+                (GridSpace, 9, SVector(1, 1), SVector(9, 8)),
+                (ContinuousSpace, 10, SVector(1.0, 1.0), SVector(9.0, 8.0)),
+            )
+                periodic = Space(
+                    [(0, upper), (0, upper)];
+                    periodic=true, metric=Metric(),
+                )
+
+                distance = geom_distance(periodic, a, b)
+                if Metric == Euclidean
+                    @test distance ≈ sqrt(13.0)
+                elseif Metric == Cityblock
+                    @test distance == 5
+                else
+                    @test distance == 3
+                end
+
+                @test geom_distance(periodic, b, a) ≈ distance
+                @test iszero(geom_distance(periodic, a, a))
+            end
+
+            wide_grid = GridSpace([(-128, 127)]; metric=Metric())
+            @test geom_distance(
+                wide_grid, SVector(Int8(-128)), SVector(Int8(127))
+            ) == 255
+        end
+    end
+
+    @test _geom_distance(
+        Cityblock(), SVector(typemax(Int64) - 1, Int64(1))
+    ) === typemax(Int64)
+
+    @test_throws AssertionError _geom_distance(
+        Cityblock(), SVector(typemax(Int64), Int64(1))
+    )
 end
 
 end
