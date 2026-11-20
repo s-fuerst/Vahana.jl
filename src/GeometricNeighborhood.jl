@@ -19,24 +19,47 @@ struct GeometricNeighborhood{
     weight::Float64
 end
 
-Base.@kwdef struct ReplicatedKDTree
+abstract type GeometricBackend end
+
+Base.@kwdef struct ReplicatedKDTree <: GeometricBackend
     leafsize::Int = 25
     reorder::Bool = true
 end
 
-struct GeometricRegistration
+struct GeometricRegistration{D<:GeometricNeighborhood,B<:GeometricBackend}
     name::Symbol
-    definition::GeometricNeighborhood
-    backend::ReplicatedKDTree
+    definition::D
+    backend::B
     coordinate_type::DataType
     project_type::DataType
 end
 
-function GeometricNeighborhood(;
+mutable struct NeighborhoodFields{R<:GeometricRegistration,P}
+    registration::R
+    prepared::Union{Nothing,P}
+end
+
+geom_prepared_type(::GeometricRegistration{D,ReplicatedKDTree}) where {D} = Nothing
+
+function construct_geom_fields(registrations, simsymbol)
+    geomsymbol = Symbol("GeomNeighborhoods_", simsymbol)
+    fields = map(registrations) do registration
+        R = typeof(registration)
+        P = geom_prepared_type(registration)
+        F = NeighborhoodFields{R,P}
+        :($(registration.name)::$F = $F($(QuoteNode(registration)), nothing))
+    end
+
+    strukt = Expr(:struct, false, geomsymbol, Expr(:block, fields...))
+    eval(:(Base.@kwdef $strukt))
+    geomsymbol
+end
+
+function GeometricNeighborhood(
     space::GeometricSpace,
     posfunc::Function,
     query_types,
-    neighbor_types,
+    neighbor_types;
     query_filter::Union{Nothing,Function}=nothing,
     neighbor_filter::Union{Nothing,Function}=nothing,
     radius::Real=1,

@@ -30,8 +30,7 @@ Ziel der ersten nutzbaren Version:
 | `src/ModelTypes.jl`: `Param`, `Global`, `ModelTypes` | Kleine Registrierungsobjekte und Vektoren mit Modellinformationen | Neue Geometrieregistrierungen ebenfalls als Modellmetadaten speichern |
 | `register_agenttype!`, `register_edgetype!`, `register_param!`, `register_global!` | Erstes Argument `ModelTypes`; Validierung; Rückgabe `types`; zusätzliche pipebare Methode | `register_geom_neighborhood!` folgt genau diesem Aufrufmuster |
 | `src/Simulation.jl`: `create_model` | `Expr`, `Base.@kwdef` und `eval` erzeugen Simulationstyp, Parameter- und Globalstruktur | Eine modellbenannte Geometriefeldstruktur auf dieselbe Weise erzeugen |
-| `construct_agent_methods`, `construct_edge_methods` | `@eval` erzeugt modell-/typspezifische Methoden; feste Eigenschaften werden bei der Generierung eingesetzt | `construct_geom_methods` als entsprechender Generator statt eines dynamischen Frameworks |
-| `src/Helpers.jl`: `simfield`, Zugriffsmakros | Direkter Zugriff auf generierte Felder | Namen bei der Generierung in Feldzugriffe auflösen, nicht im Agentenloop über Dictionaries suchen |
+| `src/Helpers.jl`: `simfield`, Zugriffsmakros | Direkter Zugriff auf generierte Felder | Geometrienamen per Feldzugriff auflösen, nicht im Agentenloop über Dictionaries suchen |
 | `create_simulation` | Instanziierung des generierten Typs und Initialisierung seiner Felder | Pro Simulation neue Geometrielaufzeitfelder mit `prepared = nothing` erzeugen |
 
 Dynamische Vektoren und gegebenenfalls Dictionaries sind während Registrierung und äußerer Vorbereitung zulässig. Sie dürfen nicht die konkret typisierte Ablage ersetzen, die bei der Suche innerhalb einer Transition verwendet wird.
@@ -70,10 +69,11 @@ Vahana verwendet ein Modul mit nach Anliegen getrennten Quelldateien. Der Vorsch
 | `src/GeometricNeighborhood.jl` (neu) | Fachliche Definition, Backendkonfigurationen, Registrierungsdeskriptoren, parametrisierte Laufzeitcontainer und Suchiteratoren |
 | `src/GeometricKDTree.jl` (neu) | Erstes Backend: private globale Replikation, KD-tree-Aufbau und Kandidatensuche unter der neuen API |
 | `src/ModelTypes.jl` | Neue Registrierungsvektoren und `register_geom_neighborhood!` einschließlich pipebarer Variante |
-| `src/GeometricMethods.jl` (neu) | `construct_geom_methods`, spezialisierte Modellzugriffe, lokale Snapshot-Erfassung und Einbindung der Suchfunktionen |
+| `src/GeometricMethods.jl` (neu) | Namenszugriff, lokale Snapshot-Erfassung und gemeinsame Schnittstelle der Suchfunktionen |
 | `src/GeometricMPI.jl` (später) | Shared-memory-Aufbau, hierarchische Replikation, Synchronisation und Freigabe für das zusätzliche Cell-list-Backend |
 | `src/Simulation.jl` | Generierte Geometriestruktur, Simulationinitialisierung, Auswahl und Lebenszyklus in `apply!` |
 | `src/Instrumentation.jl` | Neue Phasen-/Mechanismuslabels, Registrierung und Ausgabe der Ereignisse |
+| `src/REPL.jl` | Registrierte geometrische Nachbarschaften bei Modell und Simulation und konkrete geometrische Nachbarn in `show_agent` anzeigen |
 | `src/ConnectSpatial.jl` | KD-tree-Suchprinzip in das neue Backend überführen; alte API entfernen. Später gegebenenfalls Ort der neuen Komfortfunktion |
 | `src/Edge.jl`, `src/EdgeMethods.jl` | Separater späterer Schritt für `neighbors` und `neighbors_iter` |
 | `test/geometric_*.jl`, `test/mpi/test_geometric_*.jl` (neu) | Nach Anliegen getrennte Tests plus MPI-Wrapper im vorhandenen Stil |
@@ -134,13 +134,13 @@ Bei `geom_move` im GridSpace erst den geometrischen Schnittpunkt berechnen, dann
 
 **Abnahme A:** unabhängige Tests der Geometrie ohne Simulation, Nachbarschaftsindex oder neue Kommunikationsoperationen.
 
-## 5. Arbeitspaket B: Registrierung und Typprüfung
+## 5. Arbeitspaket B: Registrierung und Typableitung (abgeschlossen)
 
 ### B1. Definitionen und Metadaten
 
-- `GeometricNeighborhood` parametrisch für Raum, `posfunc`, Agententypangaben, Filter, Projektion und Radius implementieren. Die reine Positionsfunktion auf dem lesbaren Snapshot muss alle beteiligten Query- und Neighbor-Typen unterstützen.
+- `GeometricNeighborhood` parametrisch für Raum, `posfunc`, Filter und Projektion anlegen. Die Agententypen stehen in Typvektoren; Radius und Gewicht werden als `Float64` gespeichert. Die reine Positionsfunktion auf dem lesbaren Snapshot muss alle beteiligten Query- und Neighbor-Typen unterstützen.
 - `weight`, `project_type` und Defaults entsprechend dem API-Entwurf unterstützen.
-- `GeometricRegistration` als Registrierungsdeskriptor mit `name`, `definition`, `backend`, `coordinate_type` und `project_type` vorsehen. Backendkonfiguration und validierte Koordinaten-/Projektionstypen neben der fachlichen Definition speichern.
+- `GeometricRegistration` als Registrierungsdeskriptor mit `name`, `definition`, `backend`, `coordinate_type` und `project_type` vorsehen. Backendkonfiguration und ermittelte Typparameter neben der fachlichen Definition speichern.
 - In `ModelTypes` einen Vektor `geom_neighborhoods::Vector{GeometricRegistration}` für benannte Nachbarschaften ergänzen, analog zu `params` und `globals`.
 - Räume werden nicht separat registriert oder in einer eigenen Modellliste verwaltet. Der Raum ist direkt über `definition.space` erreichbar; ein `space_index` entfällt.
 - Derselbe Raum darf von mehreren Nachbarschaften mit unterschiedlichen `posfunc`s referenziert werden, beispielsweise Wohnungs- und Arbeitsplatzposition derselben Person. Positionszuordnung und abgeleiteter Koordinatentyp bleiben nachbarschaftsspezifisch; unterschiedliche zulässige Koordinatentypen sind möglich.
@@ -152,37 +152,21 @@ register_geom_neighborhood!(types, :food, definition; backend = ReplicatedKDTree
 register_geom_neighborhood!(:food, definition; backend = ReplicatedKDTree())
 ```
 
-Die zweite Form liefert wie andere `register_*`-Funktionen eine Funktion für die Pipeline. Beide verwenden dieselbe Validierung und geben `types` zurück.
+Die zweite Form liefert wie andere `register_*`-Funktionen eine Funktion für die Pipeline. Sie ruft dieselbe Registrierung auf, die `types` zurückgibt.
 
-Prüfen:
+Die Registrierung prüft eindeutige Namen und dass alle angegebenen Agententypen bereits in `ModelTypes` registriert sind. Mortalität und Agentenhints werden dort abgelegt, nicht erneut in der Nachbarschaft.
 
-- eindeutiger Name innerhalb der Geometrieregistrierungen;
-- bekannte, konkrete, bereits registrierte Agententypen;
-- unterstützte Raum-/Backend-/Metrikkombination;
-- Dimension und Koordinatenrückgabetypen der nachbarschaftsspezifischen `posfunc` für alle Suchenden und Gesuchten; den gemeinsamen Koordinatentyp in Registrierungsmetadaten ablegen, nicht in das geteilte Raumobjekt zurückschreiben;
-- Filtermethoden mit booleschem Ergebnisvertrag;
-- endlicher, nichtnegativer Radius und endliches, nichtnegatives Gewicht;
-- gemeinsamer konkreter Projektionstyp und Anforderungen des Backends.
+**Positions- und Koordinatentypableitung:** Für jeden beteiligten Query- und Neighbor-Typ den konkreten Rückgabetyp der `posfunc` per Compilerinferenz ermitteln. Bei Tupeln die Komponententypen promoten, sonst den Elementtyp verwenden. Den Koordinatentyp je Agententyp gegen die zulässige Raumkategorie prüfen und daraus einen gemeinsamen konkreten Typ ableiten. Dieser steht in den Registrierungsmetadaten; das geteilte Raumobjekt bleibt unverändert. Dazu werden keine Beispielagenten benötigt.
 
-Mortalität und Agentenhints aus `ModelTypes` verwenden, nicht nochmals separat registrieren.
+**Bewusst schlanke Eingabeprüfung:** Passende Positionsform und -dimension, boolesche Filter, endlicher nichtnegativer Radius und ebensolches Gewicht sowie sinnvolle Backendparameter sind Voraussetzungen für die Nutzung. Die Registrierung prüft sie nicht eigens. Separate Negativtests für diese Fälle sind keine Abnahmebedingung für B. Die Regeln für die Raumhilfsfunktionen aus Paket A bleiben unverändert.
 
-**Positions- und Koordinatentypableitung:** Die `posfunc` für jeden beteiligten Query- und Neighbor-Typ prüfen und daraus den gemeinsamen skalaren Koordinatentyp der registrierten Nachbarschaft ableiten. Am Raum gibt es keine explizite Positionskoordinatentypvorgabe. Zwischen Raumdefinition und validierten Raum-/Koordinatenmetadaten der Registrierung unterscheiden; das gemeinsam referenzierte Raumobjekt nicht verändern und keine zusätzliche öffentliche Kontextübergabe einführen. Keine Beispielagenten für die Typableitung benötigen.
+### B3. Projektionstyp übernehmen oder ableiten
 
-Methoden derselben `posfunc` können unterschiedliche Komponententypen liefern. Umsetzungsvorschlag ist eine gemeinsame konkrete Promotion innerhalb der zulässigen Raumkategorie. Die resultierende Typwahl bei der Registrierung anzeigen beziehungsweise in Fehlermeldungen nennen; keine stillschweigende Promotion zu `Any`, komplexen Typen oder dynamischer Präzision.
-
-### B3. Projektionstyp ableiten
-
-- Bei explizitem `project_type` diesen als konkreten Vertrag validieren.
-- Andernfalls pro Nachbartyp argumenttypspezifische Compilerinferenz aufrufen, nicht `Base.return_types(f)[1]` ohne Argumenttyp verwenden.
-- Inferenzzugriff zentral kapseln und unter den unterstützten Julia-Versionen testen.
-- Gemeinsamen konkreten Typ verlangen; bei `Any`, ungeklärten Unions oder unterschiedlichen Ergebnistypen verständlich abbrechen und `project_type` nennen.
-- Beim Shared-memory-Backend `isbitstype` prüfen.
+- Einen expliziten `project_type` direkt übernehmen. Einen konkreten, zu den tatsächlichen Projektionsergebnissen passenden Typ anzugeben ist Aufgabe der Modelldefinition.
+- Ohne Vorgabe per argumenttypspezifischer Compilerinferenz denselben konkreten Rückgabetyp für alle Nachbartypen verlangen. Andernfalls mit einem Hinweis auf `project_type` abbrechen.
 - Projektion nicht auf Beispielzuständen ausführen; leere Populationen sind irrelevant für die Typableitung.
-- Bei explizitem Typ die tatsächlichen Projektionsergebnisse während der Vorbereitung auf den vereinbarten Vertrag prüfen.
 
-Auch stateless/Nullbyte-Projektionen sind zulässige bitstypes. Sie benötigen besondere Behandlung in der Übertragung; `sizeof(P) == 0` darf nicht zu ungültigen MPI-Datentypen oder Division durch null führen.
-
-**Abnahme B:** Tests der Pipeline, Namensprüfung, Koordinatentypableitung, expliziten Projektionstypvorgabe und Fehlermeldungen. Die erste Backendkonfiguration ist `ReplicatedKDTree`; ein Shared-memory-Index wird in diesem Meilenstein nicht benötigt.
+**Abnahme B:** Die Smoke-Tests in `test/geometric_neighborhood.jl` decken direkte und pipebare Registrierung, doppelte Namen, fehlende Agententypen, Koordinatentypableitung, implizite und explizite Projektionstypen sowie `ReplicatedKDTree` als erste Backendkonfiguration ab. Backend- und MPI-Anforderungen an die Datenübertragung gehören zu D und E.
 
 ## 6. Arbeitspaket C: Codegenerierung und typisierter Feldzugriff
 
@@ -197,24 +181,15 @@ Die Struktur nach dem bestehenden `Expr`-/`@kwdef`-/`eval`-Muster erzeugen. Die 
 - die ursprüngliche `GeometricNeighborhood`-Definition;
 - die konkrete Backendkonfiguration beziehungsweise Zugriff darauf;
 - `prepared::Union{Nothing,P}`;
-- nötigenfalls statische, validierte Raum-/Typmetadaten neben der ursprünglichen Definition.
+- nötigenfalls statische Raum-/Typmetadaten aus der Registrierung neben der ursprünglichen Definition.
 
 `create_simulation` erzeugt für jede Simulation neue Laufzeitcontainer. Keine mutable Runtime-Instanz als gemeinsam wiederverwendeten Modelldefault einbetten.
 
-### C2. Methodengenerierung
+### C2. Inferierbarer Namenszugriff
 
-`construct_geom_methods` erhält Modellmetadaten und `simsymbol`, analog zu `construct_agent_methods` und `construct_edge_methods`.
+Die Namensauflösung verwendet den generischen Feldzugriff `getfield(sim.geom_neighborhoods, name)`. Ein Testlauf unter Julia 1.12.6 hat in einer `apply!`-Transition für zwei literale Namen mit unterschiedlichen Feldtypen gezeigt, dass dieser Zugriff inferierbar ist. Dafür sind weder ein `Val`-Dispatch noch ein eigener Methodengenerator nötig. Die Auswahl von Nachbarschaften vor der Agentenschleife darf dynamisch bleiben.
 
-Generieren:
-
-- modell-/nachbarschaftsspezifische Vorbereitung und Freigabe;
-- typisierte lokale Snapshot-Erfassung je beteiligtem Agententyp;
-- direkte Zugriffe auf `sim.geom_neighborhoods.<name>`;
-- sechs öffentliche Suchvarianten beziehungsweise deren spezialisierte Kerne.
-
-Die öffentliche API bleibt `(sim, id, :name)`. Ein privater `Val{name}`-Dispatch kann zur Auflösung verwendet werden, **aber nicht allein als Behauptung von Typstabilität**: Symbolkonstanten müssen am realen Aufrufpfad propagieren. Typinferenz mit literalen Namen direkt aus einer Transition testen. Kein öffentliches `Val` und kein viertes Transition-Argument verlangen.
-
-Die Auswahl eines Namensvektors vor der Agentenschleife darf dynamisch sein. Generierte Methoden und direkte Felder müssen die eigentliche Trefferverarbeitung typisieren.
+Die öffentliche Such-API bleibt `(sim, id, :name)`, ohne zusätzliches Transition-Argument. C2 prüft nur die Typinferenz des Namenszugriffs. Snapshot-Erfassung, Suchkern und die sechs Suchvarianten gehören zu D; Vorbereitung und Freigabe werden in F in `apply!` eingebunden.
 
 ### C3. Modelllebensdauer und Kopien
 
@@ -224,7 +199,7 @@ Die Auswahl eines Namensvektors vor der Agentenschleife darf dynamisch sein. Gen
 - Außerhalb einer Transition muss `copy_simulation` `prepared = nothing` vorfinden und unabhängige Geometriecontainer erzeugen. Da alle temporären Geometriedaten nur innerhalb von `apply!` leben, ist keine Kopierstrategie für aktive Geometrieressourcen und keine gesonderte Prüfung auf aktive Geometriefenster erforderlich.
 - Keine temporären Indizes oder Fenster in HDF5-Snapshots persistieren; beim Wiederanlauf anhand des Modells neu aufbauen.
 
-**Abnahme C:** konkrete generierte Feldtypen, Inferenztests für leere/nichtleere Ergebnisse und keine ungewollt geteilten Simulationsressourcen. Zunächst mit testintern vorbereiteten Arrays prüfen, anschließend am realen KD-tree-Backend. Baum- und Vorbereitungstyp müssen insbesondere auch bei leerer Population konkret feststehen.
+**Abnahme C:** konkrete generierte Feldtypen, inferierbarer Zugriff mit literalen Namen aus einer Transition und keine ungewollt geteilten Simulationsressourcen. Die Inferenz der Suchergebnisse ist Teil von D.
 
 ## 7. Arbeitspaket D: lokale Snapshots und erstes KD-tree-Backend
 
@@ -258,8 +233,8 @@ Das bisherige Prinzip aus `_agents_ids_states_and_edges`, `_get_ids_poss_states`
 - Das Suchprinzip `KDTree`/`inrange` aus `ConnectSpatial.jl` übernehmen, aber keine alte API-Abhängigkeit, typbasierte Ablage oder alte Grenzheuristik.
 - Backendparameter `leafsize` und `reorder` in `ReplicatedKDTree` kapseln. Raum, Metrik und Periodizität kommen aus der neuen Raumdefinition.
 - Suchmatrix und Reihenfolge von IDs/Projektionen konsistent halten. Die durch die Bibliothek verwendeten Originalindizes insbesondere bei `reorder = true` testen.
-- Den konkreten Baum-/Vorbereitungstyp bei Modellbau bestimmen. Wenn unterschiedliche Raum-/Metriktypen verschiedene KD-tree-Typen erzeugen, diese über die feste Registrierung spezialisieren, nicht in `Any` ablegen.
-- Alle sechs `geom_*`-Funktionen über dieselbe Kandidatensuche bereitstellen; nur die Ergebnisansicht unterscheiden.
+- Den konkreten Baum-/Vorbereitungstyp beim Modellbau bestimmen, auch für leere Populationen. Wenn unterschiedliche Raum-/Metriktypen verschiedene KD-tree-Typen erzeugen, diese über die feste Registrierung spezialisieren, nicht in `Any` ablegen.
+- Alle sechs `geom_*`-Funktionen über dieselbe Kandidatensuche bereitstellen; nur die Ergebnisansicht unterscheiden. Mit `@inferred` prüfen, dass literale Namen im öffentlichen Suchpfad zu konkreten Ergebnisvektoren und Iteratoren führen, jeweils mit und ohne Treffer. In F auch aus einer integrierten `apply!`-Transition prüfen.
 - Die Bibliothek kann Trefferindizes als Vektor materialisieren; die `_iter`-API verspricht keinen insgesamt allokationsfreien Suchvorgang, sondern vermeidet den zusätzlichen Ergebnisvektor.
 - Kandidaten gegen den zentralen exakten Raumabstand prüfen, Selbst-ID ausschließen und periodische Duplikate nach ursprünglichem Agentenindex vermeiden.
 
@@ -329,7 +304,7 @@ Ranks dürfen nur an Kollektiven ihres jeweiligen Kommunikators teilnehmen. Alle
 - Einmalige globale Daten- und Indexkopie pro Node; lokale Arrayheader pro Rank sind in Ordnung.
 - Leader-Stagingdaten dürfen kurzzeitig eine zusätzliche Node-Kopie verursachen; Staging danach freigeben und Spitzenbedarf messen.
 - Keine globalen, privaten O(N)-Positions-/Projektionsarrays auf jedem Nichtleader.
-- MPI-Buffer und Datentypen für `SVector`, Tupel/Zellschlüssel und eigene bitstype-Projektionen explizit testen. Bei Bedarf intern einen wohldefinierten flachen Buffer verwenden, ohne das öffentliche Ergebnisformat zu ändern.
+- Für Projektionen im Shared-memory-Backend `isbitstype` verlangen. MPI-Buffer und Datentypen für `SVector`, Tupel/Zellschlüssel und eigene bitstype-Projektionen explizit testen. Bei Bedarf intern einen wohldefinierten flachen Buffer verwenden, ohne das öffentliche Ergebnisformat zu ändern.
 - Nullbyte-Projektionen nicht über Fenster mit `sizeof(T) == 0` abfragen; Werte aus dem bekannten Typ rekonstruieren beziehungsweise ein separates speicherloses Schema verwenden.
 - Leere Segmente, eine global leere Nachbarschaft und Einprozessläufe müssen denselben kollektiven Lebenszyklus einhalten.
 - Größen-/Displacementgrenzen der verwendeten MPI-Aufrufe prüfen. Der vorhandene `join` nutzt `Int32`-Größen; diese Beschränkung nicht ungeprüft in neue große Transfers übernehmen. Nicht unterstützte Größen kontrolliert melden oder explizit stückeln.
@@ -367,8 +342,8 @@ Die Freigabe direkt nach der Post-Apply-Barriere begrenzt bereits beim KD-tree-B
 
 ### F3. Fehlerpfade
 
-- Lokale Positions-/Projektions-/Filterfehler vor dem nächsten datenabhängigen Kollektiv sammeln und über ein gemeinsames Fehlerprotokoll bekannt machen.
-- Erst nach übereinstimmend erfolgreicher Validierung mit dem nächsten Allokations-/Transferabschnitt beginnen.
+- Fehler, die bei der lokalen Positions-, Projektions- oder Filterauswertung auftreten, vor dem nächsten datenabhängigen Kollektiv sammeln und über ein gemeinsames Fehlerprotokoll bekannt machen. Das erfordert keine zusätzlichen Eingabeprüfungen in der Registrierung.
+- Erst wenn kein Rank einen solchen Fehler gemeldet hat, mit dem nächsten Allokations-/Transferabschnitt beginnen.
 - Bereits angelegte Fenster in eindeutig bekanntem gemeinsamen Zustand freigeben.
 - Kein lokales `throw` oder `finally` als hinreichende Lösung für MPI-Bereinigung betrachten.
 - Unbehebbare MPI-Fehler und beliebige Ausnahmen während der bestehenden Transition-Schleifen getrennt behandeln. Der neue Code soll keine allgemeine Wiederherstellbarkeit versprechen, die `apply!` bisher nicht hat.
@@ -394,7 +369,13 @@ Die Freigabe direkt nach der Post-Apply-Barriere begrenzt bereits beim KD-tree-B
 - `copy_simulation` und `apply` außerhalb einer Transition mit `prepared = nothing` testen. Zusätzlich per Regressionstest prüfen, dass `copy_simulation` bei `sim.intransition == true` vor Kopier- oder Ressourcenoperationen mit einem verständlichen Fehler abbricht; dies gilt sowohl mit als auch ohne ausgewählte geometrische Nachbarschaften.
 - `finish_simulation!` soll nach normalem `apply!` keine offenen Geometriefenster mehr finden; keine zweite blinde Freigabe.
 - HDF5-Snapshot-Roundtrip mit dem neuen Simulationstyp testen; temporäre Daten bleiben nichtpersistent.
-- Bestehende Ausgaben/REPL-Funktionen darauf prüfen, ob zusätzliche Felder sichtbar werden und eine kleine Anpassung benötigen.
+
+### REPL-Anzeige
+
+- In `src/REPL.jl` zeigen beide `show(io, MIME"text/plain", ...)`-Ausgaben pro Nachbarschaft Name, Raumtyp, Dimension, Metrik, Radius sowie Query- und Neighbor-Typen. Beim `Model` stammen die Angaben aus den Modellregistrierungen, bei der Simulation aus ihrer generierten `geom_neighborhoods`-Struktur. Die Anzeige ist unabhängig davon, welche Nachbarschaften für eine Transition ausgewählt oder vorbereitet wurden.
+- Bei Modellen und Simulationen ohne Nachbarschaften entfällt der Abschnitt. Backend und temporäre Suchdaten (`prepared`) sind nicht Teil der Anzeige.
+- `show_agent` zusätzlich um die tatsächlichen geometrischen Treffer des Agenten ergänzen, gruppiert nach benannter Nachbarschaft und analog zur bestehenden Ausgabe durch `max` begrenzt. Dieselbe Suchsemantik wie in der `geom_*`-API verwenden; geometrische Treffer getrennt von Kantennachbarn anzeigen.
+- Für `show_agent` außerhalb einer Transition ausdrücklich festlegen, wie ein Suchsnapshot verfügbar gemacht wird. Die normale Anzeige darf keine impliziten MPI-Kollektive starten, da sie auch auf nur einem Rank aufgerufen werden kann.
 
 ## 11. Alte API ersetzen, KD-tree-Prinzip übernehmen
 
@@ -420,7 +401,7 @@ Die bisherige eigenständige `connect_spatial_neighbors!`-Implementierung gehör
 | Vorgeschlagene Datei | Schwerpunkt |
 |---|---|
 | `test/geometric_space.jl` | Grenzen, Koordinatentypen, Metriken, Wrapping mit und ohne Begrenzung nichtperiodischer Achsen, Bewegung |
-| `test/geometric_registration.jl` | `ModelTypes`, Pipeline, Inferenz, Fehler, generierte Typen |
+| `test/geometric_neighborhood.jl` | `ModelTypes`, direkte und pipebare Registrierung, Typableitung und ausgewählte Fehlerfälle |
 | `test/geometric_neighbors.jl` | zunächst KD-tree-Backend: sechs Suchformen, Snapshots, Filter, mehrere Räume/Typen; später backendübergreifende Fälle |
 | `test/mpi/test_geometric_neighbors.jl` | MPI-Wrapper und zusätzliche verteilte Ressourcen-/Fehlertests |
 
@@ -431,8 +412,8 @@ Geteilte Testmodelle wie in `test/core.jl` und `test/spatial_neighbors.jl` am To
 - Ein und mehrere Query-/Neighbor-Typen, unterschiedliche Positionsfelder.
 - Derselbe Typ in mehreren Räumen und mehreren Nachbarschaften.
 - Zwei Nachbarschaften mit demselben Raum, aber unterschiedlicher `posfunc` (Wohnung/Arbeitsplatz): unabhängige Suchergebnisse, Positionssnapshots und Typableitung; Registrierung verändert das geteilte Raumobjekt nicht. Auch unterschiedliche zulässige Koordinatentypen bei gemeinsamem Raum testen.
-- Automatisch inferierte NamedTuple-Projektion und expliziter Typ bei nicht erfolgreicher Inferenz.
-- Gemeinsamer Projektionstyp über mehrere Methoden; inkompatible Typen werden bei Registrierung abgelehnt.
+- Automatisch inferierte NamedTuple-Projektion und explizite Typvorgabe als Alternative zur Inferenz.
+- Ohne explizite Vorgabe: gemeinsamer konkreter Projektionstyp über mehrere Nachbartypen; bei abweichenden Typen verweist die Registrierung auf `project_type`.
 - Nullbyte-Projektion und schmale Positionsspeichertypen.
 - Mortalität, ID-Wiederverwendung, neue Agenten und `:Independent`.
 - Leere lokale Population, leerer Node, global leere Nachbarschaft; null oder alle durch Filter ausgeschlossen.
@@ -440,11 +421,12 @@ Geteilte Testmodelle wie in `test/core.jl` und `test/spatial_neighbors.jl` am To
 - Abstand exakt am Radius, Radius null und größer als Perioden; keine doppelten Treffer durch periodische KD-tree-Query-Bilder beziehungsweise später gewrappte Zellen.
 - Nichtnull-Untergrenzen und gemischt periodische Achsen.
 - Euklidische, Cityblock-/Manhattan- und Chebyshev-Metriken einschließlich ihrer Suchausdehnungen gegen vollständige Referenzsuche prüfen; gewichtete Metriken zurückweisen.
-- Nichtperiodische Überschreitungen, `NaN`, Infinities und Überläufe mit kontrollierten Fehlern.
+- Nichtperiodische Überschreitungen, `NaN`, unendliche Werte und Überläufe bei den Raumhilfsfunktionen nach Paket A.
 - `geom_move`-Schnittpunkt `(7,9) + (1,2) -> (7.5,10)`, Start am Rand, auswärts/einwärts/parallel, Rasterrundung und Warnbegrenzung.
 - Wiederholte `apply!`, unterschiedliche ausgewählte Nachbarschaften und Änderungen zwischen Aufrufen.
 - Vergleich aller sechs APIs nach ID sortiert, nicht anhand einer garantierten Ergebnisreihenfolge.
-- Ergebnisvektoren und Iteratoren mit konkretem `eltype`, auch bei leerem Ergebnis; `@inferred` im tatsächlichen literalen Namenspfad.
+- In C: `@inferred` für den generischen Namenszugriff mit literalen Namen aus einer Transition.
+- In D/F: Ergebnisvektoren und Iteratoren mit konkretem `eltype`, auch bei leerem Ergebnis; `@inferred` im öffentlichen Suchpfad mit literalem Namen.
 - Nach Ende von `apply!` ist `prepared = nothing`; zunächst keine dauerhaften KD-tree-/Arrayreferenzen, später zusätzlich keine offenen Geometriefenster. Unabhängige Simulationskopien.
 - Kontrollierte Fehler auf nur einem Rank ohne Hängen des Testjobs; Zeitlimit verwenden.
 
@@ -454,7 +436,7 @@ Tests im Entwicklungsprojekt ausführen, nicht gegen eine separat registrierte V
 
 ```sh
 julia --project=. test/geometric_space.jl
-julia --project=. test/geometric_registration.jl
+julia --project=. test/geometric_neighborhood.jl
 julia --project=. test/geometric_neighbors.jl
 julia --project=. test/runtests.jl
 
@@ -490,9 +472,9 @@ Beim späteren Shared-memory-Backend dürfen Shared Pages bei der Interpretation
 ### Meilenstein 1: neue API mit bisherigem KD-tree-Prinzip
 
 1. **Räume und Hilfsfunktionen** einschließlich Numeriktests.
-2. **Registrierung und Typprüfung** mit pipebarer API und `ReplicatedKDTree` als Backendkonfiguration.
-3. **Generierte Felder und inferierbare Suchzugriffe** mit testintern vorbereiteten Daten. Erst weitergehen, wenn der Zugriff über `sim` und literales Symbol nachweislich funktioniert.
-4. **Lokale Snapshots, private globale Replikation und KD-tree-Adapter** mit allen sechs Suchformen; gegen vollständige Referenzsuche testen.
+2. **Registrierung und Typableitung** mit pipebarer API und `ReplicatedKDTree` als Backendkonfiguration (abgeschlossen).
+3. **Generierte Felder, inferierbarer Namenszugriff und unabhängige Simulationscontainer.** Den Zugriff über `sim` und literales Symbol aus einer Transition prüfen.
+4. **Lokale Snapshots, private globale Replikation und KD-tree-Adapter** mit allen sechs Suchformen; Inferenz mit und ohne Treffer prüfen und Ergebnisse gegen vollständige Referenzsuche testen.
 5. **`apply!`-Integration, Instrumentierung und Entfernung des alten Spatial-API-Pfads.** Bestehende inhaltliche Testfälle auf die neue API übertragen; keine Cachefunktion übernehmen.
 6. **API-Erprobung und ausdrückliche Abnahme dieses Stands:** reale Modelltransitionen einschließlich Kantenerzeugung, MPI, Typinferenz, Filter/Projektionen, Kopien und wiederholte Aufrufe testen. Rückmeldungen zur API vor weiterer Backendentwicklung einarbeiten.
 

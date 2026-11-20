@@ -105,19 +105,13 @@ Hier werden unterschiedliche Felder gelesen, ohne Typprüfungen in einer gemeins
 city = ContinuousSpace([(0.0, 100.0), (0.0, 100.0)]; periodic = false)
 
 near_home = GeometricNeighborhood(
-    space = city,
-    posfunc = p -> p.home_position,
-    query_types = Person,
-    neighbor_types = Person,
+    city, p -> p.home_position, Person, Person;
     radius = 2.0,
     project = p -> p.home_position,
 )
 
 near_work = GeometricNeighborhood(
-    space = city,
-    posfunc = p -> p.work_position,
-    query_types = Person,
-    neighbor_types = Person,
+    city, p -> p.work_position, Person, Person;
     radius = 2.0,
     project = p -> p.work_position,
 )
@@ -160,10 +154,7 @@ Raumtyp und Index bleiben unabhängig. Auch ein kontinuierlicher Raum kann durch
 
 ```julia
 nearby_prey = GeometricNeighborhood(
-    space = physical,
-    posfunc = physical_position,
-    query_types = Predator,
-    neighbor_types = Prey,
+    physical, physical_position, Predator, Prey;
     query_filter = predator -> predator.energy < 10,
     neighbor_filter = prey -> prey.age > 0,
     radius = 2.0,

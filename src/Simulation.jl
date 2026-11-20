@@ -119,6 +119,7 @@ Returns a [`Model`](@ref) that can be used in
 """
 function create_model(typeinfos::ModelTypes, name::String)
     simsymbol = Symbol(name)
+    geomsymbol = construct_geom_fields(typeinfos.geom_neighborhoods, simsymbol)
 
     edgefields = [
         Expr(Symbol("="),
@@ -158,6 +159,7 @@ function create_model(typeinfos::ModelTypes, name::String)
                   :(h5file::Union{HDF5.File, Nothing}),
                   :(external::Dict{Any, Any}),
                   :(instrumentation::Instrumentation),
+                  :(geom_neighborhoods::$geomsymbol = $geomsymbol()),
                   edgefields...,
                   nodefields...)
     
@@ -532,6 +534,10 @@ the results to the h5file/logging field of the returned simulation.
 Returns the copy of the simulation.
 """
 function copy_simulation(sim)
+    if sim.intransition
+        error("Cannot copy a simulation during a transition.")
+    end
+
     copy = deepcopy(sim)
     # we also copied the MPI windows, so the copy points to the same
     # memory as the original. So this needs to be fixed.

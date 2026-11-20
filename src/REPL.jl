@@ -15,6 +15,21 @@ end
 
 ######################################## Model
 
+function _show_geom_neighborhoods(io::IO, registrations)
+    if !isempty(registrations)
+        printstyled(io, "\nGeometric Neighborhood(s):"; color = :cyan)
+        for registration in registrations
+            definition = registration.definition
+            space = definition.space
+            print(io, "\n\t:", registration.name, " — ",
+                  nameof(typeof(space)), " (", length(space.bounds), "D, ",
+                  nameof(typeof(space.metric)), "), radius=", definition.radius)
+            print(io, "\n\t\tQuery: ", Base.join(definition.query_types, ", "),
+                  " | Neighbors: ", Base.join(definition.neighbor_types, ", "))
+        end
+    end
+end
+
 function Base.show(io::IO, ::MIME"text/plain", model::Model)
     printstyled(io, "\nModel Name: ", model.name; color = :magenta)
 
@@ -58,6 +73,8 @@ function Base.show(io::IO, ::MIME"text/plain", model::Model)
             print(io, "{$(model.types.edges_attr[T][:target])}")
         end
     end
+
+    _show_geom_neighborhoods(io, model.types.geom_neighborhoods)
 
     params = model.types.params
     if length(params) >= 1
@@ -157,6 +174,11 @@ function construct_prettyprinting_methods(simsymbol)
         printstyled(io, "\nSimulation Name: ", sim.name; color = :magenta)
         show_agent_types(io, sim)
         show_edge_types(io, sim)
+        neighborhoods = sim.geom_neighborhoods
+        _show_geom_neighborhoods(io, (
+            getfield(neighborhoods, name).registration
+            for name in fieldnames(typeof(neighborhoods))
+        ))
         show_struct(io, sim.params, "Parameter")
         show_raster(io, sim)
         #   print(io, "Globals: ", sim.globals)
