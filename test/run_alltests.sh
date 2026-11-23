@@ -37,6 +37,16 @@ echo "------"
 mpiexecjl -n 4 julia --project mpi/test_raster.jl 
 
 echo
+echo "Geometric Neighborhood"
+echo "----------------------"
+mpiexecjl -n 4 julia --project mpi/test_geometric_neighborhood.jl
+
+echo
+echo "Spatial Neighbors"
+echo "-----------------"
+mpiexecjl -n 4 julia --project mpi/test_spatial_neighbors.jl
+
+echo
 echo "Agentstate (non shared memory)"
 echo "------------------------------"
 mpiexecjl -n 4 julia --project mpi/test_agentstate.jl 

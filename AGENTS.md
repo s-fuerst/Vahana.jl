@@ -21,6 +21,11 @@ Julia, designed for large-scale simulations of complex social networks
 - The development checkout is a `dev/` project; do not assume a
   registered `Vahana` package environment.
 
+## Language
+
+- Write all repository text in English, including documentation, plans,
+  comments, docstrings, and user-facing messages.
+
 ## Code changes
 
 - **Only make code changes after an explicit request.** Discussions,

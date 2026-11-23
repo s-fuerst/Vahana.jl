@@ -174,6 +174,8 @@ include("MPI.jl")
 
 include("GeometricSpace.jl")
 include("GeometricNeighborhood.jl")
+include("GeometricMethods.jl")
+include("geom_backends/ReplicatedKDTree.jl")
 
 include("ModelTypes.jl")
 

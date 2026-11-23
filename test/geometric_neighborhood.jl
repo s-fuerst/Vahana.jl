@@ -9,7 +9,7 @@ struct B
 end
 
 struct G
-    pos::Tuple{Int8,Int16}
+    pos::Tuple{Int16,Int16}
 end
 
 position(a::Union{A,B,G}) = a.pos
@@ -49,9 +49,27 @@ space = ContinuousSpace([(0,10),(0,10)])
     gridtypes = ModelTypes() |> register_agenttype!(G)
     grid = GeometricNeighborhood(GridSpace([(0,10),(0,10)]), position, G, G)
     register_geom_neighborhood!(gridtypes, :grid, grid)
-    # The coordinate type comes from the mixed Int8/Int16 position, not the grid bounds.
+    # The coordinate type comes from the Int16 position, not the grid bounds.
     @test only(gridtypes.geom_neighborhoods).coordinate_type === Int16
     @test only(gridtypes.geom_neighborhoods).project_type === G
+
+    mixed_position(g::G) = (Int8(g.pos[1]), g.pos[2])
+    mixed = GeometricNeighborhood(grid.space, mixed_position, G, G)
+    @test_throws AssertionError register_geom_neighborhood!(gridtypes, :mixed, mixed)
+end
+
+@testset "Independent agents in geometric neighborhoods" begin
+    types = ModelTypes() |> register_agenttype!(A, :Independent) |> register_agenttype!(B)
+
+    overlapping = GeometricNeighborhood(space, position, A, [A, B]; project=projection)
+    @test_throws ArgumentError register_geom_neighborhood!(types, :overlapping, overlapping)
+    @test isempty(types.geom_neighborhoods)
+
+    query_only = GeometricNeighborhood(space, position, A, B)
+    @test register_geom_neighborhood!(types, :query_only, query_only) === types
+
+    neighbor_only = GeometricNeighborhood(space, position, B, A)
+    @test register_geom_neighborhood!(types, :neighbor_only, neighbor_only) === types
 end
 
 struct GeomTestEdge

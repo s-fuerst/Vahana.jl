@@ -78,6 +78,7 @@ end
     EL_join_idmapping_values
     EL_join_spatial_poss
     EL_join_spatial_edges
+    EL_join_spatial_ids
     EL_transition_stats   # nur diagnostic
 
     # --- Test-only (test/instrumentation_smoke.jl) ---
@@ -163,6 +164,7 @@ const _EVENT_LABEL_BY_SYMBOL = Dict{Symbol, EventLabel}(
     :join_idmapping_values              => EL_join_idmapping_values,
     :join_spatial_poss                  => EL_join_spatial_poss,
     :join_spatial_edges                 => EL_join_spatial_edges,
+    :join_spatial_ids                   => EL_join_spatial_ids,
     :transition_stats                   => EL_transition_stats,
 )
 
@@ -586,7 +588,7 @@ end
 # Version of the /instrumentation metadata schema (enum-name attributes and
 # format_version). Bump when the /instrumentation layout or the
 # enum-to-integer mapping changes.
-const INST_FORMAT_VERSION = 4
+const INST_FORMAT_VERSION = 5
 
 """Enum member names without their declaration prefix (`EL_`, `EC_`, `EK_`),
 in declaration order"""

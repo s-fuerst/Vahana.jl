@@ -1,438 +1,419 @@
-# Geometrische Nachbarschaften: konkreter Implementierungsplan
+# Geometric Neighborhoods: Concrete Implementation Plan
 
-## 1. Ziel und Verbindlichkeit
+## 1. Objective and Commitment
 
-Dieser Plan setzt den Entwurf aus [`geometric_neighborhood_api.md`](geometric_neighborhood_api.md) in Arbeitspakete um. Grundlage ist eine Untersuchung des aktuellen Vahana-Codes, insbesondere der Registrierung in `ModelTypes`, der Codegenerierung in `create_model`, der generierten Agenten-/Kantenmethoden, des Ablaufs von `apply!`, der vorhandenen MPI-Shared-memory-Verwaltung und der Tests.
+This plan translates the design from [`geometric_neighborhood_api.md`](geometric_neighborhood_api.md) into work packages. The basis is an investigation of the current Vahana code, especially the registration in `ModelTypes`, the code generation in `create_model`, the generated agent/edge methods, the execution flow of `apply!`, the existing MPI shared-memory management, and the tests.
 
-**Dieser Schritt erstellt nur den Plan, keine Implementierung.** Wo interne Details noch nicht beschlossen wurden, werden sie als Umsetzungsvorschlag oder Prüfpunkt bezeichnet. Der Plan darf nicht stillschweigend neue öffentliche API-Verträge einführen.
+**This step only creates the plan, not the implementation.** Where internal details have not yet been decided, they are labeled as implementation suggestions or checkpoints. The plan must not silently introduce new public API contracts.
 
-Ziel der ersten nutzbaren Version:
+Objective of the first usable version:
 
-- Registrierung benannter geometrischer Nachbarschaften in `ModelTypes`, vor `create_model`.
-- Generierte, konkret typisierte Ablage unter `sim.geom_neighborhoods.<name>`.
-- Festes Backend pro Registrierung, zunächst das bisherige global replizierte KD-tree-Suchprinzip unter dem vorläufigen Backendnamen `ReplicatedKDTree`.
-- Neue API zuerst vollständig mit diesem Backend erproben; `NodeSharedCellList` erst anschließend ergänzen.
-- Vorbereitung, globale Replikation und backendabhängige Ressourcenfreigabe pro `apply!`, ohne Cache.
-- Alten `spatial_neighbors`-API-Pfad ersetzen, nicht parallel weiterführen.
-- Sechs `geom_*`-Suchfunktionen, Filter, Projektionen, Metriken und dimensionsweise Periodizität.
-- Räumliche Kantenerzeugung durch reguläre Transitionen.
-- Raumbezogene Geometriehilfsfunktionen.
-- Raumgeometrie und Positionszuordnung trennen: `posfunc` gehört zur `GeometricNeighborhood`; mehrere Nachbarschaften können denselben Raum mit unterschiedlichen Positionsfunktionen verwenden.
+- Registration of named geometric neighborhoods in `ModelTypes`, before `create_model`.
+- Generated, concretely typed storage under `sim.geom_neighborhoods.<name>`.
+- Fixed backend per registration, initially the existing globally replicated KD-tree search principle under the provisional backend name `ReplicatedKDTree`.
+- New API to be tested first fully with this backend; `NodeSharedCellList` to be added later.
+- Preparation, global replication and backend-dependent resource release per `apply!`, without cache.
+- Replacement of the old `spatial_neighbors` API path, not continued in parallel.
+- Six `geom_*` search functions, filters, projections, metrics and dimension-wise periodicity.
+- Spatial edge creation through regular transitions.
+- Spatial geometry helper functions.
+- Separate spatial geometry and position assignment: `posfunc` belongs to `GeometricNeighborhood`; multiple neighborhoods can use the same space with different position functions.
 
-**Nicht Teil des ersten Backend-Meilensteins:** node-local shared Cell List, selektive Kommunikation, neue geometrische Partitionierer, Cache oder Speicherpool, eigenständiger Kantensuchpfad. Die Komfortfunktion `connect_spatial_neighbors!` und die Ergänzung der Graphnachbar-API folgen separat.
+**Not part of the first backend milestone:** node-local shared Cell List, selective communication, new geometric partitioners, cache or memory pool, standalone edge search path. The convenience function `connect_spatial_neighbors!` and the Graph neighbor API extension will follow separately.
 
-## 2. Bestehende Muster, an denen sich die Umsetzung orientiert
+## 2. Existing Patterns to Follow in Implementation
 
-### 2.1 Registrierung und Codegenerierung
+### 2.1 Registration and Code Generation
 
-| Fundstelle | Vorhandenes Muster | Konsequenz für neuen Code |
+| Location | Existing Pattern | Consequence for New Code |
 |---|---|---|
-| `src/ModelTypes.jl`: `Param`, `Global`, `ModelTypes` | Kleine Registrierungsobjekte und Vektoren mit Modellinformationen | Neue Geometrieregistrierungen ebenfalls als Modellmetadaten speichern |
-| `register_agenttype!`, `register_edgetype!`, `register_param!`, `register_global!` | Erstes Argument `ModelTypes`; Validierung; Rückgabe `types`; zusätzliche pipebare Methode | `register_geom_neighborhood!` folgt genau diesem Aufrufmuster |
-| `src/Simulation.jl`: `create_model` | `Expr`, `Base.@kwdef` und `eval` erzeugen Simulationstyp, Parameter- und Globalstruktur | Eine modellbenannte Geometriefeldstruktur auf dieselbe Weise erzeugen |
-| `src/Helpers.jl`: `simfield`, Zugriffsmakros | Direkter Zugriff auf generierte Felder | Geometrienamen per Feldzugriff auflösen, nicht im Agentenloop über Dictionaries suchen |
-| `create_simulation` | Instanziierung des generierten Typs und Initialisierung seiner Felder | Pro Simulation neue Geometrielaufzeitfelder mit `prepared = nothing` erzeugen |
+| `src/ModelTypes.jl`: `Param`, `Global`, `ModelTypes` | Small registration objects and vectors with model information | New geometric registrations also stored as model metadata |
+| `register_agenttype!`, `register_edgetype!`, `register_param!`, `register_global!` | First argument `ModelTypes`; validation; return `types`; additional pipeable method | `register_geom_neighborhood!` follows this call pattern exactly |
+| `src/Simulation.jl`: `create_model` | `Expr`, `Base.@kwdef` and `eval` generate simulation type, parameter and global structure | Generate a model-named geometric field structure in the same way |
+| `src/Helpers.jl`: `simfield`, access macros | Direct access to generated fields | Resolve geometry names via field access, not search dictionaries in agent loop |
+| `create_simulation` | Instantiation of generated type and initialization of its fields | Create new geometric runtime fields per simulation with `prepared = nothing` |
 
-Dynamische Vektoren und gegebenenfalls Dictionaries sind während Registrierung und äußerer Vorbereitung zulässig. Sie dürfen nicht die konkret typisierte Ablage ersetzen, die bei der Suche innerhalb einer Transition verwendet wird.
+Dynamic vectors and optionally dictionaries are allowed during registration and outer preparation. They must not replace the concretely typed storage used within a transition for searching.
 
-### 2.2 Zustands-, MPI- und Lebenszyklusmuster
+### 2.2 State, MPI, and Lifecycle Patterns
 
-- `AgentFields{T}` enthält getrennte Read-/Write-Daten sowie MPI-Verwaltung; `AgentMethods.jl` erzeugt spezialisierte Zugriffe einschließlich Mortalitätsbehandlung.
-- `prepare_write!` kann bei `add_existing = false` Read- und Write-Puffer ersetzen. Die geometrische Snapshot-Vorbereitung darf deshalb nicht unbesehen an der bisherigen Spatial-Position nach `prepare_write!` stehen bleiben.
-- Agententypen mit `:Independent` können Read-Daten während der Transition verändern. Suchpositionen und Projektionen müssen schon vorher als Snapshot gesichert sein.
-- `MPIinit.jl` stellt `mpi.comm`, `mpi.shmcomm`, Shared-memory-Rank und -Größe bereit. Vorhandene Topologieannahmen werden nicht nebenbei geändert.
-- `AgentMethods.jl` verwendet `MPI.Win_allocate_shared`, `MPI.Win_shared_query`, `MPI.Win_fence` und ausdrücklich `MPI.free`.
-- Auch im Einprozessfall verwendet vorhandener Agentencode MPI-Shared-memory-Operationen. Das erste geometrische Backend selbst benötigt dagegen keine zusätzlichen Shared-memory-Fenster: Es hält private KD-tree- und Nachbardaten. Die vorhandenen Agentenfenster bleiben unverändert.
-- `create_simulation` vermeidet parallele Simulation-Finalizer ausdrücklich. Neue kollektive Freigaben dürfen ebenfalls nicht dem Garbage Collector überlassen werden.
-- `copy_simulation` kopiert den Zustand und repariert bestehende Agentenfenster ausdrücklich. Zu Beginn der Funktion eine Prüfung von `sim.intransition` ergänzen: Während eines `apply!` wird das Kopieren grundsätzlich mit einem verständlichen Fehler abgelehnt, unabhängig davon, ob geometrische Nachbarschaften ausgewählt sind. Geometrische Laufzeitdaten leben ausschließlich innerhalb von `apply!`; beim zulässigen Kopieren außerhalb einer Transition ist daher `prepared = nothing`. Temporäre Geometriearrays, Indizes oder spätere Geometriefenster müssen nicht kopiert werden.
+- `AgentFields{T}` contains separate Read-/Write data as well as MPI management; `AgentMethods.jl` generates specialized accesses including mortality handling.
+- `prepare_write!` can replace Read and Write buffers when `add_existing = false`. Therefore, the geometric snapshot preparation must not silently remain at the previous spatial position after `prepare_write!`.
+- `:Independent` allows in-place updates. Neighbor data is collected from Read buffers before transitions; the searcher reads its state in its own callback before update (see D1).
+- `MPIinit.jl` provides `mpi.comm`, `mpi.shmcomm`, shared-memory rank and size. Existing topology assumptions are not changed incidentally.
+- `AgentMethods.jl` uses `MPI.Win_allocate_shared`, `MPI.Win_shared_query`, `MPI.Win_fence` and explicitly `MPI.free`.
+- Even in single-process case, existing agent code uses MPI shared-memory operations. The first geometric backend itself does not require additional shared-memory windows: it holds private KD-tree and neighbor data. Existing agent windows remain unchanged.
+- `create_simulation` explicitly avoids parallel simulation finalizers. New collective releases must also not be left to the garbage collector.
+- `copy_simulation` copies state and explicitly repairs existing agent windows. Add a check of `sim.intransition` at the beginning of the function: copying during an `apply!` is generally rejected with a comprehensible error, regardless of whether geometric neighborhoods are selected. Geometric runtime data lives exclusively within `apply!`; thus, when copying outside a transition is allowed, `prepared = nothing`. Temporary geometry arrays, indices or future geometry windows must not be copied.
 
-### 2.3 Was nicht als Vorlage übernommen werden soll
+### 2.3 What Should Not Be Used as Template
 
-Der aktuelle Code in `ConnectSpatial.jl` ist die fachliche Ausgangsbasis, aber nicht die gewünschte Speicherarchitektur:
+The current code in `ConnectSpatial.jl` is the functional starting point, but not the desired memory architecture:
 
-- `NeighborsInfo` und `sim.neighbors_infos` halten Daten pro Agententyp statt pro benannter Nachbarschaft.
-- `SpatialNeighbors` mischt Suchdefinition, KD-tree-Tuning und Cache-Identität.
-- `_get_ids_poss_states` und `join` replizieren vollständige Daten in privaten Vektoren jedes Ranks.
-- Die Typableitung über `Base.return_types(f)[1]` reicht nicht für eine validierte, nach Argumenttypen aufgelöste Registrierung.
-- Ganzzahlige Periodengrenzen werden erst beim KD-tree-Aufbau interpretiert.
-- Der KD-tree-Aufbau wird als Backendmechanismus weiterverwendet. Alte Cachetreffer und die alte typbasierte Ablage entfallen; Instrumentierung und Tests werden auf die neue registrierte API umgestellt.
+- `NeighborsInfo` and `sim.neighbors_infos` hold data per agent type instead of per named neighborhood.
+- `SpatialNeighbors` mixes search definition, KD-tree tuning and cache identity.
+- `_get_ids_poss_states` and `join` replicate complete data in private vectors on each rank.
+- Type derivation via `Base.return_types(f)[1]` is insufficient for a validated, argument-type-resolved registration.
+- Integral periodic boundaries are interpreted only at KD-tree construction time.
+- The KD-tree construction is reused as a backend mechanism. Old cache hits and the old type-based storage are discarded; instrumentation and tests will be migrated to the new registered API.
 
-Diese Mechanismen nicht bloß umbenennen. Die bestehende Graph-, MPI- und Modellarchitektur bleibt dagegen erhalten.
+These mechanisms should not merely be renamed. However, the existing graph, MPI, and model architecture remains intact.
 
-## 3. Vorgeschlagene Datei- und Modulaufteilung
+## 3. Proposed File and Module Splitting
 
-Vahana verwendet ein Modul mit nach Anliegen getrennten Quelldateien. Der Vorschlag bleibt bei diesem Muster und führt kein neues Submodul oder Pluginframework ein.
+Vahana uses a module with source files separated by concern. The proposal sticks to this pattern and does not introduce a new sub-module or plugin framework.
 
-| Datei | Geplante Verantwortung |
+| File | Planned Responsibility |
 |---|---|
-| `src/GeometricSpace.jl` (neu) | Raumtypen, Koordinatennormalisierung, Metrikvertrag, reine Hilfsfunktionen |
-| `src/GeometricNeighborhood.jl` (neu) | Fachliche Definition, Backendkonfigurationen, Registrierungsdeskriptoren, parametrisierte Laufzeitcontainer und Suchiteratoren |
-| `src/GeometricKDTree.jl` (neu) | Erstes Backend: private globale Replikation, KD-tree-Aufbau und Kandidatensuche unter der neuen API |
-| `src/ModelTypes.jl` | Neue Registrierungsvektoren und `register_geom_neighborhood!` einschließlich pipebarer Variante |
-| `src/GeometricMethods.jl` (neu) | Namenszugriff, lokale Snapshot-Erfassung und gemeinsame Schnittstelle der Suchfunktionen |
-| `src/GeometricMPI.jl` (später) | Shared-memory-Aufbau, hierarchische Replikation, Synchronisation und Freigabe für das zusätzliche Cell-list-Backend |
-| `src/Simulation.jl` | Generierte Geometriestruktur, Simulationinitialisierung, Auswahl und Lebenszyklus in `apply!` |
-| `src/Instrumentation.jl` | Neue Phasen-/Mechanismuslabels, Registrierung und Ausgabe der Ereignisse |
-| `src/REPL.jl` | Registrierte geometrische Nachbarschaften bei Modell und Simulation und konkrete geometrische Nachbarn in `show_agent` anzeigen |
-| `src/ConnectSpatial.jl` | KD-tree-Suchprinzip in das neue Backend überführen; alte API entfernen. Später gegebenenfalls Ort der neuen Komfortfunktion |
-| `src/Edge.jl`, `src/EdgeMethods.jl` | Separater späterer Schritt für `neighbors` und `neighbors_iter` |
-| `test/geometric_*.jl`, `test/mpi/test_geometric_*.jl` (neu) | Nach Anliegen getrennte Tests plus MPI-Wrapper im vorhandenen Stil |
+| `src/GeometricSpace.jl` (new) | Space types, coordinate normalization, metric contract, pure helper functions |
+| `src/GeometricNeighborhood.jl` | Domain-specific definition, `GeometricBackend`, registration descriptor and `NeighborhoodRuntime` |
+| `src/geom_backends/ReplicatedKDTree.jl` | Configuration present; private global replication, tree, exact hit indices and result accessors to be added |
+| `src/geom_backends/NodeSharedCellList.jl` (later) | Configuration, shared cell index and same backend hooks |
+| `src/ModelTypes.jl` | Registration vectors, `register_geom_neighborhood!` and call to backend validation |
+| `src/GeometricMethods.jl` (new) | Local collector, shared search path, `GeomNeighborIterator` and six public search functions |
+| `src/GeometricMPI.jl` (later) | Shared-memory construction, hierarchical replication, synchronization and release for the additional cell-list backend |
+| `src/Simulation.jl` | Generated geometric structure, simulation initialization, selection and lifecycle in `apply!` |
+| `src/Instrumentation.jl` | New phase/mechanism labels, registration and output of events |
+| `src/REPL.jl` | Display registered geometric neighborhoods at model and simulation level and concrete geometric neighbors in `show_agent` |
+| `src/ConnectSpatial.jl` | Transfer KD-tree search principle into new backend; remove old API. Optionally, location for new convenience functions later on |
+| `src/Edge.jl`, `src/EdgeMethods.jl` | Separate step later for `neighbors` and `neighbors_iter` |
+| `test/geometric_*.jl`, `test/mpi/test_geometric_*.jl` (new) | Concern-separated tests plus MPI wrapper in existing style |
 
-Die Dateinamen sind Umsetzungsvorschläge. Zusammenlegen kleiner Teile ist sinnvoll, wenn eine eigene Datei keine echte Zuständigkeit erhält.
+File names are implementation suggestions. Merging small parts is sensible if a separate file does not gain real responsibility.
 
-### Include-Reihenfolge
+### Include Order
 
-Aktuell wird `ConnectSpatial.jl` erst nach `Simulation.jl` eingebunden. Neue Typen in `ModelTypes`- oder Simulationfeldern müssen früher bekannt sein:
+Currently, `ConnectSpatial.jl` is included only after `Simulation.jl`. New types in `ModelTypes` or simulation fields must be known earlier:
 
-1. `GeometricSpace.jl` und die grundlegenden Typen aus `GeometricNeighborhood.jl` vor `ModelTypes.jl` einbinden.
-2. Generierungs- und Backendfunktionen spätestens vor der ersten Ausführung von `create_model` verfügbar machen.
-3. Typannotationen auf noch nicht definierte konkrete Typen vermeiden; keine zirkuläre Include-Abhängigkeit schaffen.
-4. Den bisherigen `ConnectSpatial.jl`-API-Pfad nicht als Legacy-Alternative erhalten. Falls die Datei zunächst noch Hilfsfunktionen enthält, deren verbleibende Includes ausdrücklich begründen; übernommenen KD-tree-Code in das neue Backend integrieren.
+1. Include `GeometricSpace.jl` and basic types from `GeometricNeighborhood.jl` before `ModelTypes.jl`.
+2. Backend methods dispatching on `GeometricRegistration` or `NeighborhoodRuntime` should be included only after these type definitions. The current early inclusion of `ReplicatedKDTree.jl` may need to be moved accordingly. Generation and backend functions must be available before first use of registration or `create_model`.
+3. Avoid type annotations for yet undefined concrete types; do not create circular include dependencies.
+4. Do not retain the former `ConnectSpatial.jl` API path as a legacy alternative. If the file initially still contains helper functions, explicitly justify remaining includes; integrate taken KD-tree code into the new backend.
 
-Neue Imports lokal nachvollziehbar halten. `StaticArrays`, `MPI` und `NearestNeighbors` existieren bereits als direkte Abhängigkeiten. Falls Distances direkt importiert wird, muss es ausdrücklich in `Project.toml` stehen; eine transitive Abhängigkeit nicht stillschweigend voraussetzen. Accessors wird für die Geometrieimplementierung nicht benötigt.
+Keep new imports local and traceable. `StaticArrays`, `MPI`, and `NearestNeighbors` already exist as direct dependencies. If `Distances` is imported directly, it must be explicitly listed in `Project.toml`; do not silently assume a transitive dependency. Accessors are not needed for the geometry implementation.
 
-## 4. Arbeitspaket A: Räume, Metriken und Hilfsfunktionen
+## 4. Work Package A: Spaces, Metrics and Helper Functions
 
-### A1. Parametrische Raumtypen
+### A1. Parametric Space Types
 
-- `GeometricSpace` als abstrakten Basistyp sowie `GridSpace` und `ContinuousSpace` implementieren.
-- Metrik, Dimensionszahl, Grenzen und Periodizität mit konkreten Typen speichern. Weder eine Positionsfunktion noch einen skalaren Positionskoordinatentyp im Raum ablegen; auch keinen Phantom-Typparameter dafür vorsehen.
-- Konstruktoren mit Grenzpaaren pro Dimension und `Bool` beziehungsweise `NTuple{N,Bool}` für Periodizität anbieten.
-- Dimension ausschließlich aus der Anzahl der Grenzpaare bestimmen. Keine explizite Koordinatentypvorgabe wie `GridSpace{Int32}(...)` anbieten. Der Speichertyp der Grenzen legt den Positionskoordinatentyp nicht fest. Für die Hilfsfunktionen gelten die eingabebasierten Typregeln aus A4.
-- Unterstützte feste Ganzzahl-/Gleitkommatypen bei Positionsargumenten der Hilfsfunktionen prüfen; keine automatische Öffnung für beliebige `Number`-Typen.
+- Implement `GeometricSpace` as an abstract base type along with `GridSpace` and `ContinuousSpace`.
+- Store metric, number of dimensions, bounds and periodicity using concrete types. Do not store a position function or scalar positional coordinate type in the space; also do not provide a phantom type parameter for that.
+- Offer constructors with bound pairs per dimension and `Bool` or `NTuple{N,Bool}` for periodicity.
+- Determine dimension solely from the number of bound pairs. Do not offer explicit coordinate type specification like `GridSpace{Int32}(...)`. The storage type of bounds does not determine the positional coordinate type. For helper functions, apply input-based typing rules from A4.
+- Check supported fixed integer/float types for position arguments in helper functions; do not automatically widen to arbitrary `Number` types.
 
-Arbeitspaket A benötigt weder Agententypen noch Positionsfunktionen oder eine Nachbarschaftsregistrierung. Die Ableitung des Koordinatentyps aus der `posfunc` einer Nachbarschaft gehört ausschließlich zu Arbeitspaket B.
+Work package A requires neither agent types nor position functions or neighborhood registration. Deriving coordinate type from a neighborhood's `posfunc` belongs exclusively to work package B.
 
-### A2. Numerik und Grenzen
+### A2. Numerics and Bounds
 
-- Gridperioden inklusive oberer Grenze; kontinuierliche Perioden ohne zusätzliches `+1`.
-- Nichtperiodische Überschreitungen standardmäßig zurückweisen; bei `geom_wrap` über ein zusätzliches Bool-Argument ausdrücklich koordinatenweises Begrenzen ermöglichen. Periodische Normalisierung zentral bereitstellen.
-- Bei kontinuierlichen nichtperiodischen Achsen beide geometrischen Randflächen für `geom_wrap` und `geom_move` zulassen.
-- Koordinatenspeicherung schmal halten, Zwischenrechnungen und Zellindizes jedoch sicher verbreitern.
-- Grenzkonvertierung, Überlauf, `NaN`, unendliche Werte, Dimension und ungültige Raumintervalle prüfen.
-- Volle Wertebereiche schmaler Integer testen: Schon die Periodenlänge kann nicht mehr in den Koordinatentyp passen.
+- Grid periods including upper bound; continuous periods without additional `+1`.
+- Non-periodic overflows default to rejection; allow explicit coordinate-wise bounding via an additional bool argument in `geom_wrap`. Centralize periodic normalization.
+- Allow both geometric boundary surfaces for continuous non-periodic axes in `geom_wrap` and `geom_move`.
+- Keep coordinate storage narrow, but widen intermediate calculations and cell indices safely.
+- Check bound conversion, overflow, `NaN`, infinite values, dimension and invalid space intervals.
+- Test full value ranges of narrower integers: Even the period length may no longer fit into the coordinate type.
 
-### A3. Metrikvertrag
+### A3. Metric Contract
 
-Exakte Distanz nach periodischer Differenzbildung für euklidische, Cityblock-/Manhattan- und Chebyshev-Distanzen implementieren. Gewichtete Metriken sind nicht Bestandteil von Arbeitspaket A. Nur Metriken zulassen, bei denen komponentenweises Minimum Image korrekt ist.
+Implement exact distance using periodic difference computation for Euclidean, Cityblock/Manhattan, and Chebyshev distances. Weighted metrics are not part of work package A. Only allow metrics where component-wise minimum image is correct.
 
-Unbekannte oder nicht unterstützte Kombinationen früh mit verständlicher Meldung zurückweisen. Die konservative achsenweise Suchausdehnung für einen Radius wird erst für die Cell List in Arbeitspaket E2 implementiert und gehört nicht zur Abnahme von A.
+Reject unknown or unsupported combinations early with a clear message. Conservative axis-wise search extent for a radius will be implemented later in work package E2 and does not belong to the acceptance criteria of A.
 
-### A4. Öffentliche Hilfsfunktionen
+### A4. Public Helper Functions
 
-- `geom_move(space, pos, move_vector)`: gemeinsamer Streckenparameter bis zum ersten begrenzenden nichtperiodischen Randkontakt; kein Weiterrutschen und keine Reflexion.
-- `geom_displacement(space, from, to)`: gerichtete Differenz einschließlich Minimum Image; gegebenenfalls breiterer Ergebnistyp. Bei genau einer halben Periodenlänge das Vorzeichen der ursprünglichen Differenz beibehalten; Vertauschen der Endpunkte kehrt das Vorzeichen um.
-- `geom_distance(space, a, b)`: dieselbe Metrik- und Periodizitätssemantik wie im Backend. Für `Euclidean` und für alle Metriken im `ContinuousSpace` ist der Rückgabetyp `Float64`; `Cityblock` und `Chebyshev` liefern im `GridSpace` den Integer-Rechentyp von `geom_displacement`, ohne zusätzliche Verbreiterung. Bei `Euclidean` vor dem Quadrieren nach `Float64` konvertieren und die Quadratwurzel der Quadratsumme verwenden; Über-/Unterlauf extremer Gleitkommawerte wird nicht durch eine robuste Normberechnung vermieden. Die Integer-Manhattan-Summe in einer Schleife berechnen und ihre Darstellbarkeit vor jeder Addition ausschließlich mit `@mayassert` prüfen. Bei deaktivierten Assertions darf die Summe den Ergebnistyp nicht überschreiten.
-- `geom_wrap(space, pos, clamp_nonperiodic::Bool=false)` als verbindliche öffentliche API anbieten. Periodische Achsen immer normalisieren. Bei `clamp_nonperiodic=false` nichtperiodische Überschreitungen zurückweisen; bei `true` nichtperiodische Koordinaten auf die Grenzen begrenzen. Keine separate Funktion `geom_clamp` anbieten. Wrapping über mehrere Perioden, gemischte Periodizität, ungültige Eingaben sowie beide Verhaltensweisen bei nichtperiodischen Überschreitungen testen.
-- `geom_isvalidposition(space, pos)` als verbindliche öffentliche API anbieten: Korrekte Dimension und unterstützte Koordinatenkategorie sind Vorbedingungen und werden mit `@mayassert` geprüft (`AssertionError` bei aktivierten Assertions). Für solche wohlgeformten Positionen liefert die Funktion einen `Bool`: `false` bei nicht endlichen Werten oder außerhalb des gültigen Positionsbereichs, andernfalls `true`.
+- `geom_move(space, pos, move_vector)`: common path parameter to the first limiting nonperiodic boundary contact; no sliding or reflection.
+- `geom_displacement(space, from, to)`: directed difference including minimum image; result type may be wider as needed. For exactly one half-period length, preserve the sign of the original difference; swapping endpoints flips the sign.
+- `geom_distance(space, a, b)`: same metric and periodicity semantics as in the backend. For `Euclidean` and all metrics in `ContinuousSpace`, the return type is `Float64`; `Cityblock` and `Chebyshev` in `GridSpace` return the integer computation type of `geom_displacement`, without additional widening. For `Euclidean`, convert to `Float64` before squaring and use square root of sum of squares; over/underflow of extreme floating-point values is not avoided by a robust norm calculation. Compute the integer Manhattan sum in a loop and check its representability exclusively with `@mayassert` before each addition. With disabled assertions, the sum must not exceed the result type.
+- `geom_wrap(space, pos, clamp_nonperiodic::Bool=false)` as mandatory public API to offer. Normalize periodic axes always. When `clamp_nonperiodic=false`, reject nonperiodic overflows; when `true`, clamp nonperiodic coordinates to the limits. Do not provide a separate function `geom_clamp`. Test wrapping across multiple periods, mixed periodicity, invalid inputs, and both behaviors for nonperiodic overflows.
+- `geom_isvalidposition(space, pos)` as mandatory public API to offer: correct dimension and supported coordinate category are preconditions checked with `@mayassert` (`AssertionError` when assertions are enabled). For well-formed positions, the function returns a `Bool`: `false` for non-finite values or outside the valid position range, otherwise `true`.
 
-**Verbindliche Typregeln:** `geom_wrap` und `geom_move` liefern einen `SVector` mit dem Koordinatentyp von `pos`. Der Typ des Bewegungsvektors darf die Zwischenrechnung verbreitern, nicht den Ziel-Koordinatentyp ändern. `geom_displacement` verwendet einen gemeinsamen, nötigenfalls für überlaufsichere Differenzen verbreiterten Rechentyp beider Positionen. `geom_distance` liefert für `Euclidean` und im `ContinuousSpace` immer `Float64`, für `Cityblock` und `Chebyshev` im `GridSpace` den Integer-Rechentyp von `geom_displacement`; `geom_isvalidposition` liefert für wohlgeformte Positionen einen `Bool` und prüft Dimension und Koordinatenkategorie mit `@mayassert`. Am Raum gibt es keine explizite Positionskoordinatentypvorgabe. Diese Regeln benötigen keine `posfunc`, hängen nicht von registrierten Nachbarschaften ab und verändern das Raumobjekt nicht. Zulässige Koordinatenkategorien und Darstellbarkeit weiterhin prüfen; die ausdrücklich vorgesehene Rasterrundung in `geom_move` bleibt erhalten.
+**Mandatory Type Rules:** `geom_wrap` and `geom_move` return an `SVector` with the coordinate type of `pos`. The movement vector's type may widen intermediate computations but must not change the target coordinate type. `geom_displacement` uses a common, potentially widened computation type for both positions to ensure overflow safety. `geom_distance` returns `Float64` for `Euclidean` and in `ContinuousSpace`, and the integer computation type of `geom_displacement` for `Cityblock` and `Chebyshev` in `GridSpace`. `geom_isvalidposition` returns a `Bool` for well-formed positions and checks dimension and coordinate category with `@mayassert`. There is no explicit position coordinate type specification on the space. These rules do not require `posfunc`, do not depend on registered neighborhoods, and do not modify the space object. Continue to check valid coordinate categories and representability; the explicitly intended grid rounding in `geom_move` remains unchanged.
 
-Die Tests müssen insbesondere unterschiedliche Typen von Ausgangsposition und Bewegungsvektor, die Unabhängigkeit des Positionskoordinatentyps vom Grenztyp, sichere Differenzen schmaler Koordinaten, die raum- und metrikabhängigen Rückgabetypen von `geom_distance` einschließlich der `@mayassert`-Überlaufprüfung für die Integer-Manhattan-Summe, die öffentliche Positionsvalidierung sowie die Unabhängigkeit von Nachbarschaftsregistrierungen abdecken.
+Tests must especially cover different types of input positions and movement vectors, independence of position coordinate type from boundary type, safe differences with narrow coordinates, space- and metric-dependent return types of `geom_distance`, including `@mayassert` overflow checks for integer Manhattan sum, public position validation, and independence from neighborhood registrations.
 
-Bei `geom_move` im GridSpace erst den geometrischen Schnittpunkt berechnen, dann runden, normalisieren und die gültige Rasterposition sicherstellen. Mit Julias `RoundNearest` runden, bei Gleichstand zur geraden Ganzzahl; diese Konvention explizit testen. Die Warnung nur bei tatsächlicher Rundung mit `maxlog=1` ausgeben, ohne Kollektive im Bewegungsaufruf. Diese Begrenzung gilt unter MPI pro Prozess/Logger, nicht global.
+For `geom_move` in GridSpace, compute the geometric intersection first, then round, normalize, and ensure a valid grid position. Round using Julia's `RoundNearest` to the nearest even integer; explicitly test this convention. Emit warning only on actual rounding with `maxlog=1`, without collective operations in movement calls. This limitation applies per process/logger under MPI, not globally.
 
-**Abnahme A:** unabhängige Tests der Geometrie ohne Simulation, Nachbarschaftsindex oder neue Kommunikationsoperationen.
+**Acceptance A:** independent tests of geometry without simulation, neighborhood indexing, or new communication operations.
 
-## 5. Arbeitspaket B: Registrierung und Typableitung (abgeschlossen)
+## 5. Work Package B: Registration and Type Derivation (completed)
 
-### B1. Definitionen und Metadaten
+### B1. Definitions and Metadata
 
-- `GeometricNeighborhood` parametrisch für Raum, `posfunc`, Filter und Projektion anlegen. Die Agententypen stehen in Typvektoren; Radius und Gewicht werden als `Float64` gespeichert. Die reine Positionsfunktion auf dem lesbaren Snapshot muss alle beteiligten Query- und Neighbor-Typen unterstützen.
-- `weight`, `project_type` und Defaults entsprechend dem API-Entwurf unterstützen.
-- `GeometricRegistration` als Registrierungsdeskriptor mit `name`, `definition`, `backend`, `coordinate_type` und `project_type` vorsehen. Backendkonfiguration und ermittelte Typparameter neben der fachlichen Definition speichern.
-- In `ModelTypes` einen Vektor `geom_neighborhoods::Vector{GeometricRegistration}` für benannte Nachbarschaften ergänzen, analog zu `params` und `globals`.
-- Räume werden nicht separat registriert oder in einer eigenen Modellliste verwaltet. Der Raum ist direkt über `definition.space` erreichbar; ein `space_index` entfällt.
-- Derselbe Raum darf von mehreren Nachbarschaften mit unterschiedlichen `posfunc`s referenziert werden, beispielsweise Wohnungs- und Arbeitsplatzposition derselben Person. Positionszuordnung und abgeleiteter Koordinatentyp bleiben nachbarschaftsspezifisch; unterschiedliche zulässige Koordinatentypen sind möglich.
+- Create `GeometricNeighborhood` parametrically for space, `posfunc`, `neighbor_filter`, and projection. Agent types are stored in type vectors; radius and weight are stored as `Float64`. The pure position function on the readable snapshot must support all involved Query and Neighbor types.
+- Support `weight`, `project_type`, and defaults according to the API design.
+- Define `GeometricRegistration` as a registration descriptor with `name`, `definition`, `backend`, `coordinate_type`, and `project_type`. Store backend configuration and derived type parameters alongside the functional definition.
+- Add a vector `geom_neighborhoods::Vector{GeometricRegistration}` for named neighborhoods in `ModelTypes`, similar to `params` and `globals`.
+- Spaces are not separately registered or managed in their own model list. The space is directly accessible via `definition.space`; a `space_index` is omitted.
+- The same space may be referenced by multiple neighborhoods with different `posfunc`s, for example, housing and workplace positions of the same person. Position mapping and derived coordinate type remain neighborhood-specific; different valid coordinate types are allowed.
 
-### B2. Registrierungsfunktionen
+### B2. Registration Functions
 
 ```julia
 register_geom_neighborhood!(types, :food, definition; backend = ReplicatedKDTree())
 register_geom_neighborhood!(:food, definition; backend = ReplicatedKDTree())
 ```
 
-Die zweite Form liefert wie andere `register_*`-Funktionen eine Funktion für die Pipeline. Sie ruft dieselbe Registrierung auf, die `types` zurückgibt.
+The second form returns a function for the pipeline like other `register_*` functions. It calls the same registration that returns `types`.
 
-Die Registrierung prüft eindeutige Namen und dass alle angegebenen Agententypen bereits in `ModelTypes` registriert sind. Mortalität und Agentenhints werden dort abgelegt, nicht erneut in der Nachbarschaft.
+Registration checks unique names and ensures all specified agent types are already registered in `ModelTypes`. Mortality and agent hints are stored there, not re-registered in the neighborhood.
 
-**Positions- und Koordinatentypableitung:** Für jeden beteiligten Query- und Neighbor-Typ den konkreten Rückgabetyp der `posfunc` per Compilerinferenz ermitteln. Bei Tupeln die Komponententypen promoten, sonst den Elementtyp verwenden. Den Koordinatentyp je Agententyp gegen die zulässige Raumkategorie prüfen und daraus einen gemeinsamen konkreten Typ ableiten. Dieser steht in den Registrierungsmetadaten; das geteilte Raumobjekt bleibt unverändert. Dazu werden keine Beispielagenten benötigt.
+**Position and Coordinate Type Derivation:** For each involved Query and Neighbor type, determine the concrete return type of `posfunc` via compiler inference. Use the element type and check with `@mayassert` that all axes have the same type for tuples. Check the coordinate type per agent type against the allowed space category and only promote between agent types to a common concrete type. This is stored in registration metadata; the shared space object remains unchanged. No example agents are needed for this.
 
-**Bewusst schlanke Eingabeprüfung:** Passende Positionsform und -dimension, boolesche Filter, endlicher nichtnegativer Radius und ebensolches Gewicht sowie sinnvolle Backendparameter sind Voraussetzungen für die Nutzung. Die Registrierung prüft sie nicht eigens. Separate Negativtests für diese Fälle sind keine Abnahmebedingung für B. Die Regeln für die Raumhilfsfunktionen aus Paket A bleiben unverändert.
+**Conscious lightweight input validation:** Matching position form and dimension, a boolean neighbor filter, finite non-negative radius, and equally valid weight as well as sensible backend parameters are prerequisites for usage. The registration does not check these specifically. Separate negative tests for these cases are not a requirement for B. The rules for the spatial helper functions from package A remain unchanged.
 
-### B3. Projektionstyp übernehmen oder ableiten
+### B3. Adopt or derive projection type
 
-- Einen expliziten `project_type` direkt übernehmen. Einen konkreten, zu den tatsächlichen Projektionsergebnissen passenden Typ anzugeben ist Aufgabe der Modelldefinition.
-- Ohne Vorgabe per argumenttypspezifischer Compilerinferenz denselben konkreten Rückgabetyp für alle Nachbartypen verlangen. Andernfalls mit einem Hinweis auf `project_type` abbrechen.
-- Projektion nicht auf Beispielzuständen ausführen; leere Populationen sind irrelevant für die Typableitung.
+- Accept an explicit `project_type` directly. Specifying a concrete type that matches the actual projection results is the task of the model definition.
+- Without specification via argument-type-specific compiler inference, require the same concrete return type for all neighbor types. Otherwise, abort with a note to `project_type`.
+- Do not perform projection on example states; empty populations are irrelevant for type derivation.
 
-**Abnahme B:** Die Smoke-Tests in `test/geometric_neighborhood.jl` decken direkte und pipebare Registrierung, doppelte Namen, fehlende Agententypen, Koordinatentypableitung, implizite und explizite Projektionstypen sowie `ReplicatedKDTree` als erste Backendkonfiguration ab. Backend- und MPI-Anforderungen an die Datenübertragung gehören zu D und E.
+**Acceptance B:** The smoke tests in `test/geometric_neighborhood.jl` cover direct and pipeable registration, duplicate names, missing agent types, coordinate type derivation, implicit and explicit projection types, as well as `ReplicatedKDTree` as the first backend configuration. Backend and MPI requirements for data transfer belong to D and E.
 
-## 6. Arbeitspaket C: Codegenerierung und typisierter Feldzugriff
+## 6. Work Package C: Code generation and typed field access
 
-### C1. Modellbenannte Feldstruktur
+### C1. Model-named field structure
 
-In `create_model` vor dem Simulationstyp eine Struktur etwa mit dem Namen `GeomNeighborhoods_<Modellname>` erzeugen. Jedes registrierte Symbol erhält ein Feld mit konkretem `NeighborhoodFields{D,P}`-Typ.
+Create a structure named `GeomNeighborhoods_<Modelname>` in `create_model` before the simulation type. Each registered symbol gets a field with a concrete `NeighborhoodRuntime{R,P}` type.
 
-Die Struktur nach dem bestehenden `Expr`-/`@kwdef`-/`eval`-Muster erzeugen. Die Felddefinition im Simulationstyp muss den erzeugten konkreten Typ tragen, nicht einen abstrakten Geometriecontainer.
+Generate the structure following the existing `Expr`-/`@kwdef`-/`eval` pattern. The field definition in the simulation type must carry the generated concrete type, not an abstract geometry container.
 
-`NeighborhoodFields` enthält:
+`NeighborhoodRuntime` contains exactly `registration::R` and `prepared::Union{Nothing,P}`. `R` already includes definition, backend configuration, and resolved types. `P` comes from `geom_prepared_type(registration)`.
 
-- die ursprüngliche `GeometricNeighborhood`-Definition;
-- die konkrete Backendkonfiguration beziehungsweise Zugriff darauf;
-- `prepared::Union{Nothing,P}`;
-- nötigenfalls statische Raum-/Typmetadaten aus der Registrierung neben der ursprünglichen Definition.
+`create_simulation` generates new runtime containers for each simulation. Do not embed a mutable runtime instance as a shared model default.
 
-`create_simulation` erzeugt für jede Simulation neue Laufzeitcontainer. Keine mutable Runtime-Instanz als gemeinsam wiederverwendeten Modelldefault einbetten.
+### C2. Inferable name access
 
-### C2. Inferierbarer Namenszugriff
+Name resolution uses the generic field access `getfield(sim.geom_neighborhoods, name)`. A test run under Julia 1.12.6 showed that this access is inferable in an `apply!` transition for two literal names with different field types. For this, neither a `Val` dispatch nor a custom method generator is needed. The selection of neighborhoods before the agent loop may remain dynamic.
 
-Die Namensauflösung verwendet den generischen Feldzugriff `getfield(sim.geom_neighborhoods, name)`. Ein Testlauf unter Julia 1.12.6 hat in einer `apply!`-Transition für zwei literale Namen mit unterschiedlichen Feldtypen gezeigt, dass dieser Zugriff inferierbar ist. Dafür sind weder ein `Val`-Dispatch noch ein eigener Methodengenerator nötig. Die Auswahl von Nachbarschaften vor der Agentenschleife darf dynamisch bleiben.
+The public search API remains `(sim, id, :name)`, without additional transition arguments. C2 only checks the type inference of name access. Snapshot capture, search core, and the six search variants belong to D; preparation and release are included in F within `apply!`.
 
-Die öffentliche Such-API bleibt `(sim, id, :name)`, ohne zusätzliches Transition-Argument. C2 prüft nur die Typinferenz des Namenszugriffs. Snapshot-Erfassung, Suchkern und die sechs Suchvarianten gehören zu D; Vorbereitung und Freigabe werden in F in `apply!` eingebunden.
+### C3. Model lifetime and copies
 
-### C3. Modelllebensdauer und Kopien
+- The geometric structure is fixed at model creation; later mutation of underlying metadata must not silently alter the already generated schema.
+- Test multiple models with different names and multiple simulations of the same model.
+- Immediately at the start of `copy_simulation`, before copy or resource operations, check `sim.intransition` and throw a comprehensible error if `true`. Copying during a transition is generally prohibited, not just when active geometry is involved.
+- Outside of a transition, `copy_simulation` must find `prepared = nothing` and create independent geometric containers. Since all temporary geometric data lives only within `apply!`, no copying strategy for active geometric resources or special checks for active geometric windows are required.
+- No temporary indices or windows persist in HDF5 snapshots; rebuild them upon restart based on the model.
 
-- Die Geometriestruktur wird beim Modellbau fixiert; spätere Mutation der zugrunde liegenden Metadaten darf das bereits erzeugte Schema nicht unbemerkt verändern.
-- Mehrere Modelle mit verschiedenen Namen und mehrere Simulationen desselben Modells testen.
-- Direkt am Anfang von `copy_simulation`, vor Kopier- oder Ressourcenoperationen, `sim.intransition` prüfen und bei `true` einen verständlichen Fehler auslösen. Kopieren während einer Transition ist grundsätzlich unzulässig, nicht nur bei aktiver Geometrie.
-- Außerhalb einer Transition muss `copy_simulation` `prepared = nothing` vorfinden und unabhängige Geometriecontainer erzeugen. Da alle temporären Geometriedaten nur innerhalb von `apply!` leben, ist keine Kopierstrategie für aktive Geometrieressourcen und keine gesonderte Prüfung auf aktive Geometriefenster erforderlich.
-- Keine temporären Indizes oder Fenster in HDF5-Snapshots persistieren; beim Wiederanlauf anhand des Modells neu aufbauen.
+**Acceptance C:** concrete generated field types, inferable access with literal names from a transition, and no unintended shared simulation resources. The inference of search results is part of D.
 
-**Abnahme C:** konkrete generierte Feldtypen, inferierbarer Zugriff mit literalen Namen aus einer Transition und keine ungewollt geteilten Simulationsressourcen. Die Inferenz der Suchergebnisse ist Teil von D.
+## 7. Work Package D: Local snapshots and first KD-tree backend
 
-## 7. Arbeitspaket D: lokale Snapshots und erstes KD-tree-Backend
+Signatures and responsibilities are defined in the [internal backend contract of the API design](geometric_neighborhood_api.md#internal-backend-contract). D implements it initially for `ReplicatedKDTree`. The shared code passes the `NeighborhoodRuntime`; a method with `sim` always takes it as the first argument.
 
-### D1. Snapshot-Erfassung
+### D1. Collect local neighbor data
 
-Für jede ausgewählte Nachbarschaft:
+Before transitions, for each selected neighborhood, read live local neighbors from the read buffers (`read.state` and `read.died`). Filter them via `neighbor_filter` and collect per neighbor position (`posfunc`), existing agent ID, and projection. For this, reuse the local collection kernel from `ConnectSpatial.jl` as a shared helper `geom_collect_local_neighbors(sim, registration)`. `geom_prepare!(sim, runtime)` calls it and handles the MPI replication from D2; the helper itself does not communicate.
 
-- Nur lebende Agenten lesen; Read-State und Read-Died verwenden.
-- AgentIDs über die vorhandene Typ-/Rank-/AgentNr-Kodierung erzeugen.
-- Gesuchte Agenten nach `neighbor_filter` auswählen; Position über die `posfunc` der Nachbarschaft, ID und Projektion einmal erfassen.
-- Für lokale suchende Agenten `query_filter` und Suchposition über dieselbe nachbarschaftsspezifische `posfunc` vor der Transition sichern.
-- Suchpuffer anhand von AgentNr zuordnen, sodass die Suche nicht erst den möglicherweise schon veränderten Agentenzustand lesen muss.
-- Bei mehreren Query-Typen typisierte Teilpuffer erzeugen; keinen `Dict{DataType,Any}` in den inneren Suchpfad einführen.
-- Ein nicht durch Query-Filter zugelassener Agent erhält einen leeren Iterator; eine nicht zur ausgewählten Nachbarschaft passende ID muss dagegen als Fehlgebrauch erkannt werden.
+The search uses the ID of the currently executing agent and determines the search position with `posfunc` from its read state. The query type is checked with `@mayassert`. Whether to search is decided by the model transition; a separate query buffer is not needed.
 
-Dies schützt die Snapshot-Semantik auch bei `:Independent`, neuen Agenten während einer Transition und mehreren nacheinander aktivierten Agententypen.
+For `:Independent`, the own new state is written only after the callback. A neighborhood where the same `:Independent` type both searches and appears as neighbor is already rejected at registration.
 
-### D2. Globale Replikation pro Rank
+### D2. Global replication per rank
 
-Das bisherige Prinzip aus `_agents_ids_states_and_edges`, `_get_ids_poss_states` und `join` auf die registrierte Nachbarschaft übertragen:
+Transfer the existing principle from `_agents_ids_states_and_edges`, `_get_ids_poss_states`, and `join` to the registered neighborhood:
 
-- Gefilterte lokale Neighbor-Positionen, IDs und Projektionen auf allen Ranks in identischer Reihenfolge zusammenführen.
-- Alle Ranks halten private globale Nachbardaten. Dies ist beim ersten Backend ausdrücklich beabsichtigt, nicht bereits die spätere Speicheroptimierung.
-- Vorhandenen `join`-Mechanismus soweit passend wiederverwenden; seine `Int32`-Größenlimits kontrolliert prüfen. Größen-, Positions-, ID- und Projektionskollektive dürfen nicht aufgrund lokaler Leerheit übersprungen werden.
-- Query-Positionen bleiben lokale Snapshots; sie müssen nicht global repliziert werden.
-- Nullbyte-Projektionen ohne ungültigen MPI-Datentyp behandeln; leere globale Nachbarmengen erhalten einen konkret typisierten leeren Vorbereitungszustand.
-- Kein Cache und kein `snhash`; jeder ausgewählte `apply!`-Aufruf erfasst und repliziert neu.
+- Gather filtered local neighbor positions, IDs and projections from all ranks in identical order.
+- All ranks maintain private global neighbor data. This is explicitly intended for the first backend, not yet a later memory optimization.
+- Reuse existing `join` mechanism where appropriate; carefully check its `Int32` size limits. Size, position, ID and projection collectives must not be skipped due to local emptiness.
+- Handle null-byte projections without invalid MPI data type; empty global neighbor sets receive a concrete typed empty preparation state.
+- No cache and no `snhash`; each selected `apply!` call records and replicates anew.
 
-### D3. KD-tree-Aufbau und Suchadapter
+### D3. KD-tree construction and search adapter
 
-- Das Suchprinzip `KDTree`/`inrange` aus `ConnectSpatial.jl` übernehmen, aber keine alte API-Abhängigkeit, typbasierte Ablage oder alte Grenzheuristik.
-- Backendparameter `leafsize` und `reorder` in `ReplicatedKDTree` kapseln. Raum, Metrik und Periodizität kommen aus der neuen Raumdefinition.
-- Suchmatrix und Reihenfolge von IDs/Projektionen konsistent halten. Die durch die Bibliothek verwendeten Originalindizes insbesondere bei `reorder = true` testen.
-- Den konkreten Baum-/Vorbereitungstyp beim Modellbau bestimmen, auch für leere Populationen. Wenn unterschiedliche Raum-/Metriktypen verschiedene KD-tree-Typen erzeugen, diese über die feste Registrierung spezialisieren, nicht in `Any` ablegen.
-- Alle sechs `geom_*`-Funktionen über dieselbe Kandidatensuche bereitstellen; nur die Ergebnisansicht unterscheiden. Mit `@inferred` prüfen, dass literale Namen im öffentlichen Suchpfad zu konkreten Ergebnisvektoren und Iteratoren führen, jeweils mit und ohne Treffer. In F auch aus einer integrierten `apply!`-Transition prüfen.
-- Die Bibliothek kann Trefferindizes als Vektor materialisieren; die `_iter`-API verspricht keinen insgesamt allokationsfreien Suchvorgang, sondern vermeidet den zusätzlichen Ergebnisvektor.
-- Kandidaten gegen den zentralen exakten Raumabstand prüfen, Selbst-ID ausschließen und periodische Duplikate nach ursprünglichem Agentenindex vermeiden.
+- Adopt the search principle `KDTree`/`inrange` from `ConnectSpatial.jl`, but without old API dependency, type-based storage or old boundary heuristic.
+- Encapsulate backend parameters `leafsize` and `reorder` in `ReplicatedKDTree`. Space, metric and periodicity come from the new space definition.
+- Keep search matrix and order of IDs/projections consistent. Test original indices used by the library, especially with `reorder = true`.
+- Implement `geom_prepared_type(registration)` for the concrete KD-tree state, also for empty populations. Specialize tree and array types via fixed registration, not store in `Any`. `geom_prepare!(sim, runtime)` returns this state.
+- Internally check candidates against exact spatial distance in `geom_hits(runtime, id, position)`, exclude self-ID and avoid periodic duplicates. Only output exact hit indices. The library may internally materialize an index vector for this.
+- Implement `geom_neighbor_id`, `geom_neighbor_projection` and `geom_neighbor_pair` in the backend. All read at given hit index without re-search. The pair variant accesses the backend layout directly.
+- Generate three specialized variants of `GeomNeighborIterator` from the same hit source in common code. Vector variants collect with `collect`. Check literal names with and without hits using `@inferred`, also in integrated `apply!` transitions.
 
-**Kompatibilitätsprüfung vor der Umsetzung:** Die bisherigen `_create_kdtree!`-Annahmen reichen für die neue API nicht. Im installierten `NearestNeighbors` insbesondere ganzzahlige/schmale Baumkoordinaten, mehrere periodische Achsen, gemischte Periodizität und die vereinbarten Metriken prüfen. Für nicht direkt unterstützte periodische Fälle einen korrekten KD-tree-Adapter entwerfen, beispielsweise normierte Grundpositionen mit periodischen Query-Bildern und Kandidatendeduplizierung. Für die Bibliothek nötige breitere Arbeitskoordinaten von den deklarierten Raum-/Positionsspeichertypen trennen und deren Speicherbedarf offenlegen.
+**Compatibility check before implementation:** Current `_create_kdtree!` assumptions are insufficient for new API. In installed `NearestNeighbors`, especially check integer/narrow tree coordinates, multiple periodic axes, mixed periodicity and agreed metrics. Design a correct KD-tree adapter for unsupported periodic cases, e.g., normalized base positions with periodic query images and candidate deduplication. Separate broader working coordinates needed by the library from declared space/position storage types and expose their memory requirements.
 
-Nicht unterstützte Kombinationen bei der Registrierung klar melden, nicht stillschweigend Periodizität oder Metrik ändern. Die zugesagten Raum-/Metrikfälle müssen zum API-Abnahmemeilenstein entweder korrekt angebunden oder als ausdrücklich noch nicht unterstützte Backendkombination dokumentiert sein.
+Clearly report unsupported combinations in `geom_validate_backend(registration)`, do not silently change periodicity or metric. The promised space/metric cases must either be correctly connected or explicitly documented as unsupported backend combinations at API acceptance milestone.
 
-### D4. Ressourcen und Abnahme
+### D4. Resources and acceptance
 
-`prepared` enthält für dieses Backend private globale Arrays, den Baum, lokale Query-Snapshots und nötige Indexzuordnungen. Nach `apply!` Referenzen freigeben und `prepared = nothing` setzen. Keine eigenen Geometrie-Shared-memory-Fenster oder Leader-Kommunikatoren anlegen.
+`prepared` contains private global neighbor arrays, the tree and necessary index mappings for this backend. The KD-tree backend does not need to release its own MPI resources in hook `geom_release!(sim, runtime)`. The common lifecycle then sets `runtime.prepared = nothing`.
 
-**Abnahme D zusammen mit F/G:** neue API mit KD-tree-Backend in echten `apply!`-Transitionen erproben, seriell und mit MPI gegen eine vollständige Referenzsuche vergleichen. Alle sechs Zugriffsformen, Registrierung, Filter, Projektionen, Snapshot-Semantik, Hilfsfunktionen und Ressourcenlebensdauer prüfen. Erst nach diesem eigenständigen Meilenstein mit weiteren Backends beginnen. Die vollständige Referenz bleibt Testcode, kein zweites Produktionsbackend.
+**Acceptance D together with F/G:** test new API with KD-tree backend in real `apply!` transitions, serially and with MPI compared against a full reference search. Check all six access forms, registration, filtering, projections, snapshot semantics, helper functions and resource lifecycle. Begin only after this independent milestone with further backends. The full reference remains test code, not a second production backend.
 
-## 8. Späteres Arbeitspaket E: node-local shared Cell List
+## 8. Later work package E: node-local shared Cell List
 
-**Dieses Paket beginnt erst nach erfolgreicher Erprobung der neuen API mit `ReplicatedKDTree`.** Es ersetzt nicht die neue API, sondern ergänzt ein weiteres registrierbares Backend mit anderem konkretem `prepared`-Typ. Die Arbeitspakete F/G sind bereits für das erste KD-tree-Backend erforderlich.
+**This package starts only after successful testing of the new API with `ReplicatedKDTree`.** It adds another registrable backend with its own `prepared` type and same hooks. `GeomNeighborIterator` and the six public functions remain unchanged. Work packages F/G are already required for the first KD-tree backend.
 
-### E1. Konkretes Indexlayout
+### E1. Concrete index layout
 
-Umsetzungsvorschlag für die spätere Cell List: **sparse, sortierte belegte Zellen mit CSR-artigen Bereichen**, statt eines Arrays für alle denkbaren Zellen oder eines privaten Dictionaries pro Rank.
+Proposal for future Cell List implementation: **sparse, sorted occupied cells with CSR-like ranges**, instead of an array for all conceivable cells or a private dictionary per rank.
 
-Gemeinsam gespeicherte Arrays:
+Shared arrays:
 
-- nach Zellen gruppierte Positionen;
-- zugehörige AgentIDs;
-- Projektionsergebnisse;
-- sortierte Schlüssel der belegten Zellen;
-- Offsets der Trefferbereiche pro belegter Zelle.
+- positions grouped by cells;
+- associated agent IDs;
+- projection results;
+- sorted keys of occupied cells;
+- offsets of hit ranges per occupied cell.
 
-Zellschlüssel und Offsets haben konkrete feste Typen, abgeleitet aus Dimension beziehungsweise sicherem Indextyp. Suche nach einem Zellschlüssel beispielsweise über binäre Suche. Das Layout benötigt Speicher abhängig von Agenten und belegten Zellen, nicht vom gesamten Volumen eines möglicherweise sehr fein diskretisierten Raums.
+Cell keys and offsets have concrete fixed types, derived from dimension or safe index type. Search for a cell key e.g. via binary search. The layout requires memory depending on agents and occupied cells, not the entire volume of a possibly very finely discretized space.
 
-Zunächst auf einem Rank des Nodes aufbauen und dann als unveränderlichen Index veröffentlichen. Eine parallele Indexkonstruktion ist eine spätere Optimierung.
+First build on one rank of the node and then publish as immutable index. Parallel index construction is a later optimization.
 
-### E2. Zellgeometrie und Kandidaten
+### E2. Cell geometry and candidates
 
-- Konfigurierbare positive Zellgröße beziehungsweise deterministischen Default festlegen.
-- Periodische Achsen konsistent in ihre Periode kacheln; effektive Zellbreiten bei nicht exakt teilbarer Ausdehnung verwenden.
-- Obere nichtperiodische Randfläche der letzten Zelle zuordnen.
-- Eine interne Metrikoperation für die konservative achsenweise Suchausdehnung zu einem Radius implementieren. Für Euclidean, Cityblock und Chebyshev genügt jeweils der Radius pro Achse. Die Ausdehnung darf zusätzliche Kandidaten einschließen, aber keine tatsächlichen Treffer ausschließen; nicht stillschweigend euklidische Suchausdehnungen für andere Metriken verwenden.
-- Kandidaten anhand der metrikspezifischen Suchausdehnung bestimmen.
-- Periodische Zellnummern normalisieren und jede Kandidatenzelle höchstens einmal besuchen, auch wenn der Radius die Periode überdeckt.
-- Exakte Distanz prüfen; Selbst-ID ausschließen.
-- Radius null, entartete Rasterachsen mit nur einem Rasterpunkt und globale leere Population gesondert testen.
-- Keinen Integer-Überlauf bei Zellschlüsseln oder Gesamtzahlen zulassen.
+- Configure configurable positive cell size or set deterministic default.
+- Periodic axes consistently tile into their period; use effective cell widths for non-exactly divisible extent.
+- Assign the upper non-periodic boundary face of the last cell.
+- Implement an internal metric operation for conservative axis-wise search extent for a radius. For Euclidean, Cityblock and Chebyshev, the radius per axis suffices. The extent may include additional candidates but must not exclude actual hits; do not silently use Euclidean search extents for other metrics.
+- Determine candidates based on metric-specific search extent.
+- Normalize periodic cell numbers and visit each candidate cell at most once, even if the radius covers the period.
+- Check exact distance and exclude self-ID before `geom_hits` outputs a hit index. A Cell-list hit iterator can perform this check while iterating through cells.
+- Test for zero radius, degenerate raster axes with only one raster point, and global empty population separately.
+- Do not allow integer overflow in cell keys or total counts.
 
-Die Cell List gegen dieselbe vollständige Referenz und zusätzlich gegen das bereits erprobte KD-tree-Backend vergleichen.
+Compare the Cell List against the same full reference and additionally against the already tested KD-tree backend.
 
-### E3. Kommunikationsarchitektur
+### E3. Communication Architecture
 
-Das **spätere Shared-memory-Backend** darf nicht bloß den privaten KD-tree-Replikationspfad ausführen und anschließend jede Rankkopie in Shared Memory übertragen. Das würde sein Speicherziel verfehlen. Die private globale Replikation bleibt dagegen ein bewusstes Merkmal von `ReplicatedKDTree`.
+The **later shared-memory backend** must not merely execute the private KD-tree replication path and then transfer each rank copy into shared memory. That would miss its memory goal. Private global replication remains, however, a conscious feature of `ReplicatedKDTree`.
 
-Umsetzungsvorschlag ist eine zweistufige Replikation:
+A proposed implementation is a two-stage replication:
 
-1. Alle Ranks erfassen ihre lokalen gefilterten Nachbardaten.
-2. Lokale Daten und Größen auf dem Node zusammenführen; ein Shared-memory-Leader ist der jeweilige Rank `mpi.shmrank == 0`.
-3. Nur die Node-Leader tauschen die zusammengeführten Daten zwischen Nodes aus.
-4. Die globalen Empfangsarrays pro Node in Shared Memory anlegen; der Leader erhält das volle Segment, andere Node-Ranks ein Nullsegment.
-5. Übertragung und Indexaufbau durch den Leader in die gemeinsam genutzten Arrays.
-6. Alle Node-Ranks erhalten über `Win_shared_query` ihre lokalen Arrayansichten. Nach korrekter Fenstersynchronisation nur noch lesend verwenden.
+1. All ranks collect their local filtered neighbor data.
+2. Local data and sizes are gathered on the node; a shared-memory leader is the respective rank `mpi.shmrank == 0`.
+3. Only the node leaders exchange the gathered data between nodes.
+4. Create global receive arrays per node in shared memory; the leader gets the full segment, other node-ranks get a null segment.
+5. The leader performs the data transfer and index construction into the shared arrays.
+6. All node-ranks obtain their local array views via `Win_shared_query`. After correct window synchronization, only read access is used.
 
-Ein Leader-Kommunikator kann pro `apply!` kollektiv erzeugt, für dessen ausgewählte Nachbarschaften verwendet und am Ende wieder freigegeben werden. Kein neuer globaler, dauerhaft gecachter Runtimezustand ist dafür nötig. Die konkrete Umsetzung von Größenübertragung, Gather und Allgatherv folgt MPI.jl 0.20 und wird mit den installierten APIs geprüft.
+A leader communicator can be created collectively per `apply!`, used for its selected neighborhood, and released at the end. No new global, permanently cached runtime state is needed for this. The concrete implementation of size transfer, gather, and allgatherv follows MPI.jl 0.20 and will be checked against installed APIs.
 
-Ranks dürfen nur an Kollektiven ihres jeweiligen Kommunikators teilnehmen. Alle Ranks müssen aber am äußeren Protokoll einschließlich Auswahl und Fehlerabgleich teilnehmen. Ein Node ohne lokale Treffer empfängt weiterhin die globalen Daten.
+Ranks may only participate in collectives of their respective communicator. All ranks must participate in the outer preparation and release protocol. A node without local hits still receives global data.
 
-### E4. Speicher und MPI-Details
+### E4. Memory and MPI Details
 
-- Einmalige globale Daten- und Indexkopie pro Node; lokale Arrayheader pro Rank sind in Ordnung.
-- Leader-Stagingdaten dürfen kurzzeitig eine zusätzliche Node-Kopie verursachen; Staging danach freigeben und Spitzenbedarf messen.
-- Keine globalen, privaten O(N)-Positions-/Projektionsarrays auf jedem Nichtleader.
-- Für Projektionen im Shared-memory-Backend `isbitstype` verlangen. MPI-Buffer und Datentypen für `SVector`, Tupel/Zellschlüssel und eigene bitstype-Projektionen explizit testen. Bei Bedarf intern einen wohldefinierten flachen Buffer verwenden, ohne das öffentliche Ergebnisformat zu ändern.
-- Nullbyte-Projektionen nicht über Fenster mit `sizeof(T) == 0` abfragen; Werte aus dem bekannten Typ rekonstruieren beziehungsweise ein separates speicherloses Schema verwenden.
-- Leere Segmente, eine global leere Nachbarschaft und Einprozessläufe müssen denselben kollektiven Lebenszyklus einhalten.
-- Größen-/Displacementgrenzen der verwendeten MPI-Aufrufe prüfen. Der vorhandene `join` nutzt `Int32`-Größen; diese Beschränkung nicht ungeprüft in neue große Transfers übernehmen. Nicht unterstützte Größen kontrolliert melden oder explizit stückeln.
-- Daten sichtbar veröffentlichen: Barrier allein nicht mit Fensterspeichersynchronisation gleichsetzen. Die gewählte `Win_fence`-/Synchronisationsfolge anhand des MPI-Speichermodells prüfen und dokumentieren.
-- Alle Fensterreferenzen bis zur ausdrücklichen Freigabe halten; MPI.jl-Finalizer sind kein Ressourcenprotokoll.
+- One-time global data and index copy per node; local array headers per rank are acceptable.
+- Leader staging data may temporarily cause an additional node copy; free staging afterwards and measure peak demand.
+- No global, private O(N)-position/projection arrays on any non-leader.
+- For projections in the shared-memory backend require `isbitstype`. Explicitly test MPI buffers and data types for `SVector`, tuples/cell keys, and custom bitstype projections. If needed, internally use a well-defined flat buffer without changing the public result format.
+- Do not query null-byte projections via windows with `sizeof(T) == 0`; reconstruct values from known type or use a separate memoryless schema.
+- Empty segments, a globally empty neighborhood, and single-process runs must follow the same collective lifecycle.
+- Check size/displacement limits of used MPI calls. The existing `join` uses `Int32` sizes; do not blindly carry this restriction into new large transfers. Report unsupported sizes controlled or explicitly chunk them.
+- Make data visible: do not equate barrier with window memory synchronization. Check and document the chosen `Win_fence`/synchronization sequence according to the MPI memory model.
+- Hold all window references until explicit release; MPI.jl finalizers are not a resource protocol.
 
-**Abnahme E:** ein Node mit mehreren Ranks und mindestens ein echter Mehrnode-Test; vollständige Ergebnisse auf allen suchenden Ranks und kein privater globaler Datenbestand pro Rank.
+**Acceptance E:** one node with multiple ranks and at least one real multi-node test; complete results on all searching ranks and no private global data store per rank.
 
-## 9. Arbeitspaket F: Einbindung in `apply!`
+## 9. Work Package F: Integration into `apply!`
 
-### F1. Auswahl und Read-Vertrag
+### F1. Selection and Read Contract
 
-- `neighborhoods = nothing`, ein Symbol oder `Vector{Symbol}` akzeptieren.
-- Namen vor Vorbereitung validieren und Mehrfachnennungen normalisieren.
-- Vorbereitung/Freigabe in stabiler Registrierungsreihenfolge, nicht in einer zufälligen Dictionary-Reihenfolge durchführen.
-- Unterschiedliche Auswahl auf verschiedenen Ranks vor Beginn nachbarschaftsspezifischer Kollektive erkennen; keine Divergenz durch unterschiedliche Namensreihenfolgen zulassen.
-- Den vorhandenen Read-Vertrag erhalten: benötigte Zustände müssen im `read`-Argument zugelassen sein. Query- und Neighbor-Typanforderungen ausdrücklich prüfen und dokumentieren; nicht heimlich den Graph-Read-Satz erweitern.
-- `with_edge` schränkt den Transition-Aufruf ein, nicht die registrierte Suchdefinition. Anfangs darf die Vorbereitung auch weitere Query-Agenten erfassen.
+- Accept `neighborhoods = nothing`, a symbol, or `Vector{Symbol}`.
+- Validate names before preparation and normalize duplicate occurrences.
+- Perform preparation/release in stable registration order, not in a random dictionary order.
+- Detect different selections on various ranks before beginning neighborhood-specific collectives; do not allow divergence due to differing name orders.
+- Maintain the existing read contract: required states must be allowed in the `read` argument. Explicitly check and document query and neighbor type requirements; do not silently extend the graph read set.
+- `with_edge` restricts the transition call, not the registered search definition.
 
-### F2. Platzierung im bestehenden Ablauf
+### F2. Placement in Existing Flow
 
-Vorgesehene Reihenfolge:
+Intended order:
 
-1. `apply!`-Argumente normalisieren und geometrische Auswahl validieren.
-2. Bestehendes `prepare_read!` durchführen.
-3. Geometrische Snapshots und Index vollständig vorbereiten, **bevor `prepare_write!` Read-Puffer ersetzen kann**.
-4. Bestehendes `prepare_write!` und die vorhandene Pre-Apply-Barriere.
-5. Unveränderte Transition-Signaturen und bestehende Agentenschleifen verwenden.
-6. Bestehende Post-Apply-Barriere abwarten.
-7. Backendressourcen freigeben und `prepared = nothing` setzen. Beim KD-tree-Backend private Baum-/Arrayreferenzen aufgeben; beim späteren Shared-memory-Backend Fenster und temporäre Kommunikatoren kollektiv in konsistenter Reihenfolge freigeben.
-8. Bestehende Edge-Übertragung sowie `finish_read!`/`finish_write!` in ihrer fachlich erforderlichen Reihenfolge beibehalten.
-9. Instrumentierung schließen und Transitionzähler wie bisher erhöhen.
+1. Normalize `apply!` arguments and validate geometric selection.
+2. Perform existing `prepare_read!`.
+3. For each selected runtime, call `geom_prepare!(sim, runtime)` and store the return value in `runtime.prepared`, **before `prepare_write!` can replace the read buffers**. Ensure that the own read state for direct position queries remains available in the callback.
+4. Perform existing `prepare_write!` and the existing pre-apply barrier.
+5. Use unchanged transition signatures and existing agent loops.
+6. Wait for the existing post-apply barrier.
+7. Call `geom_release!(sim, runtime)` in consistent neighbor order and then set `runtime.prepared = nothing`. For the KD-tree backend, this suffices to release tree/array references; the shared-memory backend collectively frees its windows and temporary communicators.
+8. Retain existing edge transfers as well as `finish_read!`/`finish_write!` in their functionally required order.
+9. Close instrumentation and increment transition counters as before.
 
-Die Freigabe direkt nach der Post-Apply-Barriere begrenzt bereits beim KD-tree-Backend die Lebensdauer großer privater Daten; beim späteren Shared-memory-Backend verhindert sie zusätzlich unnötiges Überlappen mit neuen Agentenfenstern in `finish_write!`. Wenn während der Implementierung andere Abhängigkeiten sichtbar werden, die genaue Position ausdrücklich überprüfen, nicht nur den alten `finish_spatial_neighbors!`-Aufruf ersetzen.
+Releasing immediately after the post-apply barrier already limits the lifetime of large private data in the KD-tree backend; for the later shared-memory backend, it additionally prevents unnecessary overlap with new agent windows in `finish_write!`. If other dependencies become visible during implementation, explicitly verify the exact position—not just replace the old `finish_spatial_neighbors!` call.
 
-### F3. Fehlerpfade
+**Acceptance F first with KD-tree:** two consecutive calls build upon each other; write accesses, mortality, migration between calls and `:Independent` do not alter the snapshot of the current call. After normal completion, `prepared = nothing`. For the later shared-memory backend, all geometry windows and temporary communicators are additionally freed.
 
-- Fehler, die bei der lokalen Positions-, Projektions- oder Filterauswertung auftreten, vor dem nächsten datenabhängigen Kollektiv sammeln und über ein gemeinsames Fehlerprotokoll bekannt machen. Das erfordert keine zusätzlichen Eingabeprüfungen in der Registrierung.
-- Erst wenn kein Rank einen solchen Fehler gemeldet hat, mit dem nächsten Allokations-/Transferabschnitt beginnen.
-- Bereits angelegte Fenster in eindeutig bekanntem gemeinsamen Zustand freigeben.
-- Kein lokales `throw` oder `finally` als hinreichende Lösung für MPI-Bereinigung betrachten.
-- Unbehebbare MPI-Fehler und beliebige Ausnahmen während der bestehenden Transition-Schleifen getrennt behandeln. Der neue Code soll keine allgemeine Wiederherstellbarkeit versprechen, die `apply!` bisher nicht hat.
-- `sim.intransition`, vorbereitete Geometriefelder und Instrumentierung bei beherrschbaren Fehlern konsistent zurücksetzen; Verhalten durch Mehrprozess-Fehlertests mit Timeout absichern.
+## 10. Work-package G: Instrumentation and existing side paths
 
-**Abnahme F zuerst mit KD-tree:** zwei aufeinanderfolgende Aufrufe bauen jeweils neu auf; Schreibzugriffe, Mortalität, Migration zwischen Aufrufen und `:Independent` ändern den Snapshot des laufenden Aufrufs nicht. Nach normalem Abschluss ist `prepared = nothing`. Beim späteren Shared-memory-Backend sind zusätzlich alle Geometriefenster und temporären Kommunikatoren freigegeben.
+### Instrumentation
 
-## 10. Arbeitspaket G: Instrumentierung und bestehende Nebenpfade
+- Use existing `_inst_phase`, `_inst_begin!`, and `_inst_end!`.
+- First map phases for selection/validation, local capture, global replication, KD-tree construction, and release. Reuse existing suitable KD-tree-/join labels if their meaning remains unchanged.
+- Add Node-Gather, leader exchange, shared allocation, and cell-list construction only for the later shared-memory backend.
+- Do not generate symbolic event labels per agent; do not introduce an unlimited new label set per neighborhood.
+- Existing events have a type dimension but no general neighborhood name yet. For the first step, document order/type mapping; extend schema only consciously including persistence and tools.
+- Do not shift existing enum values by inserting new labels if persisted recordings use them numerically. Append new values or explicitly migrate format version.
+- Disabled instrumentation must not cause additional O(N) measurement buffers or diagnostic collectives.
+- Change `test/mpi/test_instrumentation.jl` to registered neighborhoods and the KD-tree backend. Expect KD-tree construction and replication at every selected call; remove old cache hit expectations.
 
-### Instrumentierung
+### Copies, Completion, and HDF5
 
-- Die vorhandenen `_inst_phase`, `_inst_begin!` und `_inst_end!` nutzen.
-- Zunächst Phasen für Auswahl/Validierung, lokale Erfassung, globale Replikation, KD-tree-Aufbau und Freigabe abbilden. Vorhandene passende KD-tree-/Join-Labels wiederverwenden, sofern ihre Bedeutung unverändert bleibt.
-- Erst beim späteren Shared-memory-Backend Node-Gather, Leader-Austausch, Shared-Allokation und Cell-list-Aufbau ergänzen.
-- Keine symbolischen Eventlabels pro Agent erzeugen; keine unbeschränkte neue Labelmenge pro Nachbarschaft einführen.
-- Vorhandene Ereignisse haben eine Typdimension, aber noch keinen allgemeinen Nachbarschaftsnamen. Für den ersten Schritt Reihenfolge/Typzuordnung dokumentieren; eine Schemaerweiterung nur bewusst einschließlich Persistenz und Werkzeugen durchführen.
-- Bestehende Enumwerte nicht durch Einschieben neuer Labels verschieben, sofern persistierte Aufzeichnungen diese numerisch verwenden. Neue Werte anhängen beziehungsweise Formatversion explizit migrieren.
-- Deaktivierte Instrumentierung darf keine zusätzlichen O(N)-Messpuffer oder Diagnosekollektive verursachen.
-- `test/mpi/test_instrumentation.jl` auf registrierte Nachbarschaften und das KD-tree-Backend umstellen. KD-tree-Aufbau und Replikation werden bei jedem ausgewählten Aufruf erwartet; alte Cachetreffer-Erwartungen entfallen.
+- Test `copy_simulation` and `apply` outside a transition with `prepared = nothing`. Additionally, verify via regression test that `copy_simulation` aborts with a comprehensible error before copying or resource operations when `sim.intransition == true`; this applies both with and without selected geometric neighborhoods.
+- `finish_simulation!` should not find open geometry windows after normal `apply!`; no second blind release.
+- Test HDF5 snapshot roundtrip with the new simulation type; temporary data remains non-persistent.
 
-### Kopien, Abschluss und HDF5
+### REPL Display
 
-- `copy_simulation` und `apply` außerhalb einer Transition mit `prepared = nothing` testen. Zusätzlich per Regressionstest prüfen, dass `copy_simulation` bei `sim.intransition == true` vor Kopier- oder Ressourcenoperationen mit einem verständlichen Fehler abbricht; dies gilt sowohl mit als auch ohne ausgewählte geometrische Nachbarschaften.
-- `finish_simulation!` soll nach normalem `apply!` keine offenen Geometriefenster mehr finden; keine zweite blinde Freigabe.
-- HDF5-Snapshot-Roundtrip mit dem neuen Simulationstyp testen; temporäre Daten bleiben nichtpersistent.
+- In `src/REPL.jl`, both `show(io, MIME"text/plain", ...)` outputs per neighborhood show name, space type, dimension, metric, radius as well as query and neighbor types. For `Model`, these values come from model registrations; for simulation, from their generated `geom_neighborhoods` structure. The display is independent of which neighborhoods were selected or prepared for a transition.
+- Sections are omitted for models and simulations without neighborhoods. Backend and temporary search data (`prepared`) are not part of the display.
+- Extend `show_agent` with actual geometric hits of the agent, grouped by named neighborhood and limited analogously to existing output via `max`. Use the same search semantics as in the `geom_*` API; show geometric hits separately from edge neighbors.
+- Explicitly define how a search snapshot is made available for `show_agent` outside a transition. Normal display must not initiate implicit MPI collectives, since it can also be called on only one rank.
 
-### REPL-Anzeige
+## 11. Replace old API, adopt KD-tree principle
 
-- In `src/REPL.jl` zeigen beide `show(io, MIME"text/plain", ...)`-Ausgaben pro Nachbarschaft Name, Raumtyp, Dimension, Metrik, Radius sowie Query- und Neighbor-Typen. Beim `Model` stammen die Angaben aus den Modellregistrierungen, bei der Simulation aus ihrer generierten `geom_neighborhoods`-Struktur. Die Anzeige ist unabhängig davon, welche Nachbarschaften für eine Transition ausgewählt oder vorbereitet wurden.
-- Bei Modellen und Simulationen ohne Nachbarschaften entfällt der Abschnitt. Backend und temporäre Suchdaten (`prepared`) sind nicht Teil der Anzeige.
-- `show_agent` zusätzlich um die tatsächlichen geometrischen Treffer des Agenten ergänzen, gruppiert nach benannter Nachbarschaft und analog zur bestehenden Ausgabe durch `max` begrenzt. Dieselbe Suchsemantik wie in der `geom_*`-API verwenden; geometrische Treffer getrennt von Kantennachbarn anzeigen.
-- Für `show_agent` außerhalb einer Transition ausdrücklich festlegen, wie ein Suchsnapshot verfügbar gemacht wird. Die normale Anzeige darf keine impliziten MPI-Kollektive starten, da sie auch auf nur einem Rank aufgerufen werden kann.
+**No parallel legacy path is provided.** The new registered API replaces the previous `spatial_neighbors` mechanism. The former search principle remains available as `ReplicatedKDTree`, not as an old public interface.
 
-## 11. Alte API ersetzen, KD-tree-Prinzip übernehmen
+For the first API/KD-tree milestone:
 
-**Es ist kein paralleler Legacy-Pfad vorgesehen.** Die neue registrierte API ersetzt den bisherigen `spatial_neighbors`-Mechanismus. Das bisherige Suchprinzip bleibt als `ReplicatedKDTree` verfügbar, nicht als alte öffentliche Schnittstelle.
+1. Remove `SpatialNeighbors`, the `spatial_neighbors` parameter, the free `find_neighbors` API, and the old prepare/finish functions from the new call path.
+2. Replace `sim.neighbors_infos`, `NeighborsInfo`, `snhash`, and `AgentFields.prepared_spatial_neighbors` with named generated fields; adjust affected constructors and comments.
+3. Adapt reusable KD-tree and replication logic from `ConnectSpatial.jl` to space definitions, registration, and `prepared`. Do not retain a second search infrastructure alongside the new API.
+4. Transfer content-relevant existing spatial test cases to the new registration and `geom_*` functions; consciously consider new semantics like inclusive grid boundaries.
+5. Switch instrumentation tests, documentation, and examples to the new API. Remove cache hit expectations.
+6. Migrate old `periodic_diff`-/`periodic_clamp` calls to new helper functions or document their removal separately in the public API.
 
-Zum ersten API-/KD-tree-Meilenstein gehören:
+The existing standalone `connect_spatial_neighbors!` implementation does not belong to the new search path. Its domain test cases can initially be covered by regular transitions with `geom_neighborids_iter` and `add_edge!`. A new convenience function will follow later as a wrapper with configurable edge direction. No search is offered by the new API before `finish_init!`.
 
-1. `SpatialNeighbors`, den `spatial_neighbors`-Parameter, die freie `find_neighbors`-API und die alten Prepare-/Finish-Funktionen aus dem neuen Aufrufpfad entfernen.
-2. `sim.neighbors_infos`, `NeighborsInfo`, `snhash` und `AgentFields.prepared_spatial_neighbors` durch benannte generierte Felder ersetzen; betroffene Konstruktoren und Kommentare anpassen.
-3. Wiederverwendbare KD-tree- und Replikationslogik aus `ConnectSpatial.jl` an Raumdefinitionen, Registrierung und `prepared` anpassen. Keine zweite Suchinfrastruktur neben der neuen API erhalten.
-4. Inhaltlich relevante bestehende Spatial-Testfälle auf die neue Registrierung und `geom_*`-Funktionen übertragen; neue Semantik wie inklusive Gridgrenzen bewusst berücksichtigen.
-5. Instrumentierungstests, Dokumentation und Beispiele auf die neue API umstellen. Cachetreffer-Erwartungen entfernen.
-6. Alte `periodic_diff`-/`periodic_clamp`-Aufrufe auf die neuen Hilfsfunktionen überführen beziehungsweise ihre Entfernung separat in der öffentlichen API dokumentieren.
+**Only after successful validation of this state** will the shared-memory backend be started. The API does not have to wait for its completion.
 
-Die bisherige eigenständige `connect_spatial_neighbors!`-Implementierung gehört nicht zum neuen Suchpfad. Ihre fachlichen Testfälle können zunächst reguläre Transitionen mit `geom_neighborids_iter` und `add_edge!` abdecken. Eine neue Komfortfunktion folgt später als Wrapper mit konfigurierbarer Kantenrichtung. Vor `finish_init!` bietet die neue API weiterhin keine Suche.
+## 12. Test and Acceptance Plan
 
-**Erst nach erfolgreicher Erprobung dieses Stands** wird das Shared-memory-Backend begonnen. Die API muss nicht auf dessen Fertigstellung warten.
+### Test Distribution
 
-## 12. Test- und Abnahmeplan
-
-### Testaufteilung
-
-| Vorgeschlagene Datei | Schwerpunkt |
+| Suggested File | Focus |
 |---|---|
-| `test/geometric_space.jl` | Grenzen, Koordinatentypen, Metriken, Wrapping mit und ohne Begrenzung nichtperiodischer Achsen, Bewegung |
-| `test/geometric_neighborhood.jl` | `ModelTypes`, direkte und pipebare Registrierung, Typableitung und ausgewählte Fehlerfälle |
-| `test/geometric_neighbors.jl` | zunächst KD-tree-Backend: sechs Suchformen, Snapshots, Filter, mehrere Räume/Typen; später backendübergreifende Fälle |
-| `test/mpi/test_geometric_neighbors.jl` | MPI-Wrapper und zusätzliche verteilte Ressourcen-/Fehlertests |
+| `test/geometric_space.jl` | Boundaries, coordinate types, metrics, wrapping with and without boundary constraints on non-periodic axes, movement |
+| `test/geometric_neighborhood.jl` | `ModelTypes`, direct and pipeable registration, type derivation and selected error cases |
+| `test/geometric_neighbors.jl` | Initially KD-tree backend: six search forms, snapshots, filters, multiple spaces/types; later cross-backend cases |
+| `test/mpi/test_geometric_neighbors.jl` | MPI wrapper and additional distributed resource tests |
 
-Geteilte Testmodelle wie in `test/core.jl` und `test/spatial_neighbors.jl` am Toplevel definieren. `create_model` und `create_simulation` nicht in derselben neu kompilierten Funktion verstecken; die bestehende World-age-Einschränkung beachten. Parametrisierte Agententypen wie in `test/parametric_types.jl` mit abdecken.
+Shared test models defined at the top level like in `test/core.jl` and `test/spatial_neighbors.jl`. Do not hide `create_model` and `create_simulation` within the same newly compiled function; respect the existing World-age restriction. Parametric agent types like in `test/parametric_types.jl` should be covered.
 
-### Wesentliche Fälle
+### Key Cases
 
-- Ein und mehrere Query-/Neighbor-Typen, unterschiedliche Positionsfelder.
-- Derselbe Typ in mehreren Räumen und mehreren Nachbarschaften.
-- Zwei Nachbarschaften mit demselben Raum, aber unterschiedlicher `posfunc` (Wohnung/Arbeitsplatz): unabhängige Suchergebnisse, Positionssnapshots und Typableitung; Registrierung verändert das geteilte Raumobjekt nicht. Auch unterschiedliche zulässige Koordinatentypen bei gemeinsamem Raum testen.
-- Automatisch inferierte NamedTuple-Projektion und explizite Typvorgabe als Alternative zur Inferenz.
-- Ohne explizite Vorgabe: gemeinsamer konkreter Projektionstyp über mehrere Nachbartypen; bei abweichenden Typen verweist die Registrierung auf `project_type`.
-- Nullbyte-Projektion und schmale Positionsspeichertypen.
-- Mortalität, ID-Wiederverwendung, neue Agenten und `:Independent`.
-- Leere lokale Population, leerer Node, global leere Nachbarschaft; null oder alle durch Filter ausgeschlossen.
-- Kein Selbsteintrag, aber verschiedene AgentIDs mit identischen Positionen/Projektionen.
-- Abstand exakt am Radius, Radius null und größer als Perioden; keine doppelten Treffer durch periodische KD-tree-Query-Bilder beziehungsweise später gewrappte Zellen.
-- Nichtnull-Untergrenzen und gemischt periodische Achsen.
-- Euklidische, Cityblock-/Manhattan- und Chebyshev-Metriken einschließlich ihrer Suchausdehnungen gegen vollständige Referenzsuche prüfen; gewichtete Metriken zurückweisen.
-- Nichtperiodische Überschreitungen, `NaN`, unendliche Werte und Überläufe bei den Raumhilfsfunktionen nach Paket A.
-- `geom_move`-Schnittpunkt `(7,9) + (1,2) -> (7.5,10)`, Start am Rand, auswärts/einwärts/parallel, Rasterrundung und Warnbegrenzung.
-- Wiederholte `apply!`, unterschiedliche ausgewählte Nachbarschaften und Änderungen zwischen Aufrufen.
-- Vergleich aller sechs APIs nach ID sortiert, nicht anhand einer garantierten Ergebnisreihenfolge.
-- In C: `@inferred` für den generischen Namenszugriff mit literalen Namen aus einer Transition.
-- In D/F: Ergebnisvektoren und Iteratoren mit konkretem `eltype`, auch bei leerem Ergebnis; `@inferred` im öffentlichen Suchpfad mit literalem Namen.
-- Nach Ende von `apply!` ist `prepared = nothing`; zunächst keine dauerhaften KD-tree-/Arrayreferenzen, später zusätzlich keine offenen Geometriefenster. Unabhängige Simulationskopien.
-- Kontrollierte Fehler auf nur einem Rank ohne Hängen des Testjobs; Zeitlimit verwenden.
+- Single and multiple query/neighbor types, different position fields.
+- Same type in multiple spaces and multiple neighborhoods.
+- Two neighborhoods with the same space but different `posfunc` (apartment/workplace): independent search results, position snapshots and type derivation; registration does not modify the shared space object. Also test differing allowed coordinate types for a common space.
+- Automatically inferred NamedTuple projection and explicit type specification as an alternative to inference.
+- Without explicit specification: common concrete projection type across multiple neighbor types; when types differ, registration refers to `project_type`.
+- Null-byte projection and narrow position storage types.
+- Mortality, ID reuse, new agents and `:Independent`.
+- Empty local population, empty node, globally empty neighborhood; zero or all excluded by filter.
+- No self-entry, but different agent IDs with identical positions/projections.
+- Distance exactly at radius, zero radius and greater than period; no duplicate hits from periodic KD-tree query images or later wrapped cells.
+- Non-zero lower bounds and mixed periodic axes.
+- Euclidean, Cityblock/Manhattan and Chebyshev metrics including their search extents against full reference search; weighted metrics to be rejected.
+- Non-periodic overflows, `NaN`, infinite values and overflows in the space helper functions per package A.
+- `geom_move` intersection `(7,9) + (1,2) -> (7.5,10)`, start at boundary, outward/inward/parallel, raster rounding and warning limit.
+- Repeated `apply!`, different selected neighborhoods and changes between calls.
+- Comparison of all six APIs sorted by ID, not based on guaranteed result order.
+- In C: `@inferred` for generic name access with literal names from a transition.
+- In D/F: Result vectors and iterators with concrete `eltype`, even when empty; `@inferred` in public search path with literal name.
+- After completion of `apply!`, `prepared = nothing`; initially no persistent KD-tree/array references, later also no open geometric windows. Independent simulation copies.
 
-### Kommandos
+### Commands
 
-Tests im Entwicklungsprojekt ausführen, nicht gegen eine separat registrierte Vahana-Version:
+Run tests in the development project, not against a separately registered Vahana version:
 
 ```sh
 julia --project=. test/geometric_space.jl
@@ -445,47 +426,47 @@ mpiexecjl -n 4 julia --project=. test/mpi/test_geometric_neighbors.jl
 mpiexecjl -n 2 julia --project=. test/mpi/test_instrumentation.jl
 ```
 
-Die neuen eigenständig aufrufbaren Testdateien müssen dazu ihre benötigten Imports selbst enthalten beziehungsweise einen gemeinsamen kleinen Test-Setup nutzen. Zusätzlich bestehende relevante MPI-Regressionen ausführen.
+The new independently callable test files must include their required imports themselves or use a common small test setup. Additionally, run existing relevant MPI regressions.
 
-Der erste Meilenstein prüft bereits die globale KD-tree-Replikation mit mehreren Ranks. Ein echter Mehrnode-Lauf ist auch dafür sinnvoll; die API-Erprobung muss jedoch nicht auf ein noch nicht implementiertes Shared-memory-Backend warten.
+The first milestone already checks global KD-tree replication with multiple ranks. A real multi-node run is also meaningful for this; however, API validation does not have to wait for an unimplemented shared-memory backend.
 
-Für das spätere `NodeSharedCellList` ist **ein echter Mehrnode-Lauf ein eigener Abnahmeschritt**, einschließlich Node ohne lokale Nachbarn und unterschiedlicher lokaler Populationsgrößen. Ein lokaler Lauf mit vier Ranks testet normalerweise nur einen Shared-memory-Node. Ein fehlender Clusterlauf darf nicht als erfolgreiche Mehrnode-Abnahme dargestellt werden.
+For the later `NodeSharedCellList`, **a real multi-node run is a separate acceptance step**, including nodes without local neighbors and differing local population sizes. A local run with four ranks typically tests only one shared-memory node. A missing cluster run must not be presented as successful multi-node acceptance.
 
-`Project.toml` unterstützt Julia 1.9 bis 1.12. Mindestens die Inferenz-/Codegenerierungstests und das MPI-API-Verhalten über die unterstützten Versionen prüfen; keine unbeabsichtigte Anhebung der Mindestversion.
+`Project.toml` supports Julia 1.9 to 1.12. At minimum, check inference/code generation tests and MPI API behavior across supported versions; avoid unintended version bumps.
 
-### Performance- und Speicherprüfung
+### Performance and Memory Checks
 
-Nach korrekten Ergebnissen und warmem Compiler messen:
+After correct results and warm compiler:
 
-- inferierte Typen und Allokationen im literalen Suchpfad;
-- Iterator gegenüber Materialisierung;
-- Aufbau, Kommunikation, Suche und Freigabe getrennt;
-- gespeicherte Positionsbytes bei `Int16`/`Int32` beziehungsweise `Float32`/`Float64`, einschließlich zusätzlicher KD-tree-Arbeitsmatrix;
-- zunächst private globale Daten- und Baumbytes pro Rank; dies ist die bewusst unoptimierte API-Baseline;
-- später Shared-memory-Datenbytes pro Node und private Stagingdaten pro Rank;
-- Verhalten bei steigender Rankzahl pro Node.
+- inferred types and allocations in literal search path;
+- iterator vs. materialization;
+- construction, communication, search and deallocation separately;
+- stored position bytes for `Int16`/`Int32` respectively `Float32`/`Float64`, including additional KD-tree working matrix;
+- initially private global data and tree bytes per rank; this is the deliberately unoptimized API baseline;
+- later shared-memory data bytes per node and private staging data per rank;
+- behavior with increasing number of ranks per node.
 
-Beim späteren Shared-memory-Backend dürfen Shared Pages bei der Interpretation von RSS nicht als unabhängige Kopien gezählt werden. Neben Betriebssystemmessungen die tatsächlichen Array-/Fenstergrößen, Buffergrößen und Eigentümer protokollieren. Keine festen Nanosekunden-Grenzen in Regressionstests setzen.
+In the later shared-memory backend, shared pages must not be counted as independent copies when interpreting RSS. In addition to OS measurements, log actual array/window sizes, buffer sizes and owners. Do not set fixed nanosecond thresholds in regression tests.
 
-## 13. Empfohlene Umsetzungsetappen
+## 13. Recommended Implementation Stages
 
-### Meilenstein 1: neue API mit bisherigem KD-tree-Prinzip
+### Milestone 1: New API with current KD-tree principle
 
-1. **Räume und Hilfsfunktionen** einschließlich Numeriktests.
-2. **Registrierung und Typableitung** mit pipebarer API und `ReplicatedKDTree` als Backendkonfiguration (abgeschlossen).
-3. **Generierte Felder, inferierbarer Namenszugriff und unabhängige Simulationscontainer.** Den Zugriff über `sim` und literales Symbol aus einer Transition prüfen.
-4. **Lokale Snapshots, private globale Replikation und KD-tree-Adapter** mit allen sechs Suchformen; Inferenz mit und ohne Treffer prüfen und Ergebnisse gegen vollständige Referenzsuche testen.
-5. **`apply!`-Integration, Instrumentierung und Entfernung des alten Spatial-API-Pfads.** Bestehende inhaltliche Testfälle auf die neue API übertragen; keine Cachefunktion übernehmen.
-6. **API-Erprobung und ausdrückliche Abnahme dieses Stands:** reale Modelltransitionen einschließlich Kantenerzeugung, MPI, Typinferenz, Filter/Projektionen, Kopien und wiederholte Aufrufe testen. Rückmeldungen zur API vor weiterer Backendentwicklung einarbeiten.
+1. **Spaces and helper functions** including numerical tests.
+2. **Registration and type derivation** with pipeable API and `ReplicatedKDTree` as backend configuration (completed).
+3. **Generated fields, inferable name access, and independent simulation containers.** Check access via `sim` and literal symbol from a transition.
+4. **Local snapshots, private global replication, and KD-tree adapter** with all six search forms; check inference with and without hits and test results against full reference search.
+5. **`apply!` integration, instrumentation, and removal of the old Spatial-API path.** Transfer existing content tests to the new API; do not adopt any caching functionality.
+6. **API testing and explicit acceptance of this state:** test real model transitions including edge generation, MPI, type inference, filters/projections, copies, and repeated calls. Incorporate feedback on the API before further backend development.
 
-### Meilenstein 2: zusätzliches node-local shared Backend
+### Milestone 2: additional node-local shared backend
 
-7. **Cell List und Ein-Node-Shared-memory-Protokoll** mit demselben öffentlichen Suchvertrag implementieren.
-8. **Hierarchische Mehrnode-Replikation, kollektive Freigabe und Fehlertests** ergänzen; gemeinsame Tests gegen KD-tree und vollständige Referenz ausführen.
-9. **Backendvergleich und Speicherbenchmark** mit echter Mehrnode-Abnahme.
+7. **Cell list and single-node shared-memory protocol** implementing the same public search contract.
+8. **Hierarchical multi-node replication and collective sharing** to be added; run joint tests against KD-tree and full reference.
+9. **Backend comparison and memory benchmark** with real multi-node acceptance.
 
-### Separate Ergänzungen
+### Separate Additions
 
-10. **Komfortfunktion und Graph-API-Ergänzung** über die gemeinsame Infrastruktur; kein neuer unabhängiger Suchpfad.
+10. **Convenience functions and Graph-API extension** via shared infrastructure; no new independent search path.
 
-Jede Etappe soll einen kleinen überprüfbaren Stand liefern. Kein zweiter unabhängiger Spatial-Stack, kein zusätzliches Transition-Argument und keine Cache-/Partitioniererimplementierung als versteckte Voraussetzung.
+Each stage should deliver a small, verifiable state. No second independent spatial stack, no additional transition argument, and no cache/partitioner implementation as hidden prerequisite.

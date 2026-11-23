@@ -238,10 +238,13 @@ register_edgetype!(t::Type{T}, props...; kwargs...) where T =
     types -> register_edgetype!(types, t, props...; kwargs...) 
 
 has_hint(sim, T::DataType, hint::Symbol, ge = :Edge) =
+    has_hint(sim.typeinfos, T, hint, ge)
+
+has_hint(types::ModelTypes, T::DataType, hint::Symbol, ge = :Edge) =
     if ge == :Edge
-        hint in sim.typeinfos.edges_attr[T][:hints]
-    elseif ge == :Agent 
-        hint in sim.typeinfos.nodes_attr[T][:hints]
+        hint in types.edges_attr[T][:hints]
+    elseif ge == :Agent
+        hint in types.nodes_attr[T][:hints]
     else
         @error "Unknown graph element, use :Agent or :Edge"
     end
@@ -319,14 +322,28 @@ function register_geom_neighborhood!(
             "Agent type $agent_type is not registered"
         )
 
+        if agent_type in definition.query_types &&
+           agent_type in definition.neighbor_types &&
+           has_hint(types, agent_type, :Independent, :Agent)
+            throw(ArgumentError(
+                "Geometric neighborhood $name cannot use :Independent agent type " *
+                "$agent_type as both a query and a neighbor type."
+            ))
+        end
+
         position_type = inferred_type(definition.posfunc, agent_type)
 
         @assert isconcretetype(position_type) (
             "Cannot infer position type for $agent_type in neighborhood $name"
         )
 
-        coordinate_type = position_type <: Tuple ?
-            promote_type(fieldtypes(position_type)...) : eltype(position_type)
+        coordinate_type = eltype(position_type)
+
+        @mayassert !(position_type <: Tuple) ||
+            all(T -> T === coordinate_type, fieldtypes(position_type)) """
+        All coordinates returned by posfunc for $agent_type in neighborhood $name \
+        must have the same type.
+        """
 
         @assert coordinate_type <: supported_coordinates (
             "Unsupported coordinate type $coordinate_type in neighborhood $name"
@@ -357,13 +374,15 @@ function register_geom_neighborhood!(
         project_type = only(project_types)
     end
 
-    push!(types.geom_neighborhoods, GeometricRegistration(
+    registration = GeometricRegistration(
         name,
         definition,
         backend,
         coordinate_type,
         project_type,
-    ))
+    )
+    geom_validate_backend(registration)
+    push!(types.geom_neighborhoods, registration)
 
     types
 end

@@ -1,359 +1,300 @@
-using Vahana
-
-using Test
-
-using StaticArrays
-
-import Vahana: @onrankof, disable_transition_checks
+using Vahana, Test, StaticArrays
 
 struct AgentWithPosFrom
-    pos::SVector{2, Int64}
-    age::Float64 # to check the filter option
-end    
+    pos::SVector{2,Int64}
+    age::Float64
+end
 
 struct AgentWithPosTo
-    pos::SVector{2, Int64}
-end    
+    pos::SVector{2,Int64}
+end
 
 struct Agent3DFrom
-    pos::SVector{3, Float64}
+    pos::SVector{3,Float64}
 end
 
 struct Agent3DTo
-    pos::SVector{3, Float64}
+    pos::SVector{3,Float64}
 end
 
 struct Neighbor end
 
-spatial_model = ModelTypes() |>
-    register_agenttype!(AgentWithPosFrom, :Immortal) |> 
-    register_agenttype!(AgentWithPosTo, :Immortal) |>
-    register_agenttype!(Agent3DFrom, :Immortal) |> 
-    register_agenttype!(Agent3DTo) |>
-    register_edgetype!(Neighbor) |>
-    create_model("Spatial_Neighbors")
+spatial_test_position(agent) = agent.pos
+spatial_test_adult(agent) = agent.age >= 18
 
-@testset "connect_spatial_neighbors" begin
-    function count_edges(edgelist, idmap, id)
-        # to test this on every rank, we must remove the mpi.rank
-        # from the id, as we distribute only the graph that is
-        # created on rank 0
-        aid = Vahana.agent_id(Vahana.type_nr(id), 0, Vahana.agent_nr(id))
-        count(e -> e[1] == idmap[aid], edgelist)
-    end
+const spatial_test_grid_zero = GridSpace([(0, 4), (0, 5)]; periodic=true)
+const spatial_test_grid = GridSpace([(1, 5), (1, 6)])
+const spatial_test_grid_periodic = GridSpace([(1, 5), (1, 6)]; periodic=true)
+const spatial_test_grid_periodic_x =
+    GridSpace([(1, 5), (1, 6)]; periodic=(true, false))
+const spatial_test_3d = ContinuousSpace([(1, 4), (3, 6), (4, 6)])
+const spatial_test_unit_cube = [(0, 1), (0, 1), (0, 1)]
+const spatial_test_cube_periodic_x =
+    ContinuousSpace(spatial_test_unit_cube; periodic=(true, false, false))
+const spatial_test_cube_periodic =
+    ContinuousSpace(spatial_test_unit_cube; periodic=true)
 
-    sim = create_simulation(spatial_model)
-
-    # e.g. lowercase: from, uppercase: to
-    #   0   1   2   3   4
-    # 0 aAB             b
-    # 1 c   C
-    # 2 d
-    # 3
-    # 4 D
-    # 5             e   E
-    # We add source agents (From) with different positions
-    from_a = add_agent!(sim, AgentWithPosFrom((0,0), 5))
-    from_b = add_agent!(sim, AgentWithPosFrom((4,0), 20))
-    from_c = add_agent!(sim, AgentWithPosFrom((0,1), 20))
-    from_d = add_agent!(sim, AgentWithPosFrom((0,2), 5))
-    from_e = add_agent!(sim, AgentWithPosFrom((3,5), 20))
-
-    # And target agents (To) at the same positions
-    to_A = add_agent!(sim, AgentWithPosTo((0,0)))
-    to_B = add_agent!(sim, AgentWithPosTo((0,0)))
-    to_C = add_agent!(sim, AgentWithPosTo((1,1)))
-    to_D = add_agent!(sim, AgentWithPosTo((0,4)))
-    to_E = add_agent!(sim, AgentWithPosTo((4,5)))
-
-    idmap = finish_init!(sim; return_idmapping = true)
-
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosFrom,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               distance = 1.0,
-                               periodic_upper = SVector(4,5))
-    
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 3
-    @test count_edges(es, idmap, to_B) == 3
-    @test count_edges(es, idmap, to_C) == 1
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 2
-
-    
-    
-    sim = create_simulation(spatial_model)
-
-    # e.g. lowercase: from, uppercase: to
-    #   1   2   3   4   5
-    # 1 aAB             b
-    # 2 c   C
-    # 3 d
-    # 4
-    # 5 D
-    # 6             e   E
-    # We add source agents (From) with different positions
-    from_a = add_agent!(sim, AgentWithPosFrom((1,1), 5))
-    from_b = add_agent!(sim, AgentWithPosFrom((5,1), 20))
-    from_c = add_agent!(sim, AgentWithPosFrom((1,2), 20))
-    from_d = add_agent!(sim, AgentWithPosFrom((1,3), 5))
-    from_e = add_agent!(sim, AgentWithPosFrom((4,6), 20))
-
-    # And target agents (To) at the same positions
-    to_A = add_agent!(sim, AgentWithPosTo((1,1)))
-    to_B = add_agent!(sim, AgentWithPosTo((1,1)))
-    to_C = add_agent!(sim, AgentWithPosTo((2,2)))
-    to_D = add_agent!(sim, AgentWithPosTo((1,5)))
-    to_E = add_agent!(sim, AgentWithPosTo((5,6)))
-
-    idmap = finish_init!(sim; return_idmapping = true)
-    
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosFrom,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               distance = 1.5)
-
-    
-    # using all_edges allow to run the tests als in parallel
-    es = all_edges(sim, Neighbor)
-    @test length(es) == 8
-    @test count_edges(es, idmap, to_A) == 2
-    @test count_edges(es, idmap, to_B) == 2
-    @test count_edges(es, idmap, to_C) == 3
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 1
-
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosFrom,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               from_pos_field = :pos,
-                               to_pos_field = :pos,
-                               distance = 2.0)
-
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 3
-    @test count_edges(es, idmap, to_B) == 3
-    @test count_edges(es, idmap, to_C) == 3
-    @test count_edges(es, idmap, to_D) == 1
-    @test count_edges(es, idmap, to_E) == 1
-
-    # test the filter option, the filter remove a and d so we
-    # have only
-    # e.g. lowercase: from, uppercase: to
-    #   1   2   3   4   5
-    # 1 AB             b
-    # 2 c   C
-    # 3 
-    # 4
-    # 5 D
-    # 6             e   E
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosFrom,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               from_filter = a -> a.age >= 18, 
-                               distance = 2.0)
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 1
-    @test count_edges(es, idmap, to_B) == 1
-    @test count_edges(es, idmap, to_C) == 1
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 1
-    
-    # test also connections of the same type, both To
-    # should not contain the agent itself
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosTo,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               distance = 3.0)
-
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 2
-    @test count_edges(es, idmap, to_B) == 2
-    @test count_edges(es, idmap, to_C) == 2
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 0
-
-    # test periodic boundaries
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosFrom,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               distance = 1.0,
-                               periodic_lower = [1,1],
-                               periodic_upper = [5,6])
-    
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 3
-    @test count_edges(es, idmap, to_B) == 3
-    @test count_edges(es, idmap, to_C) == 1
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 2
-
-    connect_spatial_neighbors!(sim,
-                               AgentWithPosFrom,
-                               AgentWithPosTo, 
-                               _ -> Neighbor();
-                               distance = 1,
-                               periodic_lower = SVector(1,0),
-                               periodic_upper = SVector(5,Inf))
-    
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 3
-    @test count_edges(es, idmap, to_B) == 3
-    @test count_edges(es, idmap, to_C) == 1
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 1
-    
-    
-    finish_simulation!(sim)
-
-    sim = create_simulation(spatial_model)
-
-    # e.g. lowercase: from, uppercase: to
-    # z:4                5               6
-    #   1  2  3  4       1  2  3  4      1  2  3  4
-    # 3 aA             3 c             3
-    # 4                4 C             4 d        D
-    # 5                5               5
-    # 6 b        B     6               6 E        e
-
-    # Add from agents with 3D positions
-    from_a = add_agent!(sim, Agent3DFrom((1.0, 3.0, 4.0)))
-    from_b = add_agent!(sim, Agent3DFrom((1.0, 6.0, 4.0)))
-    from_c = add_agent!(sim, Agent3DFrom((1.0, 3.0, 5.0)))
-    from_d = add_agent!(sim, Agent3DFrom((1.0, 4.0, 6.0)))
-    from_e = add_agent!(sim, Agent3DFrom((4.0, 6.0, 6.0)))
-    
-    # Add to agents with 3D positions at the same locations
-    to_A = add_agent!(sim, Agent3DTo(SVector(1.0, 3.0, 4.0)))
-    to_B = add_agent!(sim, Agent3DTo(SVector(4.0, 6.0, 4.0)))
-    to_C = add_agent!(sim, Agent3DTo(SVector(1.0, 4.0, 5.0)))
-    to_D = add_agent!(sim, Agent3DTo(SVector(4.0, 4.0, 6.0)))
-    to_E = add_agent!(sim, Agent3DTo(SVector(1.0, 6.0, 6.0)))
-    
-    idmap = finish_init!(sim; return_idmapping = true)
-
-    connect_spatial_neighbors!(sim,
-                               Agent3DFrom,
-                               Agent3DTo,
-                               _ -> Neighbor(),
-                               distance = 1.5)
-    
-    # Verify 3D connections
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, to_A) == 2
-    @test count_edges(es, idmap, to_B) == 0
-    @test count_edges(es, idmap, to_C) == 3
-    @test count_edges(es, idmap, to_D) == 0
-    @test count_edges(es, idmap, to_E) == 0
-    
-    finish_simulation!(sim)
-
-    # testing periodic bounding for floating point position/ranges
-    sim = create_simulation(spatial_model)
-    a1 = add_agent!(sim, Agent3DTo((0.0, 0.0, 0.0)))
-    a2 = add_agent!(sim, Agent3DTo((1.0, 0.0, 0.0)))
-    a3 = add_agent!(sim, Agent3DTo((0.1, 0.1, 0.0)))
-    a4 = add_agent!(sim, Agent3DTo((0.0, 0.0, 0.1)))
-    a5 = add_agent!(sim, Agent3DTo((0.0, 0.0, 1.0)))
-    a6 = add_agent!(sim, Agent3DTo((1.0, 0.0, 1.0)))
-    idmap = finish_init!(sim; return_idmapping = true)
-
-    connect_spatial_neighbors!(sim,
-                               Agent3DTo,
-                               Agent3DTo,
-                               _ -> Neighbor(),
-                               periodic_upper = SVector(1.0, Inf, Inf),
-                               distance = 0.1001)
-    
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, a1) == 2 # a2, a4
-    @test count_edges(es, idmap, a2) == 2 # a1, a4
-    @test count_edges(es, idmap, a3) == 0
-    @test count_edges(es, idmap, a4) == 2 # a1, a2
-    @test count_edges(es, idmap, a5) == 1 # a6
-    @test count_edges(es, idmap, a6) == 1 # a1
-
-    connect_spatial_neighbors!(sim,
-                               Agent3DTo,
-                               Agent3DTo,
-                               (a) -> Neighbor(),
-                               periodic_upper = SVector(1.0, 1.0, 1.0),
-                               distance = 0.1001)
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, a1) == 4 # a2, a4, a5, a6
-    @test count_edges(es, idmap, a2) == 4 # a1, a4, a5, a6
-    @test count_edges(es, idmap, a3) == 0
-    @test count_edges(es, idmap, a4) == 4 # a1, a2, a5, a6
-    @test count_edges(es, idmap, a5) == 4 # a1, a2, a5, a6
-    @test count_edges(es, idmap, a6) == 4 # a1, a2, a5, a6
-
-    
-    connect_spatial_neighbors!(sim,
-                               Agent3DTo,
-                               Agent3DTo,
-                               (a) -> Neighbor(),
-                               periodic_upper = SVector(1.0, 1.0, 1.0),
-                               distance = 0.1001)
-    es = all_edges(sim, Neighbor)
-    @test count_edges(es, idmap, a1) == 4 # a2, a4, a5, a6
-    @test count_edges(es, idmap, a2) == 4 # a1, a4, a5, a6
-    @test count_edges(es, idmap, a3) == 0
-    @test count_edges(es, idmap, a4) == 4 # a1, a2, a5, a6
-    @test count_edges(es, idmap, a5) == 4 # a1, a2, a5, a6
-    @test count_edges(es, idmap, a6) == 4 # a1, a2, a5, a6
-
-    finish_simulation!(sim)
-
-    
-    # this hack should help that the output is not scrambled
-    sleep(mpi.rank * 0.05)
+function spatial_test_neighborhood(space, query_type, neighbor_type, radius;
+                                   neighbor_filter=nothing)
+    GeometricNeighborhood(
+        space, spatial_test_position, query_type, neighbor_type;
+        radius, neighbor_filter,
+    )
 end
 
+const spatial_model = ModelTypes() |>
+    register_agenttype!(AgentWithPosFrom, :Immortal) |>
+    register_agenttype!(AgentWithPosTo, :Immortal) |>
+    register_agenttype!(Agent3DFrom, :Immortal) |>
+    register_agenttype!(Agent3DTo) |>
+    register_edgetype!(Neighbor) |>
+    register_geom_neighborhood!(:grid_zero, spatial_test_neighborhood(
+        spatial_test_grid_zero, AgentWithPosTo, AgentWithPosFrom, 1.0,
+    )) |>
+    register_geom_neighborhood!(:grid_near, spatial_test_neighborhood(
+        spatial_test_grid, AgentWithPosTo, AgentWithPosFrom, 1.5,
+    )) |>
+    register_geom_neighborhood!(:grid_far, spatial_test_neighborhood(
+        spatial_test_grid, AgentWithPosTo, AgentWithPosFrom, 2.0,
+    )) |>
+    register_geom_neighborhood!(:grid_adult, spatial_test_neighborhood(
+        spatial_test_grid, AgentWithPosTo, AgentWithPosFrom, 2.0;
+        neighbor_filter=spatial_test_adult,
+    )) |>
+    register_geom_neighborhood!(:grid_same_type, spatial_test_neighborhood(
+        spatial_test_grid, AgentWithPosTo, AgentWithPosTo, 3.0,
+    )) |>
+    register_geom_neighborhood!(:grid_periodic, spatial_test_neighborhood(
+        spatial_test_grid_periodic, AgentWithPosTo, AgentWithPosFrom, 1.0,
+    )) |>
+    register_geom_neighborhood!(:grid_periodic_x, spatial_test_neighborhood(
+        spatial_test_grid_periodic_x, AgentWithPosTo, AgentWithPosFrom, 1.0,
+    )) |>
+    register_geom_neighborhood!(:continuous_3d, spatial_test_neighborhood(
+        spatial_test_3d, Agent3DTo, Agent3DFrom, 1.5,
+    )) |>
+    register_geom_neighborhood!(:cube_periodic_x, spatial_test_neighborhood(
+        spatial_test_cube_periodic_x, Agent3DTo, Agent3DTo, 0.1001,
+    )) |>
+    register_geom_neighborhood!(:cube_periodic, spatial_test_neighborhood(
+        spatial_test_cube_periodic, Agent3DTo, Agent3DTo, 0.1001,
+    )) |>
+    register_geom_neighborhood!(:grid_from, spatial_test_neighborhood(
+        spatial_test_grid, AgentWithPosFrom, AgentWithPosFrom, 3.0,
+    )) |>
+    create_model("Spatial_Neighbors")
 
-@testset "spatial apply" begin
-    sim = create_simulation(spatial_model)
-
-    # e.g. lowercase: from, uppercase: to
-    #   0   1   2   3   4
-    # 0 aAB             b
-    # 1 c   C
-    # 2 d
-    # 3
-    # 4 D
-    # 5             e   E
-    # We add source agents (From) with different positions
-    from_a = add_agent!(sim, AgentWithPosFrom((0,0), 5))
-    from_b = add_agent!(sim, AgentWithPosFrom((4,0), 20))
-    from_c = add_agent!(sim, AgentWithPosFrom((0,1), 20))
-    from_d = add_agent!(sim, AgentWithPosFrom((0,2), 5))
-    from_e = add_agent!(sim, AgentWithPosFrom((3,5), 20))
-
-    # And target agents (To) at the same positions
-    to_A = add_agent!(sim, AgentWithPosTo((0,0)))
-    to_B = add_agent!(sim, AgentWithPosTo((0,0)))
-    to_C = add_agent!(sim, AgentWithPosTo((1,1)))
-    to_D = add_agent!(sim, AgentWithPosTo((0,4)))
-    to_E = add_agent!(sim, AgentWithPosTo((4,5)))
-
-    idmap = finish_init!(sim; return_idmapping = true)
-
-    function check1(self, _, sim)
-        @test length(find_neighbors(sim, SVector(0,0), 1.0, AgentWithPosFrom)) == 3
-        @test length(find_neighbors_iter(sim, SVector(1,1), 1.0, AgentWithPosFrom, AgentWithPosFrom)) == 1
-        @test length(find_neighbors(sim, SVector(0,4), 1.0, AgentWithPosFrom)) == 0
-        @test length(find_neighbors_iter(sim, SVector(4,5), 1.0, AgentWithPosFrom, AgentWithPosFrom)) == 2
+function spatial_test_add_grid_agents!(sim, offset)
+    positions_2d = ((0, 0), (4, 0), (0, 1), (0, 2), (3, 5))
+    ages = (5.0, 20.0, 20.0, 5.0, 20.0)
+    for (pos, age) in zip(positions_2d, ages)
+        add_agent!(sim, AgentWithPosFrom(pos .+ offset, age))
     end
-    
-    apply!(sim, check1, AgentWithPosTo, AgentWithPosFrom , [];
-           spatial_neighbors = SpatialNeighbors(AgentWithPosFrom, [4,5]))
-               
 
-    sleep(mpi.rank * 0.05)
+    targets = ((0, 0), (0, 0), (1, 1), (0, 4), (4, 5))
+    map(pos -> add_agent!(sim, AgentWithPosTo(pos .+ offset)), targets)
+end
+
+function spatial_test_connect!(sim, query_type, neighbor_type, ::Val{name}) where {name}
+    read = unique([query_type, neighbor_type])
+    apply!(sim, query_type, read, Neighbor; neighborhoods=name) do _, id, sim
+        for neighbor_id in geom_neighborids_iter(sim, id, name)
+            add_edge!(sim, neighbor_id, id, Neighbor())
+        end
+        nothing
+    end
+end
+
+function spatial_test_edge_counts(sim, idmap, target_ids)
+    edges = all_edges(sim, Neighbor)
+
+    counts = map(target_ids) do id
+        # finish_init! distributes the graph created on rank 0.
+        root_id = Vahana.agent_id(Vahana.type_nr(id), 0, Vahana.agent_nr(id))
+        target_id = idmap[root_id]
+        count(edge -> edge[1] == target_id, edges)
+    end
+
+    @test length(edges) == sum(counts)
+    counts
+end
+
+@testset "Edges from geometric neighborhoods" begin
+    sim = create_simulation(spatial_model)
+    targets = spatial_test_add_grid_agents!(sim, 0)
+    idmap = finish_init!(sim; return_idmapping=true)
+
+    spatial_test_connect!(sim, AgentWithPosTo, AgentWithPosFrom, Val(:grid_zero))
+    @test spatial_test_edge_counts(sim, idmap, targets) == (3, 3, 1, 0, 2)
+    finish_simulation!(sim)
+
+    sim = create_simulation(spatial_model)
+    targets = spatial_test_add_grid_agents!(sim, 1)
+    idmap = finish_init!(sim; return_idmapping=true)
+
+    for (name, neighbor_type, expected) in (
+        (:grid_near, AgentWithPosFrom, (2, 2, 3, 0, 1)),
+        (:grid_far, AgentWithPosFrom, (3, 3, 3, 1, 1)),
+        (:grid_adult, AgentWithPosFrom, (1, 1, 1, 0, 1)),
+        (:grid_same_type, AgentWithPosTo, (2, 2, 2, 0, 0)),
+        (:grid_periodic, AgentWithPosFrom, (3, 3, 1, 0, 2)),
+        (:grid_periodic_x, AgentWithPosFrom, (3, 3, 1, 0, 1)),
+    )
+        spatial_test_connect!(sim, AgentWithPosTo, neighbor_type, Val(name))
+        @test spatial_test_edge_counts(sim, idmap, targets) == expected
+    end
+    finish_simulation!(sim)
+
+    sim = create_simulation(spatial_model)
+    for pos in ((1.0, 3.0, 4.0), (1.0, 6.0, 4.0), (1.0, 3.0, 5.0),
+                (1.0, 4.0, 6.0), (4.0, 6.0, 6.0))
+        add_agent!(sim, Agent3DFrom(pos))
+    end
+    targets = map(
+        pos -> add_agent!(sim, Agent3DTo(pos)),
+        ((1.0, 3.0, 4.0), (4.0, 6.0, 4.0), (1.0, 4.0, 5.0),
+         (4.0, 4.0, 6.0), (1.0, 6.0, 6.0)),
+    )
+    idmap = finish_init!(sim; return_idmapping=true)
+
+    spatial_test_connect!(sim, Agent3DTo, Agent3DFrom, Val(:continuous_3d))
+    @test spatial_test_edge_counts(sim, idmap, targets) == (2, 0, 3, 0, 0)
+    finish_simulation!(sim)
+
+    sim = create_simulation(spatial_model)
+    targets = map(
+        pos -> add_agent!(sim, Agent3DTo(pos)),
+        ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.1, 0.1, 0.0),
+         (0.0, 0.0, 0.1), (0.0, 0.0, 1.0), (1.0, 0.0, 1.0)),
+    )
+    idmap = finish_init!(sim; return_idmapping=true)
+
+    spatial_test_connect!(sim, Agent3DTo, Agent3DTo, Val(:cube_periodic_x))
+    @test spatial_test_edge_counts(sim, idmap, targets) == (2, 2, 0, 2, 1, 1)
+
+    for _ in 1:2
+        spatial_test_connect!(sim, Agent3DTo, Agent3DTo, Val(:cube_periodic))
+        @test spatial_test_edge_counts(sim, idmap, targets) == (4, 4, 0, 4, 4, 4)
+    end
+    finish_simulation!(sim)
+end
+
+@testset "Geometric search in apply!" begin
+    sim = create_simulation(spatial_model)
+    spatial_test_add_grid_agents!(sim, 0)
+    finish_init!(sim)
+
+    apply!(sim, AgentWithPosTo, [AgentWithPosTo, AgentWithPosFrom], [];
+           neighborhoods=:grid_zero) do agent, id, sim
+        if agent.pos == SVector(0, 0)
+            @test length(geom_neighborstates(sim, id, :grid_zero)) == 3
+        elseif agent.pos == SVector(1, 1)
+            @test count(_ -> true, geom_neighborstates_iter(sim, id, :grid_zero)) == 1
+        elseif agent.pos == SVector(0, 4)
+            @test isempty(geom_neighborstates(sim, id, :grid_zero))
+        else
+            @test agent.pos == SVector(4, 5)
+            @test count(_ -> true, geom_neighborstates_iter(sim, id, :grid_zero)) == 2
+        end
+        nothing
+    end
+    finish_simulation!(sim)
+end
+
+spatial_test_search(f::F, sim, id) where {F} = f(sim, id, :grid_from)
+
+function spatial_test_check_results(sim, id, expected)
+    pairs = @inferred spatial_test_search(geom_neighbors, sim, id)
+    ids = @inferred spatial_test_search(geom_neighborids, sim, id)
+    states = @inferred spatial_test_search(geom_neighborstates, sim, id)
+
+    pair_iter = @inferred spatial_test_search(geom_neighbors_iter, sim, id)
+    id_iter = @inferred spatial_test_search(geom_neighborids_iter, sim, id)
+    state_iter = @inferred spatial_test_search(geom_neighborstates_iter, sim, id)
+
+    @test pairs isa Vector{Tuple{AgentID,AgentWithPosFrom}}
+    @test ids isa Vector{AgentID}
+    @test states isa Vector{AgentWithPosFrom}
+    @test eltype(pair_iter) === Tuple{AgentID,AgentWithPosFrom}
+    @test eltype(id_iter) === AgentID
+    @test eltype(state_iter) === AgentWithPosFrom
+
+    expected_ids = first.(expected)
+    expected_states = last.(expected)
+    by_age = a -> a.age
+
+    @test sort(pairs; by=first) == sort(expected; by=first)
+    @test sort(ids) == sort(expected_ids)
+    @test sort(states; by=by_age) == sort(expected_states; by=by_age)
+    @test sort(collect(pair_iter); by=first) == sort(expected; by=first)
+    @test sort(collect(id_iter)) == sort(expected_ids)
+    @test sort(collect(state_iter); by=by_age) == sort(expected_states; by=by_age)
+end
+
+@testset "Geometric search result forms" begin
+    sim = create_simulation(spatial_model)
+    same_position = AgentWithPosFrom((1, 1), 20.0)
+    at_radius = AgentWithPosFrom((4, 1), 30.0)
+
+    local_expected = Tuple{AgentID,AgentWithPosFrom}[]
+    if mpi.rank == 0
+        add_agent!(sim, AgentWithPosFrom((1, 1), 10.0)) # self is not a hit
+        add_agent!(sim, AgentWithPosFrom((1, 6), 11.0)) # no hits
+    end
+    if mpi.rank == mpi.size - 1
+        for state in (same_position, at_radius)
+            id = add_agent!(sim, state)
+            push!(local_expected, (id, state))
+        end
+        add_agent!(sim, AgentWithPosFrom((5, 1), 40.0)) # outside the radius
+    end
+    finish_init!(sim; distribute=false)
+    expected = Vahana.join(local_expected)
+
+    apply!(sim, AgentWithPosFrom, AgentWithPosFrom, []; neighborhoods=:grid_from) do a, id, sim
+        if a.age == 10.0
+            spatial_test_check_results(sim, id, expected)
+        elseif a.age == 11.0
+            spatial_test_check_results(sim, id, Tuple{AgentID,AgentWithPosFrom}[])
+        end
+        nothing
+    end
+    finish_simulation!(sim)
+end
+
+@testset "Geometric snapshot lifetime" begin
+    sim = create_simulation(spatial_model)
+    old_neighbor = AgentWithPosFrom((1, 1), 20.0)
+    new_neighbor = AgentWithPosFrom((5, 6), 99.0)
+
+    if mpi.rank == 0
+        add_agent!(sim, old_neighbor)
+    end
+    if mpi.rank == mpi.size - 1
+        add_agent!(sim, AgentWithPosTo(old_neighbor.pos))
+        add_agent!(sim, AgentWithPosTo(new_neighbor.pos))
+    end
+    finish_init!(sim; distribute=false)
+
+    for visible_neighbor in (old_neighbor, new_neighbor)
+        apply!(sim, [AgentWithPosFrom, AgentWithPosTo],
+               [AgentWithPosFrom, AgentWithPosTo], AgentWithPosFrom;
+               neighborhoods=:grid_near) do a, id, sim
+            if a isa AgentWithPosFrom
+                new_neighbor
+            else
+                states = geom_neighborstates(sim, id, :grid_near)
+                if a.pos == visible_neighbor.pos
+                    @test states == [visible_neighbor]
+                else
+                    @test isempty(states)
+                end
+                nothing
+            end
+        end
+
+        @test sim.geom_neighborhoods.grid_near.prepared === nothing
+    end
+
+    finish_simulation!(sim)
 end

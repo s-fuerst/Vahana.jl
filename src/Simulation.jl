@@ -757,17 +757,10 @@ used for edgetypes without the :SingleType hint.
 See also [`apply`](@ref) and the [Applying Transition Function section
 in the tutorial](tutorial1.md#Applying-Transition-Functions)
 
-TODO: Add Documentation for
-spatial_neighbors dict:
-- agenttypes (from_types)
-- state_func (edge_constructor). Default `identity`
-- pos_field (from_pos_field). Default: `:pos`
-- filter (from_filter): Default: `nothing`
-- periodic_lower (nothing)
-- periodic_upper (nothing)
-- metric (Euclidean)
-- leafsize (25)
-- reorder (false)
+Use `neighborhoods` to select registered geometric neighborhoods for this
+transition. Pass `nothing`, a name such as `:food`, or a vector of names.
+Include the query and neighbor agent types of each selected neighborhood
+in `read`. All MPI ranks must select the same neighborhoods in the same order.
 """
 function apply!(sim::Simulation,
          func::Function,
@@ -775,7 +768,7 @@ function apply!(sim::Simulation,
          read,
          write;
          add_existing = [],
-         spatial_neighbors = nothing,
+         neighborhoods = nothing,
          with_edge = nothing)
     @assert sim.initialized "You must call finish_init! before apply!"
 
@@ -783,6 +776,14 @@ function apply!(sim::Simulation,
     The `with_edge` keyword can only be used for edgetypes without the
     :SingleType hint.
     """
+
+    neighborhoods = applicable(iterate, neighborhoods) || neighborhoods === nothing ?
+        neighborhoods : [ neighborhoods ]
+
+    runtimes = map(
+        name -> getfield(sim.geom_neighborhoods, name),
+        unique(something(neighborhoods, ())),
+    )
 
     with_logger(sim) do
         @info "<Begin> apply!" func transition=sim.num_transitions+1
@@ -803,13 +804,6 @@ function apply!(sim::Simulation,
     write = applicable(iterate, write) ? write : [ write ]
     add_existing = applicable(iterate, add_existing) ?
         add_existing : [ add_existing ]
-
-    # sn = spatial_neighbors
-    # if sn !== nothing
-    #     for at in _spatial_agenttypes(sn)
-    #         @assert at in read "$sn is in `sn` but not in `read`"
-    #     end
-    # end
 
     for c in call
         @assert ! (c in add_existing) "$c can not be element of `add_existing`"
@@ -837,6 +831,12 @@ function apply!(sim::Simulation,
         end
     end
 
+    for runtime in runtimes
+        _inst_phase(sim, :prepare_spatial) do
+            runtime.prepared = geom_prepare!(sim, runtime)
+        end
+    end
+
     writeableAT = filter(w -> w in sim.typeinfos.nodes_types, write)
     writeableET = filter(w -> w in sim.typeinfos.edges_types, write)
     
@@ -856,10 +856,6 @@ function apply!(sim::Simulation,
             prepare_write!(sim, read, T in addexisting, T)
         end
     end
-
-    # _inst_phase(sim, :prepare_spatial; kind = :barrier) do
-    #     prepare_spatial_neighbors!(sim, sn)
-    # end
 
     _inst_phase(sim, :barrier_pre_apply; kind = :barrier) do
         MPI.Barrier(MPI.COMM_WORLD)
@@ -890,6 +886,13 @@ function apply!(sim::Simulation,
     
     _inst_phase(sim, :barrier_post_apply; kind = :barrier) do
         MPI.Barrier(MPI.COMM_WORLD)
+    end
+
+    for runtime in runtimes
+        _inst_phase(sim, :finish_spatial) do
+            geom_release!(sim, runtime)
+            runtime.prepared = nothing
+        end
     end
 
     # we first remove all deleted edges, so that we can readd
@@ -930,10 +933,6 @@ function apply!(sim::Simulation,
             finish_write!(sim, T)
         end
     end
-
-    # _inst_phase(sim, :finish_spatial) do
-    #     finish_spatial_neighbors!(sim, sn, write)
-    # end
 
     sim.intransition = false
 

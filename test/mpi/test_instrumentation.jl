@@ -335,51 +335,50 @@ end
     @test !isempty(String(top4.caller))
     @test top4.context == Vahana.EC_apply
 
-    # 8) spatial markers: rebuild with joins, then snhash cache
-    # hit (the spatial type A1 is read-only; only A2 is written, so
-    # finish_spatial_neighbors! never deletes A1's cached info)
-    model4 = ModelTypes() |> register_agenttype!(A1) |> register_agenttype!(A2) |> register_edgetype!(E1) |> create_model("Instr MPI 4")
+    # 8) A selected spatial neighborhood is rebuilt on every apply! call.
+    spatial = GeometricNeighborhood(
+        GridSpace([(0, 101)]), a -> (a.x,), A2, A1,
+    )
+    model4 = ModelTypes() |>
+        register_agenttype!(A1) |>
+        register_agenttype!(A2) |>
+        register_edgetype!(E1) |>
+        register_geom_neighborhood!(:spatial, spatial) |>
+        create_model("Instr MPI 4")
     sim4 = create_simulation(model4)
-    [ add_agent!(sim4, A1(i)) for i in 1:100 ]
-    [ add_agent!(sim4, A2(i)) for i in 1:10 ]
+    [add_agent!(sim4, A1(i)) for i in 1:100]
+    [add_agent!(sim4, A2(i)) for i in 1:10]
     finish_init!(sim4)
-    sn4 = SpatialNeighbors(agenttypes = [A1], pos_field = :x)
-    apply!(sim4, (s, id, sim) -> A2(s.x + 1), A2, [A1, A2], [A2];
-           spatial_neighbors = sn4)
-    rec5 = filter(e -> e.transition_nr == maximum(e2.transition_nr
-                                                  for e2 in
-                                                  sim4.instrumentation.events),
-                  sim4.instrumentation.events)
-    @test !isempty(filter(e -> e.label == Vahana.EL_spatial_collect && etype(e) == nameof(A1),
-                          rec5))
-    @test !isempty(filter(e -> e.label == Vahana.EL_spatial_kdtree && etype(e) == nameof(A1),
-                          rec5))
-    # the collect phase joins poss and the state values across all ranks;
-    # purpose events carry no volume (plan §11), the comm stats are on the
-    # `:join_values` children
-    @test !isempty(filter(e -> e.label == Vahana.EL_join_spatial_poss, rec5))
-    @test !isempty(filter(e -> e.label == Vahana.EL_join_spatial_edges, rec5))
-    for e in filter(e -> e.label in (Vahana.EL_join_spatial_poss,
-                                     Vahana.EL_join_spatial_edges), rec5)
-        @test !has_comm(e)
-        @test e.kind == Vahana.EK_phase
+
+    for _ in 1:2
+        transition_nr = sim4.num_transitions
+        apply!(sim4, A2, [A1, A2], A2; neighborhoods=:spatial) do s, id, sim
+            @test !isempty(geom_neighborids(sim, id, :spatial))
+            A2(s.x + 1)
+        end
+
+        records = filter(e -> e.transition_nr == transition_nr,
+                         sim4.instrumentation.events)
+        for label in (Vahana.EL_spatial_collect, Vahana.EL_spatial_kdtree)
+            @test count(e -> e.label == label && etype(e) == nameof(A1), records) == 1
+        end
+        @test !any(e -> e.label == Vahana.EL_spatial_cached, records)
+
+        for label in (Vahana.EL_join_spatial_poss, Vahana.EL_join_spatial_ids,
+                      Vahana.EL_join_spatial_edges)
+            event = only(filter(e -> e.label == label, records))
+            @test !has_comm(event)
+            @test event.kind == Vahana.EK_phase
+        end
+
+        transfers = filter(e -> e.label == Vahana.EL_join_values &&
+                                etype(e) == nameof(A1), records)
+        @test length(transfers) == 3
+        for event in transfers
+            @test has_comm(event)
+            @test event.send_bytes == event.send_items * sizeof(Int64)
+        end
     end
-    # A1-typed join_values: spatial poss (Int64) and states (A1), both 8 B
-    av = filter(e -> e.label == Vahana.EL_join_values && etype(e) == nameof(A1), rec5)
-    @test length(av) == 2
-    for e in av
-        @test has_comm(e)
-        @test e.send_bytes == e.send_items * sizeof(Int64)
-    end
-    apply!(sim4, (s, id, sim) -> A2(s.x + 1), A2, [A1, A2], [A2];
-           spatial_neighbors = sn4)
-    rec6 = filter(e -> e.transition_nr == maximum(e2.transition_nr
-                                                  for e2 in
-                                                  sim4.instrumentation.events),
-                  sim4.instrumentation.events)
-    @test !isempty(filter(e -> e.label == Vahana.EL_spatial_cached && etype(e) == nameof(A1),
-                          rec6))
-    @test isempty(filter(e -> e.label == Vahana.EL_spatial_collect, rec6))
 
     # 9) mapreduce: own top-level record with the
     # allreduce child (mpi.active here), correct global result
