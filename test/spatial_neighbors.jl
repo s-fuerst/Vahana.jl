@@ -42,6 +42,20 @@ function spatial_test_neighborhood(space, query_type, neighbor_type, radius;
     )
 end
 
+spatial_test_value(a::AgentWithPosFrom) = a.age
+spatial_test_value(::AgentWithPosTo) = -1.0
+
+function spatial_test_mixed_neighborhood(neighbor_filter)
+    types = [AgentWithPosFrom, AgentWithPosTo]
+    GeometricNeighborhood(
+        spatial_test_grid, spatial_test_position, types, types;
+        radius=1.0, project=spatial_test_value, neighbor_filter,
+    )
+end
+
+spatial_test_mixed_filter(a::AgentWithPosFrom) = a.age >= 18
+spatial_test_mixed_filter(::AgentWithPosTo) = true
+
 const spatial_model = ModelTypes() |>
     register_agenttype!(AgentWithPosFrom, :Immortal) |>
     register_agenttype!(AgentWithPosTo, :Immortal) |>
@@ -81,6 +95,10 @@ const spatial_model = ModelTypes() |>
     )) |>
     register_geom_neighborhood!(:grid_from, spatial_test_neighborhood(
         spatial_test_grid, AgentWithPosFrom, AgentWithPosFrom, 3.0,
+    )) |>
+    register_geom_neighborhood!(:mixed_all, spatial_test_mixed_neighborhood(nothing)) |>
+    register_geom_neighborhood!(:mixed_filtered, spatial_test_mixed_neighborhood(
+        spatial_test_mixed_filter,
     )) |>
     create_model("Spatial_Neighbors")
 
@@ -262,10 +280,68 @@ end
     finish_simulation!(sim)
 end
 
-@testset "Geometric snapshot lifetime" begin
+@testset "Geometric neighbors across type boundaries" begin
     sim = create_simulation(spatial_model)
-    old_neighbor = AgentWithPosFrom((1, 1), 20.0)
-    new_neighbor = AgentWithPosFrom((5, 6), 99.0)
+    local_records = Tuple{AgentID,Float64}[]
+
+    if mpi.rank == 0
+        for (pos, age) in (((1, 1), 10.0), ((5, 6), 30.0), ((1, 1), 20.0))
+            id = add_agent!(sim, AgentWithPosFrom(pos, age))
+            push!(local_records, (id, age))
+        end
+    end
+    if mpi.rank == mpi.size - 1
+        id = add_agent!(sim, AgentWithPosTo((1, 1)))
+        push!(local_records, (id, -1.0))
+    end
+    finish_init!(sim; distribute=false)
+    records = Vahana.join(local_records)
+
+    types = [AgentWithPosFrom, AgentWithPosTo]
+    for name in (:mixed_all, :mixed_filtered)
+        apply!(sim, types, types, []; neighborhoods=name) do agent, id, sim
+            expected = Tuple{AgentID,Float64}[]
+            if agent.pos == SVector(1, 1)
+                for (neighbor_id, value) in records
+                    in_range = value != 30.0
+                    passes_filter = name == :mixed_all || value != 10.0
+                    if neighbor_id != id && in_range && passes_filter
+                        push!(expected, (neighbor_id, value))
+                    end
+                end
+            end
+
+            @test sort(geom_neighbors(sim, id, name); by=first) ==
+                  sort(expected; by=first)
+            @test sort(geom_neighborids(sim, id, name)) == sort(first.(expected))
+            @test sort(geom_neighborstates(sim, id, name)) == sort(last.(expected))
+            nothing
+        end
+    end
+    finish_simulation!(sim)
+end
+
+struct IndependentSnapshotNeighbor
+    pos::SVector{2,Int64}
+    age::Float64
+end
+
+const spatial_independent_snapshot_model = ModelTypes() |>
+    register_agenttype!(IndependentSnapshotNeighbor, :Immortal, :Independent) |>
+    register_agenttype!(AgentWithPosTo, :Immortal) |>
+    register_edgetype!(Neighbor) |>
+    register_geom_neighborhood!(:grid_near, spatial_test_neighborhood(
+        spatial_test_grid, AgentWithPosTo, IndependentSnapshotNeighbor, 1.5,
+    )) |>
+    create_model("Spatial_Independent_Snapshot")
+
+@testset "Geometric snapshot lifetime: $mode" for (mode, model, neighbor_type) in (
+    ("buffered", spatial_model, AgentWithPosFrom),
+    ("independent", spatial_independent_snapshot_model, IndependentSnapshotNeighbor),
+)
+    sim = create_simulation(model)
+    old_neighbor = neighbor_type((1, 1), 20.0)
+    new_neighbor = neighbor_type((5, 6), 99.0)
 
     if mpi.rank == 0
         add_agent!(sim, old_neighbor)
@@ -277,10 +353,10 @@ end
     finish_init!(sim; distribute=false)
 
     for visible_neighbor in (old_neighbor, new_neighbor)
-        apply!(sim, [AgentWithPosFrom, AgentWithPosTo],
-               [AgentWithPosFrom, AgentWithPosTo], AgentWithPosFrom;
+        apply!(sim, [neighbor_type, AgentWithPosTo],
+               [neighbor_type, AgentWithPosTo], neighbor_type;
                neighborhoods=:grid_near) do a, id, sim
-            if a isa AgentWithPosFrom
+            if a isa neighbor_type
                 new_neighbor
             else
                 states = geom_neighborstates(sim, id, :grid_near)

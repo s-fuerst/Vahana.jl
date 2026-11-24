@@ -88,55 +88,80 @@ end
 
 # Optional helpers for backend preparation; not part of the backend contract.
 
-# Collect `(positions, ids, projections)` for the living neighbors on the
-# current rank that pass the registered neighbor filter. The three vectors have
-# matching indices and use the registered coordinate and projection types.
-
-# Call this before the transition callbacks to read their initial state. This
-# helper does not communicate via MPI or build an index. Backends can use a
-# different collection strategy if they do not need these intermediate vectors.
-function geom_collect_local_neighbors(sim, registration)
+# Collect one local neighbor type before transition callbacks run. The three
+# vectors share a batch index, which need not equal the original agent slot.
+# An identity projection may alias read.state: the backend must not mutate it
+# and must copy it if that storage can change during the query phase.
+function geom_collect_local_neighbors(sim, registration, ::Type{T}) where {T}
     definition = registration.definition
     N = length(definition.space.bounds)
-    positions = SVector{N,registration.coordinate_type}[]
-    ids = AgentID[]
-    projections = registration.project_type[]
-
-    for agent_type in definition.neighbor_types
-        _geom_collect_local_neighbors!(
-            sim, agent_type, definition, positions, ids, projections,
-        )
-    end
-
-    (positions, ids, projections)
-end
-
-# Append one agent type to the three aligned vectors.
-function _geom_collect_local_neighbors!(
-    sim, ::Type{T}, definition, positions, ids, projections,
-) where {T}
+    V = SVector{N,registration.coordinate_type}
+    P = registration.project_type
     read = simfield(sim, T).read
-    immortal = has_hint(sim, T, :Immortal, :Agent)
-    filter = definition.neighbor_filter
     agent_type_id = typeid(sim, T)
 
+    if has_hint(sim, T, :Immortal, :Agent)
+        _geom_collect_immortal_neighbors(read.state, agent_type_id, definition, V, P)
+    else
+        _geom_collect_mortal_neighbors(read, agent_type_id, definition, V, P)
+    end
+end
+
+function _geom_collect_mortal_neighbors(
+    read, agent_type_id, definition, ::Type{V}, ::Type{P},
+) where {V,P}
+    positions = V[]
+    ids = AgentID[]
+    projections = P[]
+    filter = definition.neighbor_filter
+
     if filter === nothing
-        capacity = length(ids) + length(read.state)
+        capacity = length(read.state)
         sizehint!(positions, capacity)
         sizehint!(ids, capacity)
         sizehint!(projections, capacity)
     end
 
     for i in eachindex(read.state)
-        if immortal || !read.died[i]
+        if !read.died[i]
             state = read.state[i]
             if filter === nothing || filter(state)
-                position = definition.posfunc(state)
-                push!(positions, position)
+                push!(positions, definition.posfunc(state))
                 push!(ids, agent_id(agent_type_id, AgentNr(i)))
                 push!(projections, definition.project(state))
             end
         end
     end
-    nothing
+    (positions, ids, projections)
+end
+
+function _geom_collect_immortal_neighbors(
+    states::Vector{T}, agent_type_id, definition, ::Type{V}, ::Type{P},
+) where {T,V,P}
+    filter = definition.neighbor_filter
+    project = definition.project
+    base_id = agent_id(agent_type_id, AgentNr(0))
+
+    if filter === nothing
+        positions = V[definition.posfunc(state) for state in states]
+        ids = collect(base_id .+ (1:length(states)))
+        projections = if project === identity && T === P
+            states
+        else
+            P[project(state) for state in states]
+        end
+    else
+        positions = V[]
+        ids = AgentID[]
+        projections = P[]
+        for i in eachindex(states)
+            state = states[i]
+            if filter(state)
+                push!(positions, definition.posfunc(state))
+                push!(ids, base_id + i)
+                push!(projections, project(state))
+            end
+        end
+    end
+    (positions, ids, projections)
 end
