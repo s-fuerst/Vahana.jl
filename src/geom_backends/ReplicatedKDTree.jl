@@ -5,20 +5,14 @@ end
 
 import NearestNeighbors
 
-struct KDBatch{T}
+struct KDBatch{T,K}
     ids::Vector{AgentID}
     projections::Vector{T}
-end
-
-struct KDSegments{T}
-    batches::Vector{KDBatch{T}}
-    ends::Vector{Int}
-end
-
-struct ReplicatedKDPrepared{V,T,K,B}
-    positions::Vector{V}
-    neighbors::B
     tree::Union{Nothing,K}
+end
+
+struct ReplicatedKDPrepared{T,B}
+    neighbors::B
 end
 
 const ReplicatedKDRuntime =
@@ -29,6 +23,9 @@ function geom_validate_backend(
 ) where {D}
     if registration.backend.leafsize < 1
         throw(ArgumentError("ReplicatedKDTree requires a positive leafsize."))
+    end
+    if !(registration.definition.space.metric isa Euclidean)
+        throw(ArgumentError("ReplicatedKDTree supports only the Euclidean metric."))
     end
     if !isbitstype(registration.project_type)
         throw(ArgumentError(
@@ -43,14 +40,13 @@ function geom_prepared_type(
     registration::GeometricRegistration{D,ReplicatedKDTree},
 ) where {D}
     N = length(registration.definition.space.bounds)
-    V = SVector{N,registration.coordinate_type}
     W = SVector{N,Float64}
-    K = NearestNeighbors.KDTree{W,NearestNeighbors.Chebyshev,Float64,W}
+    K = NearestNeighbors.KDTree{W,NearestNeighbors.Euclidean,Float64,W}
     P = any(registration.definition.space.periodic) ?
-        NearestNeighbors.PeriodicTree{W,NearestNeighbors.Chebyshev,K,N,Float64} : K
+        NearestNeighbors.PeriodicTree{W,NearestNeighbors.Euclidean,K,N,Float64} : K
     T = registration.project_type
-    B = length(registration.definition.neighbor_types) == 1 ? KDBatch{T} : KDSegments{T}
-    ReplicatedKDPrepared{V,T,P,B}
+    B = KDBatch{T,P}
+    ReplicatedKDPrepared{T,length(registration.definition.neighbor_types) == 1 ? B : Vector{B}}
 end
 
 function _kd_collect_batch(sim, registration, agent_type)
@@ -93,48 +89,21 @@ function _kd_collect_batch(sim, registration, agent_type)
         projections = copy(projections)
     end
 
-    (positions, KDBatch(ids, projections))
+    (positions, ids, projections)
 end
 
-function _kd_collect_neighbors(sim, registration)
-    definition = registration.definition
-    types = definition.neighbor_types
-    if length(types) == 1
-        _kd_collect_batch(sim, registration, only(types))
+function _kd_prepare_batch(::Type{B}, sim, registration, agent_type) where {B<:KDBatch}
+    positions, ids, projections = _inst_phase(sim, :spatial_collect, agent_type) do
+        _kd_collect_batch(sim, registration, agent_type)
+    end
+    space = registration.definition.space
+    tree = if isempty(positions)
+        nothing
     else
-        N = length(definition.space.bounds)
-        positions = SVector{N,registration.coordinate_type}[]
-        batches = KDBatch{registration.project_type}[]
-        ends = Int[]
-        for agent_type in types
-            batch_positions, batch = _kd_collect_batch(sim, registration, agent_type)
-            append!(positions, batch_positions)
-            push!(batches, batch)
-            push!(ends, length(positions))
-        end
-        (positions, KDSegments(batches, ends))
-    end
-end
-
-function geom_prepare!(sim, runtime::NeighborhoodRuntime{R,P}) where {
-    R<:GeometricRegistration{<:GeometricNeighborhood,ReplicatedKDTree},P
-}
-    registration = runtime.registration
-    definition = registration.definition
-    neighbor_types = definition.neighbor_types
-    agent_type = length(neighbor_types) == 1 ? only(neighbor_types) : Nothing
-
-    positions, neighbors = _inst_phase(sim, :spatial_collect, agent_type) do
-        _kd_collect_neighbors(sim, registration)
-    end
-
-    space = definition.space
-    tree = if !isempty(positions) && _kd_indexable_bounds(space) &&
-              all(position -> _kd_indexable(space, position), positions)
         _inst_phase(sim, :spatial_kdtree, agent_type) do
-            points = [_kd_point(space, position) for position in positions]
+            points = _kd_points(space, positions)
             kd = NearestNeighbors.KDTree(
-                points, NearestNeighbors.Chebyshev();
+                points, NearestNeighbors.Euclidean();
                 leafsize=registration.backend.leafsize,
                 reorder=registration.backend.reorder,
             )
@@ -148,32 +117,34 @@ function geom_prepare!(sim, runtime::NeighborhoodRuntime{R,P}) where {
                 kd
             end
         end
-    else
-        nothing
     end
-
-    P(positions, neighbors, tree)
+    B(ids, projections, tree)
 end
 
-_kd_indexable(position) = all(x -> abs(Float64(x)) <= 2.0^51, position)
+function geom_prepare!(sim, runtime::NeighborhoodRuntime{R,ReplicatedKDPrepared{T,B}}) where {
+    R<:GeometricRegistration{<:GeometricNeighborhood,ReplicatedKDTree},T,B
+}
+    registration = runtime.registration
+    types = registration.definition.neighbor_types
+    neighbors = if B <: KDBatch
+        _kd_prepare_batch(B, sim, registration, only(types))
+    else
+        Batch = eltype(B)
+        Batch[_kd_prepare_batch(Batch, sim, registration, agent_type) for agent_type in types]
+    end
+    ReplicatedKDPrepared{T,B}(neighbors)
+end
+
+function _kd_points(space, positions::Vector{SVector{N,T}}) where {N,T}
+    if T === Float64 && !any(space.periodic)
+        positions
+    else
+        [_kd_point(space, position) for position in positions]
+    end
+end
 
 _kd_period(::GridSpace, (lo, hi)) = Float64(Int128(hi) - Int128(lo) + 1)
 _kd_period(::ContinuousSpace, (lo, hi)) = Float64(hi) - Float64(lo)
-
-function _kd_indexable_bounds(space)
-    all(eachindex(space.bounds)) do axis
-        bounds = space.bounds[axis]
-        !space.periodic[axis] ||
-            (_kd_indexable(bounds) && 0.0 < _kd_period(space, bounds) <= 2.0^52)
-    end
-end
-
-function _kd_indexable(space, position)
-    _kd_indexable(position) && all(eachindex(space.bounds)) do axis
-        lo, hi = space.bounds[axis]
-        !space.periodic[axis] || lo <= position[axis] <= hi
-    end
-end
 
 function _kd_point(space, position)
     SVector(map(space.bounds, space.periodic, Tuple(position)) do bounds, periodic, x
@@ -185,48 +156,52 @@ function _kd_point(space, position)
     end)
 end
 
-function _kd_periodic_padding(space)
-    # Account for rounding when shifting the query across periodic boundaries.
-    scale = maximum(
-        (maximum(x -> abs(Float64(x)), space.bounds[i])
-         for i in eachindex(space.bounds) if space.periodic[i]);
-        init=0.0,
-    )
-    8 * eps(scale)
-end
-
-@inline _kd_locate(batch::KDBatch, i) = (batch, i)
-
-@inline function _kd_locate(segments::KDSegments, i)
-    b = searchsortedfirst(segments.ends, i)
-    offset = b == 1 ? 0 : segments.ends[b - 1]
-    (segments.batches[b], i - offset)
-end
-
-function geom_hits(runtime::ReplicatedKDRuntime, id, position)::Vector{Int}
-    definition = runtime.registration.definition
-    prepared = runtime.prepared
-    radius = definition.radius
-
-    # Conservative box; the exact metric decides below.
-    extent = 2 * max(radius, sqrt(floatmin(Float64)))
-    space = definition.space
-    if prepared.tree isa NearestNeighbors.PeriodicTree
-        extent += _kd_periodic_padding(space)
-    end
-    candidates = if prepared.tree !== nothing && _kd_indexable(space, position) &&
-                    isfinite(extent)
-        point = _kd_point(space, position)
-        NearestNeighbors.inrange(prepared.tree, point, extent)
+function _kd_batch_hits(batch::KDBatch, id, point, radius)::Vector{Int}
+    tree = batch.tree
+    hits = if tree === nothing
+        Int[]
     else
-        collect(eachindex(prepared.positions))
+        NearestNeighbors.inrange(tree, point, radius)
     end
+    if tree !== nothing && type_nr(first(batch.ids)) == type_nr(id)
+        filter!(i -> batch.ids[i] != id, hits)
+    end
+    hits
+end
 
-    filter!(candidates) do i
-        geom_distance(space, position, prepared.positions[i]) <= radius &&
-            geom_neighbor_id(runtime, i) != id
+_kd_hits(batch::KDBatch, id, point, radius) = _kd_batch_hits(batch, id, point, radius)
+
+struct KDBatchHits
+    indices::Vector{Vector{Int}}
+end
+
+Base.IteratorSize(::Type{KDBatchHits}) = Base.SizeUnknown()
+Base.eltype(::Type{KDBatchHits}) = Tuple{Int,Int}
+
+@inline function Base.iterate(hits::KDBatchHits, (batch, offset)=(1, 1))
+    while batch <= length(hits.indices) && offset > length(hits.indices[batch])
+        batch += 1
+        offset = 1
+    end
+    if batch <= length(hits.indices)
+        ((batch, hits.indices[batch][offset]), (batch, offset + 1))
+    else
+        nothing
     end
 end
+
+function _kd_hits(batches::Vector{<:KDBatch}, id, point, radius)
+    KDBatchHits([_kd_batch_hits(batch, id, point, radius) for batch in batches])
+end
+
+function geom_hits(runtime::ReplicatedKDRuntime, id, position)
+    definition = runtime.registration.definition
+    point = _kd_point(definition.space, position)
+    _kd_hits(runtime.prepared.neighbors, id, point, definition.radius)
+end
+
+@inline _kd_locate(batch::KDBatch, index) = (batch, index)
+@inline _kd_locate(batches::Vector{<:KDBatch}, index) = (batches[index[1]], index[2])
 
 @inline function geom_neighbor_id(runtime::ReplicatedKDRuntime, index)
     batch, i = _kd_locate(runtime.prepared.neighbors, index)
@@ -243,7 +218,6 @@ end
     (batch.ids[i], batch.projections[i])
 end
 
-geom_projection_type(::NeighborhoodRuntime{R,ReplicatedKDPrepared{V,T,K,B}}) where {R,V,T,K,B} =
-    T
+geom_projection_type(::NeighborhoodRuntime{R,ReplicatedKDPrepared{T,B}}) where {R,T,B} = T
 
 geom_release!(sim, runtime::ReplicatedKDRuntime) = nothing
