@@ -561,65 +561,62 @@ end
 
 
 
-# Join a vector that is distributed over serveral processes. vec can be [].
+function _join_layout(sizes::Vector{Int64})
+    counts = Vector{MPI.API.MPI_Count}(undef, length(sizes))
+    displacements = Vector{MPI.API.MPI_Aint}(undef, length(sizes))
+    total = 0
+    for i in eachindex(sizes)
+        counts[i] = sizes[i]
+        displacements[i] = total
+        total = Base.Checked.checked_add(total, Int(sizes[i]))
+    end
+    counts, displacements, total
+end
+
+# Join vectors distributed across MPI ranks. The local vector may be empty.
+# Every rank receives the concatenated vector in rank order.
 #
-# # Example
+# Example:
 # rank 0: vec = [1, 2]
-# rank 1: vec = []
+# rank 1: vec = Int[]
 # rank 2: vec = [4]
 #
-# join(vec) returns [1, 2, 4] on all ranks
+# join(vec) returns [1, 2, 4] on all ranks.
 #
-# Instrumentation: with the `sim` kwarg the two Alltoallv calls are
-# recorded as `:join_sizes`/`:join_values` (type = `type` kwarg); with
-# additionally a `label` the whole join is wrapped in a purpose event
-# (e.g. `join(aids; sim = sim, label = :join_died, type = T)`). Without
-# the `sim` kwarg the call is uninstrumented (user-level usage).
+# With the `sim` keyword, the length exchange (`Allgather`) is recorded as
+# `:join_sizes` and the data exchange (`MPI_Allgatherv_c`) as `:join_values`.
+# Both events use the `type` keyword. If `label` is also supplied, it wraps
+# the whole join in a purpose event, e.g.
+# `join(aids; sim = sim, label = :join_died, type = T)`.
+# Without `sim`, the call is not instrumented.
 function join(vec::Vector{T}; sim = nothing, label = nothing, type = Nothing) where T
-    # transfer the vector sizes
-    sizes = Vector{Int32}(undef, mpi.size)
-    sizes[mpi.rank + 1] = length(vec)
-
-    send = MPI.VBuffer(sizes, fill(Int32(1), mpi.size),
-                       fill(Int32(mpi.rank), mpi.size))
-    recv = MPI.VBuffer(sizes, fill(Int32(1), mpi.size))
-
-    # purpose event (only if the caller opts in with a label); wraps
-    # both mechanism events below
     if sim !== nothing && label !== nothing
         _inst_begin!(sim, label, type)
     end
 
+    local_size = Int64(length(vec))
     _inst_diag_barrier(sim, :ready_wait_join_sizes)
-    _inst_phase(sim, :join_sizes, type; kind = :alltoallv,
-                si = length(sizes), ri = length(sizes),
-                sb = length(sizes) * sizeof(Int32),
-                rb = length(sizes) * sizeof(Int32)) do
-        MPI.Alltoallv!(send, recv, mpi.comm)
+    sizes = _inst_phase(sim, :join_sizes, type; kind = :allgather,
+                        si = 1, ri = mpi.size,
+                        sb = sizeof(Int64), rb = mpi.size * sizeof(Int64)) do
+        MPI.Allgather(local_size, mpi.comm)
     end
-    sizes = recv.data
 
-    # transfer the vector itself
-    displace = append!([0], cumsum(sizes)[1 : length(sizes) - 1])
-    values = Vector{T}(undef, sum(sizes))
-    values[displace[mpi.rank+1] + 1 : displace[mpi.rank+1] + sizes[mpi.rank+1]] = vec
-
-    send = MPI.VBuffer(values,
-                       fill(Int32(sizes[mpi.rank + 1]), mpi.size),
-                       fill(Int32(displace[mpi.rank + 1]), mpi.size))
-    recv = MPI.VBuffer(values, sizes)
+    counts, displacements, total = _join_layout(sizes)
+    values = Vector{T}(undef, total)
+    datatype = MPI.Datatype(T)
 
     _inst_diag_barrier(sim, :ready_wait_join_values)
-    _inst_phase(sim, :join_values, type; kind = :alltoallv,
-                si = length(vec), ri = sum(sizes),
-                sb = length(vec) * sizeof(T),
-                rb = sum(sizes) * sizeof(T)) do
-        MPI.Alltoallv!(send, recv, mpi.comm)
+    _inst_phase(sim, :join_values, type; kind = :allgatherv,
+                si = local_size, ri = total,
+                sb = local_size * sizeof(T), rb = total * sizeof(T)) do
+        MPI.API.MPI_Allgatherv_c(vec, counts[mpi.rank + 1], datatype,
+                                values, counts, displacements, datatype, mpi.comm)
     end
 
     if sim !== nothing && label !== nothing
         _inst_end!(sim, label, type)
     end
 
-    recv.data
+    values
 end

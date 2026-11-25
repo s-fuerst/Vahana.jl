@@ -18,8 +18,13 @@ end
 
 const mpi = VMPI(nothing, 0, 0, false, false, nothing, 0, 0, 0)
 
-function mpiinit() 
-    MPI.Init(;threadlevel = :single)
+function mpiinit()
+    version = MPI.Get_version()
+    if version < v"4.0"
+        error("Vahana requires MPI 4.0 or newer; the loaded MPI library reports MPI $version.")
+    end
+
+    MPI.Init(; threadlevel = :single)
 
     mpi.comm = MPI.COMM_WORLD
     mpi.rank = MPI.Comm_rank(mpi.comm)

@@ -16,6 +16,8 @@ end
     EK_alltoallv
     EK_allreduce
     EK_win_fence
+    EK_allgather
+    EK_allgatherv
 end
 
 @enum EventLabel begin
@@ -108,6 +110,8 @@ const _EVENT_KIND_BY_SYMBOL = Dict{Symbol, EventKind}(
     :alltoallv  => EK_alltoallv,
     :allreduce  => EK_allreduce,
     :win_fence  => EK_win_fence,
+    :allgather  => EK_allgather,
+    :allgatherv => EK_allgatherv,
 )
 
 const _EVENT_LABEL_BY_SYMBOL = Dict{Symbol, EventLabel}(

@@ -7,7 +7,9 @@ import plotly.graph_objects as go
 PRE_PHASES = ["prepare_read", "prepare_write", "prepare_spatial"]
 POST_PHASES = ["edges_remove", "edges_add", "finish_read", "finish_write", "finish_spatial"]
 PHASES = PRE_PHASES + ["transition"] + POST_PHASES
-COLLECTIVES = {"alltoall", "alltoallv", "allreduce", "win_fence"}
+COLLECTIVES = {
+    "alltoall", "alltoallv", "allreduce", "win_fence", "allgather", "allgatherv",
+}
 
 
 def phases(events: pd.DataFrame) -> pd.DataFrame:

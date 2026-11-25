@@ -81,6 +81,8 @@ KIND_BY_ID = {
     3: "alltoallv",
     4: "allreduce",
     5: "win_fence",
+    6: "allgather",
+    7: "allgatherv",
 }
 
 _REQUIRED_FIELDS = {
