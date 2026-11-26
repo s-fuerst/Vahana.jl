@@ -29,6 +29,6 @@ At 4,096 global agents, two-type preparation also improved: 0.738 → 0.541 ms s
 
 ## Other follow-ups
 
-- [ ] **Deferred until the cell index is implemented.** Keep collecting IDs for now; do not change the temporary KD-tree or MPI joins for this optimization. Once the cell index defines how hits identify individual agents, revisit self-exclusion and benchmark an optional `ignore_ids` mode for geometric neighborhoods used only through `geom_neighborstates` or `geom_neighborstates_iter`. Skip the MPI join of neighbor IDs even when query and neighbor types overlap: the querying agent is local to its rank, so self-exclusion can use a local ID-to-index mapping. Measure preparation time, MPI traffic, and memory use, and verify that other agents at the same position remain valid hits.
+- [ ] **Optional follow-up after `NodeSharedCellList`.** Consider an `ignore_ids` mode for projection-only queries if it can preserve self-exclusion without exchanging agent IDs and offers a measurable benefit. The initial cell-list backend always stores IDs.
 
 - [ ] Switch `join` in `src/MPI.jl` to `MPI_Allgatherv_c` (MPI-4 large counts). Exchange local vector lengths as `Int64` values using `Allgather`, then transfer the data using `MPI_Count` counts and `MPI_Aint` displacements. Check compatibility with older MPI libraries, test count and displacement calculations at the `Int32` limit, and benchmark against the current `Alltoallv` implementation.
